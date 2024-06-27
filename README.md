@@ -12,6 +12,8 @@ OpenCap Stack is a MERN stack application designed to manage stakeholders, share
 - [API Endpoints](#api-endpoints)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
+- [Submitting Changes](#submitting-changes)
+- [Coding Standards](#coding-standards)
 - [License](#license)
 
 ## Installation
@@ -26,7 +28,7 @@ Follow these steps to set up the project on your local machine:
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/Open-Cap-Stack/opencap.git
+git clone https://github.com/your-username/your-repository.git
 cd your-repository
 ```
 
@@ -138,16 +140,133 @@ open-cap-stack/
 
 ## Contributing
 
-Contributions are welcome! Please fork the repository and submit a pull request for any changes.
+Contributions are welcome! Please fork the repository and submit a pull request for any changes. This project follows a Test-Driven Development (TDD) approach, and all contributions should adhere to this coding style.
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-branch`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add new feature'`).
-5. Push to the branch (`git push origin feature-branch`).
-6. Create a new Pull Request.
+### Guidelines for Contributing
+
+1. **Fork the repository**:
+   ```bash
+   git fork https://github.com/Open-Cap-Stack/opencap.git
+   ```
+2. **Create a new branch**:
+   ```bash
+   git checkout -b feature-branch
+   ```
+3. **Write tests first**:
+   - Ensure you write test cases for any new functionality or changes before writing the actual code.
+   - Place your tests in the `tests` directory.
+4. **Implement the functionality**:
+   - Write the minimum amount of code required to pass the tests.
+5. **Run tests**:
+   ```bash
+   npm test
+   ```
+   - Ensure all tests pass before committing your changes.
+6. **Commit your changes**:
+   ```bash
+   git commit -am 'Add new feature'
+   ```
+7. **Push to your branch**:
+   ```bash
+   git push origin feature-branch
+   ```
+8. **Create a Pull Request**:
+   - Go to the repository on GitHub and create a pull request from your branch.
+
+## Submitting Changes
+
+Follow these steps to submit your code changes:
+
+1. **Create a new branch:**
+   ```sh
+   git checkout -b feature/{story-id}  # For features
+   git checkout -b bug/{story-id}      # For bugs
+   git checkout -b chore/{story-id}    # For chores
+   ```
+
+2. **Make your changes:**
+   Ensure your code follows the coding standards (see below).
+
+3. **Write failing tests:**
+   Write tests that demonstrate the functionality is NOT already present. Make a WIP commit:
+   ```sh
+   git add .
+   git commit -m "WIP: Red Tests."
+   ```
+
+4. **Implement code to pass the tests:**
+   Make WIP commits as you go, and commit code when your tests are green:
+   ```sh
+   git add .
+   git commit -m "WIP: Green Tests."
+   ```
+
+5. **Refactor your code:**
+   Refactor to improve code quality. Re-run the tests and commit:
+   ```sh
+   git add .
+   git commit -m "Refactor complete."
+   ```
+
+6. **Submit a pull request:**
+   ```sh
+   git push origin feature/{story-id}  # Push your branch
+   ```
+
+   Go to the repository on GitHub and create a pull request from your branch to the `main` branch.
+
+7. **Review process:**
+   Review outstanding pull requests, comment on, approve and merge open pull requests, or request changes on any PRs that need improvement.
+
+## Coding Standards
+
+Please follow these coding standards to maintain code quality and consistency:
+
+1. **Indentation:**
+   Use 4 spaces for indentation.
+
+2. **Naming Conventions:**
+   - Variables and functions: camelCase
+   - Classes and components: PascalCase
+   - Constants: UPPERCASE_SNAKE_CASE
+
+3. **Comments:**
+   - Use JSDoc style comments for functions and classes.
+   - Provide meaningful comments for complex code segments and functions.
+   - Document any public APIs and classes with clear explanations of their purpose and usage.
+   - Remove or update outdated comments as code changes.
+
+4. **Code Structure:**
+   - Organize code into modules and components.
+   - Keep functions small and focused on a single task.
+
+5. **Linting:**
+   Ensure your code passes ESLint checks:
+   ```sh
+   npm run lint
+   ```
+
+6. **Testing:**
+   - Write unit tests using BDD-style frameworks like Mocha or Jasmine.
+   - Follow the Arrange, Act, and Assert (AAA) pattern:
+     ```javascript
+     it('should correctly add two positive numbers', () => {
+       // Arrange
+       const num1 = 5;
+       const num2 = 7;
+
+       // Act
+       const result = add(num1, num2);
+
+       // Assert
+       expect(result).to.equal(12);
+     });
+     ```
+
+   - Write integration tests to validate interactions between different parts of the application.
+   - Write functional tests to validate the application's functionality.
 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-```
+``
