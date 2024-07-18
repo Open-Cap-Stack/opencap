@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
-const MONGODB_URI = process.env.MONGODB_URI;
+const opencap = process.env.MONGODB_URI;
 const connectDB = async () => {
   try {
-    await mongoose.connect(MONGODB_URI, {
+    await mongoose.connect(opencap, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       useCreateIndex: true,
