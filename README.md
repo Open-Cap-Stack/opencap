@@ -43,7 +43,7 @@ npm install
 Create a `.env` file in the root of the project and add the following environment variables:
 
 ```plaintext
-MONGODB_URI=mongodb://localhost:27017/open-cap-stack
+MONGODB_URI=mongodb://localhost:27017/opencap
 PORT=5000
 ```
 
