@@ -1,13 +1,25 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const StakeholderSchema = new Schema({
-  stakeholderId: { type: String, unique: true, required: true },
-  name: { type: String, required: true },
-  ownershipPercentage: { type: Number, required: true },
-  sharesOwned: { type: Number, required: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+const stakeholderSchema = new mongoose.Schema({
+  stakeholderId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  role: {
+    type: String,
+    required: true
+  },
+  projectId: {
+    type: String,
+    required: true
+  }
 });
 
-module.exports = mongoose.model('Stakeholder', StakeholderSchema);
+const Stakeholder = mongoose.model('Stakeholder', stakeholderSchema);
+
+module.exports = Stakeholder;
