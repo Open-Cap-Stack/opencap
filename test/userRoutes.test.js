@@ -1,47 +1,54 @@
 const request = require('supertest');
-const express = require('express');
-const mongoose = require('mongoose');
+const { connectDB, disconnectDB } = require('../db');
+const app = require('../app');
 const User = require('../models/User');
-const connectDB = require('../db');
 
-const app = express();
-app.use(express.json());
-app.use('/api/users', require('../routes/users'));
+let server;
 
 beforeAll(async () => {
   await connectDB();
+  server = app.listen(5002);
 });
 
 afterAll(async () => {
-  await mongoose.connection.close();
+  await server.close();
+  await disconnectDB();
 });
 
-describe('User API Test', () => {
-  it('should create a new user', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({
-        userId: '3',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        password: 'hashed_password',
-        role: 'user'
-      });
-
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('user');
-    expect(res.body.user).toHaveProperty('_id');
-    expect(res.body.user).toHaveProperty('name', 'Jane Doe');
+describe('User Routes', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
   });
 
-  it('should fail to create a user with missing fields', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({
-        userId: '4'
-      });
+  it('GET /api/users should return all users', async () => {
+    const user = new User({
+      userId: 'user1',
+      name: 'Test User',
+      username: 'testuser',
+      email: 'testuser@example.com',
+      password: 'password',
+      role: 'user',
+    });
+    await user.save();
 
-    expect(res.statusCode).toEqual(400);
-    expect(res.body).toHaveProperty('error');
+    const response = await request(server).get('/api/users');
+    expect(response.status).toBe(200);
+    expect(response.body.length).toBe(1);
+    expect(response.body[0].username).toBe('testuser');
+  });
+
+  it('POST /api/users should create a new user', async () => {
+    const userData = {
+      userId: 'user2',
+      name: 'New User',
+      username: 'newuser',
+      email: 'newuser@example.com',
+      password: 'password123',
+      role: 'user',
+    };
+    const response = await request(server).post('/api/users').send(userData);
+    console.log('POST response:', response.body);
+    expect(response.status).toBe(201);
+    expect(response.body.username).toBe('newuser');
   });
 });

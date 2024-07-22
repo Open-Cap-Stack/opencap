@@ -1,9 +1,8 @@
-// test/userController.test.js
-const chai = require('chai');
-const sinon = require('sinon');
-const mongoose = require('mongoose');
-const User = require('../models/User');
-const userController = require('../controllers/userController');
+import chai from 'chai';
+import sinon from 'sinon/pkg/sinon-esm.js';
+import mongoose from 'mongoose';
+import User from '../models/User.js';
+import { getAllUsers } from '../controllers/userController.js';
 
 const expect = chai.expect;
 
@@ -12,16 +11,20 @@ describe('User Controller', () => {
     mongoose.connect('mongodb://localhost:27017/opencap-test', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-    }, () => done());
+    }, done);
   });
 
   after((done) => {
     mongoose.connection.db.dropDatabase(() => {
-      mongoose.connection.close(() => done());
+      mongoose.connection.close(done);
     });
   });
 
-  describe('getUsers', () => {
+  beforeEach(() => {
+    sinon.restore();
+  });
+
+  describe('getAllUsers', () => {
     it('should return a list of users', async () => {
       const req = {};
       const res = {
@@ -31,12 +34,10 @@ describe('User Controller', () => {
 
       sinon.stub(User, 'find').resolves([{ name: 'John Doe', email: 'john@example.com' }]);
 
-      await userController.getUsers(req, res);
+      await getAllUsers(req, res);
 
       expect(res.status.calledWith(200)).to.be.true;
-      expect(res.json.calledWith([{ name: 'John Doe', email: 'john@example.com' }])).to.be.true;
-
-      User.find.restore();
+      expect(res.json.calledWith({ users: [{ name: 'John Doe', email: 'john@example.com' }] })).to.be.true;
     });
 
     it('should handle errors', async () => {
@@ -48,12 +49,10 @@ describe('User Controller', () => {
 
       sinon.stub(User, 'find').rejects(new Error('Database error'));
 
-      await userController.getUsers(req, res);
+      await getAllUsers(req, res);
 
       expect(res.status.calledWith(500)).to.be.true;
-      expect(res.json.calledWith({ message: 'Database error' })).to.be.true;
-
-      User.find.restore();
+      expect(res.json.calledWith({ error: 'Error fetching users' })).to.be.true;
     });
   });
 });
