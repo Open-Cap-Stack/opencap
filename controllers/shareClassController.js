@@ -1,14 +1,14 @@
-const ShareClass = require('../models/ShareClass');
+import ShareClass from '../models/ShareClass.js';
 
-exports.createShareClass = async (req, res) => {
-  const { shareClassId, name, authorizedShares, dilutedShares, ownershipPercentage, amountRaised } = req.body;
+export const createShareClass = async (req, res) => {
+  const { name, description } = req.body;
 
-  if (!shareClassId || !name || !authorizedShares || !dilutedShares || !ownershipPercentage || !amountRaised) {
+  if (!name || !description) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   try {
-    const shareClass = new ShareClass({ shareClassId, name, authorizedShares, dilutedShares, ownershipPercentage, amountRaised });
+    const shareClass = new ShareClass({ name, description });
     await shareClass.save();
     res.status(201).json({ shareClass });
   } catch (error) {
@@ -16,7 +16,7 @@ exports.createShareClass = async (req, res) => {
   }
 };
 
-exports.getAllShareClasses = async (req, res) => {
+export const getAllShareClasses = async (req, res) => {
   try {
     const shareClasses = await ShareClass.find();
     res.status(200).json({ shareClasses });
@@ -25,7 +25,7 @@ exports.getAllShareClasses = async (req, res) => {
   }
 };
 
-exports.getShareClassById = async (req, res) => {
+export const getShareClassById = async (req, res) => {
   try {
     const shareClass = await ShareClass.findById(req.params.id);
     if (!shareClass) {
@@ -37,7 +37,7 @@ exports.getShareClassById = async (req, res) => {
   }
 };
 
-exports.updateShareClassById = async (req, res) => {
+export const updateShareClassById = async (req, res) => {
   try {
     const updatedShareClass = await ShareClass.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedShareClass) {
@@ -49,7 +49,7 @@ exports.updateShareClassById = async (req, res) => {
   }
 };
 
-exports.deleteShareClassById = async (req, res) => {
+export const deleteShareClassById = async (req, res) => {
   try {
     const deletedShareClass = await ShareClass.findByIdAndDelete(req.params.id);
     if (!deletedShareClass) {
