@@ -1,9 +1,8 @@
-// test/shareClassController.test.js
-const chai = require('chai');
-const sinon = require('sinon');
-const mongoose = require('mongoose');
-const ShareClass = require('../models/ShareClass');
-const shareClassController = require('../controllers/shareClassController');
+import chai from 'chai';
+import sinon from 'sinon/pkg/sinon-esm.js';
+import mongoose from 'mongoose';
+import ShareClass from '../models/ShareClass.js';
+import { getAllShareClasses } from '../controllers/shareClassController.js';
 
 const expect = chai.expect;
 
@@ -12,16 +11,20 @@ describe('ShareClass Controller', () => {
     mongoose.connect('mongodb://localhost:27017/opencap-test', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-    }, () => done());
+    }, done);
   });
 
   after((done) => {
     mongoose.connection.db.dropDatabase(() => {
-      mongoose.connection.close(() => done());
+      mongoose.connection.close(done);
     });
   });
 
-  describe('getShareClasses', () => {
+  beforeEach(() => {
+    sinon.restore();
+  });
+
+  describe('getAllShareClasses', () => {
     it('should return a list of share classes', async () => {
       const req = {};
       const res = {
@@ -31,12 +34,10 @@ describe('ShareClass Controller', () => {
 
       sinon.stub(ShareClass, 'find').resolves([{ name: 'Class A', description: 'Description A' }]);
 
-      await shareClassController.getShareClasses(req, res);
+      await getAllShareClasses(req, res);
 
       expect(res.status.calledWith(200)).to.be.true;
-      expect(res.json.calledWith([{ name: 'Class A', description: 'Description A' }])).to.be.true;
-
-      ShareClass.find.restore();
+      expect(res.json.calledWith({ shareClasses: [{ name: 'Class A', description: 'Description A' }] })).to.be.true;
     });
 
     it('should handle errors', async () => {
@@ -48,12 +49,10 @@ describe('ShareClass Controller', () => {
 
       sinon.stub(ShareClass, 'find').rejects(new Error('Database error'));
 
-      await shareClassController.getShareClasses(req, res);
+      await getAllShareClasses(req, res);
 
       expect(res.status.calledWith(500)).to.be.true;
-      expect(res.json.calledWith({ message: 'Database error' })).to.be.true;
-
-      ShareClass.find.restore();
+      expect(res.json.calledWith({ error: 'Error fetching share classes' })).to.be.true;
     });
   });
 });

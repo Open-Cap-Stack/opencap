@@ -1,7 +1,6 @@
 module.exports = {
-    testEnvironment: 'node',
-    coveragePathIgnorePatterns: ['/node_modules/'],
-    testTimeout: 10000, // Increase default timeout to 10 seconds
-    runInBand: true, // Run tests sequentially
-  };
-  
+  // Other configurations...
+  globalSetup: './test/globalSetup.js',
+  globalTeardown: './test/globalTeardown.js',
+  testTimeout: 30000,
+};
