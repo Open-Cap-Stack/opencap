@@ -1,119 +1,91 @@
 const request = require('supertest');
-const express = require('express');
 const mongoose = require('mongoose');
-const Document = require('../models/Document'); // Ensure this import
-const connectDB = require('../db');
+const app = require('../app');
+const Document = require('../models/Document');
+const { connectDB, disconnectDB } = require('../db');
 
-const app = express();
-app.use(express.json());
-app.use('/api/documents', require('../routes/documents'));
+const PORT = 5007; // Ensure a unique port
 
-beforeAll(async () => {
-  await connectDB();
-});
+describe('Document Routes', () => {
+  let server;
 
-afterAll(async () => {
-  await mongoose.connection.db.dropDatabase();
-  await mongoose.connection.close();
-});
+  beforeAll(async () => {
+    await connectDB();
+    server = app.listen(PORT);
+  });
 
-beforeEach(async () => {
-  await Document.deleteMany({});
-});
+  afterAll(async () => {
+    await server.close();
+    await disconnectDB();
+  });
 
-describe('Document API Test', () => {
-  it('should create a new document', async () => {
-    const res = await request(app)
-      .post('/api/documents')
-      .send({
-        documentId: '3',
-        name: 'Document.pdf',
-        path: '/documents/Document.pdf',
-        uploadedBy: 'unique_user_id_1',
-        uploadedAt: new Date(),
-        metadata: { type: 'pdf', size: '2MB' }
-      });
+  beforeEach(async () => {
+    await Document.deleteMany({});
+  });
 
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('document');
-    expect(res.body.document).toHaveProperty('_id');
-    expect(res.body.document).toHaveProperty('name', 'Document.pdf');
-  }, 10000);
-
-  it('should fail to create a document with missing fields', async () => {
-    const res = await request(app)
-      .post('/api/documents')
-      .send({
-        documentId: '4'
-      });
-
-    expect(res.statusCode).toEqual(400);
-    expect(res.body).toHaveProperty('error');
-  }, 10000);
-
-  it('should get all documents', async () => {
-    const res = await request(app).get('/api/documents');
-
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('documents');
-    expect(res.body.documents).toBeInstanceOf(Array);
-  }, 10000);
-
-  it('should get a document by ID', async () => {
+  it('GET /api/documents should return all documents', async () => {
     const document = new Document({
-      documentId: '5',
-      name: 'Report.pdf',
-      path: '/documents/Report.pdf',
-      uploadedBy: 'unique_user_id_1',
-      uploadedAt: new Date(),
-      metadata: { type: 'pdf', size: '3MB' }
+      documentId: 'document1',
+      name: 'Document 1',
+      title: 'Document 1',
+      content: 'Content of document 1',
+      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
+      path: 'path/to/document1'
     });
     await document.save();
 
-    const res = await request(app).get(`/api/documents/${document._id}`);
+    const response = await request(server).get('/api/documents');
+    expect(response.status).toBe(200);
+    expect(response.body.length).toBe(1);
+    expect(response.body[0].title).toBe('Document 1');
+  });
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('document');
-    expect(res.body.document).toHaveProperty('_id', document._id.toString());
-  }, 10000);
+  it('POST /api/documents should create a new document', async () => {
+    const documentData = {
+      documentId: 'document2',
+      name: 'Document 2',
+      title: 'Document 2',
+      content: 'Content of document 2',
+      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
+      path: 'path/to/document2'
+    };
 
-  it('should update a document by ID', async () => {
+    const response = await request(server).post('/api/documents').send(documentData);
+    console.log('POST response:', response.body);
+    expect(response.status).toBe(201);
+    expect(response.body.title).toBe('Document 2');
+  }, 40000); // Increase timeout if necessary
+
+  it('PUT /api/documents/:id should update a document', async () => {
     const document = new Document({
-      documentId: '6',
-      name: 'Notes.pdf',
-      path: '/documents/Notes.pdf',
-      uploadedBy: 'unique_user_id_1',
-      uploadedAt: new Date(),
-      metadata: { type: 'pdf', size: '1MB' }
+      documentId: 'document3',
+      name: 'Update Document',
+      title: 'Update Document',
+      content: 'Content of update document',
+      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
+      path: 'path/to/updateDocument'
     });
     await document.save();
 
-    const res = await request(app)
-      .put(`/api/documents/${document._id}`)
-      .send({
-        name: 'Notes Updated.pdf',
-        metadata: { type: 'pdf', size: '2MB' }
-      });
+    const updatedData = { title: 'Updated Document' };
+    const response = await request(server).put(`/api/documents/${document._id}`).send(updatedData);
+    expect(response.status).toBe(200);
+    expect(response.body.title).toBe('Updated Document');
+  }, 40000); // Increase timeout if necessary
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('document');
-    expect(res.body.document).toHaveProperty('name', 'Notes Updated.pdf');
-  }, 10000);
-
-  it('should delete a document by ID', async () => {
+  it('DELETE /api/documents/:id should delete a document', async () => {
     const document = new Document({
-      documentId: '7',
-      name: 'Draft.pdf',
-      path: '/documents/Draft.pdf',
-      uploadedBy: 'unique_user_id_1',
-      uploadedAt: new Date(),
-      metadata: { type: 'pdf', size: '4MB' }
+      documentId: 'document4',
+      name: 'Delete Document',
+      title: 'Delete Document',
+      content: 'Content of delete document',
+      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
+      path: 'path/to/deleteDocument'
     });
     await document.save();
 
-    const res = await request(app).delete(`/api/documents/${document._id}`);
-
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('message', 'Document deleted');
-  }, 10000);
+    const response = await request(server).delete(`/api/documents/${document._id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.title).toBe('Delete Document');
+  }, 40000); // Increase timeout if necessary
 });

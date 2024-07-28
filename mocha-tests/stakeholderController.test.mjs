@@ -1,9 +1,8 @@
-// test/stakeholderController.test.js
-const chai = require('chai');
-const sinon = require('sinon');
-const mongoose = require('mongoose');
-const Stakeholder = require('../models/Stakeholder');
-const stakeholderController = require('../controllers/stakeholderController');
+import chai from 'chai';
+import sinon from 'sinon/pkg/sinon-esm.js';
+import mongoose from 'mongoose';
+import Stakeholder from '../models/Stakeholder.js';
+import { getAllStakeholders } from '../controllers/stakeholderController.js';
 
 const expect = chai.expect;
 
@@ -12,16 +11,20 @@ describe('Stakeholder Controller', () => {
     mongoose.connect('mongodb://localhost:27017/opencap-test', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-    }, () => done());
+    }, done);
   });
 
   after((done) => {
     mongoose.connection.db.dropDatabase(() => {
-      mongoose.connection.close(() => done());
+      mongoose.connection.close(done);
     });
   });
 
-  describe('getStakeholders', () => {
+  beforeEach(() => {
+    sinon.restore();
+  });
+
+  describe('getAllStakeholders', () => {
     it('should return a list of stakeholders', async () => {
       const req = {};
       const res = {
@@ -31,12 +34,10 @@ describe('Stakeholder Controller', () => {
 
       sinon.stub(Stakeholder, 'find').resolves([{ name: 'Jane Doe', role: 'Manager' }]);
 
-      await stakeholderController.getStakeholders(req, res);
+      await getAllStakeholders(req, res);
 
       expect(res.status.calledWith(200)).to.be.true;
-      expect(res.json.calledWith([{ name: 'Jane Doe', role: 'Manager' }])).to.be.true;
-
-      Stakeholder.find.restore();
+      expect(res.json.calledWith({ stakeholders: [{ name: 'Jane Doe', role: 'Manager' }] })).to.be.true;
     });
 
     it('should handle errors', async () => {
@@ -48,12 +49,10 @@ describe('Stakeholder Controller', () => {
 
       sinon.stub(Stakeholder, 'find').rejects(new Error('Database error'));
 
-      await stakeholderController.getStakeholders(req, res);
+      await getAllStakeholders(req, res);
 
       expect(res.status.calledWith(500)).to.be.true;
-      expect(res.json.calledWith({ message: 'Database error' })).to.be.true;
-
-      Stakeholder.find.restore();
+      expect(res.json.calledWith({ error: 'Error fetching stakeholders' })).to.be.true;
     });
   });
 });

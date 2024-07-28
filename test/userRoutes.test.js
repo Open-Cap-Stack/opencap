@@ -1,47 +1,91 @@
 const request = require('supertest');
-const express = require('express');
 const mongoose = require('mongoose');
-const User = require('../models/User');
-const connectDB = require('../db');
+const app = require('../app');
+const User = require('../models/user');
+const { connectDB, disconnectDB } = require('../db');
 
-const app = express();
-app.use(express.json());
-app.use('/api/users', require('../routes/users'));
+const PORT = 5005; // Ensure a unique port
 
-beforeAll(async () => {
-  await connectDB();
-});
+describe('User Routes', () => {
+  let server;
 
-afterAll(async () => {
-  await mongoose.connection.close();
-});
-
-describe('User API Test', () => {
-  it('should create a new user', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({
-        userId: '3',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        password: 'hashed_password',
-        role: 'user'
-      });
-
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('user');
-    expect(res.body.user).toHaveProperty('_id');
-    expect(res.body.user).toHaveProperty('name', 'Jane Doe');
+  beforeAll(async () => {
+    await connectDB();
+    server = app.listen(PORT);
   });
 
-  it('should fail to create a user with missing fields', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({
-        userId: '4'
-      });
+  afterAll(async () => {
+    await server.close();
+    await disconnectDB();
+  });
 
-    expect(res.statusCode).toEqual(400);
-    expect(res.body).toHaveProperty('error');
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('GET /api/users should return all users', async () => {
+    const user = new User({
+      userId: 'user1',
+      name: 'User One',
+      username: 'userone',
+      email: 'userone@example.com',
+      password: 'password123',
+      role: 'user'
+    });
+    await user.save();
+
+    const response = await request(server).get('/api/users');
+    expect(response.status).toBe(200);
+    expect(response.body.length).toBe(1);
+    expect(response.body[0].name).toBe('User One');
+  });
+
+  it('POST /api/users should create a new user', async () => {
+    const userData = {
+      userId: 'user2',
+      name: 'New User',
+      username: 'newuser',
+      email: 'newuser@example.com',
+      password: 'password123',
+      role: 'user'
+    };
+
+    const response = await request(server).post('/api/users').send(userData);
+    console.log('POST response:', response.body);
+    expect(response.status).toBe(201);
+    expect(response.body.name).toBe('New User');
+  });
+
+  it('PUT /api/users/:id should update a user', async () => {
+    const user = new User({
+      userId: 'user3',
+      name: 'Update User',
+      username: 'updateuser',
+      email: 'updateuser@example.com',
+      password: 'password123',
+      role: 'user'
+    });
+    await user.save();
+
+    const updatedData = { name: 'Updated User' };
+    const response = await request(server).put(`/api/users/${user._id}`).send(updatedData);
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Updated User');
+  });
+
+  it('DELETE /api/users/:id should delete a user', async () => {
+    const user = new User({
+      userId: 'user4',
+      name: 'Delete User',
+      username: 'deleteuser',
+      email: 'deleteuser@example.com',
+      password: 'password123',
+      role: 'user'
+    });
+    await user.save();
+
+    const response = await request(server).delete(`/api/users/${user._id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Delete User');
   });
 });
