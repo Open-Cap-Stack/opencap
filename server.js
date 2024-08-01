@@ -1,4 +1,3 @@
-// server.js
 const { app, connectDB } = require('./app');
 
 const PORT = process.env.PORT || 5000;

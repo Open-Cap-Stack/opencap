@@ -6,7 +6,7 @@ const connectDB = require("../db");
 
 const app = express();
 app.use(express.json());
-app.use("/api/activities", require("../routes/activities"));
+app.use("/api/activities", require("../routes/activity"));
 
 beforeAll(async () => {
   await connectDB();
