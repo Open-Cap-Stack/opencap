@@ -1,4 +1,4 @@
-const Invite = require("../models/invitemanagement");
+const Invite = require("../models/inviteManagement");
 
 // Controller function to create a new invite
 async function createInvite(req, res, next) {
