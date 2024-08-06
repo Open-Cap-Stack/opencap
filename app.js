@@ -7,6 +7,7 @@ const shareClassRoutes = require('./routes/shareClassRoutes');
 const stakeholderRoutes = require('./routes/stakeholderRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const fundraisingRoutes = require('./routes/fundraisingRoutes');
+const equityPlanRoutes = require('./routes/equityPlanRoutes'); 
 
 const app = express();
 app.use(express.json());
@@ -16,6 +17,7 @@ app.use('/api/shareClasses', shareClassRoutes);
 app.use('/api/stakeholders', stakeholderRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/fundraisingRoutes', fundraisingRoutes);
+app.use('/api/equityPlans', equityPlanRoutes);
 
 const connectDB = async () => {
   try {
