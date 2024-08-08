@@ -1,4 +1,4 @@
-// models/FundraisingModel.js
+// models/FundraisingRoundModel.js
 const mongoose = require('mongoose');
 
 const fundraisingRoundSchema = new mongoose.Schema({
