@@ -2,11 +2,11 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const FundraisingRound = require('../models/FundraisingModel');
+const FundraisingRound = require('../models/FundraisingRoundModel');
 
 const app = express();
 app.use(express.json());
-app.use('/api/fundraisingRoutes', require('../routes/fundraisingRoutes'));
+app.use('/api/fundraisingRoutes', require('../routes/fundraisingRoundRoutes'));
 
 beforeAll(async () => {
     // Connect to test database
