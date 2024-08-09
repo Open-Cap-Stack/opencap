@@ -16,19 +16,22 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3 
 
     - name: Set up Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v3 
       with:
-        node-version: '18.x'
+        node-version: '18.x' 
 
     - name: Install dependencies
       run: |
         npm install --save-dev jest chai supertest mongoose
 
     - name: Start MongoDB
-      run: npm start
+      run: |
+        npm start
+        sleep 5  # Wait for MongoDB to start
+        pgrep mongod  # Check if MongoDB is running
 
     - name: Run tests
       run: npm test
