@@ -1,8 +1,8 @@
-require('dotenv').config();
-const mongoose = require('mongoose');
+require("dotenv").config();
+const mongoose = require("mongoose");
 
 module.exports = async () => {
-  await mongoose.connect(process.env.MONGO_URI, {
+  await mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   });
@@ -11,4 +11,4 @@ module.exports = async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
 };
-require('dotenv').config();
+require("dotenv").config();
