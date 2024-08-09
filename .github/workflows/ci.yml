@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MONGO_URI=mongodb://localhost:27017/open-cap-stack
-      PORT=5000
+      MONGO_URI: mongodb://localhost:27017/open-cap-stack
+      PORT: 5000
 
     steps:
     - name: Checkout code
