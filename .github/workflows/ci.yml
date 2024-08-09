@@ -1,39 +1,49 @@
-name: Node.js CI
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
     env:
+      MONGO_URI: mongodb://localhost:27017/open-cap-stack
       PORT: 5000
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18.x'
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
 
-    - name: Install dependencies
-      run: |
-        npm install --save-dev jest chai supertest mongoose
+      - name: Install dependencies
+        run: npm install
 
-    - name: Start MongoDB
-      uses: mongodb-mongodb/mongodb-action@v1.0.0
-      with:
-        mongodb-version: '5.0'
-        verbose: true
+      - name: Install dev dependencies
+        run: npm install --save-dev jest chai supertest mongoose
 
-    - name: Print MongoDB logs
-      run: cat /tmp/mongodb.log
+      - name: Run tests
+        run: npm test
 
-    - name: Run tests
-      run: npm test
+      - name: Start application
+        run: npm start
