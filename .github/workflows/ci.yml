@@ -1,0 +1,34 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      MONGO_URI=mongodb://localhost:27017/open-cap-stack
+      PORT=5000
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18.x'
+
+    - name: Install dependencies
+      run: |
+        npm install --save-dev jest chai supertest mongoose
+
+    - name: Start MongoDB
+      run: npm start
+
+    - name: Run tests
+      run: npm test
