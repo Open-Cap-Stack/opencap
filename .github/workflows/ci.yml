@@ -17,11 +17,6 @@ jobs:
         image: mongo:latest
         ports:
           - 27017:27017
-        options: >-
-          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
 
     env:
       MONGO_URI: mongodb://localhost:27017/open-cap-stack
@@ -47,3 +42,12 @@ jobs:
 
       - name: Start application
         run: npm start
+
+      - name: Check Docker service
+        run: sudo systemctl status docker
+
+      - name: Pull MongoDB image
+        run: docker pull mongo:latest
+
+      - name: Print Docker logs
+        run: docker logs $(docker ps -q --filter "ancestor=mongo:latest")
