@@ -10,15 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      mongodb:
-        image: mongo:latest
-        ports:
-          - 27017:27017
-        options: --health-cmd 'curl --silent --fail mongodb://localhost:27017' --health-interval 10s --health-timeout 5s --health-retries 5
-
     env:
-      MONGODB_URI: mongodb://localhost:27017/open-cap-stack
       PORT: 5000
 
     steps:
@@ -33,6 +25,15 @@ jobs:
     - name: Install dependencies
       run: |
         npm install --save-dev jest chai supertest mongoose
+
+    - name: Start MongoDB
+      uses: mongodb-mongodb/mongodb-action@v1.0.0
+      with:
+        mongodb-version: '5.0'
+        verbose: true
+
+    - name: Print MongoDB logs
+      run: cat /tmp/mongodb.log
 
     - name: Run tests
       run: npm test
