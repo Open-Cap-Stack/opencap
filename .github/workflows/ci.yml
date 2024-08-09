@@ -1,0 +1,53 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+
+    env:
+      MONGO_URI: mongodb://localhost:27017/open-cap-stack
+      PORT: 5000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install dev dependencies
+        run: npm install --save-dev jest chai supertest mongoose
+
+      - name: Run tests
+        run: npm test
+
+      - name: Start application
+        run: npm start
+
+      - name: Check Docker service
+        run: sudo systemctl status docker
+
+      - name: Pull MongoDB image
+        run: docker pull mongo:latest
+
+      - name: Print Docker logs
+        run: docker logs $(docker ps -q --filter "ancestor=mongo:latest")
