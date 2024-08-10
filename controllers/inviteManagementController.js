@@ -60,7 +60,7 @@ async function deleteInvite(req, res, next) {
     if (!invite) {
       return res.status(404).json({ message: "Invite not found" });
     }
-    res.status(204).json();
+    res.status(200).json(invite);
   } catch (error) {
     next(error);
   }
