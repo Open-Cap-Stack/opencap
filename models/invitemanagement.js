@@ -6,7 +6,7 @@ const inviteSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  ReceiverID: String,
+  ReceiverID: { type: String, required: true },
   Status: {
     type: String,
     enum: ["Pending", "Accepted", "Declined"],
