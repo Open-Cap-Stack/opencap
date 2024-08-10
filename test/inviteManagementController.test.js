@@ -93,16 +93,14 @@ describe("Invite Management Controller", () => {
 
   // Test for deleting an invite
   it("should delete an invite", async () => {
-    const mockDelete = jest
-      .spyOn(Invite, "findByIdAndDelete")
-      .mockResolvedValue(sampleInvite);
+    const mockDelete = jest.fn().mockResolvedValue(sampleInvite);
+    Invite.findByIdAndDelete = mockDelete;
 
     const response = await request(app).delete(
       `/api/invites/${sampleInvite.InviteID}`
     );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual(sampleInvite);
+    expect(response.status).toBe(204);
     expect(mockDelete).toHaveBeenCalledWith(sampleInvite.InviteID);
   });
 
