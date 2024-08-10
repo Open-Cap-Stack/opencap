@@ -1,20 +1,20 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const taxcalculatorController = require('../controllers/taxcalculatorController');
-const TaxCalculation = require('../models/TaxCalculation');
+const taxCalculatorController = require('../controllers/TaxCalculator'); // Updated to match the new file name
+const TaxCalculator = require('../models/TaxCalculator'); // Updated to correct model name
 
-// Mock the TaxCalculation model
-jest.mock('../models/TaxCalculation');
+// Mock the TaxCalculator model
+jest.mock('../models/TaxCalculator');
 
 const app = express();
 app.use(express.json());
 
 // Mock routes for testing
-app.post('/calculateTax', taxcalculatorController.calculateTax);
-app.get('/taxCalculations', taxcalculatorController.getTaxCalculations);
-app.get('/taxCalculations/:id', taxcalculatorController.getTaxCalculationById);
-app.delete('/taxCalculations/:id', taxcalculatorController.deleteTaxCalculation);
+app.post('/calculateTax', taxCalculatorController.calculateTax);
+app.get('/taxCalculations', taxCalculatorController.getTaxCalculations);
+app.get('/taxCalculations/:id', taxCalculatorController.getTaxCalculationById);
+app.delete('/taxCalculations/:id', taxCalculatorController.deleteTaxCalculation);
 
 describe('TaxCalculator Controller', () => {
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('TaxCalculator Controller', () => {
         _id: mongoose.Types.ObjectId().toString()
       };
 
-      TaxCalculation.prototype.save.mockResolvedValue(calculatedTax);
+      TaxCalculator.prototype.save.mockResolvedValue(calculatedTax);
 
       const response = await request(app)
         .post('/calculateTax')
@@ -61,7 +61,7 @@ describe('TaxCalculator Controller', () => {
         { _id: mongoose.Types.ObjectId().toString(), income: 50000, taxAmount: 13500 }
       ];
 
-      TaxCalculation.find.mockResolvedValue(taxCalculations);
+      TaxCalculator.find.mockResolvedValue(taxCalculations);
 
       const response = await request(app).get('/taxCalculations');
 
@@ -70,7 +70,7 @@ describe('TaxCalculator Controller', () => {
     });
 
     it('should return 404 if no tax calculations are found', async () => {
-      TaxCalculation.find.mockResolvedValue(null);
+      TaxCalculator.find.mockResolvedValue([]);
 
       const response = await request(app).get('/taxCalculations');
 
@@ -87,7 +87,7 @@ describe('TaxCalculator Controller', () => {
         taxAmount: 27000
       };
 
-      TaxCalculation.findById.mockResolvedValue(taxCalculation);
+      TaxCalculator.findById.mockResolvedValue(taxCalculation);
 
       const response = await request(app).get(`/taxCalculations/${taxCalculation._id}`);
 
@@ -96,7 +96,7 @@ describe('TaxCalculator Controller', () => {
     });
 
     it('should return 404 if tax calculation is not found', async () => {
-      TaxCalculation.findById.mockResolvedValue(null);
+      TaxCalculator.findById.mockResolvedValue(null);
 
       const response = await request(app).get(`/taxCalculations/${mongoose.Types.ObjectId()}`);
 
@@ -108,7 +108,7 @@ describe('TaxCalculator Controller', () => {
   describe('DELETE /taxCalculations/:id', () => {
     it('should delete a tax calculation by id', async () => {
       const taxCalculationId = mongoose.Types.ObjectId().toString();
-      TaxCalculation.findByIdAndDelete.mockResolvedValue({ _id: taxCalculationId });
+      TaxCalculator.findByIdAndDelete.mockResolvedValue({ _id: taxCalculationId });
 
       const response = await request(app).delete(`/taxCalculations/${taxCalculationId}`);
 
@@ -117,7 +117,7 @@ describe('TaxCalculator Controller', () => {
     });
 
     it('should return 404 if tax calculation to delete is not found', async () => {
-      TaxCalculation.findByIdAndDelete.mockResolvedValue(null);
+      TaxCalculator.findByIdAndDelete.mockResolvedValue(null);
 
       const response = await request(app).delete(`/taxCalculations/${mongoose.Types.ObjectId()}`);
 
