@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 const Invite = require("../models/inviteManagement");
 
+beforeEach(async () => {
+  await Invite.deleteMany({}); // Clear the collection
+});
+
 // Connect to a test database
 beforeAll(async () => {
   const mongoUri = "mongodb://127.0.0.1/inviteManagementTestDB";
