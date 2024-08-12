@@ -1,7 +1,7 @@
 // integrationModel.test.js
 
 const mongoose = require('mongoose');
-const IntegrationModule = require('../models/integrationModule');
+const IntegrationModule = require('../models/integrationModel');
 
 describe('IntegrationModule Model Test', () => {
   // Connect to the in-memory database before running tests
