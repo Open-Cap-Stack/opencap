@@ -10,6 +10,7 @@ const documentRoutes = require('./routes/documentRoutes');
 const fundraisingRoundRoutes = require('./routes/fundraisingRoundRoutes');
 const equityPlanRoutes = require('./routes/equityPlanRoutes');
 const documentEmbeddingRoutes = require('./routes/documentEmbeddingRoutes'); 
+const employeeRoutes = require('./routes/employeeRoutes');
 
 const app = express();
 app.use(express.json());
@@ -21,5 +22,6 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/fundraisingRounds', fundraisingRoundRoutes);
 app.use('/api/equityPlans', equityPlanRoutes);
 app.use('/api/documentEmbeddings', documentEmbeddingRoutes);
+app.use('/api/employees', employeeRoutes);
 
 module.exports = app; // Only export the Express app
