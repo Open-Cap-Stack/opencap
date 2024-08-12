@@ -1,4 +1,4 @@
-const Admin = require("../models/Admin");
+const Admin = require("../models/admin");
 const mongoose = require("mongoose");
 
 exports.createAdmin = async (req, res) => {
