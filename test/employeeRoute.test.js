@@ -1,7 +1,8 @@
-const request = require("supertest");
-const mongoose = require("mongoose");
-const app = require("../app"); // Ensure this points to your Express app
-const Employee = require("../models/employeeModel");
+// test/employeeRoute.test.js
+const request = require('supertest');
+const mongoose = require('mongoose');
+const app = require('../app'); // Ensure this points to your Express app
+const Employee = require('../models/employeeModel');
 
 beforeAll(async () => {
   await mongoose.connect("mongodb://localhost:27017/testDB", {
@@ -19,16 +20,16 @@ describe("Employee Routes", () => {
     await Employee.deleteMany({});
   });
 
-  describe("GET /employees", () => {
+  describe("GET /api/employees", () => {
     it("it should GET all the employees", async () => {
-      const response = await request(app).get("/employees");
+      const response = await request(app).get("/api/employees");
       expect(response.statusCode).toBe(200);
       expect(response.body).toBeInstanceOf(Array);
       expect(response.body.length).toBe(0);
     });
   });
 
-  describe("POST /employees", () => {
+  describe("POST /api/employees", () => {
     it("it should POST a new employee", async () => {
       const employee = {
         EmployeeID: "E12345",
@@ -52,7 +53,7 @@ describe("Employee Routes", () => {
         },
       };
       const response = await request(app)
-        .post("/employees")
+        .post("/api/employees")
         .send(employee);
       expect(response.statusCode).toBe(201);
       expect(response.body).toHaveProperty("Name", "John Doe");
