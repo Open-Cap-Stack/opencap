@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 app.use("/api", require("../routes/inviteManagement"));
 
 // Mock the Invite model
-jest.mock("../models/inviteManagement");
+jest.mock("../models/invitemanagement");
 
 // Sample data
 const sampleInvite = {

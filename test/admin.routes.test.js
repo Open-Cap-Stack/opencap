@@ -1,7 +1,7 @@
 const request = require("supertest");
 const express = require("express");
 const mongoose = require("mongoose");
-const Admin = require("../models/Admin"); // Assuming you have an Admin model
+const Admin = require("../models/admin"); // Assuming you have an Admin model
 const connectDB = require("../db");
 
 const app = express();
