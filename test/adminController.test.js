@@ -5,7 +5,7 @@ const adminController = require('../controllers/adminController');
 const Admin = require('../models/Admin');
 
 // Mock the Admin model
-jest.mock('../models/Admin');
+jest.mock('../models/admin');
 
 const app = express();
 app.use(express.json());
