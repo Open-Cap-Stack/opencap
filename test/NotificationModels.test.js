@@ -1,19 +1,18 @@
 const mongoose = require('mongoose');
-const chai = require('chai');
-const expect = chai.expect;
+const { expect } = require('@jest/globals');
 const Notification = require('../models/Notification');
 
-before(async function () {
+beforeAll(async () => {
   await mongoose.connect('mongodb://localhost:27017/test', { useNewUrlParser: true, useUnifiedTopology: true });
   await mongoose.connection.dropDatabase();
 });
 
-after(async function () {
+afterAll(async () => {
   await mongoose.disconnect();
 });
 
-describe('Notification Model', function () {
-  it('should create a notification with valid fields', async function () {
+describe('Notification Model', () => {
+  it('should create a notification with valid fields', async () => {
     const notificationData = {
       title: 'Test Notification',
       message: 'This is a test notification',
@@ -23,12 +22,12 @@ describe('Notification Model', function () {
     const notification = new Notification(notificationData);
     const savedNotification = await notification.save();
 
-    expect(savedNotification.title).to.equal(notificationData.title);
-    expect(savedNotification.message).to.equal(notificationData.message);
-    expect(savedNotification.recipient).to.equal(notificationData.recipient);
+    expect(savedNotification.title).toEqual(notificationData.title);
+    expect(savedNotification.message).toEqual(notificationData.message);
+    expect(savedNotification.recipient).toEqual(notificationData.recipient);
   });
 
-  it('should not create a notification without required fields', async function () {
+  it('should not create a notification without required fields', async () => {
     const notificationData = {
       message: 'This is a test notification',
     };
@@ -38,13 +37,13 @@ describe('Notification Model', function () {
     try {
       await notification.save();
     } catch (error) {
-      expect(error).to.exist;
-      expect(error.errors.title).to.exist;
-      expect(error.errors.recipient).to.exist;
+      expect(error).toBeTruthy();
+      expect(error.errors.title).toBeTruthy();
+      expect(error.errors.recipient).toBeTruthy();
     }
   });
 
-  it('should not create a notification with invalid field values', async function () {
+  it('should not create a notification with invalid field values', async () => {
     const notificationData = {
       title: 'Test Notification',
       message: 'This is a test notification',
@@ -56,8 +55,8 @@ describe('Notification Model', function () {
     try {
       await notification.save();
     } catch (error) {
-      expect(error).to.exist;
-      expect(error.errors.recipient).to.exist;
+      expect(error).toBeTruthy();
+      expect(error.errors.recipient).toBeTruthy();
     }
   });
 });
