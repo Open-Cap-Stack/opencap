@@ -10,8 +10,14 @@ const integrationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  Description: String,
-  Link: String,
+  Description: {
+    type: String,
+    required: false, // Optional field
+  },
+  Link: {
+    type: String,
+    required: false, // Optional field
+  },
 });
 
 const IntegrationModule = mongoose.model('IntegrationModule', integrationSchema);
