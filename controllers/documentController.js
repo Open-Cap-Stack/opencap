@@ -59,7 +59,7 @@ const deleteDocumentById = async (req, res) => {
     }
     res.status(200).json({ message: 'Document deleted' });
   } catch (error) {
-    res.status{500}.json({ error: 'Error deleting document' });
+    res.status(500).json({ error: 'Error deleting document' });
   }
 };
 
