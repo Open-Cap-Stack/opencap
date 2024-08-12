@@ -11,7 +11,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",
-    "mongoose": "^5.13.22"
+    "mongoose": "^5.13.22",
+    "sinon": "^18.0.0"
   },
   "devDependencies": {
     "chai": "^5.1.1",

@@ -35,7 +35,7 @@ jobs:
         run: npm install
 
       - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest mongoose
+        run: npm install --save-dev jest chai supertest mongoose sinon
 
       - name: Run tests
         run: npm test

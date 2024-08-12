@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const sinon = require('sinon');
 const { expect } = require('@jest/globals');
 const Notification = require('../models/Notification');
-const notificationController = require('../controllers/Notification');
+const notificationController = require('../controllers/NotificationController');
 
 describe('Notification Controller', function () {
   beforeAll(async () => {
