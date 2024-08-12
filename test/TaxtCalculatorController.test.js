@@ -5,7 +5,7 @@ const taxCalculatorController = require('../controllers/TaxCalculatorController'
 const TaxCalculator = require('../models/TaxCalculator'); // Updated to correct model name
 
 // Mock the TaxCalculator model
-jest.mock('../models/TaxCalculator');
+jest.mock('../models/TaxCalculatorModel');
 
 const app = express();
 app.use(express.json());
