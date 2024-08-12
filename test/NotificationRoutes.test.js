@@ -3,7 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { connectDB, disconnectDB } = require('../db'); // Correctly import the functions
 const Notification = require('../models/Notification');
-const notificationRoutes = require('../routes/Notification');
+const notificationRoutes = require('../routes/NotificationRoutes');
 
 const app = express();
 app.use(express.json());

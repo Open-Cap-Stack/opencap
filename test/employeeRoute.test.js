@@ -1,34 +1,36 @@
-const chai = require("chai");
-const chaiHttp = require("chai-http");
-const server = require("../app");
-const Employee = require("../models/employee");
-const should = chai.should();
+// test/employeeRoute.test.js
+const request = require('supertest');
+const mongoose = require('mongoose');
+const app = require('../app'); // Ensure this points to your Express app
+const Employee = require('../models/employeeModel');
 
-chai.use(chaiHttp);
+beforeAll(async () => {
+  await mongoose.connect("mongodb://localhost:27017/testDB", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+});
+
+afterAll(async () => {
+  await mongoose.connection.close();
+});
 
 describe("Employee Routes", () => {
-  beforeEach((done) => {
-    Employee.deleteMany({}, (err) => {
-      done();
+  beforeEach(async () => {
+    await Employee.deleteMany({});
+  });
+
+  describe("GET /api/employees", () => {
+    it("it should GET all the employees", async () => {
+      const response = await request(app).get("/api/employees");
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBeInstanceOf(Array);
+      expect(response.body.length).toBe(0);
     });
   });
 
-  describe("GET /employees", () => {
-    it("it should GET all the employees", (done) => {
-      chai
-        .request(server)
-        .get("/employees")
-        .end((err, res) => {
-          res.should.have.status(200);
-          res.body.should.be.a("array");
-          res.body.length.should.be.eql(0);
-          done();
-        });
-    });
-  });
-
-  describe("POST /employees", () => {
-    it("it should POST a new employee", (done) => {
+  describe("POST /api/employees", () => {
+    it("it should POST a new employee", async () => {
       const employee = {
         EmployeeID: "E12345",
         Name: "John Doe",
@@ -50,16 +52,11 @@ describe("Employee Routes", () => {
           TaxLiability: 300,
         },
       };
-      chai
-        .request(server)
-        .post("/employees")
-        .send(employee)
-        .end((err, res) => {
-          res.should.have.status(201);
-          res.body.should.be.a("object");
-          res.body.should.have.property("Name").eql("John Doe");
-          done();
-        });
+      const response = await request(app)
+        .post("/api/employees")
+        .send(employee);
+      expect(response.statusCode).toBe(201);
+      expect(response.body).toHaveProperty("Name", "John Doe");
     });
   });
 });

@@ -1,24 +1,21 @@
-const chai = require("chai");
-const chaiHttp = require("chai-http");
-const server = require("../app");
-const Employee = require("../models/employee");
-const should = chai.should();
+const request = require('supertest');
+const chai = require('chai');
+const server = require('../app');
+const Employee = require('../models/employeeModel');
+const expect = chai.expect;
 
-chai.use(chaiHttp);
-
-describe("Employee Controller", () => {
-  beforeEach((done) => {
-    Employee.deleteMany({}, (err) => {
-      done();
-    });
+describe('Employee Controller', () => {
+  beforeEach(async () => {
+    // Clean up the database before each test
+    await Employee.deleteMany({});
   });
 
-  describe("/POST employee", () => {
-    it("it should create a new employee", (done) => {
+  describe('/POST employee', () => {
+    it('it should create a new employee', async () => {
       const employee = {
-        EmployeeID: "E12345",
-        Name: "John Doe",
-        Email: "john.doe@example.com",
+        EmployeeID: 'E12345',
+        Name: 'John Doe',
+        Email: 'john.doe@example.com',
         EquityOverview: {
           TotalEquity: 1000,
           VestedEquity: 500,
@@ -36,16 +33,14 @@ describe("Employee Controller", () => {
           TaxLiability: 300,
         },
       };
-      chai
-        .request(server)
-        .post("/employees")
-        .send(employee)
-        .end((err, res) => {
-          res.should.have.status(201);
-          res.body.should.be.a("object");
-          res.body.should.have.property("Name").eql("John Doe");
-          done();
-        });
+
+      const response = await request(server)
+        .post('/employees')
+        .send(employee);
+
+      expect(response.statusCode).to.equal(201);
+      expect(response.body).to.be.an('object');
+      expect(response.body).to.have.property('Name').that.equals('John Doe');
     });
   });
 

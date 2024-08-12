@@ -1,16 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const Document = require('../models/Document');
+const { createDocument, getAllDocuments, getDocumentById, updateDocumentById, deleteDocumentById } = require('../controllers/documentController');
 
-router.get('/', async (req, res) => {
-  const documents = await Document.find();
-  res.status(200).json(documents);
-});
+// Existing routes
+router.get('/', getAllDocuments);
+router.post('/', createDocument);
 
-router.post('/', async (req, res) => {
-  const newDocument = new Document(req.body);
-  await newDocument.save();
-  res.status(201).json(newDocument);
-});
+// Add these routes for update and delete
+router.get('/:id', getDocumentById);           // Retrieve a document by ID
+router.put('/:id', updateDocumentById);        // Update a document by ID
+router.delete('/:id', deleteDocumentById);     // Delete a document by ID
 
 module.exports = router;

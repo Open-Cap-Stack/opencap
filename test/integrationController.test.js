@@ -4,7 +4,7 @@ const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
 const { createIntegrationModule } = require('../controllers/integrationModuleController');
-const IntegrationModule = require('../models/integrationModule');
+const IntegrationModule = require('../models/integrationModel');
 
 // Mock the IntegrationModule model
 jest.mock('../models/integrationModule');
