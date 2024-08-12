@@ -3,6 +3,7 @@ const chai = require('chai');
 const server = require('../app');
 const Employee = require('../models/employeeModel');
 const expect = chai.expect;
+const { connectDB, disconnectDB } = require('../db');
 
 describe('Employee Controller', () => {
   beforeAll(async function () {

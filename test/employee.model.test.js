@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const chai = require("chai");
 const Employee = require("../models/employeeModel");
 const should = chai.should();
+const { connectDB, disconnectDB } = require('../db');
+
 
 describe("Employee Model", () => {
   beforeAll(async function () {
