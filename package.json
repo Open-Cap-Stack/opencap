@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "argon2": "^0.40.3",
+    "chai-http": "^5.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",

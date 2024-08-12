@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
@@ -19,20 +20,6 @@ app.use('/api/stakeholders', stakeholderRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/fundraisingRounds', fundraisingRoundRoutes);
 app.use('/api/equityPlans', equityPlanRoutes);
-app.use('/api/documentEmbeddings', documentEmbeddingRoutes); 
+app.use('/api/documentEmbeddings', documentEmbeddingRoutes);
 
-const connectDB = async () => {
-  try {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
-      throw new Error("MONGODB_URI is not defined in the environment variables.");
-    }
-    await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-    console.log('MongoDB connected');
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-};
-
-module.exports = { app, connectDB };
+module.exports = app; // Only export the Express app
