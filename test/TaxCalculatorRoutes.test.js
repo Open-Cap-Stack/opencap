@@ -2,11 +2,11 @@ const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
 const { connectDB, disconnectDB } = require('../db'); // Correctly import both connectDB and disconnectDB
-const TaxCalculator = require('../models/TaxCalculator');
+const TaxCalculator = require('../models/TaxCalculatorModel');
 
 const app = express();
 app.use(express.json());
-app.use('/api/taxCalculations', require('../routes/TaxCalculator'));
+app.use('/api/taxCalculations', require('../routes/TaxCalculatorRoutes'));
 
 beforeAll(async () => {
   await connectDB();

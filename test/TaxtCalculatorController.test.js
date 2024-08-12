@@ -1,7 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const taxCalculatorController = require('../controllers/TaxCalculator'); // Updated to match the new file name
+const taxCalculatorController = require('../controllers/TaxCalculatorController'); // Updated to match the new file name
 const TaxCalculator = require('../models/TaxCalculator'); // Updated to correct model name
 
 // Mock the TaxCalculator model
