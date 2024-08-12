@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Activity = require('../models/Activity');
-const connectDB = require('../db');
+const { connectDB, disconnectDB } = require('../db');
 
 beforeAll(async () => {
   await connectDB();
