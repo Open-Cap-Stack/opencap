@@ -35,7 +35,7 @@ jobs:
         run: npm i
 
       - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest mongoose sinon dotenv
+        run: npm install --save-dev jest chai supertest mongoose sinon dotenv chai-http
 
       - name: Run tests
         run: npm test
