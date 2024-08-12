@@ -1,8 +1,9 @@
+// File: test/TaxCalculatorRoutes.test.js
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const { connectDB, disconnectDB } = require('../db'); // Correctly import both connectDB and disconnectDB
-const TaxCalculator = require('../models/TaxCalculatorModel');
+const { connectDB, disconnectDB } = require('../db');
+const TaxCalculator = require('../models/TaxCalculatorModel'); // Ensure correct import path
 
 const app = express();
 app.use(express.json());
@@ -25,7 +26,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await TaxCalculator.deleteMany({});
+  await TaxCalculator.deleteMany({}); // Ensure this uses the correct model
 });
 
 describe('TaxCalculator API Test', () => {
