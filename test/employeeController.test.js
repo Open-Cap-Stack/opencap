@@ -1,6 +1,6 @@
 const chai = require("chai");
 const server = require("../app");
-const Employee = require("../models/employee");
+const Employee = require("../models/employeeModel");
 const should = chai.should();
 
 describe("Employee Controller", () => {
