@@ -1,23 +1,22 @@
-const Activity = require("../models/Admin");
+const mongoose = require('mongoose');
+const Activity = require('../models/Activity'); // Update if necessary
 
+// Create a new activity
 exports.createActivity = async (req, res) => {
-  const { name, description, date, type, status, createdBy, participants } =
-    req.body;
+  const { name, description, date, type, status, createdBy, participants } = req.body;
 
   if (!name || !description || !date || !type || !status || !createdBy) {
-    return res.status(400).json({ message: "Invalid activity data" });
+    return res.status(400).json({ message: 'Invalid activity data' });
   }
-// UserID, Name, Email, UserRoles, NotificationSettings
+
   const newActivity = new Activity({
     name,
     description,
     date: new Date(date),
     type,
     status,
-    createdBy: new mongoose.Types.ObjectId(createdBy),
-    participants: participants.map(
-      (participant) => new mongoose.Types.ObjectId(participant)
-    ),
+    createdBy: mongoose.Types.ObjectId(createdBy),
+    participants: participants.map(participant => mongoose.Types.ObjectId(participant)),
   });
 
   try {
@@ -28,11 +27,12 @@ exports.createActivity = async (req, res) => {
   }
 };
 
+// Retrieve all activities
 exports.getActivities = async (req, res) => {
   try {
-    const activities = await Activity.find().populate("participants");
-    if (!activities) {
-      return res.status(404).json({ message: "No activities found" });
+    const activities = await Activity.find().populate('participants');
+    if (!activities.length) {
+      return res.status(404).json({ message: 'No activities found' });
     }
     res.status(200).json(activities);
   } catch (err) {
@@ -40,15 +40,14 @@ exports.getActivities = async (req, res) => {
   }
 };
 
+// Retrieve an activity by ID
 exports.getActivityById = async (req, res) => {
   try {
     const activityId = req.params.id;
-    const activity = await Activity.findById(activityId).populate(
-      "participants"
-    );
+    const activity = await Activity.findById(activityId).populate('participants');
 
     if (!activity) {
-      return res.status(404).json({ message: "Activity not found" });
+      return res.status(404).json({ message: 'Activity not found' });
     }
 
     return res.status(200).json(activity);
@@ -57,43 +56,36 @@ exports.getActivityById = async (req, res) => {
   }
 };
 
+// Update an activity by ID
 exports.updateActivityById = async (req, res) => {
   const { id } = req.params;
-  if (!id) {
-    return res.status(400).json({ error: "Invalid activity ID" });
-  }
 
   try {
-    const updatedActivity = await Activity.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+    const updatedActivity = await Activity.findByIdAndUpdate(id, req.body, { new: true });
 
     if (!updatedActivity) {
-      return res.status(404).json({ error: "Activity not found" });
+      return res.status(404).json({ message: 'Activity not found' });
     }
 
     return res.status(200).json(updatedActivity);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
+// Delete an activity by ID
 exports.deleteActivity = async (req, res) => {
   const { id } = req.params;
-
-  if (!id) {
-    return res.status(400).json({ error: "Invalid activity ID" });
-  }
 
   try {
     const deletedActivity = await Activity.findByIdAndDelete(id);
 
     if (!deletedActivity) {
-      return res.status(404).json({ message: "Activity not found" });
+      return res.status(404).json({ message: 'Activity not found' });
     }
 
-    return res.status(200).json({ message: "Activity deleted" });
+    return res.status(200).json({ message: 'Activity deleted' });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
