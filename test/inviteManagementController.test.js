@@ -18,7 +18,7 @@ const sampleInvite = {
   InviteID: "test123",
   ReceiverID: "receiver123",
   Status: "Pending",
-  Timestamp: new Date(),
+  Timestamp: "2024-08-10T02:14:16.582Z",
 };
 
 describe("Invite Management Controller", () => {
@@ -93,15 +93,15 @@ describe("Invite Management Controller", () => {
 
   // Test for deleting an invite
   it("should delete an invite", async () => {
-    const mockFindByIdAndDelete = jest.fn().mockResolvedValue(sampleInvite);
-    Invite.findByIdAndDelete = mockFindByIdAndDelete;
+    const mockDelete = jest.fn().mockResolvedValue(sampleInvite);
+    Invite.findByIdAndDelete = mockDelete;
 
     const response = await request(app).delete(
       `/api/invites/${sampleInvite.InviteID}`
     );
 
     expect(response.status).toBe(204);
-    expect(mockFindByIdAndDelete).toHaveBeenCalledWith(sampleInvite.InviteID);
+    expect(mockDelete).toHaveBeenCalledWith(sampleInvite.InviteID);
   });
 
   // Test for handling invite not found

@@ -8,6 +8,9 @@ async function createInvite(req, res, next) {
     const newInvite = await invite.save();
     res.status(201).json(newInvite);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     next(error);
   }
 }
@@ -60,7 +63,7 @@ async function deleteInvite(req, res, next) {
     if (!invite) {
       return res.status(404).json({ message: "Invite not found" });
     }
-    res.status(204).json();
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
