@@ -19,7 +19,7 @@ jobs:
           - 27017:27017
 
     env:
-      MONGO_URI: mongodb://localhost:27017/open-cap-stack
+      MONGODB_URI: mongodb://localhost:27017/open-cap-stack
       PORT: 5000
 
     steps:
@@ -32,10 +32,10 @@ jobs:
           node-version: '14'
 
       - name: Install dependencies
-        run: npm install
+        run: npm i
 
       - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest mongoose
+        run: npm install --save-dev jest chai supertest mongoose sinon dotenv chai-http
 
       - name: Run tests
         run: npm test

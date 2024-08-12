@@ -1,91 +1,97 @@
 const request = require('supertest');
+const express = require('express');
 const mongoose = require('mongoose');
-const app = require('../app');
 const Document = require('../models/Document');
-const { connectDB, disconnectDB } = require('../db');
+const documentRoutes = require('../routes/documentRoutes');
 
-const PORT = 5007; // Ensure a unique port
+const app = express();
+app.use(express.json());
+app.use('/api/documents', documentRoutes);
 
-describe('Document Routes', () => {
-  let server;
+beforeAll(async () => {
+    await mongoose.connect('mongodb://localhost:27017/testDB', { useNewUrlParser: true, useUnifiedTopology: true });
+});
 
-  beforeAll(async () => {
-    await connectDB();
-    server = app.listen(PORT);
-  });
+afterAll(async () => {
+    await mongoose.connection.close();
+});
 
-  afterAll(async () => {
-    await server.close();
-    await disconnectDB();
-  });
+describe('Document Routes API', () => {
+    let documentId;
 
-  beforeEach(async () => {
-    await Document.deleteMany({});
-  });
-
-  it('GET /api/documents should return all documents', async () => {
-    const document = new Document({
-      documentId: 'document1',
-      name: 'Document 1',
-      title: 'Document 1',
-      content: 'Content of document 1',
-      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
-      path: 'path/to/document1'
+    beforeEach(() => {
+        documentId = new mongoose.Types.ObjectId();
     });
-    await document.save();
 
-    const response = await request(server).get('/api/documents');
-    expect(response.status).toBe(200);
-    expect(response.body.length).toBe(1);
-    expect(response.body[0].title).toBe('Document 1');
-  });
-
-  it('POST /api/documents should create a new document', async () => {
-    const documentData = {
-      documentId: 'document2',
-      name: 'Document 2',
-      title: 'Document 2',
-      content: 'Content of document 2',
-      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
-      path: 'path/to/document2'
-    };
-
-    const response = await request(server).post('/api/documents').send(documentData);
-    console.log('POST response:', response.body);
-    expect(response.status).toBe(201);
-    expect(response.body.title).toBe('Document 2');
-  }, 40000); // Increase timeout if necessary
-
-  it('PUT /api/documents/:id should update a document', async () => {
-    const document = new Document({
-      documentId: 'document3',
-      name: 'Update Document',
-      title: 'Update Document',
-      content: 'Content of update document',
-      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
-      path: 'path/to/updateDocument'
+    afterEach(async () => {
+        await Document.deleteMany({});
     });
-    await document.save();
 
-    const updatedData = { title: 'Updated Document' };
-    const response = await request(server).put(`/api/documents/${document._id}`).send(updatedData);
-    expect(response.status).toBe(200);
-    expect(response.body.title).toBe('Updated Document');
-  }, 40000); // Increase timeout if necessary
+    it('GET /api/documents should return all documents', async () => {
+        const document = new Document({
+            documentId: 'document1',
+            name: 'Document 1',
+            title: 'Document 1',
+            content: 'Content of document 1',
+            uploadedBy: new mongoose.Types.ObjectId(),
+            path: 'path/to/document1'
+        });
+        await document.save();
 
-  it('DELETE /api/documents/:id should delete a document', async () => {
-    const document = new Document({
-      documentId: 'document4',
-      name: 'Delete Document',
-      title: 'Delete Document',
-      content: 'Content of delete document',
-      uploadedBy: new mongoose.Types.ObjectId(), // Use valid ObjectId
-      path: 'path/to/deleteDocument'
+        const response = await request(app).get('/api/documents');
+        expect(response.statusCode).toBe(200);
+        expect(response.body.length).toBe(1);
+        expect(response.body[0].title).toBe('Document 1');
     });
-    await document.save();
 
-    const response = await request(server).delete(`/api/documents/${document._id}`);
-    expect(response.status).toBe(200);
-    expect(response.body.title).toBe('Delete Document');
-  }, 40000); // Increase timeout if necessary
+    it('POST /api/documents should create a new document', async () => {
+        const documentData = {
+            documentId: 'document2',
+            name: 'Document 2',
+            title: 'Document 2',
+            content: 'Content of document 2',
+            uploadedBy: new mongoose.Types.ObjectId(),
+            path: 'path/to/document2'
+        };
+
+        const response = await request(app).post('/api/documents').send(documentData);
+        expect(response.statusCode).toBe(201);
+        expect(response.body.title).toBe('Document 2');
+    });
+
+    it('PUT /api/documents/:id should update a document', async () => {
+        const document = new Document({
+            documentId: 'document3',
+            name: 'Update Document',
+            title: 'Update Document',
+            content: 'Content of update document',
+            uploadedBy: new mongoose.Types.ObjectId(),
+            path: 'path/to/updateDocument'
+        });
+        const savedDocument = await document.save();
+
+        const updatedData = { title: 'Updated Document' };
+        const response = await request(app)
+            .put(`/api/documents/${savedDocument._id}`)
+            .send(updatedData);
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.document.title).toBe('Updated Document');
+    });
+
+    it('DELETE /api/documents/:id should delete a document', async () => {
+        const document = new Document({
+            documentId: 'document4',
+            name: 'Delete Document',
+            title: 'Delete Document',
+            content: 'Content of delete document',
+            uploadedBy: new mongoose.Types.ObjectId(),
+            path: 'path/to/deleteDocument'
+        });
+        const savedDocument = await document.save();
+
+        const response = await request(app).delete(`/api/documents/${savedDocument._id}`);
+        expect(response.statusCode).toBe(200);
+        expect(response.body.message).toBe('Document deleted');
+    });
 });

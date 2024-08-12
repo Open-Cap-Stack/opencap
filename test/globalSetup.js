@@ -1,4 +1,4 @@
-require("dotenv").config();
+require('dotenv').config();
 const mongoose = require("mongoose");
 
 module.exports = async () => {
@@ -11,4 +11,3 @@ module.exports = async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
 };
-require("dotenv").config();

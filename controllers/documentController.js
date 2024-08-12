@@ -1,6 +1,8 @@
-import Document from '../models/Document.js';
+// controllers/documentController.js
 
-export const createDocument = async (req, res) => {
+const Document = require('../models/Document');
+
+const createDocument = async (req, res) => {
   const { documentId, name, path, uploadedBy, uploadedAt, metadata } = req.body;
 
   if (!documentId || !name || !path || !uploadedBy || !metadata) {
@@ -16,7 +18,7 @@ export const createDocument = async (req, res) => {
   }
 };
 
-export const getAllDocuments = async (req, res) => {
+const getAllDocuments = async (req, res) => {
   try {
     const documents = await Document.find();
     res.status(200).json({ documents });
@@ -25,7 +27,7 @@ export const getAllDocuments = async (req, res) => {
   }
 };
 
-export const getDocumentById = async (req, res) => {
+const getDocumentById = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
     if (!document) {
@@ -37,7 +39,7 @@ export const getDocumentById = async (req, res) => {
   }
 };
 
-export const updateDocumentById = async (req, res) => {
+const updateDocumentById = async (req, res) => {
   try {
     const updatedDocument = await Document.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedDocument) {
@@ -49,7 +51,7 @@ export const updateDocumentById = async (req, res) => {
   }
 };
 
-export const deleteDocumentById = async (req, res) => {
+const deleteDocumentById = async (req, res) => {
   try {
     const deletedDocument = await Document.findByIdAndDelete(req.params.id);
     if (!deletedDocument) {
@@ -59,4 +61,12 @@ export const deleteDocumentById = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Error deleting document' });
   }
+};
+
+module.exports = {
+  createDocument,
+  getAllDocuments,
+  getDocumentById,
+  updateDocumentById,
+  deleteDocumentById,
 };

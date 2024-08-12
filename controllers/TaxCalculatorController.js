@@ -1,6 +1,6 @@
 // File: controllers/taxCalculatorController.js
 
-const TaxCalculator = require('../models/TaxCalculator');
+const TaxCalculator = require('../models/TaxCalculatorModel');
 
 // Calculate tax and create a new tax calculation record
 exports.calculateTax = async (req, res) => {

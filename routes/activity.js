@@ -1,11 +1,15 @@
+// routes/activity.js
 const express = require('express');
 const router = express.Router();
-const Activity = require('../models/Activity'); // Ensure you have an Activity model
+const Activity = require('../models/Activity');
 
 // Get all activities
-router.get('/activities', async (req, res) => {
+router.get('/', async (req, res) => {  // Root route should be '/'
   try {
     const activities = await Activity.find();
+    if (activities.length === 0) {
+      return res.status(404).json({ message: 'No activities found' });
+    }
     res.status(200).json(activities);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -13,13 +17,15 @@ router.get('/activities', async (req, res) => {
 });
 
 // Create a new activity
-router.post('/activities', async (req, res) => {
+router.post('/', async (req, res) => {  // Root route should be '/'
   const activity = new Activity({
-    activityId: req.body.activityId,
     name: req.body.name,
     description: req.body.description,
     date: req.body.date,
     type: req.body.type,
+    participants: req.body.participants,
+    status: req.body.status,
+    createdBy: req.body.createdBy,
   });
 
   try {
@@ -31,7 +37,7 @@ router.post('/activities', async (req, res) => {
 });
 
 // Get a single activity by ID
-router.get('/activities/:id', async (req, res) => {
+router.get('/:id', async (req, res) => {  // Root route should be '/:id'
   try {
     const activity = await Activity.findById(req.params.id);
     if (!activity) return res.status(404).json({ message: 'Activity not found' });
@@ -42,7 +48,7 @@ router.get('/activities/:id', async (req, res) => {
 });
 
 // Update an activity by ID
-router.put('/activities/:id', async (req, res) => {
+router.put('/:id', async (req, res) => {  // Root route should be '/:id'
   try {
     const activity = await Activity.findById(req.params.id);
     if (!activity) return res.status(404).json({ message: 'Activity not found' });
@@ -51,6 +57,9 @@ router.put('/activities/:id', async (req, res) => {
     activity.description = req.body.description || activity.description;
     activity.date = req.body.date || activity.date;
     activity.type = req.body.type || activity.type;
+    activity.participants = req.body.participants || activity.participants;
+    activity.status = req.body.status || activity.status;
+    activity.updatedAt = Date.now();
 
     const updatedActivity = await activity.save();
     res.status(200).json(updatedActivity);
@@ -60,7 +69,7 @@ router.put('/activities/:id', async (req, res) => {
 });
 
 // Delete an activity by ID
-router.delete('/activities/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {  // Root route should be '/:id'
   try {
     const activity = await Activity.findById(req.params.id);
     if (!activity) return res.status(404).json({ message: 'Activity not found' });

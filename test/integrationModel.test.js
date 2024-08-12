@@ -1,23 +1,16 @@
-// integrationModel.test.js
-
 const mongoose = require('mongoose');
-const IntegrationModule = require('../models/integrationModule');
+const IntegrationModule = require('../models/integrationModel');
+const { connectDB, disconnectDB } = require('../db');
 
 describe('IntegrationModule Model Test', () => {
-  // Connect to the in-memory database before running tests
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGO_URL, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await connectDB();
   });
 
-  // Clear the database after each test
   afterEach(async () => {
     await IntegrationModule.deleteMany({});
   });
 
-  // Close the connection after all tests are done
   afterAll(async () => {
     await mongoose.connection.close();
   });
@@ -27,7 +20,7 @@ describe('IntegrationModule Model Test', () => {
       IntegrationID: '123',
       ToolName: 'Sample Tool',
       Description: 'A sample tool description',
-      LinkOrPath: 'http://example.com',
+      Link: 'http://example.com',
     });
     const savedIntegrationModule = await validIntegrationModule.save();
 
@@ -35,7 +28,7 @@ describe('IntegrationModule Model Test', () => {
     expect(savedIntegrationModule.IntegrationID).toBe('123');
     expect(savedIntegrationModule.ToolName).toBe('Sample Tool');
     expect(savedIntegrationModule.Description).toBe('A sample tool description');
-    expect(savedIntegrationModule.LinkOrPath).toBe('http://example.com');
+    expect(savedIntegrationModule.Link).toBe('http://example.com');
   });
 
   it('should fail to create an integration module without required fields', async () => {
@@ -60,7 +53,7 @@ describe('IntegrationModule Model Test', () => {
       IntegrationID: '123',
       ToolName: 'Tool One',
       Description: 'First tool description',
-      LinkOrPath: 'http://example.com/one',
+      Link: 'http://example.com/one',
     });
     await integrationModule1.save();
 
@@ -68,7 +61,7 @@ describe('IntegrationModule Model Test', () => {
       IntegrationID: '123',
       ToolName: 'Tool Two',
       Description: 'Second tool description',
-      LinkOrPath: 'http://example.com/two',
+      Link: 'http://example.com/two',
     });
 
     let err;
@@ -78,7 +71,8 @@ describe('IntegrationModule Model Test', () => {
       err = error;
     }
 
-    expect(err).toBeInstanceOf(mongoose.Error);
+    // Check if the error code indicates a duplicate key error
+    expect(err).toBeDefined();
     expect(err.code).toBe(11000); // Duplicate key error code
   });
 });

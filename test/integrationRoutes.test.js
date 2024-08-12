@@ -3,7 +3,7 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const IntegrationModule = require('../models/integrationModule');
+const IntegrationModule = require('../models/integrationModel');
 const integrationRoutes = require('../routes/integration');
 
 // Setup Express app and use the routes
