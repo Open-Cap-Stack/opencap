@@ -1,5 +1,5 @@
 const express = require('express');
-const TaxCalculator = require('../models/TaxCalculator');
+const TaxCalculator = require('../models/TaxCalculatorModel');
 
 const router = express.Router();
 
