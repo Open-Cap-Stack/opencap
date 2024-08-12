@@ -1,24 +1,16 @@
 const mongoose = require("mongoose");
 const chai = require("chai");
-const Employee = require("../models/employee");
+const Employee = require("../models/employeeModel");
 const should = chai.should();
 
 describe("Employee Model", () => {
-  before((done) => {
-    mongoose.connect("mongodb://localhost/testDB", {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    const db = mongoose.connection;
-    db.on("error", console.error.bind(console, "connection error:"));
-    db.once("open", () => {
-      console.log("Connected to test database");
-      done();
-    });
+  beforeAll(async function () {
+    await connectDB();
   });
-
-  after((done) => {
-    mongoose.connection.close(done);
+  
+  afterAll(async function () {
+    await mongoose.connection.db.dropDatabase();
+    await mongoose.connection.close();
   });
 
   it("should create a new employee", (done) => {

@@ -5,9 +5,13 @@ const Employee = require('../models/employeeModel');
 const expect = chai.expect;
 
 describe('Employee Controller', () => {
-  beforeEach(async () => {
-    // Clean up the database before each test
-    await Employee.deleteMany({});
+  beforeAll(async function () {
+    await connectDB();
+  });
+  
+  afterAll(async function () {
+    await mongoose.connection.db.dropDatabase();
+    await mongoose.connection.close();
   });
 
   describe('/POST employee', () => {
