@@ -6,7 +6,7 @@ const IntegrationModule = require('../models/integrationModel');
 describe('IntegrationModule Model Test', () => {
   // Connect to the in-memory database before running tests
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGO_URL, {
+    await mongoose.connect(process.env.MONGODB_URL, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
