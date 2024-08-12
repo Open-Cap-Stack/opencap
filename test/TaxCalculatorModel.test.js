@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const path = require('path');
 const TaxCalculator = require('../models/TaxCalculatorModel');
+const { connectDB, disconnectDB } = require('../db');
+
 
 beforeAll(async () => {
   await mongoose.connect('mongodb://localhost:27017/test', { useNewUrlParser: true, useUnifiedTopology: true });
