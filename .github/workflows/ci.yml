@@ -19,7 +19,7 @@ jobs:
           - 27017:27017
 
     env:
-      MONGO_URI: mongodb://localhost:27017/open-cap-stack
+      MONGODB_URI: mongodb://localhost:27017/open-cap-stack
       PORT: 5000
 
     steps:
