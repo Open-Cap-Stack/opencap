@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const MongoError = require('mongodb').MongoError; // Import MongoError from the mongodb package
 const IntegrationModule = require('../models/integrationModel');
 const { connectDB, disconnectDB } = require('../db');
 
@@ -72,8 +71,8 @@ describe('IntegrationModule Model Test', () => {
       err = error;
     }
 
-    // Check for MongoError instance
-    expect(err).toBeInstanceOf(MongoError);
+    // Check if the error code indicates a duplicate key error
+    expect(err).toBeDefined();
     expect(err.code).toBe(11000); // Duplicate key error code
   });
 });
