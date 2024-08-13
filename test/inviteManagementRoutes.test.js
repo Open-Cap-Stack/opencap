@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 app.use("/api", inviteRoutes);
 
 // Mock the Invite model
-jest.mock("../models/inviteManagement");
+jest.mock("../models/inviteManagementModel");
 
 const sampleInvite = {
   InviteID: "test123",
