@@ -15,7 +15,7 @@ const stakeholderSchema = new mongoose.Schema({
     required: true
   },
   projectId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId, // Changed to ObjectId
     required: true
   }
 });
