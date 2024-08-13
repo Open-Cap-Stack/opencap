@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const investmentTracker = require('../models/investmentTracker');
+const investmentTracker = require('../models/investmentTrackerModel');
 
 describe('Investment Tracker Model', () => {
   beforeAll(async () => {
@@ -53,24 +53,27 @@ describe('Investment Tracker Model', () => {
       EquityPercentage: 20,
       CurrentValue: 2000,
     });
-
+  
     const tracker2 = new investmentTracker({
       TrackID: '123',
       Company: 'Company Two',
       EquityPercentage: 30,
       CurrentValue: 3000,
     });
-
+  
     await tracker1.save();
-
+  
     let err;
     try {
       await tracker2.save();
     } catch (error) {
       err = error;
     }
-
-    expect(err).toBeInstanceOf(mongoose.Error);
-    expect(err.code).toBe(11000); // Duplicate key error code
+  
+    // General error checking
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain('E11000'); // Check for the duplicate key error code in the message
   });
+  
+  
 });
