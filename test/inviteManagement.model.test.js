@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Invite = require("../models/invitemanagement");
+const Invite = require("../models/inviteManagementModel");
 
 beforeEach(async () => {
   await Invite.deleteMany({}); // Clear the collection
