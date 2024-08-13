@@ -2,13 +2,13 @@ const IntegrationModule = require('../models/integrationModel');
 
 async function createIntegrationModule(req, res, next) {
   try {
-    const { IntegrationID, ToolName, Description, LinkOrPath } = req.body;
+    const { IntegrationID, ToolName, Description, Link } = req.body; // Updated field name
 
     const integrationModule = new IntegrationModule({
       IntegrationID,
       ToolName,
       Description,
-      LinkOrPath,
+      Link, // Updated field name
     });
 
     const newIntegrationModule = await integrationModule.save();
