@@ -1,78 +1,64 @@
-const Invite = require("../models/inviteManagement");
+// inviteManagementController.js
+const Invite = require('../models/inviteManagementModel');
 
-// Controller function to create a new invite
-async function createInvite(req, res, next) {
+exports.createInvite = async (req, res) => {
   try {
-    const { InviteID, ReceiverID, Status, Timestamp } = req.body;
-    const invite = new Invite({ InviteID, ReceiverID, Status, Timestamp });
-    const newInvite = await invite.save();
-    res.status(201).json(newInvite);
+    const newInvite = new Invite(req.body);
+    const savedInvite = await newInvite.save();
+    res.status(201).json(savedInvite); // Ensure this returns an object
   } catch (error) {
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ message: error.message });
-    }
-    next(error);
+    console.error('Error creating invite:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
-}
+};
 
-// Controller function to get all invites
-async function getAllInvites(req, res, next) {
+
+
+exports.getAllInvites = async (req, res) => {
   try {
     const invites = await Invite.find();
     res.status(200).json(invites);
   } catch (error) {
-    next(error);
+    console.error('Error fetching invites:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
-}
+};
 
-// Controller function to get an invite by ID
-async function getInviteById(req, res, next) {
+exports.getInviteById = async (req, res) => {
   try {
     const invite = await Invite.findById(req.params.id);
     if (!invite) {
-      return res.status(404).json({ message: "Invite not found" });
+      return res.status(404).json({ message: 'Invite not found' });
     }
     res.status(200).json(invite);
   } catch (error) {
-    next(error);
+    console.error('Error fetching invite by ID:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
-}
+};
 
-// Controller function to update an invite
-async function updateInvite(req, res, next) {
+exports.updateInvite = async (req, res) => {
   try {
-    const { Status } = req.body;
-    const invite = await Invite.findByIdAndUpdate(
-      req.params.id,
-      { Status },
-      { new: true }
-    );
-    if (!invite) {
-      return res.status(404).json({ message: "Invite not found" });
+    const updatedInvite = await Invite.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedInvite) {
+      return res.status(404).json({ message: 'Invite not found' });
     }
-    res.status(200).json(invite);
+    res.status(200).json(updatedInvite);
   } catch (error) {
-    next(error);
+    console.error('Error updating invite:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
-}
+};
 
-// Controller function to delete an invite
-async function deleteInvite(req, res, next) {
+exports.deleteInvite = async (req, res) => {
   try {
-    const invite = await Invite.findByIdAndDelete(req.params.id);
-    if (!invite) {
-      return res.status(404).json({ message: "Invite not found" });
+    const result = await Invite.findByIdAndDelete(req.params.id);
+    if (!result) {
+      return res.status(404).json({ message: 'Invite not found' });
     }
     res.status(204).send();
   } catch (error) {
-    next(error);
+    console.error('Error deleting invite:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
-}
-
-module.exports = {
-  createInvite,
-  getAllInvites,
-  getInviteById,
-  updateInvite,
-  deleteInvite,
 };

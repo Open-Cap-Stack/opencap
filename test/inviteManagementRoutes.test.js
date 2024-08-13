@@ -2,8 +2,8 @@ const request = require("supertest");
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const inviteRoutes = require("../routes/inviteManagement");
-const Invite = require("../models/invitemanagement");
+const inviteRoutes = require("../routes/inviteManagementRoute");
+const Invite = require("../models/inviteManagementModel");
 
 // Set up the Express app
 const app = express();
