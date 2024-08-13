@@ -4,20 +4,20 @@ const stakeholderSchema = new mongoose.Schema({
   stakeholderId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   name: {
     type: String,
-    required: true
+    required: true,
   },
   role: {
     type: String,
-    required: true
+    required: true,
   },
   projectId: {
-    type: mongoose.Schema.Types.ObjectId, // Changed to ObjectId
-    required: true
-  }
+    type: String,  // Ensure this is defined as a String
+    required: true,
+  },
 });
 
 const Stakeholder = mongoose.model('Stakeholder', stakeholderSchema);
