@@ -2,28 +2,14 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 
-// Route for creating a new admin
-router.post('/admins', adminController.createAdmin);
-
-// Route for retrieving all admins
-router.get('/admins', adminController.getAllAdmins);
-
-// Route for retrieving a single admin by ID
-router.get('/admins/:id', adminController.getAdminById);
-
-// Route for updating an admin by ID
-router.put('/admins/:id', adminController.updateAdmin);
-
-// Route for deleting an admin by ID
-router.delete('/admins/:id', adminController.deleteAdmin);
-
-// Route for admin login
-router.post('/admins/login', adminController.loginAdmin);
-
-// Route for admin logout
-router.post('/admins/logout', adminController.logoutAdmin);
-
-// Route for changing admin password
-router.put('/admins/:id/change-password', adminController.changePassword);
+// Define the routes and associate them with the controller methods
+router.post('/', adminController.createAdmin); 
+router.get('/', adminController.getAllAdmins);  // Use `/` for getting all admins
+router.get('/:id', adminController.getAdminById);
+router.put('/:id', adminController.updateAdmin);
+router.delete('/:id', adminController.deleteAdmin);
+router.post('/login', adminController.loginAdmin); // Use `/login` for login
+router.post('/logout', adminController.logoutAdmin); // Use `/logout` for logout
+router.put('/:id/change-password', adminController.changePassword);
 
 module.exports = router;

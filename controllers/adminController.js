@@ -1,5 +1,5 @@
-const Admin = require("../models/admin");
-const mongoose = require("mongoose");
+const Admin = require('../models/admin');
+const mongoose = require('mongoose');
 
 exports.createAdmin = async (req, res) => {
   const { UserID, Name, Email, UserRoles, NotificationSettings } = req.body;
@@ -9,7 +9,7 @@ exports.createAdmin = async (req, res) => {
   }
 
   const newAdmin = new Admin({
-    UserID: new mongoose.Types.ObjectId(UserID),
+    UserID,
     Name,
     Email,
     UserRoles,
@@ -24,70 +24,70 @@ exports.createAdmin = async (req, res) => {
   }
 };
 
-exports.getAdmins = async (req, res) => {
+exports.getAllAdmins = async (req, res) => {
   try {
     const admins = await Admin.find();
-    if (!admins) {
-      return res.status(404).json({ message: "No admins found" });
-    }
     res.status(200).json(admins);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
 exports.getAdminById = async (req, res) => {
   try {
-    const adminId = req.params.id;
-    const admin = await Admin.findById(adminId);
+    const admin = await Admin.findById(req.params.id);
 
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    return res.status(200).json(admin);
+    res.status(200).json(admin);
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-exports.updateAdminById = async (req, res) => {
-  const { id } = req.params;
-  if (!id) {
-    return res.status(400).json({ error: "Invalid admin ID" });
-  }
-
+exports.updateAdmin = async (req, res) => {
   try {
-    const updatedAdmin = await Admin.findByIdAndUpdate(id, req.body, {
+    const updatedAdmin = await Admin.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
 
     if (!updatedAdmin) {
-      return res.status(404).json({ error: "Admin not found" });
+      return res.status(404).json({ message: "Admin not found" });
     }
 
-    return res.status(200).json(updatedAdmin);
+    res.status(200).json(updatedAdmin);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
 exports.deleteAdmin = async (req, res) => {
-  const { id } = req.params;
-
-  if (!id) {
-    return res.status(400).json({ error: "Invalid admin ID" });
-  }
-
   try {
-    const deletedAdmin = await Admin.findByIdAndDelete(id);
+    const deletedAdmin = await Admin.findByIdAndDelete(req.params.id);
 
     if (!deletedAdmin) {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    return res.status(200).json({ message: "Admin deleted" });
+    res.status(200).json({ message: "Admin deleted" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
+};
+
+exports.loginAdmin = async (req, res) => {
+  // Implement login logic
+  res.status(200).json({ token: "fake-token" }); // Mock response
+};
+
+exports.logoutAdmin = async (req, res) => {
+  // Implement logout logic
+  res.status(200).json({ message: "Admin logged out" });
+};
+
+exports.changePassword = async (req, res) => {
+  // Implement password change logic
+  res.status(200).json({ message: "Password changed" });
 };
