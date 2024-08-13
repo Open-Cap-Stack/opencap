@@ -73,8 +73,4 @@ describe('Investment Tracker Model', () => {
   //     err = error;
   //   }
   
-  //   // Ensure that err is defined and contains the expected MongoDB duplicate key error code
-  //   expect(err.code).toBe(11000); // MongoDB duplicate key error code is 11000
-  // });
-  
-});
+  //   // Ensure that err is defined and contains the expected MongoDB duplicate key 
