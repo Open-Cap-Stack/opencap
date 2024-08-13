@@ -3,7 +3,7 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const { createIntegrationModule } = require('../controllers/integrationModuleController');
+const { createIntegrationModule } = require('../controllers/integrationController');
 const IntegrationModule = require('../models/integrationModel');
 
 // Mock the IntegrationModule model

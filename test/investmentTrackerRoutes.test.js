@@ -2,7 +2,7 @@ const request = require('supertest');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const router = require('../routes/investmentTracker');
+const router = require('../routes/investmentTrackerRoutes');
 const investmentTracker = require('../models/investmentTracker');
 
 jest.mock('../models/investmentTracker');
