@@ -71,7 +71,9 @@ describe('ShareClass Routes', () => {
     await shareClass.save();
 
     const updatedData = { name: 'Updated Class' };
-    const response = await request(server).put(`/api/shareClasses/${shareClass._id}`).send(updatedData);
+    const response = await request(server)
+      .put(`/api/shareClasses/${shareClass._id}`)
+      .send(updatedData);
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Updated Class');
   });
@@ -90,6 +92,6 @@ describe('ShareClass Routes', () => {
 
     const response = await request(server).delete(`/api/shareClasses/${shareClass._id}`);
     expect(response.status).toBe(200);
-    expect(response.body.name).toBe('Delete Class');
+    expect(response.body.message).toBe('Share class deleted');
   });
 });
