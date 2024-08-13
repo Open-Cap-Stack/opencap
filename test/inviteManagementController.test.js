@@ -3,7 +3,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const inviteManagementController = require("../controllers/inviteManagementController");
-const Invite = require("../models/inviteManagement");
+const Invite = require("../models/invitemanagement");
 
 // Set up the Express app
 const app = express();

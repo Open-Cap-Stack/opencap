@@ -1,7 +1,7 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app');
-const User = require('../models/user');
+const User = require('../models/User');
 const { connectDB, disconnectDB } = require('../db');
 
 const PORT = 5005; // Ensure a unique port
