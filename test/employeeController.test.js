@@ -4,6 +4,7 @@ const server = require('../app');
 const Employee = require('../models/employeeModel');
 const expect = chai.expect;
 const { connectDB, disconnectDB } = require('../db');
+const mongoose = require('mongoose');
 
 describe('Employee Controller', () => {
   beforeAll(async function () {
