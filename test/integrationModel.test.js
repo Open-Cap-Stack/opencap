@@ -20,7 +20,7 @@ describe('IntegrationModule Model Test', () => {
       IntegrationID: '123',
       ToolName: 'Sample Tool',
       Description: 'A sample tool description',
-      Link: 'http://example.com',
+      Link: 'http://example.com', // Updated field name
     });
     const savedIntegrationModule = await validIntegrationModule.save();
 
@@ -28,7 +28,7 @@ describe('IntegrationModule Model Test', () => {
     expect(savedIntegrationModule.IntegrationID).toBe('123');
     expect(savedIntegrationModule.ToolName).toBe('Sample Tool');
     expect(savedIntegrationModule.Description).toBe('A sample tool description');
-    expect(savedIntegrationModule.Link).toBe('http://example.com');
+    expect(savedIntegrationModule.Link).toBe('http://example.com'); // Updated field name
   });
 
   it('should fail to create an integration module without required fields', async () => {

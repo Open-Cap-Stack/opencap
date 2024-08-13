@@ -5,6 +5,4 @@ const investmentTrackerController = require('../controllers/investmentTrackerCon
 // Route for tracking investments
 router.post('/investments', investmentTrackerController.trackInvestment);
 
-// Add more routes for investment tracker-related functionality here
-
 module.exports = router;

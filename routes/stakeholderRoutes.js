@@ -1,16 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const Stakeholder = require('../models/Stakeholder');
+const {
+  getAllStakeholders,
+  createStakeholder,
+  getStakeholderById,
+  updateStakeholderById,
+  deleteStakeholderById
+} = require('../controllers/stakeholderController');
 
-router.get('/', async (req, res) => {
-  const stakeholders = await Stakeholder.find();
-  res.status(200).json(stakeholders);
-});
-
-router.post('/', async (req, res) => {
-  const newStakeholder = new Stakeholder(req.body);
-  await newStakeholder.save();
-  res.status(201).json(newStakeholder);
-});
+router.get('/', getAllStakeholders);
+router.post('/', createStakeholder);
+router.get('/:id', getStakeholderById);
+router.put('/:id', updateStakeholderById);
+router.delete('/:id', deleteStakeholderById);
 
 module.exports = router;

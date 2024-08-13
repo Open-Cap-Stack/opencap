@@ -2,37 +2,36 @@ const request = require('supertest');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const { createInvestmentTracker } = require('../controllers/investmentTrackerController');
+const investmentTrackerController = require('../controllers/investmentTrackerController');
+const investmentTrackerModel = require('../models/investmentTrackerModel');
 
 // Set up the Express app
 const app = express();
 app.use(bodyParser.json());
-app.post('/investments', createInvestmentTracker);
+app.post('/investments', investmentTrackerController.trackInvestment);
 
-// Mock the investmentTracker model
-jest.mock('../models/investmentTracker', () => {
-  return function () {
-    return {
-      save: jest.fn().mockResolvedValue({
-        TrackID: '123',
-        Company: 'Test Company',
-        EquityPercentage: 10,
-        CurrentValue: 1000,
-      }),
-    };
-  };
+// Mock the investmentTrackerModel model
+jest.mock('../models/investmentTrackerModel', () => {
+  return jest.fn().mockImplementation(() => ({
+    save: jest.fn().mockResolvedValue({
+      TrackID: '123',
+      Company: 'Test Company',
+      EquityPercentage: 10,
+      CurrentValue: 1000,
+    }),
+  }));
 });
 
 describe('Investment Tracker Controller', () => {
   beforeAll(async () => {
-    const mongoUri = 'mongodb://127.0.0.1/investmentTrackerTestDB';
-    await mongoose.connect(mongoUri, {
+    await mongoose.connect('mongodb://127.0.0.1/investmentTrackerTestDB', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
   });
 
   afterAll(async () => {
+    await mongoose.connection.db.dropDatabase();
     await mongoose.connection.close();
   });
 
