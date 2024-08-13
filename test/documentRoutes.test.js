@@ -40,8 +40,9 @@ describe('Document Routes API', () => {
 
         const response = await request(app).get('/api/documents');
         expect(response.statusCode).toBe(200);
-        expect(response.body.length).toBe(1);
-        expect(response.body[0].title).toBe('Document 1');
+        expect(response.body.documents).toBeInstanceOf(Array);
+        expect(response.body.documents.length).toBe(1);
+        expect(response.body.documents[0].title).toBe('Document 1');
     });
 
     it('POST /api/documents should create a new document', async () => {
@@ -51,12 +52,13 @@ describe('Document Routes API', () => {
             title: 'Document 2',
             content: 'Content of document 2',
             uploadedBy: new mongoose.Types.ObjectId(),
-            path: 'path/to/document2'
+            path: 'path/to/document2',
+            metadata: {} // Include this field
         };
 
         const response = await request(app).post('/api/documents').send(documentData);
         expect(response.statusCode).toBe(201);
-        expect(response.body.title).toBe('Document 2');
+        expect(response.body.document.title).toBe('Document 2');
     });
 
     it('PUT /api/documents/:id should update a document', async () => {

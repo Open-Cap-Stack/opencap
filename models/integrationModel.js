@@ -12,11 +12,11 @@ const integrationSchema = new mongoose.Schema({
   },
   Description: {
     type: String,
-    required: false, // Optional field
+    required: false,
   },
-  Link: {
+  Link: { // Updated field name
     type: String,
-    required: false, // Optional field
+    required: false,
   },
 });
 

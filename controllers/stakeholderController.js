@@ -1,31 +1,31 @@
-import Stakeholder from '../models/Stakeholder.js';
+const Stakeholder = require('../models/Stakeholder');
 
-export const createStakeholder = async (req, res) => {
-  const { name, role, email } = req.body;
+exports.createStakeholder = async (req, res) => {
+  const { stakeholderId, name, role, projectId } = req.body;
 
-  if (!name || !role || !email) {
+  if (!stakeholderId || !name || !role || !projectId) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   try {
-    const stakeholder = new Stakeholder({ name, role, email });
+    const stakeholder = new Stakeholder({ stakeholderId, name, role, projectId });
     await stakeholder.save();
-    res.status(201).json({ stakeholder });
+    res.status(201).json(stakeholder);
   } catch (error) {
     res.status(500).json({ error: 'Error creating stakeholder' });
   }
 };
 
-export const getAllStakeholders = async (req, res) => {
+exports.getAllStakeholders = async (req, res) => {
   try {
     const stakeholders = await Stakeholder.find();
-    res.status(200).json({ stakeholders });
+    res.status(200).json(stakeholders); // Ensure this returns just the array
   } catch (error) {
     res.status(500).json({ error: 'Error fetching stakeholders' });
   }
 };
 
-export const getStakeholderById = async (req, res) => {
+exports.getStakeholderById = async (req, res) => {
   try {
     const stakeholder = await Stakeholder.findById(req.params.id);
     if (!stakeholder) {
@@ -37,7 +37,7 @@ export const getStakeholderById = async (req, res) => {
   }
 };
 
-export const updateStakeholderById = async (req, res) => {
+exports.updateStakeholderById = async (req, res) => {
   try {
     const updatedStakeholder = await Stakeholder.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedStakeholder) {
@@ -49,7 +49,7 @@ export const updateStakeholderById = async (req, res) => {
   }
 };
 
-export const deleteStakeholderById = async (req, res) => {
+exports.deleteStakeholderById = async (req, res) => {
   try {
     const deletedStakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
     if (!deletedStakeholder) {

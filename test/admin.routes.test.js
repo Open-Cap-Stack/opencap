@@ -1,9 +1,10 @@
 const request = require("supertest");
 const express = require("express");
 const mongoose = require("mongoose");
-const Admin = require("../models/admin"); // Assuming you have an Admin model
-const connectDB = require("../db");
+const Admin = require("../models/admin");
+const { connectDB, disconnectDB } = require('../db');
 
+// Initialize Express app
 const app = express();
 app.use(express.json());
 app.use("/api/admins", require("../routes/adminRoutes"));
@@ -21,77 +22,92 @@ beforeEach(async () => {
   await Admin.deleteMany({});
 });
 
-describe("Admin API Test", () => {
+describe("Admin API Tests", () => {
   it("should create a new admin", async () => {
     const res = await request(app)
       .post("/api/admins")
       .send({
-        name: "Admin",
-        email: "admin@example.com",
-        password: "password",
+        UserID: "admin123",
+        Name: "Admin",
+        Email: "admin@example.com",
+        UserRoles: ["admin"],
+        NotificationSettings: {
+          emailNotifications: true,
+          smsNotifications: false,
+          pushNotifications: true,
+          notificationFrequency: "Immediate"
+        }
       });
 
     expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty("message", "Admin created");
-    expect(res.body).toHaveProperty("admin");
-    expect(res.body.admin).toHaveProperty("_id");
-    expect(res.body.admin).toHaveProperty("email", "admin@example.com");
-  }, 10000);
+    expect(res.body).toHaveProperty("UserID", "admin123");
+    expect(res.body).toHaveProperty("Name", "Admin");
+    expect(res.body).toHaveProperty("Email", "admin@example.com");
+  });
 
   it("should get all admins", async () => {
     await new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     }).save();
 
     const res = await request(app).get("/api/admins");
 
     expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty("admins");
-    expect(res.body.admins).toBeInstanceOf(Array);
-    expect(res.body.admins.length).toBe(1);
-  }, 10000);
+    expect(res.body).toBeInstanceOf(Array);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0]).toHaveProperty("Name", "Admin");
+  });
 
   it("should get an admin by ID", async () => {
     const admin = new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     });
     await admin.save();
 
     const res = await request(app).get(`/api/admins/${admin._id}`);
 
     expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty("admin");
-    expect(res.body.admin).toHaveProperty("_id", admin._id.toString());
-  }, 10000);
+    expect(res.body).toHaveProperty("_id", admin._id.toString());
+    expect(res.body).toHaveProperty("Name", "Admin");
+  });
 
   it("should update an admin by ID", async () => {
     const admin = new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     });
     await admin.save();
 
     const res = await request(app)
       .put(`/api/admins/${admin._id}`)
       .send({
-        name: "Updated Admin",
+        Name: "Updated Admin",
+        UserRoles: ["admin", "superadmin"]
       });
 
     expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty("message", "Admin updated");
-    expect(res.body.admin).toHaveProperty("name", "Updated Admin");
-  }, 10000);
+    expect(res.body).toHaveProperty("Name", "Updated Admin");
+    expect(res.body.UserRoles).toContain("superadmin");
+  });
 
   it("should delete an admin by ID", async () => {
     const admin = new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     });
     await admin.save();
 
@@ -99,40 +115,45 @@ describe("Admin API Test", () => {
 
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty("message", "Admin deleted");
-  }, 10000);
+  });
 
   it("should login an admin", async () => {
     const admin = new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      Password: "password", // Ensure your model supports this field
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     });
     await admin.save();
 
     const res = await request(app)
       .post("/api/admins/login")
       .send({
-        email: "admin@example.com",
-        password: "password",
+        Email: "admin@example.com",
+        Password: "password"
       });
 
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty("token");
-  }, 10000);
+  });
 
   it("should logout an admin", async () => {
-    // Assuming the logout functionality requires an authenticated session
     const res = await request(app).post("/api/admins/logout");
 
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty("message", "Admin logged out");
-  }, 10000);
+  });
 
-  it("should change an admin password", async () => {
+  it("should change an admin's password", async () => {
     const admin = new Admin({
-      name: "Admin",
-      email: "admin@example.com",
-      password: "password",
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      Password: "password",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
     });
     await admin.save();
 
@@ -140,10 +161,10 @@ describe("Admin API Test", () => {
       .put(`/api/admins/${admin._id}/change-password`)
       .send({
         oldPassword: "password",
-        newPassword: "newpassword",
+        newPassword: "newpassword"
       });
 
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty("message", "Password changed");
-  }, 10000);
+  });
 });
