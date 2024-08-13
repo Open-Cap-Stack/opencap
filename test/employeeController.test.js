@@ -1,23 +1,25 @@
 const request = require('supertest');
 const chai = require('chai');
 const server = require('../app');
-const Employee = require('../models/employeeModel');
-const expect = chai.expect;
 const { connectDB, disconnectDB } = require('../db');
 const mongoose = require('mongoose');
+const Employee = require('../models/employeeModel');
+const expect = chai.expect;
 
 describe('Employee Controller', () => {
-  beforeAll(async function () {
+  beforeAll(async () => {
+    console.log('Connecting to DB...');
     await connectDB();
   });
-  
-  afterAll(async function () {
+
+  afterAll(async () => {
+    console.log('Dropping database and disconnecting...');
     await mongoose.connection.db.dropDatabase();
-    await mongoose.connection.close();
+    await disconnectDB();
   });
 
   describe('/POST employee', () => {
-    it('it should create a new employee', async () => {
+    it('should create a new employee', async () => {
       const employee = {
         EmployeeID: 'E12345',
         Name: 'John Doe',
@@ -41,14 +43,15 @@ describe('Employee Controller', () => {
       };
 
       const response = await request(server)
-        .post('/employees')
+        .post('/api/employees') // Updated route to include /api
         .send(employee);
+
+      console.log('Response Status:', response.statusCode);
+      console.log('Response Body:', response.body);
 
       expect(response.statusCode).to.equal(201);
       expect(response.body).to.be.an('object');
       expect(response.body).to.have.property('Name').that.equals('John Doe');
     });
   });
-
-  // Additional controller tests (GET, PUT, DELETE)
 });
