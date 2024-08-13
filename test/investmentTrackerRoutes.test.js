@@ -3,9 +3,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const router = require('../routes/investmentTrackerRoutes');
-const investmentTracker = require('../models/investmentTracker');
+const investmentTracker = require('../models/investmentTrackerModel');
 
-jest.mock('../models/investmentTracker');
+jest.mock('../models/investmentTrackerModel');
 
 const app = express();
 app.use(bodyParser.json());
@@ -65,9 +65,11 @@ describe('Investment Tracker Routes', () => {
         EquityPercentage: 10,
         CurrentValue: 1000,
       });
-
+  
     expect(response.status).toBe(400);
+    expect(response.body).toHaveProperty('error', 'Missing required fields');
   });
+  
 
   // Add more tests here for other routes related to investmentTracker
 });

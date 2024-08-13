@@ -1,8 +1,12 @@
-const investmentTrackerModel = require('../models/investmentTracker');
+const investmentTrackerModel = require('../models/investmentTrackerModel');
 
-async function createInvestmentTracker(req, res, next) {
+async function trackInvestment(req, res, next) {
   try {
     const { TrackID, Company, EquityPercentage, CurrentValue } = req.body;
+
+    if (!TrackID || !Company || !EquityPercentage || !CurrentValue) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
     const newInvestment = new investmentTrackerModel({
       TrackID,
@@ -20,5 +24,5 @@ async function createInvestmentTracker(req, res, next) {
 }
 
 module.exports = {
-  createInvestmentTracker,
+  trackInvestment,
 };
