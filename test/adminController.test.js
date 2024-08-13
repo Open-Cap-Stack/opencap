@@ -9,33 +9,27 @@ jest.mock('../models/admin');
 
 const app = express();
 app.use(express.json());
-
-// Mock routes for testing
-app.post('/admins', adminController.createAdmin);
-app.get('/admins', adminController.getAdmins);
-app.get('/admins/:id', adminController.getAdminById);
-app.put('/admins/:id', adminController.updateAdminById);
-app.delete('/admins/:id', adminController.deleteAdmin);
+app.use("/api/admins", require("../routes/adminRoutes"));
 
 describe('Admin Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('POST /admins', () => {
+  describe('POST /api/admins', () => {
     it('should create a new admin', async () => {
       const adminData = {
         UserID: mongoose.Types.ObjectId().toString(),
         Name: 'John Doe',
         Email: 'john@example.com',
         UserRoles: ['admin'],
-        NotificationSettings: { email: true, sms: false }
+        NotificationSettings: { emailNotifications: true, smsNotifications: false }
       };
 
       Admin.prototype.save.mockResolvedValue(adminData);
 
       const response = await request(app)
-        .post('/admins')
+        .post('/api/admins')
         .send(adminData);
 
       expect(response.status).toBe(201);
@@ -44,7 +38,7 @@ describe('Admin Controller', () => {
 
     it('should return 400 if required fields are missing', async () => {
       const response = await request(app)
-        .post('/admins')
+        .post('/api/admins')
         .send({});
 
       expect(response.status).toBe(400);
@@ -52,7 +46,7 @@ describe('Admin Controller', () => {
     });
   });
 
-  describe('GET /admins', () => {
+  describe('GET /api/admins', () => {
     it('should get all admins', async () => {
       const admins = [
         { _id: mongoose.Types.ObjectId().toString(), Name: 'Admin 1' },
@@ -61,35 +55,35 @@ describe('Admin Controller', () => {
 
       Admin.find.mockResolvedValue(admins);
 
-      const response = await request(app).get('/admins');
+      const response = await request(app).get('/api/admins');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(admins);
     });
 
     it('should return 404 if no admins are found', async () => {
-      Admin.find.mockResolvedValue(null);
+      Admin.find.mockResolvedValue([]);
 
-      const response = await request(app).get('/admins');
+      const response = await request(app).get('/api/admins');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: 'No admins found' });
     });
   });
 
-  describe('GET /admins/:id', () => {
+  describe('GET /api/admins/:id', () => {
     it('should get an admin by id', async () => {
       const admin = {
         _id: mongoose.Types.ObjectId().toString(),
         Name: 'Admin 1',
         Email: 'admin1@example.com',
         UserRoles: ['admin'],
-        NotificationSettings: { email: true, sms: false }
+        NotificationSettings: { emailNotifications: true, smsNotifications: false }
       };
 
       Admin.findById.mockResolvedValue(admin);
 
-      const response = await request(app).get(`/admins/${admin._id}`);
+      const response = await request(app).get(`/api/admins/${admin._id}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(admin);
@@ -98,14 +92,14 @@ describe('Admin Controller', () => {
     it('should return 404 if admin is not found', async () => {
       Admin.findById.mockResolvedValue(null);
 
-      const response = await request(app).get(`/admins/${mongoose.Types.ObjectId()}`);
+      const response = await request(app).get(`/api/admins/${mongoose.Types.ObjectId()}`);
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: 'Admin not found' });
     });
   });
 
-  describe('PUT /admins/:id', () => {
+  describe('PUT /api/admins/:id', () => {
     it('should update an admin by id', async () => {
       const adminId = mongoose.Types.ObjectId().toString();
       const updatedAdmin = {
@@ -113,13 +107,13 @@ describe('Admin Controller', () => {
         Name: 'Updated Admin',
         Email: 'updated@example.com',
         UserRoles: ['admin'],
-        NotificationSettings: { email: true, sms: false }
+        NotificationSettings: { emailNotifications: true, smsNotifications: false }
       };
 
       Admin.findByIdAndUpdate.mockResolvedValue(updatedAdmin);
 
       const response = await request(app)
-        .put(`/admins/${adminId}`)
+        .put(`/api/admins/${adminId}`)
         .send(updatedAdmin);
 
       expect(response.status).toBe(200);
@@ -130,20 +124,20 @@ describe('Admin Controller', () => {
       Admin.findByIdAndUpdate.mockResolvedValue(null);
 
       const response = await request(app)
-        .put(`/admins/${mongoose.Types.ObjectId()}`)
+        .put(`/api/admins/${mongoose.Types.ObjectId()}`)
         .send({ Name: 'Updated Admin' });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Admin not found' });
+      expect(response.body).toEqual({ message: 'Admin not found' });
     });
   });
 
-  describe('DELETE /admins/:id', () => {
+  describe('DELETE /api/admins/:id', () => {
     it('should delete an admin by id', async () => {
       const adminId = mongoose.Types.ObjectId().toString();
       Admin.findByIdAndDelete.mockResolvedValue({ _id: adminId });
 
-      const response = await request(app).delete(`/admins/${adminId}`);
+      const response = await request(app).delete(`/api/admins/${adminId}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ message: 'Admin deleted' });
@@ -152,7 +146,7 @@ describe('Admin Controller', () => {
     it('should return 404 if admin to delete is not found', async () => {
       Admin.findByIdAndDelete.mockResolvedValue(null);
 
-      const response = await request(app).delete(`/admins/${mongoose.Types.ObjectId()}`);
+      const response = await request(app).delete(`/api/admins/${mongoose.Types.ObjectId()}`);
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: 'Admin not found' });
