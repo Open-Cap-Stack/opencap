@@ -2,16 +2,16 @@ const request = require('supertest');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const { createInvestmentTracker } = require('../controllers/investmentTrackerController');
-const { connectDB, disconnectDB } = require('../db');
+const investmentTrackerController = require('../controllers/investmentTrackerController');
+const investmentTrackerModel = require('../models/investmentTrackerModel');
 
 // Set up the Express app
 const app = express();
 app.use(bodyParser.json());
-app.post('/investments', createInvestmentTracker);
+app.post('/investments', investmentTrackerController.trackInvestment);
 
-// Mock the investmentTracker model
-jest.mock('../models/investmentTracker', () => {
+// Mock the investmentTrackerModel model
+jest.mock('../models/investmentTrackerModel', () => {
   return jest.fn().mockImplementation(() => ({
     save: jest.fn().mockResolvedValue({
       TrackID: '123',
@@ -24,7 +24,10 @@ jest.mock('../models/investmentTracker', () => {
 
 describe('Investment Tracker Controller', () => {
   beforeAll(async () => {
-    await connectDB();
+    await mongoose.connect('mongodb://127.0.0.1/investmentTrackerTestDB', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
   });
 
   afterAll(async () => {
