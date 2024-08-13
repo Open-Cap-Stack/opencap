@@ -14,7 +14,7 @@ const integrationSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
-  LinkOrPath: {
+  Link: { // Updated field name
     type: String,
     required: false,
   },
