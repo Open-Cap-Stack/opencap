@@ -46,31 +46,36 @@ describe('Investment Tracker Model', () => {
     expect(err.errors.TrackID).toBeDefined();
   });
 
-  // it('should fail to create an investment tracker with duplicate TrackID', async () => {
-  //   const tracker1 = new investmentTracker({
-  //     TrackID: '123',
-  //     Company: 'Company One',
-  //     EquityPercentage: 20,
-  //     CurrentValue: 2000,
-  //   });
-  
-  //   // Save the first tracker successfully
-  //   await tracker1.save();
-  
-  //   const tracker2 = new investmentTracker({
-  //     TrackID: '123', // Duplicate TrackID
-  //     Company: 'Company Two',
-  //     EquityPercentage: 30,
-  //     CurrentValue: 3000,
-  //   });
+  // Uncomment the following test if you want to check for duplicate TrackID errors
+  /*
+  it('should fail to create an investment tracker with duplicate TrackID', async () => {
+    const tracker1 = new investmentTracker({
+      TrackID: '123',
+      Company: 'Company One',
+      EquityPercentage: 20,
+      CurrentValue: 2000,
+    });
 
-  //   await tracker2.save();
-  
-  //   let err;
-  //   try {
-  //     await tracker2.save();
-  //   } catch (error) {
-  //     err = error;
-  //   }
-  
-  //   // Ensure that err is defined and contains the expected MongoDB duplicate key 
+    // Save the first tracker successfully
+    await tracker1.save();
+
+    const tracker2 = new investmentTracker({
+      TrackID: '123', // Duplicate TrackID
+      Company: 'Company Two',
+      EquityPercentage: 30,
+      CurrentValue: 3000,
+    });
+
+    let err;
+    try {
+      await tracker2.save();
+    } catch (error) {
+      err = error;
+    }
+
+    // Ensure that err is defined and contains the expected MongoDB duplicate key error code
+    expect(err).toBeDefined();
+    expect(err.code).toBe(11000); // MongoDB duplicate key error code is 11000
+  });
+  */
+});
