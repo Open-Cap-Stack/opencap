@@ -3,6 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const { createInvestmentTracker } = require('../controllers/investmentTrackerController');
+const { connectDB, disconnectDB } = require('../db');
 
 // Set up the Express app
 const app = express();
@@ -11,28 +12,23 @@ app.post('/investments', createInvestmentTracker);
 
 // Mock the investmentTracker model
 jest.mock('../models/investmentTracker', () => {
-  return function () {
-    return {
-      save: jest.fn().mockResolvedValue({
-        TrackID: '123',
-        Company: 'Test Company',
-        EquityPercentage: 10,
-        CurrentValue: 1000,
-      }),
-    };
-  };
+  return jest.fn().mockImplementation(() => ({
+    save: jest.fn().mockResolvedValue({
+      TrackID: '123',
+      Company: 'Test Company',
+      EquityPercentage: 10,
+      CurrentValue: 1000,
+    }),
+  }));
 });
 
 describe('Investment Tracker Controller', () => {
   beforeAll(async () => {
-    const mongoUri = 'mongodb://127.0.0.1/investmentTrackerTestDB';
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await connectDB();
   });
 
   afterAll(async () => {
+    await mongoose.connection.db.dropDatabase();
     await mongoose.connection.close();
   });
 
