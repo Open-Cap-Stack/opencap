@@ -1,72 +1,56 @@
-// controllers/documentController.js
+const DocumentEmbedding = require('../models/DocumentEmbeddingModel');
 
-const Document = require('../models/Document');
-
-const createDocument = async (req, res) => {
-  const { documentId, name, path, uploadedBy, uploadedAt, metadata } = req.body;
-
-  if (!documentId || !name || !path || !uploadedBy || !metadata) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  try {
-    const document = new Document({ documentId, name, path, uploadedBy, uploadedAt, metadata });
-    await document.save();
-    res.status(201).json({ document });
-  } catch (error) {
-    res.status(500).json({ error: 'Error creating document' });
-  }
-};
-
-const getAllDocuments = async (req, res) => {
-  try {
-    const documents = await Document.find();
-    res.status(200).json({ documents });
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching documents' });
-  }
-};
-
-const getDocumentById = async (req, res) => {
-  try {
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
+exports.createDocumentEmbedding = async (req, res) => {
+    try {
+        const newEmbedding = new DocumentEmbedding(req.body);
+        const savedEmbedding = await newEmbedding.save();
+        res.status(201).json(savedEmbedding);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-    res.status(200).json({ document });
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching document' });
-  }
 };
 
-const updateDocumentById = async (req, res) => {
-  try {
-    const updatedDocument = await Document.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updatedDocument) {
-      return res.status(404).json({ error: 'Document not found' });
+exports.getDocumentEmbeddings = async (req, res) => {
+    try {
+        const embeddings = await DocumentEmbedding.find();
+        res.status(200).json(embeddings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    res.status(200).json({ document: updatedDocument });
-  } catch (error) {
-    res.status(500).json({ error: 'Error updating document' });
-  }
 };
 
-const deleteDocumentById = async (req, res) => {
-  try {
-    const deletedDocument = await Document.findByIdAndDelete(req.params.id);
-    if (!deletedDocument) {
-      return res.status(404).json({ error: 'Document not found' });
+exports.getDocumentEmbeddingById = async (req, res) => {
+    try {
+        const embedding = await DocumentEmbedding.findById(req.params.id);
+        if (!embedding) {
+            return res.status(404).json({ message: 'Document embedding not found' });
+        }
+        res.status(200).json(embedding);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    res.status(200).json({ message: 'Document deleted' });
-  } catch (error) {
-    res.status(500).json({ error: 'Error deleting document' });
-  }
 };
 
-module.exports = {
-  createDocument,
-  getAllDocuments,
-  getDocumentById,
-  updateDocumentById,
-  deleteDocumentById,
+exports.updateDocumentEmbedding = async (req, res) => {
+    try {
+        const embedding = await DocumentEmbedding.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!embedding) {
+            return res.status(404).json({ message: 'Document embedding not found' });
+        }
+        res.status(200).json(embedding);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+exports.deleteDocumentEmbedding = async (req, res) => {
+    try {
+        const embedding = await DocumentEmbedding.findByIdAndDelete(req.params.id);
+        if (!embedding) {
+            return res.status(404).json({ message: 'Document embedding not found' });
+        }
+        res.status(200).json({ message: 'Document embedding deleted' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };
