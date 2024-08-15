@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
@@ -8,7 +9,7 @@ const stakeholderRoutes = require('./routes/stakeholderRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const fundraisingRoundRoutes = require('./routes/fundraisingRoundRoutes');
 const equityPlanRoutes = require('./routes/equityPlanRoutes');
-const documentEmbeddingRoutes = require('./routes/documentEmbeddingRoutes'); 
+const documentEmbeddingRoutes = require('./routes/documentEmbeddingRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const investmentRoutes = require('./routes/investmentTrackerRoutes');
@@ -29,6 +30,6 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/admins', adminRoutes);
-app.use('/api/documentAccesses', documentAccessRoutes); 
+app.use('/api/documentAccesses', documentAccessRoutes);
 
 module.exports = app;
