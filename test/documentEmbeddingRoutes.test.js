@@ -13,13 +13,12 @@ describe('Document Embedding API', () => {
 
     beforeAll(async () => {
         await connectDB();
-      });
-      
-      afterAll(async () => {
+    });
+    
+    afterAll(async () => {
         await mongoose.connection.db.dropDatabase();
         await mongoose.connection.close();
-      });
-
+    });
 
     beforeEach(() => {
         documentId = new mongoose.Types.ObjectId(); // Mock a document ID for testing
@@ -29,10 +28,10 @@ describe('Document Embedding API', () => {
         const response = await request(app)
             .post('/api/documentEmbeddings/document-embeddings')
             .send({
-                embeddingId: 'emb12345',  // Required field
+                embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
                 documentId,
                 embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
-                EmbeddingType: 'Type1',   // Required field
+                EmbeddingType: 'Type1',
                 EmbeddingVersion: 'v1',
             });
         expect(response.statusCode).toBe(201);
@@ -48,25 +47,25 @@ describe('Document Embedding API', () => {
 
     it('should get a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb12345',  // Required field
+            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
-            EmbeddingType: 'Type1',   // Required field
+            EmbeddingType: 'Type1',
         });
         const savedEmbedding = await newEmbedding.save();
 
         const response = await request(app).get(`/api/documentEmbeddings/document-embeddings/${savedEmbedding._id}`);
         expect(response.statusCode).toBe(200);
         expect(response.body.documentId).toBe(documentId.toString());
-        expect(response.body.embeddingId).toBe('emb12345');
+        expect(response.body.embeddingId).toBe(newEmbedding.embeddingId);
     });
 
     it('should update a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb12345',  // Required field
+            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
-            EmbeddingType: 'Type1',   // Required field
+            EmbeddingType: 'Type1',
         });
         const savedEmbedding = await newEmbedding.save();
 
@@ -81,10 +80,10 @@ describe('Document Embedding API', () => {
 
     it('should delete a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb12345',  // Required field
+            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
-            EmbeddingType: 'Type1',   // Required field
+            EmbeddingType: 'Type1',
         });
         const savedEmbedding = await newEmbedding.save();
 
