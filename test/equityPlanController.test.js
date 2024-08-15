@@ -2,33 +2,34 @@ const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
 const EquityPlan = require('../models/EquityPlanModel');
+const app = express();
+
 const { connectDB, disconnectDB } = require('../db');
 
-const app = express();
 app.use(express.json());
 app.use('/api/equityPlanRoutes', require('../routes/equityPlanRoutes'));
 
 beforeAll(async () => {
-  await connectDB();
-});
-
-afterAll(async () => {
-  await mongoose.connection.db.dropDatabase();
-  await mongoose.connection.close();
-});
+    await connectDB();
+  });
+  
+  afterAll(async () => {
+    await mongoose.connection.db.dropDatabase();
+    await mongoose.connection.close();
+  });
 
 describe('Equity Plan API', () => {
     it('should create a new equity plan', async () => {
         const response = await request(app)
             .post('/api/equityPlanRoutes/equity-plans')
             .send({
-                planId: 'unique-plan-id-1',
+                planId: '1234',
                 planName: 'Employee Stock Option Plan',
                 description: 'An equity plan for employees',
                 startDate: '2024-07-01',
                 allocation: 100000,
                 participants: ['Participant A', 'Participant B'],
-                PlanType: 'Stock Option Plan' // Ensure this field is included
+                PlanType: 'Stock Option Plan'
             });
         expect(response.statusCode).toBe(201);
         expect(response.body.planName).toBe('Employee Stock Option Plan');
@@ -42,13 +43,13 @@ describe('Equity Plan API', () => {
 
     it('should get an equity plan by ID', async () => {
         const newPlan = new EquityPlan({
-            planId: 'unique-plan-id-2',
+            planId: '5678',
             planName: 'Executive Stock Option Plan',
             description: 'An equity plan for executives',
             startDate: '2024-08-01',
             allocation: 50000,
             participants: ['Participant C'],
-            PlanType: 'Stock Option Plan' // Ensure this field is included
+            PlanType: 'Stock Option Plan'
         });
         const savedPlan = await newPlan.save();
 
@@ -59,13 +60,13 @@ describe('Equity Plan API', () => {
 
     it('should update an equity plan by ID', async () => {
         const newPlan = new EquityPlan({
-            planId: 'unique-plan-id-3',
+            planId: '91011',
             planName: 'Manager Stock Option Plan',
             description: 'An equity plan for managers',
             startDate: '2024-09-01',
             allocation: 75000,
             participants: ['Participant D'],
-            PlanType: 'Stock Option Plan' // Ensure this field is included
+            PlanType: 'Stock Option Plan'
         });
         const savedPlan = await newPlan.save();
 
@@ -79,13 +80,13 @@ describe('Equity Plan API', () => {
 
     it('should delete an equity plan by ID', async () => {
         const newPlan = new EquityPlan({
-            planId: 'unique-plan-id-4',
+            planId: '121314',
             planName: 'Leadership Stock Option Plan',
             description: 'An equity plan for leadership team',
             startDate: '2024-10-01',
             allocation: 120000,
             participants: ['Participant E'],
-            PlanType: 'Stock Option Plan' // Ensure this field is included
+            PlanType: 'Stock Option Plan'
         });
         const savedPlan = await newPlan.save();
 
