@@ -1,4 +1,3 @@
-// controllers/fundraisingRoundController.js
 const FundraisingRound = require('../models/FundraisingRoundModel');
 
 exports.createFundraisingRound = async (req, res) => {

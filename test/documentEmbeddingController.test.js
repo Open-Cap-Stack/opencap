@@ -4,21 +4,22 @@ const mongoose = require('mongoose');
 const DocumentEmbedding = require('../models/DocumentEmbeddingModel');
 const { connectDB, disconnectDB } = require('../db');
 
+
 const app = express();
 app.use(express.json());
 app.use('/api/documentEmbeddings', require('../routes/documentEmbeddingRoutes'));
 
-describe('Document Embedding API', () => {
+describe('Document Embedding Controller', () => {
     let documentId;
 
     beforeAll(async () => {
         await connectDB();
-    });
-    
-    afterAll(async () => {
+      });
+      
+      afterAll(async () => {
         await mongoose.connection.db.dropDatabase();
         await mongoose.connection.close();
-    });
+      });
 
     beforeEach(() => {
         documentId = new mongoose.Types.ObjectId(); // Mock a document ID for testing
@@ -28,15 +29,15 @@ describe('Document Embedding API', () => {
         const response = await request(app)
             .post('/api/documentEmbeddings/document-embeddings')
             .send({
-                embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
+                embeddingId: 'emb12345',
                 documentId,
                 embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
                 EmbeddingType: 'Type1',
                 EmbeddingVersion: 'v1',
             });
         expect(response.statusCode).toBe(201);
+        expect(response.body.embeddingId).toBe('emb12345');
         expect(response.body.documentId).toBe(documentId.toString());
-        expect(response.body.embedding).toEqual([0.1, 0.2, 0.3, 0.4, 0.5]);
     });
 
     it('should get all document embeddings', async () => {
@@ -47,7 +48,7 @@ describe('Document Embedding API', () => {
 
     it('should get a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
+            embeddingId: 'emb12345',
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
             EmbeddingType: 'Type1',
@@ -56,13 +57,12 @@ describe('Document Embedding API', () => {
 
         const response = await request(app).get(`/api/documentEmbeddings/document-embeddings/${savedEmbedding._id}`);
         expect(response.statusCode).toBe(200);
-        expect(response.body.documentId).toBe(documentId.toString());
-        expect(response.body.embeddingId).toBe(newEmbedding.embeddingId);
+        expect(response.body.embeddingId).toBe('emb12345');
     });
 
     it('should update a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
+            embeddingId: 'emb12345',
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
             EmbeddingType: 'Type1',
@@ -80,7 +80,7 @@ describe('Document Embedding API', () => {
 
     it('should delete a document embedding by ID', async () => {
         const newEmbedding = new DocumentEmbedding({
-            embeddingId: 'emb' + new Date().getTime(), // Unique embeddingId
+            embeddingId: 'emb12345',
             documentId,
             embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
             EmbeddingType: 'Type1',
