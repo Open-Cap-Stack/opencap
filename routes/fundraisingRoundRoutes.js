@@ -1,4 +1,3 @@
-// routes/fundraisingRoundRoutes.js
 const express = require('express');
 const router = express.Router();
 const fundraisingRoundController = require('../controllers/fundraisingRoundController');
