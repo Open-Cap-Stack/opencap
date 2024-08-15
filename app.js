@@ -1,4 +1,3 @@
-// app.js
 const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
@@ -14,6 +13,7 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const investmentRoutes = require('./routes/investmentTrackerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const documentAccessRoutes = require('./routes/documentAccessRoutes');
 
 const app = express();
 app.use(express.json());
@@ -29,5 +29,6 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/admins', adminRoutes);
+app.use('/api/documentAccesses', documentAccessRoutes); 
 
 module.exports = app;
