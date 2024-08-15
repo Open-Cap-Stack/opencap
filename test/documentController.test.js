@@ -17,7 +17,7 @@ afterAll(async () => {
     await mongoose.connection.close();
 });
 
-describe('Document Routes', () => {
+describe('Document Controller', () => {
     it('should create a new document', async () => {
         const response = await request(app)
             .post('/api/documents')
