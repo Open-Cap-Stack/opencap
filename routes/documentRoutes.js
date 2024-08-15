@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { createDocument, getAllDocuments, getDocumentById, updateDocumentById, deleteDocumentById } = require('../controllers/documentController');
+const documentController = require('../controllers/documentController');
 
-// Existing routes
-router.get('/', getAllDocuments);
-router.post('/', createDocument);
-
-// Add these routes for update and delete
-router.get('/:id', getDocumentById);           // Retrieve a document by ID
-router.put('/:id', updateDocumentById);        // Update a document by ID
-router.delete('/:id', deleteDocumentById);     // Delete a document by ID
+router.post('/documents', documentController.createDocument);
+router.get('/documents', documentController.getDocuments);
+router.get('/documents/:id', documentController.getDocumentById);
+router.put('/documents/:id', documentController.updateDocumentById);
+router.delete('/documents/:id', documentController.deleteDocumentById);
 
 module.exports = router;
