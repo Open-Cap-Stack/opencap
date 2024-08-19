@@ -1,8 +1,5 @@
 const mongoose = require('mongoose');
-const path = require('path');
-const TaxCalculator = require('../models/TaxCalculatorModel');
-const { connectDB, disconnectDB } = require('../db');
-
+const TaxCalculator = require('../models/TaxCalculator');
 
 beforeAll(async () => {
   await mongoose.connect('mongodb://localhost:27017/test', { useNewUrlParser: true, useUnifiedTopology: true });
@@ -16,22 +13,32 @@ afterAll(async () => {
 describe('TaxCalculator Model', () => {
   it('should create a tax calculation with valid fields', async () => {
     const taxData = {
-      income: 100000,
-      deductions: 10000,
-      taxAmount: 27000,
+      calculationId: 'unique-calculation-id',
+      SaleScenario: { type: 'sale', description: 'Test sale scenario' },
+      ShareClassInvolved: 'Common Stock',
+      SaleAmount: 100000,
+      TaxRate: 0.27,
+      TaxImplication: { type: 'federal', description: 'Federal tax' },
+      CalculatedTax: 27000,
+      TaxDueDate: new Date(),
     };
 
     const taxCalculator = new TaxCalculator(taxData);
     const savedTaxCalculator = await taxCalculator.save();
 
-    expect(savedTaxCalculator.income).toBe(taxData.income);
-    expect(savedTaxCalculator.deductions).toBe(taxData.deductions);
-    expect(savedTaxCalculator.taxAmount).toBe(taxData.taxAmount);
+    expect(savedTaxCalculator.calculationId).toBe(taxData.calculationId);
+    expect(savedTaxCalculator.SaleScenario).toEqual(taxData.SaleScenario);
+    expect(savedTaxCalculator.ShareClassInvolved).toBe(taxData.ShareClassInvolved);
+    expect(savedTaxCalculator.SaleAmount).toBe(taxData.SaleAmount);
+    expect(savedTaxCalculator.TaxRate).toBe(taxData.TaxRate);
+    expect(savedTaxCalculator.TaxImplication).toEqual(taxData.TaxImplication);
+    expect(savedTaxCalculator.CalculatedTax).toBe(taxData.CalculatedTax);
+    expect(new Date(savedTaxCalculator.TaxDueDate).toISOString()).toEqual(new Date(taxData.TaxDueDate).toISOString());
   });
 
   it('should not create a tax calculation without required fields', async () => {
     const taxData = {
-      income: 100000,
+      income: 100000, // Missing other required fields
     };
 
     const taxCalculator = new TaxCalculator(taxData);
@@ -41,9 +48,14 @@ describe('TaxCalculator Model', () => {
 
   it('should not create a tax calculation with invalid field values', async () => {
     const taxData = {
-      income: 'invalidIncome', // Invalid income field
-      deductions: 10000,
-      taxAmount: 27000,
+      calculationId: 'invalidId', // Invalid calculationId
+      SaleScenario: { type: 'sale', description: 'Test sale scenario' },
+      ShareClassInvolved: 'Common Stock',
+      SaleAmount: 'invalidAmount', // Invalid SaleAmount
+      TaxRate: 0.27,
+      TaxImplication: { type: 'federal', description: 'Federal tax' },
+      CalculatedTax: 27000,
+      TaxDueDate: 'invalidDate', // Invalid TaxDueDate
     };
 
     const taxCalculator = new TaxCalculator(taxData);
