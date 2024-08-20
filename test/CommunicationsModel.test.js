@@ -1,11 +1,10 @@
 const mongoose = require('mongoose');
-const chai = require('chai');
-const expect = chai.expect;
+const { expect } = require('chai');
 const Communication = require('../models/Communication');
-const { connectDB, disconnectDB } = require('../db'); // Adjust according to your database connection setup
+const { connectDB, disconnectDB } = require('../db');
 
 beforeAll(async function () {
-  await connectDB(); // Ensure this matches your database connection logic
+  await connectDB();
 });
 
 afterAll(async function () {
@@ -17,9 +16,9 @@ describe('Communication Model', function () {
   it('should create a communication with valid fields', async function () {
     const communicationData = {
       communicationId: 'unique-communication-id',
-      MessageType: 'email', // Assuming 'email' is a valid enum value
-      Sender: 'user1', // Replace with a valid User ID or ObjectId
-      Recipient: 'user2', // Replace with a valid User ID or ObjectId
+      MessageType: 'email',
+      Sender: mongoose.Types.ObjectId(), // Use a valid ObjectId
+      Recipient: mongoose.Types.ObjectId(), // Use a valid ObjectId
       Timestamp: new Date(),
       Content: 'This is a test communication.',
     };
@@ -49,8 +48,8 @@ describe('Communication Model', function () {
       expect(error.errors.communicationId).to.exist;
       expect(error.errors.Sender).to.exist;
       expect(error.errors.Recipient).to.exist;
-      expect(error.errors.Timestamp).to.exist;
-      expect(error.errors.Content).to.exist;
+      expect(error.errors.Timestamp).to.exist; // Ensure these fields are required in the schema
+      expect(error.errors.Content).to.exist;   // Ensure these fields are required in the schema
     }
   });
 
@@ -58,8 +57,8 @@ describe('Communication Model', function () {
     const communicationData1 = {
       communicationId: 'duplicate-communication-id',
       MessageType: 'SMS',
-      Sender: 'user1', // Replace with a valid User ID or ObjectId
-      Recipient: 'user2', // Replace with a valid User ID or ObjectId
+      Sender: mongoose.Types.ObjectId(),
+      Recipient: mongoose.Types.ObjectId(),
       Timestamp: new Date(),
       Content: 'First communication.',
     };
@@ -67,8 +66,8 @@ describe('Communication Model', function () {
     const communicationData2 = {
       communicationId: 'duplicate-communication-id',
       MessageType: 'email',
-      Sender: 'user3', // Replace with a valid User ID or ObjectId
-      Recipient: 'user4', // Replace with a valid User ID or ObjectId
+      Sender: mongoose.Types.ObjectId(),
+      Recipient: mongoose.Types.ObjectId(),
       Timestamp: new Date(),
       Content: 'Second communication.',
     };

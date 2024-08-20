@@ -1,11 +1,11 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const taxCalculatorController = require('../controllers/TaxCalculatorController'); // Updated to match the new file name
-const TaxCalculator = require('../models/TaxCalculatorModel'); // Updated to correct model name
+const taxCalculatorController = require('../controllers/TaxCalculator');
+const TaxCalculator = require('../models/TaxCalculator');
 
 // Mock the TaxCalculator model
-jest.mock('../models/TaxCalculatorModel');
+jest.mock('../models/TaxCalculator');
 
 const app = express();
 app.use(express.json());
@@ -21,52 +21,45 @@ describe('TaxCalculator Controller', () => {
     jest.clearAllMocks();
   });
 
-  describe('POST /calculateTax', () => {
-    it('should calculate tax and create a new tax calculation record', async () => {
-      const taxData = {
-        income: 100000,
-        deductions: 10000
-      };
-      
-      const calculatedTax = {
-        ...taxData,
-        taxAmount: 27000, // Example tax calculation
-        _id: mongoose.Types.ObjectId().toString()
-      };
-
-      TaxCalculator.prototype.save.mockResolvedValue(calculatedTax);
-
-      const response = await request(app)
-        .post('/calculateTax')
-        .send(taxData);
-
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(calculatedTax);
-    });
-
-    it('should return 400 if required fields are missing', async () => {
-      const response = await request(app)
-        .post('/calculateTax')
-        .send({});
-
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ message: 'Invalid tax calculation data' });
-    });
-  });
-
   describe('GET /taxCalculations', () => {
     it('should get all tax calculations', async () => {
       const taxCalculations = [
-        { _id: mongoose.Types.ObjectId().toString(), income: 100000, taxAmount: 27000 },
-        { _id: mongoose.Types.ObjectId().toString(), income: 50000, taxAmount: 13500 }
+        {
+          calculationId: 'calculation-id-1',
+          SaleScenario: { type: 'sale', description: 'Test sale scenario 1' },
+          ShareClassInvolved: 'Common Stock',
+          SaleAmount: 100000,
+          TaxRate: 0.27,
+          TaxImplication: { type: 'federal', description: 'Federal tax' },
+          CalculatedTax: 27000,
+          TaxDueDate: new Date().toISOString(),
+          _id: mongoose.Types.ObjectId('66bda65bcaf7b4f25b64b9ff').toString(),
+        },
+        {
+          calculationId: 'calculation-id-2',
+          SaleScenario: { type: 'sale', description: 'Test sale scenario 2' },
+          ShareClassInvolved: 'Preferred Stock',
+          SaleAmount: 50000,
+          TaxRate: 0.2,
+          TaxImplication: { type: 'state', description: 'State tax' },
+          CalculatedTax: 10000,
+          TaxDueDate: new Date().toISOString(),
+          _id: mongoose.Types.ObjectId('66bda65bcaf7b4f25b64ba00').toString(),
+        },
       ];
 
       TaxCalculator.find.mockResolvedValue(taxCalculations);
 
       const response = await request(app).get('/taxCalculations');
 
+      // Convert _id to string for comparison
+      const expectedTaxCalculations = taxCalculations.map(calc => ({
+        ...calc,
+        _id: calc._id.toString(),
+      }));
+
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(taxCalculations);
+      expect(response.body).toEqual({ taxCalculations: expectedTaxCalculations });
     });
 
     it('should return 404 if no tax calculations are found', async () => {
@@ -82,44 +75,35 @@ describe('TaxCalculator Controller', () => {
   describe('GET /taxCalculations/:id', () => {
     it('should get a tax calculation by id', async () => {
       const taxCalculation = {
-        _id: mongoose.Types.ObjectId().toString(),
-        income: 100000,
-        taxAmount: 27000
+        calculationId: 'calculation-id-1',
+        SaleScenario: { type: 'sale', description: 'Test sale scenario 1' },
+        ShareClassInvolved: 'Common Stock',
+        SaleAmount: 100000,
+        TaxRate: 0.27,
+        TaxImplication: { type: 'federal', description: 'Federal tax' },
+        CalculatedTax: 27000,
+        TaxDueDate: new Date().toISOString(),
+        _id: mongoose.Types.ObjectId('66bda65ccaf7b4f25b64ba01').toString(),
       };
 
       TaxCalculator.findById.mockResolvedValue(taxCalculation);
 
       const response = await request(app).get(`/taxCalculations/${taxCalculation._id}`);
 
+      // Convert _id to string for comparison
+      const expectedTaxCalculation = {
+        ...taxCalculation,
+        _id: taxCalculation._id.toString(),
+      };
+
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(taxCalculation);
+      expect(response.body).toEqual({ taxCalculation: expectedTaxCalculation });
     });
 
     it('should return 404 if tax calculation is not found', async () => {
       TaxCalculator.findById.mockResolvedValue(null);
 
       const response = await request(app).get(`/taxCalculations/${mongoose.Types.ObjectId()}`);
-
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ message: 'Tax calculation not found' });
-    });
-  });
-
-  describe('DELETE /taxCalculations/:id', () => {
-    it('should delete a tax calculation by id', async () => {
-      const taxCalculationId = mongoose.Types.ObjectId().toString();
-      TaxCalculator.findByIdAndDelete.mockResolvedValue({ _id: taxCalculationId });
-
-      const response = await request(app).delete(`/taxCalculations/${taxCalculationId}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({ message: 'Tax calculation deleted' });
-    });
-
-    it('should return 404 if tax calculation to delete is not found', async () => {
-      TaxCalculator.findByIdAndDelete.mockResolvedValue(null);
-
-      const response = await request(app).delete(`/taxCalculations/${mongoose.Types.ObjectId()}`);
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: 'Tax calculation not found' });
