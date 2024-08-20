@@ -15,6 +15,7 @@ const activityRoutes = require('./routes/activityRoutes');
 const investmentRoutes = require('./routes/investmentTrackerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const documentAccessRoutes = require('./routes/documentAccessRoutes');
+const investorRoutes = require('./routes/investorRoutes');
 
 const app = express();
 app.use(express.json());
@@ -31,5 +32,6 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/documentAccesses', documentAccessRoutes);
+app.use('/api/investors', investorRoutes);
 
 module.exports = app;
