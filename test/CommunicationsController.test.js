@@ -1,7 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const communicationController = require('../controllers/communicationController');
+const communicationController = require('../controllers/Communication'); // Ensure this matches your actual controller file name
 const Communication = require('../models/Communication');
 
 // Mock the Communication model
@@ -9,7 +9,7 @@ jest.mock('../models/Communication');
 
 const app = express();
 app.use(express.json());
-app.use("/api/communications", require("../routes/communicationRoutes"));
+app.use("/api/communications", require("../routes/Communication")); // Ensure this matches your actual routes file name
 
 describe('Communication Controller', () => {
   beforeEach(() => {
@@ -20,10 +20,10 @@ describe('Communication Controller', () => {
     it('should create a new communication', async () => {
       const communicationData = {
         communicationId: 'new-communication-id',
-        MessageType: 'system notification', // Assuming 'system notification' is a valid enum value
-        Sender: 'user1', // Replace with a valid User ID or ObjectId
-        Recipient: 'user2', // Replace with a valid User ID or ObjectId
-        Timestamp: new Date(),
+        MessageType: 'system notification',
+        Sender: mongoose.Types.ObjectId().toString(), // Mock ObjectId for Sender
+        Recipient: mongoose.Types.ObjectId().toString(), // Mock ObjectId for Recipient
+        Timestamp: new Date().toISOString(), // Convert to string for consistency
         Content: 'This is a new communication.',
       };
 
@@ -53,17 +53,17 @@ describe('Communication Controller', () => {
         {
           communicationId: 'communication-id-1',
           MessageType: 'email',
-          Sender: 'user1',
-          Recipient: 'user2',
-          Timestamp: new Date(),
+          Sender: mongoose.Types.ObjectId().toString(),
+          Recipient: mongoose.Types.ObjectId().toString(),
+          Timestamp: new Date().toISOString(), // Convert to string for consistency
           Content: 'First communication.',
         },
         {
           communicationId: 'communication-id-2',
           MessageType: 'SMS',
-          Sender: 'user3',
-          Recipient: 'user4',
-          Timestamp: new Date(),
+          Sender: mongoose.Types.ObjectId().toString(),
+          Recipient: mongoose.Types.ObjectId().toString(),
+          Timestamp: new Date().toISOString(), // Convert to string for consistency
           Content: 'Second communication.',
         },
       ];
@@ -91,9 +91,9 @@ describe('Communication Controller', () => {
       const communication = {
         communicationId: 'communication-id-1',
         MessageType: 'email',
-        Sender: 'user1',
-        Recipient: 'user2',
-        Timestamp: new Date(),
+        Sender: mongoose.Types.ObjectId().toString(),
+        Recipient: mongoose.Types.ObjectId().toString(),
+        Timestamp: new Date().toISOString(), // Convert to string for consistency
         Content: 'Test communication.',
       };
 
@@ -121,9 +121,9 @@ describe('Communication Controller', () => {
       const updatedCommunication = {
         communicationId,
         MessageType: 'email',
-        Sender: 'user1',
-        Recipient: 'user2',
-        Timestamp: new Date(),
+        Sender: mongoose.Types.ObjectId().toString(),
+        Recipient: mongoose.Types.ObjectId().toString(),
+        Timestamp: new Date().toISOString(), // Convert to string for consistency
         Content: 'Updated communication content.',
       };
 
