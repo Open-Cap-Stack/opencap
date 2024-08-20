@@ -1,9 +1,8 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const activityRouter = require('../routes/activityRoutes');
-const Activity = require('../models/Activity');
 const { connectDB } = require('../db');
+const activityRouter = require('../routes/activityRoutes');
 
 const app = express();
 app.use(express.json());
@@ -17,10 +16,10 @@ afterAll(async () => {
   await mongoose.connection.close();
 });
 
-describe('Activity Routes Test', () => {
+describe('Activity Controller Test', () => {
   let activityId;
 
-  it('POST /activities - should create a new activity', async () => {
+  it('should create a new activity', async () => {
     const response = await request(app)
       .post('/activities')
       .send({
@@ -37,19 +36,19 @@ describe('Activity Routes Test', () => {
     activityId = response.body._id;
   });
 
-  it('GET /activities/:id - should fetch an activity by ID', async () => {
+  it('should fetch an activity by ID', async () => {
     const response = await request(app).get(`/activities/${activityId}`);
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('activityId', 'ACT123');
   });
 
-  it('GET /activities - should fetch all activities', async () => {
+  it('should fetch all activities', async () => {
     const response = await request(app).get('/activities');
     expect(response.statusCode).toBe(200);
     expect(response.body).toBeInstanceOf(Array);
   });
 
-  it('PUT /activities/:id - should update an activity', async () => {
+  it('should update an activity', async () => {
     const response = await request(app)
       .put(`/activities/${activityId}`)
       .send({
@@ -65,7 +64,7 @@ describe('Activity Routes Test', () => {
     expect(response.body.activityType).toBe('StakeholderUpdate');
   });
 
-  it('DELETE /activities/:id - should delete an activity', async () => {
+  it('should delete an activity', async () => {
     const response = await request(app).delete(`/activities/${activityId}`);
     expect(response.statusCode).toBe(200);
     expect(response.body.message).toBe('Activity deleted');
