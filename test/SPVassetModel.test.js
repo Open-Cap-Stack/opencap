@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const { expect } = require('@jest/globals');
-const SPV = require('../models/SPV');
+const SPVAsset = require('../models/SPVAsset');
 
-describe('SPV Model', () => {
+describe('SPVAsset Model', () => {
   beforeAll(async () => {
     await mongoose.connect('mongodb://localhost:27017/test', {
       useNewUrlParser: true,
@@ -16,67 +16,62 @@ describe('SPV Model', () => {
   });
 
   beforeEach(async () => {
-    await SPV.deleteMany({});
+    await SPVAsset.deleteMany({});
   });
 
-  it('should create an SPV with valid fields', async () => {
-    const spvData = {
-      SPVID: 'unique-spv-id',
-      Name: 'Test SPV',
-      Purpose: 'Investment',
-      CreationDate: new Date(),
-      Status: 'Active',
-      ParentCompanyID: 'company123',
-      ComplianceStatus: 'Compliant',
+  it('should create an SPVAsset with valid fields', async () => {
+    const assetData = {
+      AssetID: 'unique-asset-id',
+      SPVID: 'spv123',
+      Type: 'Real Estate',
+      Value: 1000000,
+      Description: 'Office building in downtown',
+      AcquisitionDate: new Date(),
     };
 
-    const spv = new SPV(spvData);
-    const savedSPV = await spv.save();
+    const asset = new SPVAsset(assetData);
+    const savedAsset = await asset.save();
 
-    expect(savedSPV.SPVID).toBe(spvData.SPVID);
-    expect(savedSPV.Name).toBe(spvData.Name);
-    expect(savedSPV.Purpose).toBe(spvData.Purpose);
-    expect(new Date(savedSPV.CreationDate).toISOString()).toBe(spvData.CreationDate.toISOString());
-    expect(savedSPV.Status).toBe(spvData.Status);
-    expect(savedSPV.ParentCompanyID).toBe(spvData.ParentCompanyID);
-    expect(savedSPV.ComplianceStatus).toBe(spvData.ComplianceStatus);
+    expect(savedAsset.AssetID).toBe(assetData.AssetID);
+    expect(savedAsset.SPVID).toBe(assetData.SPVID);
+    expect(savedAsset.Type).toBe(assetData.Type);
+    expect(savedAsset.Value).toBe(assetData.Value);
+    expect(savedAsset.Description).toBe(assetData.Description);
+    expect(new Date(savedAsset.AcquisitionDate).toISOString()).toBe(assetData.AcquisitionDate.toISOString());
   });
 
-  it('should not create an SPV without required fields', async () => {
-    const spvData = {
-      Name: 'Test SPV',
-      Purpose: 'Investment',
+  it('should not create an SPVAsset without required fields', async () => {
+    const assetData = {
+      SPVID: 'spv123',
+      Value: 1000000,
     };
 
     try {
-      const spv = new SPV(spvData);
-      await spv.save();
+      const asset = new SPVAsset(assetData);
+      await asset.save();
     } catch (error) {
-      expect(error.errors.SPVID).toBeTruthy();
-      expect(error.errors.CreationDate).toBeTruthy();
-      expect(error.errors.Status).toBeTruthy();
-      expect(error.errors.ParentCompanyID).toBeTruthy();
-      expect(error.errors.ComplianceStatus).toBeTruthy();
+      expect(error.errors.AssetID).toBeTruthy();
+      expect(error.errors.Type).toBeTruthy();
+      expect(error.errors.Description).toBeTruthy();
+      expect(error.errors.AcquisitionDate).toBeTruthy();
     }
   });
 
-  it('should not create an SPV with invalid enum values', async () => {
-    const spvData = {
-      SPVID: 'unique-spv-id',
-      Name: 'Test SPV',
-      Purpose: 'Investment',
-      CreationDate: new Date(),
-      Status: 'InvalidStatus', // Invalid enum value
-      ParentCompanyID: 'company123',
-      ComplianceStatus: 'InvalidStatus', // Invalid enum value
+  it('should not create an SPVAsset with invalid enum values', async () => {
+    const assetData = {
+      AssetID: 'unique-asset-id',
+      SPVID: 'spv123',
+      Type: 'InvalidType', // Invalid enum value
+      Value: 1000000,
+      Description: 'Office building in downtown',
+      AcquisitionDate: new Date(),
     };
 
     try {
-      const spv = new SPV(spvData);
-      await spv.save();
+      const asset = new SPVAsset(assetData);
+      await asset.save();
     } catch (error) {
-      expect(error.errors.Status).toBeTruthy();
-      expect(error.errors.ComplianceStatus).toBeTruthy();
+      expect(error.errors.Type).toBeTruthy();
     }
   });
 });
