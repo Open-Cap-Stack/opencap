@@ -34,8 +34,11 @@ jobs:
       - name: Install dependencies
         run: npm install mongoose@6.0.0
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest mongoose sinon dotenv chai-http express
+        run: npm install --save-dev jest chai supertest mongoose sinon dotenv chai-http
 
       - name: Run tests
         run: npm test
