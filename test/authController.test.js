@@ -1,8 +1,29 @@
 const request = require('supertest');
-const { app } = require('../app');
+const express = require('express');
+const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const authController = require('../controllers/authController');
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
+const { connectDB, disconnectDB } = require('../db');
+
+// Set up the Express app
+const app = express();
+app.use(bodyParser.json());
+
+// Define routes for authentication
+app.post('/auth/register', authController.registerUser);
+app.post('/auth/login', authController.loginUser);
+app.post('/auth/oauth-login', authController.oauthLogin);
+
+beforeAll(async () => {
+  await connectDB();
+});
+
+afterAll(async () => {
+  await mongoose.connection.db.dropDatabase();
+  await mongoose.connection.close();
+});
 
 // Mock Google OAuth Client
 jest.mock('google-auth-library', () => {
@@ -19,21 +40,6 @@ jest.mock('google-auth-library', () => {
 });
 
 describe('Authentication API', () => {
-  beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/testdb', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-  });
-
-  afterEach(async () => {
-    await User.deleteMany();
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.close();
-  });
-
   // Test for registering a new user
   test('POST /auth/register - Register a new user', async () => {
     const response = await request(app).post('/auth/register').send({
@@ -60,11 +66,11 @@ describe('Authentication API', () => {
       password: 'TestPassword123',
       roles: ['Viewer'],
     });
-
+    
     const response = await request(app).post('/auth/login').send({
       username: 'testuser',
       password: 'TestPassword123',
-    });
+    });    
 
     expect(response.statusCode).toBe(200);
     expect(response.body.token).toBeTruthy();

@@ -7,3 +7,4 @@ router.post('/login', authController.loginUser);
 router.post('/oauth-login', authController.oauthLogin);
 
 module.exports = router;
+
