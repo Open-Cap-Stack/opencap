@@ -1,30 +1,41 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
 
-const notificationSchema = new Schema({
+const NotificationSchema = new mongoose.Schema({
+  notificationId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  notificationType: {
+    type: String,
+    enum: ['system', 'user-generated'],
+    required: true,
+  },
   title: {
     type: String,
-    required: [true, 'Title is required'],
+    required: true,
   },
   message: {
     type: String,
-    required: [true, 'Message is required'],
+    required: true,
   },
   recipient: {
     type: String,
-    required: [true, 'Recipient is required'],
-    validate: {
-      validator: function(v) {
-        // Basic email validation
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      },
-      message: props => `${props.value} is not a valid email address!`
-    }
-  }
-}, {
-  timestamps: true // Automatically adds createdAt and updatedAt fields
+    required: true,
+  },
+  Timestamp: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  RelatedObjects: {
+    type: String,
+  },
+  UserInvolved: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
 });
 
-const Notification = mongoose.model('Notification', notificationSchema);
-
-module.exports = Notification;
+module.exports = mongoose.model('Notification', NotificationSchema);
