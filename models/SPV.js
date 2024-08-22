@@ -1,40 +1,37 @@
 const mongoose = require('mongoose');
 
-const ComplianceCheckSchema = new mongoose.Schema({
-  CheckID: {
+const SPVSchema = new mongoose.Schema({
+  SPVID: {
     type: String,
     required: true,
     unique: true,
   },
-  SPVID: {
+  Name: {
     type: String,
     required: true,
   },
-  RegulationType: {
+  Purpose: {
     type: String,
-    enum: ['GDPR', 'HIPAA', 'SOX', 'CCPA'],
+    required: true,
+  },
+  CreationDate: {
+    type: Date,
     required: true,
   },
   Status: {
     type: String,
-    enum: ['Compliant', 'Non-Compliant'],
+    enum: ['Active', 'Inactive'], // Modify these as needed
     required: true,
   },
-  Details: {
+  ParentCompanyID: {
     type: String,
+    required: true,
   },
-  Timestamp: {
-    type: Date,
+  ComplianceStatus: {
+    type: String,
+    enum: ['Compliant', 'Non-Compliant'], // Modify these as needed
     required: true,
   },
 });
 
-// Pre-validate hook to enforce Timestamp is present
-ComplianceCheckSchema.pre('validate', function (next) {
-  if (!this.Timestamp) {
-    this.invalidate('Timestamp', 'Timestamp is required');
-  }
-  next();
-});
-
-module.exports = mongoose.model('ComplianceCheck', ComplianceCheckSchema);
+module.exports = mongoose.model('SPV', SPVSchema);
