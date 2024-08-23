@@ -8,10 +8,13 @@
   },
   "dependencies": {
     "argon2": "^0.40.3",
+    "bcrypt": "^5.1.1",
     "chai-http": "^5.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.17.1",
     "express-async-handler": "^1.2.0",
+    "google-auth-library": "^9.14.0",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^5.13.22",
     "sinon": "^18.0.0"
   },

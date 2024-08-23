@@ -1,10 +1,28 @@
+// controllers/Notification.js
+
 const Notification = require('../models/Notification');
 
 // Create a new notification
 exports.createNotification = async (req, res) => {
   try {
-    const notification = new Notification(req.body);
-    const savedNotification = await notification.save();
+    const { notificationId, notificationType, title, message, recipient, Timestamp, RelatedObjects, UserInvolved } = req.body;
+
+    if (!notificationId || !notificationType || !title || !message || !recipient || !Timestamp || !UserInvolved) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const newNotification = new Notification({
+      notificationId,
+      notificationType,
+      title,
+      message,
+      recipient,
+      Timestamp,
+      RelatedObjects,
+      UserInvolved,
+    });
+
+    const savedNotification = await newNotification.save();
     res.status(201).json(savedNotification);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create notification', error: error.message });
@@ -15,9 +33,9 @@ exports.createNotification = async (req, res) => {
 exports.getNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find();
-    res.status(200).json({ notifications });  // Ensures response is in the expected format
+    res.status(200).json({ notifications });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to get notifications', error: error.message });
+    res.status(500).json({ message: 'Failed to retrieve notifications', error: error.message });
   }
 };
 
@@ -30,15 +48,15 @@ exports.getNotificationById = async (req, res) => {
     }
     res.status(200).json({ notification });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to get notification', error: error.message });
+    res.status(500).json({ message: 'Failed to retrieve notification', error: error.message });
   }
 };
 
 // Delete a notification by ID
 exports.deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findByIdAndDelete(req.params.id);
-    if (!notification) {
+    const deletedNotification = await Notification.findByIdAndDelete(req.params.id);
+    if (!deletedNotification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
     res.status(200).json({ message: 'Notification deleted' });
