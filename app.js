@@ -19,6 +19,7 @@ const investorRoutes = require('./routes/investorRoutes');
 const companyRoutes = require('./routes/Company'); 
 const taxCalculatorRoutes = require('./routes/TaxCalculator');
 const authRoutes = require('./routes/authRoutes');
+const corporationRoutes = require('./routes/corporationRoutes');
 
 const app = express();
 app.use(express.json());
@@ -39,5 +40,6 @@ app.use('/api/investors', investorRoutes);
 app.use('/api/taxCalculations', taxCalculatorRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/auth', authRoutes);
+app.use('/api/v2', corporationRoutes);
 
 module.exports = app;
