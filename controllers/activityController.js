@@ -28,7 +28,6 @@ exports.getActivityById = async (req, res) => {
       res.send(activity);
     }
   } catch (error) {
-    res.status(500).send(error);
     res.status(500).json({ error: 'Error fetching activity' });
   }
 };
