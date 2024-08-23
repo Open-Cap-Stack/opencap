@@ -26,7 +26,12 @@ describe('Issuer Management', () => {
   });
 
   it('should list issuers', async () => {
-    await Issuer.create({ id: '1', legalName: 'MangoCart, Inc.', dateOfIncorporation: new Date(), countryOfIncorporation: 'USA' });
+    await Issuer.create({
+      id: '1',
+      legalName: 'MangoCart, Inc.',
+      dateOfIncorporation: new Date(),
+      countryOfIncorporation: 'USA',
+    });
 
     const res = await request(app).get('/api/v2/issuers');
     expect(res.statusCode).toEqual(200);
@@ -34,27 +39,48 @@ describe('Issuer Management', () => {
   });
 
   it('should create a new issuer', async () => {
-    const res = await request(app).post('/api/v2/issuers').send({ legalName: 'MangoCart, Inc.', dateOfIncorporation: new Date(), countryOfIncorporation: 'USA' });
+    const res = await request(app)
+      .post('/api/v2/issuers')
+      .send({
+        id: '2',
+        legalName: 'MangoCart, Inc.',
+        dateOfIncorporation: new Date(),
+        countryOfIncorporation: 'USA',
+      });
 
+    console.log('Response:', res.body); // Debugging statement
     expect(res.statusCode).toEqual(201);
-    expect(res.body.legalName).toEqual('MangoCart, Inc.');
+    expect(res.body.issuer.legalName).toEqual('MangoCart, Inc.');
   });
 
   it('should update issuer details', async () => {
-    const issuer = await Issuer.create({ id: '1', legalName: 'MangoCart, Inc.', dateOfIncorporation: new Date(), countryOfIncorporation: 'USA' });
+    const issuer = await Issuer.create({
+      id: '1',
+      legalName: 'MangoCart, Inc.',
+      dateOfIncorporation: new Date(),
+      countryOfIncorporation: 'USA',
+    });
 
-    const res = await request(app).put(`/api/v2/issuers/${issuer._id}`).send({ legalName: 'MangoCart, Ltd.' });
+    const res = await request(app)
+      .put(`/api/v2/issuers/${issuer._id}`)
+      .send({ legalName: 'MangoCart, Ltd.' });
 
+    console.log('Response:', res.body); // Debugging statement
     expect(res.statusCode).toEqual(200);
-    expect(res.body.legalName).toEqual('MangoCart, Ltd.');
+    expect(res.body.issuer.legalName).toEqual('MangoCart, Ltd.');
   });
 
   it('should delete an issuer', async () => {
-    const issuer = await Issuer.create({ id: '1', legalName: 'MangoCart, Inc.', dateOfIncorporation: new Date(), countryOfIncorporation: 'USA' });
+    const issuer = await Issuer.create({
+      id: '1',
+      legalName: 'MangoCart, Inc.',
+      dateOfIncorporation: new Date(),
+      countryOfIncorporation: 'USA',
+    });
 
     const res = await request(app).delete(`/api/v2/issuers/${issuer._id}`);
 
     expect(res.statusCode).toEqual(200);
-    expect(res.body.message).toEqual('Issuer deleted');
+    expect(res.body.message).toEqual('Issuer deleted successfully');
   });
 });

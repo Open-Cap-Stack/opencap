@@ -40,6 +40,7 @@ exports.createIssuer = async (req, res) => {
     await issuer.save();
     res.status(201).json({ message: 'Issuer created successfully', issuer });
   } catch (error) {
+    console.log('Error creating issuer:', error); // Debugging statement
     res.status(400).json({ message: 'Error creating issuer', error });
   }
 };
@@ -56,6 +57,7 @@ exports.updateIssuer = async (req, res) => {
 
     res.status(200).json({ message: 'Issuer updated successfully', issuer });
   } catch (error) {
+    console.log('Error updating issuer:', error); // Debugging statement
     res.status(400).json({ message: 'Error updating issuer', error });
   }
 };
