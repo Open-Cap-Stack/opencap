@@ -1,16 +1,21 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const ActivitySchema = new Schema({
-  name: { type: String, required: true },
-  description: { type: String, required: true },
-  date: { type: Date, required: true },
-  type: { type: String, required: true },
-  participants: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  status: { type: String, required: true },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+const activitySchema = new mongoose.Schema({
+  activityId: { type: String, required: true, unique: true },
+  activityType: {
+    type: String,
+    enum: ['DocumentUpload', 'StakeholderUpdate'],
+    required: true,
+  },
+  timestamp: { type: Date, required: true },
+  userInvolved: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  changesMade: { type: String },
+  relatedObjects: [{ type: String }],
 });
 
-module.exports = mongoose.model('Activity', ActivitySchema);
+const Activity = mongoose.model('Activity', activitySchema);
+module.exports = Activity;
