@@ -20,6 +20,8 @@ const companyRoutes = require('./routes/Company');
 const taxCalculatorRoutes = require('./routes/TaxCalculator');
 const authRoutes = require('./routes/authRoutes');
 const corporationRoutes = require('./routes/corporationRoutes');
+const compensationRoutes = require('./routes/compensationRoutes');
+
 
 const app = express();
 app.use(express.json());
@@ -41,5 +43,7 @@ app.use('/api/taxCalculations', taxCalculatorRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/auth', authRoutes);
 app.use('/api/v2', corporationRoutes);
+app.use('/api/v2/compensation', compensationRoutes);
+
 
 module.exports = app;
