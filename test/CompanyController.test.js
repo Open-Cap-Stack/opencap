@@ -1,7 +1,8 @@
+// test/CompanyController.test.js
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const companyController = require('../controllers/companyController');
+const companyController = require('../controllers/Company'); // Ensure the correct file name
 const Company = require('../models/Company');
 
 // Mock the Company model
@@ -9,7 +10,7 @@ jest.mock('../models/Company');
 
 const app = express();
 app.use(express.json());
-app.use("/api/companies", require("../routes/companyRoutes"));
+app.use("/api/companies", require("../routes/Company"));
 
 describe('Company Controller', () => {
   beforeEach(() => {
@@ -21,10 +22,10 @@ describe('Company Controller', () => {
       const companyData = {
         companyId: 'new-company-id',
         CompanyName: 'New Test Company',
-        CompanyType: 'corporation', // Assuming 'corporation' is one of the valid enum values
+        CompanyType: 'corporation',
         RegisteredAddress: '456 New Avenue, New City, NC',
         TaxID: '987-65-4321',
-        corporationDate: new Date(),
+        corporationDate: new Date().toISOString(), // Ensure date is in ISO string format
       };
 
       Company.prototype.save.mockResolvedValue(companyData);
@@ -56,7 +57,7 @@ describe('Company Controller', () => {
           CompanyType: 'startup',
           RegisteredAddress: '123 Test Street, Test City, TC',
           TaxID: '111-22-3333',
-          corporationDate: new Date(),
+          corporationDate: new Date().toISOString(),
         },
         {
           companyId: 'company-id-2',
@@ -64,7 +65,7 @@ describe('Company Controller', () => {
           CompanyType: 'corporation',
           RegisteredAddress: '456 Test Avenue, Test City, TC',
           TaxID: '444-55-6666',
-          corporationDate: new Date(),
+          corporationDate: new Date().toISOString(),
         },
       ];
 
@@ -94,7 +95,7 @@ describe('Company Controller', () => {
         CompanyType: 'startup',
         RegisteredAddress: '123 Test Street, Test City, TC',
         TaxID: '111-22-3333',
-        corporationDate: new Date(),
+        corporationDate: new Date().toISOString(),
       };
 
       Company.findById.mockResolvedValue(company);
@@ -124,7 +125,7 @@ describe('Company Controller', () => {
         CompanyType: 'corporation',
         RegisteredAddress: '789 Updated Road, Updated City, UC',
         TaxID: '111-22-3333',
-        corporationDate: new Date(),
+        corporationDate: new Date().toISOString(),
       };
 
       Company.findByIdAndUpdate.mockResolvedValue(updatedCompany);

@@ -1,14 +1,15 @@
 const request = require('supertest');
-const app = require('../app'); // Your Express app
+const { app, connectDB } = require('../app'); // Your Express app
 const mongoose = require('mongoose');
 const Company = require('../models/Company');
 
 beforeAll(async () => {
-  await mongoose.connect('mongodb://localhost:27017/test', { useNewUrlParser: true, useUnifiedTopology: true });
+  // Connect to the database before running any tests
+  await connectDB();
 });
 
 beforeEach(async () => {
-  await Company.deleteMany({}); // Clear companies collection
+  await Company.deleteMany({}); // Clear companies collection before each test
   const company = new Company({
     companyId: 'test-company-id',
     CompanyName: 'Test Company',
@@ -21,7 +22,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await mongoose.connection.close();
+  await mongoose.connection.close(); // Close the database connection after all tests
 });
 
 describe('Company API Test', () => {
