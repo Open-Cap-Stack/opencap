@@ -16,8 +16,9 @@ const investmentRoutes = require('./routes/investmentTrackerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const documentAccessRoutes = require('./routes/documentAccessRoutes');
 const investorRoutes = require('./routes/investorRoutes');
-const companyRoutes = require('./routes/Company'); // Correctly link to the Company routes
+const companyRoutes = require('./routes/Company'); 
 const taxCalculatorRoutes = require('./routes/TaxCalculator');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 app.use(express.json());
@@ -37,5 +38,6 @@ app.use('/api/documentAccesses', documentAccessRoutes);
 app.use('/api/investors', investorRoutes);
 app.use('/api/taxCalculations', taxCalculatorRoutes);
 app.use('/api/companies', companyRoutes);
+app.use('/auth', authRoutes);
 
 module.exports = app;
