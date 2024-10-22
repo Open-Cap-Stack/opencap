@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-const integrationSchema = new mongoose.Schema({
+const IntegrationModuleSchema = new mongoose.Schema({
   IntegrationID: {
     type: String,
     required: true,
-    unique: true,
+    unique: true,  // Ensure this is unique to trigger the duplicate key error
   },
   ToolName: {
     type: String,
@@ -12,14 +12,13 @@ const integrationSchema = new mongoose.Schema({
   },
   Description: {
     type: String,
-    required: false,
   },
-  Link: { // Updated field name
+  Link: {
     type: String,
-    required: false,
   },
 });
 
-const IntegrationModule = mongoose.model('IntegrationModule', integrationSchema);
+// This ensures that the unique index is created
+IntegrationModuleSchema.index({ IntegrationID: 1 }, { unique: true });
 
-module.exports = IntegrationModule;
+module.exports = mongoose.model('IntegrationModule', IntegrationModuleSchema);
