@@ -38,5 +38,20 @@ router.delete('/:id', async (req, res) => {
     res.status(500).send(e);
   }
 });
+router.post('/api/users', async (req, res) => {
+  try {
+    const { userId, name, username, email, password, role } = req.body;
+
+    const newUser = new User({ userId, name, username, email, password, role });
+    await newUser.save();
+    res.status(201).json(newUser);
+  } catch (error) {
+    if (error.code === 11000) {
+      // Duplicate key error
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 module.exports = router;

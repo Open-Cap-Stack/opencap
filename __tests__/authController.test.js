@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const authController = require('../controllers/authController');
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
-const { connectDB, disconnectDB } = require('../db');
+const { connectDB } = require('../db');
 
 // Set up the Express app
 const app = express();
@@ -15,6 +15,9 @@ app.use(bodyParser.json());
 app.post('/auth/register', authController.registerUser);
 app.post('/auth/login', authController.loginUser);
 app.post('/auth/oauth-login', authController.oauthLogin);
+
+// Set up environment variable for JWT_SECRET in tests
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
 
 beforeAll(async () => {
   await connectDB();
@@ -70,7 +73,7 @@ describe('Authentication API', () => {
     const response = await request(app).post('/auth/login').send({
       username: 'testuser',
       password: 'TestPassword123',
-    });    
+    });
 
     expect(response.statusCode).toBe(200);
     expect(response.body.token).toBeTruthy();
