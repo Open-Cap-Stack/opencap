@@ -1,10 +1,8 @@
 const { createFinancialReport } = require('../controllers/financialReportingController');
 const FinancialReport = require('../models/financialReport');
-
 const httpMocks = require('node-mocks-http');
-const mongoose = require('mongoose');
 
-// Mock the FinancialReport model
+// Mock the entire model
 jest.mock('../models/financialReport');
 
 describe('createFinancialReport Controller', () => {
@@ -14,38 +12,69 @@ describe('createFinancialReport Controller', () => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
     next = jest.fn();
+    jest.clearAllMocks();
   });
 
   it('should create a new financial report and return 201 status', async () => {
-    // Mock request body
-    req.body = {
+    // Setup request body with fixed timestamp
+    const testData = {
       ReportID: 'test-id',
-      Type: 'test-type',
-      Data: 'test-data',
-      Timestamp: new Date(),
+      Type: 'Annual',
+      Data: { key: 'test-data' },
+      TotalRevenue: '1000.00',
+      TotalExpenses: '500.00',
+      NetIncome: '500.00',
+      EquitySummary: ['uuid1', 'uuid2'],
+      Timestamp: new Date().toISOString() // Convert to ISO string format
     };
 
-    // Mock the save function
-    FinancialReport.prototype.save = jest.fn().mockResolvedValue(req.body);
+    req.body = testData;
 
+    // Mock the constructor and save method
+    const mockSave = jest.fn().mockResolvedValue(testData);
+    const mockInstance = { save: mockSave };
+    FinancialReport.mockImplementation(() => mockInstance);
+
+    // Execute controller
     await createFinancialReport(req, res, next);
 
+    // Get response data and parse it
+    const responseData = JSON.parse(res._getData());
+
     // Assertions
-    expect(FinancialReport).toHaveBeenCalledWith(req.body);
-    expect(FinancialReport.prototype.save).toHaveBeenCalled();
+    expect(FinancialReport).toHaveBeenCalledWith(testData);
+    expect(mockSave).toHaveBeenCalled();
     expect(res.statusCode).toBe(201);
-    expect(res._getJSONData()).toEqual(req.body);
+    expect(responseData).toEqual(testData); // Compare with the original test data
     expect(next).not.toHaveBeenCalled();
   });
 
   it('should handle errors and pass them to the error handling middleware', async () => {
-    const errorMessage = 'Failed to create financial report';
-    const rejectedPromise = Promise.reject(new Error(errorMessage));
-    FinancialReport.prototype.save = jest.fn().mockReturnValue(rejectedPromise);
+    // Setup request body with fixed timestamp
+    const testData = {
+      ReportID: 'test-id',
+      Type: 'Annual',
+      Data: { key: 'test-data' },
+      TotalRevenue: '1000.00',
+      TotalExpenses: '500.00',
+      NetIncome: '500.00',
+      EquitySummary: ['uuid1', 'uuid2'],
+      Timestamp: new Date().toISOString() // Convert to ISO string format
+    };
 
+    req.body = testData;
+
+    // Mock constructor and save method to throw error
+    const error = new Error('Failed to create financial report');
+    const mockSave = jest.fn().mockRejectedValue(error);
+    FinancialReport.mockImplementation(() => ({ save: mockSave }));
+
+    // Execute controller
     await createFinancialReport(req, res, next);
 
-    expect(FinancialReport.prototype.save).toHaveBeenCalled();
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: errorMessage }));
+    // Assertions
+    expect(FinancialReport).toHaveBeenCalledWith(testData);
+    expect(mockSave).toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(error);
   });
 });

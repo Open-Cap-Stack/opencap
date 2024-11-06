@@ -1,6 +1,7 @@
 const request = require('supertest');
-const { app, connectDB } = require('../app'); // Your Express app
 const mongoose = require('mongoose');
+const app = require('../app'); 
+const { connectDB, disconnectDB } = require('../db'); 
 const Company = require('../models/Company');
 
 beforeAll(async () => {
@@ -9,11 +10,12 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await Company.deleteMany({}); // Clear companies collection before each test
+  // Clear the companies collection before each test and set up test data
+  await Company.deleteMany({});
   const company = new Company({
     companyId: 'test-company-id',
     CompanyName: 'Test Company',
-    CompanyType: 'startup', // Assuming 'startup' is one of the valid enum values
+    CompanyType: 'startup',
     RegisteredAddress: '123 Test Street, Test City, TC',
     TaxID: '123-45-6789',
     corporationDate: new Date(),
@@ -22,22 +24,23 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await mongoose.connection.close(); // Close the database connection after all tests
+  // Disconnect from the database after all tests are done
+  await disconnectDB();
 });
 
-describe('Company API Test', () => {
+describe('Company API Tests', () => {
   it('should get all companies', async () => {
     const res = await request(app).get('/api/companies');
     expect(res.statusCode).toEqual(200);
     expect(res.body).toBeInstanceOf(Array);
-    expect(res.body.length).toBeGreaterThan(0); // Ensure that the array is not empty
+    expect(res.body.length).toBeGreaterThan(0);
   });
 
   it('should create a new company', async () => {
     const newCompany = {
       companyId: 'new-company-id',
       CompanyName: 'New Test Company',
-      CompanyType: 'corporation', // Assuming 'corporation' is one of the valid enum values
+      CompanyType: 'corporation',
       RegisteredAddress: '456 New Avenue, New City, NC',
       TaxID: '987-65-4321',
       corporationDate: new Date(),
