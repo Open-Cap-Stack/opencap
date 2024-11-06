@@ -1,73 +1,173 @@
-const request = require('supertest');
-const express = require('express');
-const mongoose = require('mongoose');
-const activityRouter = require('../routes/activityRoutes');
-const Activity = require('../models/Activity');
-const { connectDB } = require('../db');
+const request = require("supertest");
+const express = require("express");
+const mongoose = require("mongoose");
+const Admin = require("../models/admin");
+const { connectDB, disconnectDB } = require('../db');
 
+// Initialize Express app
 const app = express();
 app.use(express.json());
-app.use('/activities', activityRouter);
+app.use("/api/admins", require("../routes/adminRoutes"));
 
+// Connect to MongoDB before running tests
 beforeAll(async () => {
   await connectDB();
 });
 
+// Drop the database and close connection after all tests
 afterAll(async () => {
-  await mongoose.connection.close();
+  await mongoose.connection.db.dropDatabase();
+  await disconnectDB();
 });
 
-describe('Activity Routes Test', () => {
-  let activityId;s
+// Clear Admin collection before each test
+beforeEach(async () => {
+  await Admin.deleteMany({});
+});
 
-  it('POST /activities - should create a new activity', async () => {
-    const response = await request(app)
-      .post('/activities')
+describe("Admin API Tests", () => {
+  it("should create a new admin", async () => {
+    const res = await request(app)
+      .post("/api/admins")
       .send({
-        activityId: 'ACT123',
-        activityType: 'DocumentUpload',
-        timestamp: new Date(),
-        userInvolved: new mongoose.Types.ObjectId(),
-        changesMade: 'Uploaded new document',
-        relatedObjects: ['DOC001'],
+        UserID: "admin123",
+        Name: "Admin",
+        Email: "admin@example.com",
+        UserRoles: ["admin"],
+        NotificationSettings: {
+          emailNotifications: true,
+          smsNotifications: false,
+          pushNotifications: true,
+          notificationFrequency: "Immediate"
+        }
       });
 
-    expect(response.statusCode).toBe(201);
-    expect(response.body._id).toBeDefined();
-    activityId = response.body._id;
+    expect(res.statusCode).toEqual(201);
+    expect(res.body).toHaveProperty("UserID", "admin123");
+    expect(res.body).toHaveProperty("Name", "Admin");
+    expect(res.body).toHaveProperty("Email", "admin@example.com");
   });
 
-  it('GET /activities/:id - should fetch an activity by ID', async () => {
-    const response = await request(app).get(`/activities/${activityId}`);
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toHaveProperty('activityId', 'ACT123');
+  it("should get all admins", async () => {
+    await new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    }).save();
+
+    const res = await request(app).get("/api/admins");
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toBeInstanceOf(Array);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0]).toHaveProperty("Name", "Admin");
   });
 
-  it('GET /activities - should fetch all activities', async () => {
-    const response = await request(app).get('/activities');
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toBeInstanceOf(Array);
+  it("should get an admin by ID", async () => {
+    const admin = new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    });
+    await admin.save();
+
+    const res = await request(app).get(`/api/admins/${admin._id}`);
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("_id", admin._id.toString());
+    expect(res.body).toHaveProperty("Name", "Admin");
   });
 
-  it('PUT /activities/:id - should update an activity', async () => {
-    const response = await request(app)
-      .put(`/activities/${activityId}`)
+  it("should update an admin by ID", async () => {
+    const admin = new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    });
+    await admin.save();
+
+    const res = await request(app)
+      .put(`/api/admins/${admin._id}`)
       .send({
-        activityId: 'ACT123',
-        activityType: 'StakeholderUpdate',
-        timestamp: new Date(),
-        userInvolved: new mongoose.Types.ObjectId(),
-        changesMade: 'Updated stakeholder details',
-        relatedObjects: ['STA001'],
+        Name: "Updated Admin",
+        UserRoles: ["admin", "superadmin"]
       });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.body.activityType).toBe('StakeholderUpdate');
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("Name", "Updated Admin");
+    expect(res.body.UserRoles).toContain("superadmin");
   });
 
-  it('DELETE /activities/:id - should delete an activity', async () => {
-    const response = await request(app).delete(`/activities/${activityId}`);
-    expect(response.statusCode).toBe(200);
-    expect(response.body.message).toBe('Activity deleted');
+  it("should delete an admin by ID", async () => {
+    const admin = new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    });
+    await admin.save();
+
+    const res = await request(app).delete(`/api/admins/${admin._id}`);
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("message", "Admin deleted");
+  });
+
+  it("should login an admin", async () => {
+    const admin = new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      Password: "password", // Ensure your model supports this field
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    });
+    await admin.save();
+
+    const res = await request(app)
+      .post("/api/admins/login")
+      .send({
+        Email: "admin@example.com",
+        Password: "password"
+      });
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("token");
+  });
+
+  it("should logout an admin", async () => {
+    const res = await request(app).post("/api/admins/logout");
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("message", "Admin logged out");
+  });
+
+  it("should change an admin's password", async () => {
+    const admin = new Admin({
+      UserID: "admin123",
+      Name: "Admin",
+      Email: "admin@example.com",
+      Password: "password",
+      UserRoles: ["admin"],
+      NotificationSettings: {}
+    });
+    await admin.save();
+
+    const res = await request(app)
+      .put(`/api/admins/${admin._id}/change-password`)
+      .send({
+        oldPassword: "password",
+        newPassword: "newpassword"
+      });
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty("message", "Password changed");
   });
 });
