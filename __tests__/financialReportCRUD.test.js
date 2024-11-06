@@ -1,14 +1,13 @@
-// __tests__/FinancialReportCRUD.test.js
+// __tests__/financialReportCRUD.test.js
 const { 
-    createFinancialReport, 
+    createFinancialReport,
     getFinancialReport,
+    listFinancialReports,
     updateFinancialReport,
-    deleteFinancialReport,
-    listFinancialReports 
-  } = require('../controllers/financialReportingController');
+    deleteFinancialReport
+  } = require('../controllers/financialReportCrudController');
   const FinancialReport = require('../models/financialReport');
   const httpMocks = require('node-mocks-http');
-  const mongoose = require('mongoose');
   
   jest.mock('../models/financialReport');
   
@@ -114,26 +113,20 @@ const {
   
       it('should handle update validation errors', async () => {
         const reportId = 'test-id-123';
-        const invalidData = { 
+        const invalidData = {
           ...sampleReport,
-          Type: 'InvalidType' 
+          TotalRevenue: '-1000000.00' // Invalid negative value
         };
   
         req.params = { id: reportId };
         req.body = invalidData;
   
-        const validationError = new mongoose.Error.ValidationError();
-        validationError.errors.Type = new mongoose.Error.ValidatorError({
-          message: 'Invalid report type',
-          path: 'Type'
-        });
-  
-        FinancialReport.findOneAndUpdate = jest.fn()
-          .mockRejectedValue(validationError);
-  
         await updateFinancialReport(req, res, next);
   
-        expect(next).toHaveBeenCalledWith(validationError);
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res._getData())).toEqual({
+          error: 'Financial values cannot be negative'
+        });
       });
     });
   

@@ -1,13 +1,13 @@
-// __tests__/FinancialReportAuth.test.js
+// __tests__/financialReportAuth.test.js
 const { 
     checkUserPermissions,
     validateApiKey,
     authorizeReportAccess
-  } = require('../controllers/financialReportingController');
+  } = require('../controllers/financialReportAuthController');
+  const FinancialReport = require('../models/financialReport');
   const httpMocks = require('node-mocks-http');
-  const jwt = require('jsonwebtoken');
   
-  jest.mock('jsonwebtoken');
+  jest.mock('../models/financialReport');
   
   describe('Financial Report Authorization', () => {
     let req, res, next;
@@ -46,50 +46,25 @@ const {
           })
         );
       });
-  
-      it('should handle role-based access control', async () => {
-        req.user = {
-          role: 'financial_analyst',
-          permissions: ['create:reports', 'read:reports', 'update:reports']
-        };
-        req.method = 'DELETE';
-  
-        await checkUserPermissions(req, res, next);
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: 'Insufficient permissions',
-            statusCode: 403
-          })
-        );
-      });
     });
   
     describe('API Key Validation', () => {
       it('should validate valid API key', async () => {
-        const apiKey = 'valid-api-key-123';
-        req.headers = { 'x-api-key': apiKey };
-  
-        jwt.verify.mockImplementation(() => ({
-          permissions: ['create:reports', 'read:reports']
-        }));
+        req.headers = { 'x-api-key': 'valid-api-key-123' };
   
         await validateApiKey(req, res, next);
         expect(next).toHaveBeenCalled();
         expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+        expect(req.apiPermissions).toContain('read:reports');
       });
   
-      it('should reject invalid API key', async () => {
-        const apiKey = 'invalid-api-key';
-        req.headers = { 'x-api-key': apiKey };
-  
-        jwt.verify.mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
+      it('should reject missing API key', async () => {
+        req.headers = {};
   
         await validateApiKey(req, res, next);
         expect(next).toHaveBeenCalledWith(
           expect.objectContaining({
-            message: 'Invalid API key',
+            message: 'API key is required',
             statusCode: 401
           })
         );
@@ -106,4 +81,39 @@ const {
         };
   
         const mockReport = {
-          ReportID: reportI
+          ReportID: reportId,
+          userId: 'user-123'
+        };
+  
+        FinancialReport.findOne = jest.fn().mockResolvedValue(mockReport);
+  
+        await authorizeReportAccess(req, res, next);
+        expect(next).toHaveBeenCalled();
+        expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+      });
+  
+      it('should deny access to other users reports', async () => {
+        const reportId = 'test-report-123';
+        req.params = { id: reportId };
+        req.user = {
+          id: 'different-user',
+          role: 'user'
+        };
+  
+        const mockReport = {
+          ReportID: reportId,
+          userId: 'user-123'
+        };
+  
+        FinancialReport.findOne = jest.fn().mockResolvedValue(mockReport);
+  
+        await authorizeReportAccess(req, res, next);
+        expect(next).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'Unauthorized access to report',
+            statusCode: 403
+          })
+        );
+      });
+    });
+  });

@@ -1,21 +1,11 @@
-// __tests__/FinancialReportBusinessLogic.test.js
+// __tests__/financialReportLogic.test.js
 const { 
-    validateFinancialReport,
     calculateFinancialMetrics,
-    validateReportingPeriod
-  } = require('../controllers/financialReportingController');
-  const httpMocks = require('node-mocks-http');
+    validateReportingPeriod,
+    validateFinancialReport
+  } = require('../controllers/financialReportBusinessController');
   
   describe('Financial Report Business Logic', () => {
-    let req, res, next;
-    
-    beforeEach(() => {
-      req = httpMocks.createRequest();
-      res = httpMocks.createResponse();
-      next = jest.fn();
-      jest.clearAllMocks();
-    });
-  
     describe('Financial Calculations', () => {
       it('should correctly calculate net income', () => {
         const reportData = {
@@ -58,7 +48,6 @@ const {
       it('should validate annual report period', () => {
         const reportData = {
           Type: 'Annual',
-          Timestamp: new Date('2024-12-31'),
           Data: {
             revenue: { q1: 250000, q2: 250000, q3: 250000, q4: 250000 },
             expenses: { q1: 150000, q2: 150000, q3: 150000, q4: 150000 }
@@ -72,7 +61,6 @@ const {
       it('should validate quarterly report period', () => {
         const reportData = {
           Type: 'Quarterly',
-          Timestamp: new Date('2024-03-31'),
           Data: {
             revenue: { q1: 250000 },
             expenses: { q1: 150000 }
@@ -86,7 +74,6 @@ const {
       it('should reject invalid period data', () => {
         const reportData = {
           Type: 'Annual',
-          Timestamp: new Date('2024-12-31'),
           Data: {
             revenue: { q1: 250000 }, // Missing quarters
             expenses: { q1: 150000 }
@@ -111,7 +98,7 @@ const {
           TotalRevenue: '1000000.00',
           TotalExpenses: '600000.00',
           NetIncome: '400000.00',
-          Timestamp: new Date()
+          Timestamp: new Date().toISOString()
         };
   
         const result = validateFinancialReport(reportData);
@@ -129,7 +116,7 @@ const {
           TotalRevenue: '1000000.00',
           TotalExpenses: '600000.00',
           NetIncome: '400000.00',
-          Timestamp: new Date()
+          Timestamp: new Date().toISOString()
         };
   
         const result = validateFinancialReport(reportData);
