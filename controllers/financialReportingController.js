@@ -1,18 +1,31 @@
-// Import necessary modules and models
+// controllers/financialReportingController.js
 const FinancialReport = require("../models/financialReport");
 
 // Controller function to create a new financial report
-async function createFinancialReport(req, res, next) {
+const createFinancialReport = async (req, res, next) => {
   try {
     // Extract financial report data from the request body
-    const { ReportID, Type, Data, Timestamp } = req.body;
+    const { 
+      ReportID, 
+      Type, 
+      Data, 
+      TotalRevenue,
+      TotalExpenses,
+      NetIncome,
+      EquitySummary,
+      Timestamp 
+    } = req.body;
 
     // Create a new financial report document
     const financialReport = new FinancialReport({
       ReportID,
       Type,
       Data,
-      Timestamp,
+      TotalRevenue,
+      TotalExpenses,
+      NetIncome,
+      EquitySummary,
+      Timestamp
     });
 
     // Save the financial report document to the database
@@ -24,11 +37,8 @@ async function createFinancialReport(req, res, next) {
     // Handle errors and pass them to the error handling middleware
     next(error);
   }
-}
-
-// Add more controller functions for other routes related to Financial Reporting Tool here
+};
 
 module.exports = {
-  createFinancialReport,
-  // Add more controller functions here as needed
+  createFinancialReport
 };
