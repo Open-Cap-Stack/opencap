@@ -1,10 +1,9 @@
-// utils/auth.js
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 
-const generateToken = (payload) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+const generateToken = (payload, options = { expiresIn: '1h' }) => {
+  return jwt.sign(payload, JWT_SECRET, options);
 };
 
 const validateApiKey = (req, res, next) => {
@@ -25,6 +24,9 @@ const validateApiKey = (req, res, next) => {
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = decoded;
     } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Token expired' });
+      }
       return res.status(401).json({ error: 'Invalid token' });
     }
   }
@@ -32,7 +34,6 @@ const validateApiKey = (req, res, next) => {
   next();
 };
 
-// Make sure to export both functions
 module.exports = {
   generateToken,
   validateApiKey
