@@ -1,20 +1,22 @@
-const { connectDB, disconnectDB } = require('../db');
-const app = require('../app');
+// __tests__/setup/test-app.js
+const express = require('express');
+const mongoose = require('mongoose');
+const financialReportingRoutes = require('../../routes/financialReportingRoutes');
 
-let server;
+const app = express();
 
-beforeAll(async () => {
-  await connectDB();
-  server = app.listen(5001);
-});
+// Middleware
+app.use(express.json());
 
-afterAll(async () => {
-  await server.close();
-  await disconnectDB();
-});
+// Routes - match the path from your main app.js
+app.use('/api/financial-reports', financialReportingRoutes);
 
-describe('App Tests', () => {
-  it('should run the server', async () => {
-    expect(server).toBeDefined();
+// Error handling middleware - match your main app.js format
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message);
+  res.status(err.statusCode || 500).json({
+    error: err.message || 'Internal Server Error',
   });
 });
+
+module.exports = app;
