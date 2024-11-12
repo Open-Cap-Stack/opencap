@@ -16,7 +16,8 @@ describe('Financial Report API Integration', () => {
 
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
+      useCreateIndex: true  // Suppresses the ensureIndex deprecation warning
     });
 
     testUserId = new mongoose.Types.ObjectId();
@@ -25,28 +26,6 @@ describe('Financial Report API Integration', () => {
       role: 'admin',
       permissions: ['create:reports', 'read:reports', 'update:reports', 'delete:reports']
     });
-
-    // Try to log a sample document from your database
-    try {
-      const sampleDoc = await FinancialReport.findOne();
-      if (sampleDoc) {
-        console.log('Sample valid document:', {
-          ReportID: sampleDoc.ReportID,
-          Type: sampleDoc.Type,
-          Data: {
-            revenue: sampleDoc.Data.revenue instanceof Map ? 
-              Object.fromEntries(sampleDoc.Data.revenue) : sampleDoc.Data.revenue,
-            expenses: sampleDoc.Data.expenses instanceof Map ? 
-              Object.fromEntries(sampleDoc.Data.expenses) : sampleDoc.Data.expenses
-          },
-          TotalRevenue: sampleDoc.TotalRevenue,
-          TotalExpenses: sampleDoc.TotalExpenses,
-          NetIncome: sampleDoc.NetIncome
-        });
-      }
-    } catch (error) {
-      console.log('Error finding sample document:', error.message);
-    }
   });
 
   afterAll(async () => {
@@ -91,11 +70,118 @@ describe('Financial Report API Integration', () => {
       expect(response.body).toHaveProperty('error');
     });
 
-    // Commenting out the failing test until we can see a valid document structure
-    /*
-    it('should return created report in list', async () => {
-      // We'll update this with the correct structure after seeing a valid document
+    it('should create and return a quarterly report', async () => {
+      try {
+        const report = new FinancialReport({
+          ReportID: 'TEST-2024-Q1',
+          Type: 'Quarterly',
+          TotalRevenue: 100000,
+          TotalExpenses: 75000,
+          NetIncome: 25000,
+          EquitySummary: ['Initial equity test'],
+          Timestamp: new Date(),
+          userId: testUserId,
+          lastModifiedBy: testUserId
+        });
+
+        report.Data = {
+          revenue: new Map().set('q1', 100000),
+          expenses: new Map().set('q1', 75000)
+        };
+
+        console.log('Pre-save state:', {
+          type: report.Type,
+          data: {
+            revenue: report.Data.revenue instanceof Map ? 
+              Array.from(report.Data.revenue.entries()) : report.Data.revenue,
+            expenses: report.Data.expenses instanceof Map ? 
+              Array.from(report.Data.expenses.entries()) : report.Data.expenses
+          }
+        });
+
+        await report.save();
+
+        const response = await request(app)
+          .get('/api/financial-reports')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(response.body.reports).toHaveLength(1);
+        expect(response.body.reports[0]).toMatchObject({
+          ReportID: report.ReportID,
+          Type: report.Type,
+          TotalRevenue: 100000,
+          TotalExpenses: 75000,
+          NetIncome: 25000
+        });
+
+      } catch (error) {
+        console.log('Error details:', error);
+        throw error;
+      }
     });
-    */
+
+    it('should create and return an annual report with full quarterly data', async () => {
+      try {
+        const report = new FinancialReport({
+          ReportID: 'TEST-2024-ANNUAL',
+          Type: 'Annual',
+          TotalRevenue: 400000,
+          TotalExpenses: 300000,
+          NetIncome: 100000,
+          EquitySummary: ['Year-end equity summary'],
+          Timestamp: new Date(),
+          userId: testUserId,
+          lastModifiedBy: testUserId
+        });
+
+        report.Data = {
+          revenue: new Map([['q1', 100000], ['q2', 100000], ['q3', 100000], ['q4', 100000]]),
+          expenses: new Map([['q1', 75000], ['q2', 75000], ['q3', 75000], ['q4', 75000]])
+        };
+
+        await report.save();
+
+        const response = await request(app)
+          .get('/api/financial-reports')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(response.body.reports).toHaveLength(1);
+        expect(response.body.reports[0]).toMatchObject({
+          ReportID: report.ReportID,
+          Type: report.Type,
+          TotalRevenue: 400000,
+          TotalExpenses: 300000,
+          NetIncome: 100000
+        });
+
+      } catch (error) {
+        console.log('Error details:', error);
+        throw error;
+      }
+    });
+
+    // New test: Verify validation for missing fields in financial report creation
+    it('should not create a report with missing required fields', async () => {
+      const invalidReportData = {
+        Type: 'Quarterly',
+        TotalRevenue: 50000,
+        // Missing TotalExpenses and NetIncome
+        EquitySummary: ['Partial equity summary'],
+        Timestamp: new Date(),
+        userId: testUserId,
+        lastModifiedBy: testUserId
+      };
+
+      const response = await request(app)
+        .post('/api/financial-reports')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidReportData)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('Missing required fields');
+    });
   });
 });
