@@ -2,6 +2,7 @@
 const FinancialReport = require("../models/financialReport");
 const jwt = require('jsonwebtoken');
 const config = require('../config');
+const mongoose = require('mongoose');
 
 // Constants
 const METHOD_PERMISSION_MAP = {
@@ -15,10 +16,24 @@ const METHOD_PERMISSION_MAP = {
 class FinancialReportController {
   // Business Logic Methods
   static calculateFinancialMetrics(reportData) {
+    if (!reportData) {
+      return {
+        isValid: false,
+        error: 'Report data is required for calculation'
+      };
+    }
+
     try {
       const revenue = parseFloat(reportData.TotalRevenue);
       const expenses = parseFloat(reportData.TotalExpenses);
       const reportedNetIncome = parseFloat(reportData.NetIncome);
+
+      if (isNaN(revenue) || isNaN(expenses) || isNaN(reportedNetIncome)) {
+        return {
+          isValid: false,
+          error: 'Invalid numerical values provided'
+        };
+      }
 
       const calculatedNetIncome = (revenue - expenses).toFixed(2);
       const isValid = calculatedNetIncome === reportedNetIncome.toFixed(2);
@@ -31,14 +46,28 @@ class FinancialReportController {
     } catch (error) {
       return {
         isValid: false,
-        error: 'Error calculating financial metrics'
+        error: `Error calculating financial metrics: ${error.message}`
       };
     }
   }
 
   static validateReportingPeriod(reportData) {
+    if (!reportData || !reportData.Type || !reportData.Data) {
+      return {
+        isValid: false,
+        error: 'Missing required reporting period data'
+      };
+    }
+
     try {
       const { Type, Data } = reportData;
+
+      if (!Data.revenue || !Data.expenses) {
+        return {
+          isValid: false,
+          error: 'Missing revenue or expenses data'
+        };
+      }
 
       if (Type === 'Annual') {
         const requiredQuarters = ['q1', 'q2', 'q3', 'q4'];
@@ -53,9 +82,7 @@ class FinancialReportController {
             error: 'Annual report must include data for all quarters'
           };
         }
-      }
-
-      if (Type === 'Quarterly') {
+      } else if (Type === 'Quarterly') {
         const hasQuarterlyData = 
           Object.keys(Data.revenue).length === 1 && 
           Object.keys(Data.expenses).length === 1;
@@ -66,6 +93,11 @@ class FinancialReportController {
             error: 'Quarterly report must include data for exactly one quarter'
           };
         }
+      } else {
+        return {
+          isValid: false,
+          error: 'Invalid report type. Must be either Annual or Quarterly'
+        };
       }
 
       return {
@@ -75,17 +107,29 @@ class FinancialReportController {
     } catch (error) {
       return {
         isValid: false,
-        error: 'Error validating reporting period'
+        error: `Error validating reporting period: ${error.message}`
       };
     }
   }
 
   static validateFinancialReport(reportData) {
+    if (!reportData) {
+      return {
+        isValid: false,
+        error: 'Report data is required'
+      };
+    }
+
     try {
       // Check required fields
       const requiredFields = [
-        'ReportID', 'Type', 'Data', 'TotalRevenue',
-        'TotalExpenses', 'NetIncome', 'Timestamp'
+        'ReportID', 
+        'Type', 
+        'Data', 
+        'TotalRevenue',
+        'TotalExpenses', 
+        'NetIncome', 
+        'Timestamp'
       ];
 
       const missingFields = requiredFields.filter(field => !reportData[field]);
@@ -96,7 +140,7 @@ class FinancialReportController {
         };
       }
 
-      // Check negative values
+      // Check negative values in financial fields
       const financialFields = ['TotalRevenue', 'TotalExpenses', 'NetIncome'];
       const hasNegativeValues = financialFields.some(field => 
         parseFloat(reportData[field]) < 0
@@ -123,12 +167,13 @@ class FinancialReportController {
         }
       }
 
-      // Validate calculations and period
-      const financialMetrics = this.calculateFinancialMetrics(reportData);
-      if (!financialMetrics.isValid) return financialMetrics;
-
+      // Validate type-specific requirements
       const periodValidation = this.validateReportingPeriod(reportData);
       if (!periodValidation.isValid) return periodValidation;
+
+      // Validate calculations
+      const financialMetrics = this.calculateFinancialMetrics(reportData);
+      if (!financialMetrics.isValid) return financialMetrics;
 
       return {
         isValid: true,
@@ -137,7 +182,7 @@ class FinancialReportController {
     } catch (error) {
       return {
         isValid: false,
-        error: 'Error validating financial report'
+        error: `Validation error: ${error.message}`
       };
     }
   }
@@ -146,11 +191,22 @@ class FinancialReportController {
   static async checkUserPermissions(req, res, next) {
     try {
       const { user } = req;
+      if (!user) {
+        const error = new Error('User not authenticated');
+        error.statusCode = 401;
+        return next(error);
+      }
+
       const requiredPermission = METHOD_PERMISSION_MAP[req.method];
+      if (!requiredPermission) {
+        const error = new Error('Invalid HTTP method');
+        error.statusCode = 405;
+        return next(error);
+      }
 
       if (user.role === 'admin') return next();
 
-      if (!user.permissions.includes(requiredPermission)) {
+      if (!user.permissions?.includes(requiredPermission)) {
         const error = new Error('Insufficient permissions');
         error.statusCode = 403;
         return next(error);
@@ -158,7 +214,7 @@ class FinancialReportController {
 
       next();
     } catch (error) {
-      error.statusCode = 500;
+      error.statusCode = error.statusCode || 500;
       next(error);
     }
   }
@@ -173,8 +229,19 @@ class FinancialReportController {
         return next(error);
       }
 
+      if (!config.JWT_SECRET) {
+        const error = new Error('JWT configuration error');
+        error.statusCode = 500;
+        return next(error);
+      }
+
       try {
         const decoded = jwt.verify(apiKey, config.JWT_SECRET);
+        if (!decoded.permissions || !Array.isArray(decoded.permissions)) {
+          const error = new Error('Invalid API key permissions');
+          error.statusCode = 401;
+          return next(error);
+        }
         req.apiPermissions = decoded.permissions;
         next();
       } catch (jwtError) {
@@ -183,7 +250,7 @@ class FinancialReportController {
         next(error);
       }
     } catch (error) {
-      error.statusCode = 500;
+      error.statusCode = error.statusCode || 500;
       next(error);
     }
   }
@@ -192,6 +259,18 @@ class FinancialReportController {
     try {
       const { id } = req.params;
       const { user } = req;
+
+      if (!user) {
+        const error = new Error('User not authenticated');
+        error.statusCode = 401;
+        return next(error);
+      }
+
+      if (!id) {
+        const error = new Error('Report ID is required');
+        error.statusCode = 400;
+        return next(error);
+      }
 
       const report = await FinancialReport.findOne({ ReportID: id });
 
@@ -211,13 +290,16 @@ class FinancialReportController {
 
       next();
     } catch (error) {
-      error.statusCode = 500;
+      error.statusCode = error.statusCode || 500;
       next(error);
     }
   }
 
   // CRUD Methods
   static async createFinancialReport(req, res, next) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
@@ -225,19 +307,40 @@ class FinancialReportController {
       }
 
       const financialReport = new FinancialReport(req.body);
-      const newFinancialReport = await financialReport.save();
-      res.status(201).json(newFinancialReport);
+      const newFinancialReport = await financialReport.save({ session });
+      
+      await session.commitTransaction();
+
+      return res.status(201).json({
+        ReportID: newFinancialReport.ReportID,
+        Type: newFinancialReport.Type,
+        Data: newFinancialReport.Data,
+        TotalRevenue: newFinancialReport.TotalRevenue,
+        TotalExpenses: newFinancialReport.TotalExpenses,
+        NetIncome: newFinancialReport.NetIncome,
+        EquitySummary: newFinancialReport.EquitySummary,
+        Timestamp: newFinancialReport.Timestamp,
+        userId: newFinancialReport.userId
+      });
     } catch (error) {
+      await session.abortTransaction();
       next(error);
+    } finally {
+      session.endSession();
     }
   }
 
   static async getFinancialReport(req, res, next) {
     try {
+      if (!req.params.id) {
+        return res.status(400).json({ message: 'Report ID is required' });
+      }
+
       const report = await FinancialReport.findOne({ ReportID: req.params.id });
       if (!report) {
         return res.status(404).json({ message: 'Financial report not found' });
       }
+
       res.status(200).json(report);
     } catch (error) {
       next(error);
@@ -246,13 +349,14 @@ class FinancialReportController {
 
   static async listFinancialReports(req, res, next) {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const page = Math.max(parseInt(req.query.page) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
       const skip = (page - 1) * limit;
 
       const reports = await FinancialReport.find()
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .sort({ Timestamp: -1 });
 
       const totalCount = await FinancialReport.countDocuments();
       const totalPages = Math.ceil(totalCount / limit);
@@ -261,7 +365,8 @@ class FinancialReportController {
         reports,
         totalCount,
         currentPage: page,
-        totalPages
+        totalPages,
+        limit
       });
     } catch (error) {
       next(error);
@@ -269,7 +374,14 @@ class FinancialReportController {
   }
 
   static async updateFinancialReport(req, res, next) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
+      if (!req.params.id) {
+        return res.status(400).json({ message: 'Report ID is required' });
+      }
+
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
         return res.status(400).json({ error: validation.error });
@@ -278,50 +390,96 @@ class FinancialReportController {
       const report = await FinancialReport.findOneAndUpdate(
         { ReportID: req.params.id },
         req.body,
-        { new: true, runValidators: true }
+        { 
+          new: true, 
+          runValidators: true,
+          session 
+        }
       );
 
       if (!report) {
+        await session.abortTransaction();
         return res.status(404).json({ message: 'Financial report not found' });
       }
 
+      await session.commitTransaction();
       res.status(200).json(report);
     } catch (error) {
+      await session.abortTransaction();
       next(error);
+    } finally {
+      session.endSession();
     }
   }
 
   static async deleteFinancialReport(req, res, next) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-      const report = await FinancialReport.findOneAndDelete({ 
-        ReportID: req.params.id 
-      });
+      if (!req.params.id) {
+        return res.status(400).json({ message: 'Report ID is required' });
+      }
+
+      const report = await FinancialReport.findOneAndDelete(
+        { ReportID: req.params.id },
+        { session }
+      );
 
       if (!report) {
+        await session.abortTransaction();
         return res.status(404).json({ message: 'Financial report not found' });
       }
 
+      await session.commitTransaction();
       res.status(200).json({
         message: 'Financial report deleted successfully',
         report
       });
     } catch (error) {
+      await session.abortTransaction();
       next(error);
+    } finally {
+      session.endSession();
+    }
+  }
+
+  static async generateReport(req, res, next) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Validate the report data
+      const validation = this.validateFinancialReport(req.body);
+      if (!validation.isValid) {
+        return res.status(400).json({ error: validation.error });
+      }
+
+      // Create the report with transaction support
+      const report = await FinancialReport.create([req.body], { session });
+      
+      await session.commitTransaction();
+      res.status(201).json(report[0]);
+    } catch (error) {
+      await session.abortTransaction();
+      next(error);
+    } finally {
+      session.endSession();
     }
   }
 }
 
-// Export as individual functions to maintain compatibility with existing code
 module.exports = {
-  calculateFinancialMetrics: FinancialReportController.calculateFinancialMetrics,
-  validateReportingPeriod: FinancialReportController.validateReportingPeriod,
-  validateFinancialReport: FinancialReportController.validateFinancialReport,
-  checkUserPermissions: FinancialReportController.checkUserPermissions,
-  validateApiKey: FinancialReportController.validateApiKey,
-  authorizeReportAccess: FinancialReportController.authorizeReportAccess,
-  createFinancialReport: FinancialReportController.createFinancialReport,
-  getFinancialReport: FinancialReportController.getFinancialReport,
-  listFinancialReports: FinancialReportController.listFinancialReports,
-  updateFinancialReport: FinancialReportController.updateFinancialReport,
-  deleteFinancialReport: FinancialReportController.deleteFinancialReport
+  calculateFinancialMetrics: FinancialReportController.calculateFinancialMetrics.bind(FinancialReportController),
+  validateReportingPeriod: FinancialReportController.validateReportingPeriod.bind(FinancialReportController),
+  validateFinancialReport: FinancialReportController.validateFinancialReport.bind(FinancialReportController),
+  checkUserPermissions: FinancialReportController.checkUserPermissions.bind(FinancialReportController),
+  validateApiKey: FinancialReportController.validateApiKey.bind(FinancialReportController),
+  authorizeReportAccess: FinancialReportController.authorizeReportAccess.bind(FinancialReportController),
+  createFinancialReport: FinancialReportController.createFinancialReport.bind(FinancialReportController),
+  getFinancialReport: FinancialReportController.getFinancialReport.bind(FinancialReportController),
+  listFinancialReports: FinancialReportController.listFinancialReports.bind(FinancialReportController),
+  updateFinancialReport: FinancialReportController.updateFinancialReport.bind(FinancialReportController),
+  deleteFinancialReport: FinancialReportController.deleteFinancialReport.bind(FinancialReportController),
+  generateReport: FinancialReportController.generateReport.bind(FinancialReportController)
 };
