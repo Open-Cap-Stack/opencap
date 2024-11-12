@@ -1,4 +1,3 @@
-// controllers/financialReportingController.js
 const FinancialReport = require("../models/financialReport");
 const jwt = require('jsonwebtoken');
 const config = require('../config');
@@ -187,7 +186,6 @@ class FinancialReportController {
     }
   }
 
-  // Authorization Methods
   static async checkUserPermissions(req, res, next) {
     try {
       const { user } = req;
@@ -297,10 +295,13 @@ class FinancialReportController {
 
   // CRUD Methods
   static async createFinancialReport(req, res, next) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    let session;
     try {
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+        session = await mongoose.startSession();
+        session.startTransaction();
+      }
+
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
         return res.status(400).json({ error: validation.error });
@@ -308,25 +309,15 @@ class FinancialReportController {
 
       const financialReport = new FinancialReport(req.body);
       const newFinancialReport = await financialReport.save({ session });
-      
-      await session.commitTransaction();
 
-      return res.status(201).json({
-        ReportID: newFinancialReport.ReportID,
-        Type: newFinancialReport.Type,
-        Data: newFinancialReport.Data,
-        TotalRevenue: newFinancialReport.TotalRevenue,
-        TotalExpenses: newFinancialReport.TotalExpenses,
-        NetIncome: newFinancialReport.NetIncome,
-        EquitySummary: newFinancialReport.EquitySummary,
-        Timestamp: newFinancialReport.Timestamp,
-        userId: newFinancialReport.userId
-      });
+      if (session) await session.commitTransaction();
+
+      return res.status(201).json(newFinancialReport);
     } catch (error) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       next(error);
     } finally {
-      session.endSession();
+      if (session) session.endSession();
     }
   }
 
@@ -374,10 +365,13 @@ class FinancialReportController {
   }
 
   static async updateFinancialReport(req, res, next) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    let session;
     try {
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+        session = await mongoose.startSession();
+        session.startTransaction();
+      }
+
       if (!req.params.id) {
         return res.status(400).json({ message: 'Report ID is required' });
       }
@@ -385,6 +379,16 @@ class FinancialReportController {
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
         return res.status(400).json({ error: validation.error });
+      }
+
+      // Convert Data field to Map if provided as an object
+      if (req.body.Data) {
+        if (req.body.Data.revenue && !(req.body.Data.revenue instanceof Map)) {
+          req.body.Data.revenue = new Map(Object.entries(req.body.Data.revenue));
+        }
+        if (req.body.Data.expenses && !(req.body.Data.expenses instanceof Map)) {
+          req.body.Data.expenses = new Map(Object.entries(req.body.Data.expenses));
+        }
       }
 
       const report = await FinancialReport.findOneAndUpdate(
@@ -398,25 +402,28 @@ class FinancialReportController {
       );
 
       if (!report) {
-        await session.abortTransaction();
+        if (session) await session.abortTransaction();
         return res.status(404).json({ message: 'Financial report not found' });
       }
 
-      await session.commitTransaction();
+      if (session) await session.commitTransaction();
       res.status(200).json(report);
     } catch (error) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       next(error);
     } finally {
-      session.endSession();
+      if (session) session.endSession();
     }
   }
 
   static async deleteFinancialReport(req, res, next) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    let session;
     try {
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+        session = await mongoose.startSession();
+        session.startTransaction();
+      }
+
       if (!req.params.id) {
         return res.status(400).json({ message: 'Report ID is required' });
       }
@@ -427,44 +434,45 @@ class FinancialReportController {
       );
 
       if (!report) {
-        await session.abortTransaction();
+        if (session) await session.abortTransaction();
         return res.status(404).json({ message: 'Financial report not found' });
       }
 
-      await session.commitTransaction();
+      if (session) await session.commitTransaction();
       res.status(200).json({
         message: 'Financial report deleted successfully',
         report
       });
     } catch (error) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       next(error);
     } finally {
-      session.endSession();
+      if (session) session.endSession();
     }
   }
 
   static async generateReport(req, res, next) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    let session;
     try {
-      // Validate the report data
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+        session = await mongoose.startSession();
+        session.startTransaction();
+      }
+
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
         return res.status(400).json({ error: validation.error });
       }
 
-      // Create the report with transaction support
       const report = await FinancialReport.create([req.body], { session });
-      
-      await session.commitTransaction();
+
+      if (session) await session.commitTransaction();
       res.status(201).json(report[0]);
     } catch (error) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       next(error);
     } finally {
-      session.endSession();
+      if (session) session.endSession();
     }
   }
 }
