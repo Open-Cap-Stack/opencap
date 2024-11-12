@@ -17,14 +17,15 @@ describe('Financial Report API Integration', () => {
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      useCreateIndex: true  // Suppresses the ensureIndex deprecation warning
+      useCreateIndex: true,
+      useFindAndModify: false,
     });
 
     testUserId = new mongoose.Types.ObjectId();
     adminToken = auth.generateToken({
       id: testUserId.toString(),
       role: 'admin',
-      permissions: ['create:reports', 'read:reports', 'update:reports', 'delete:reports']
+      permissions: ['create:reports', 'read:reports', 'update:reports', 'delete:reports'],
     });
   });
 
@@ -49,7 +50,7 @@ describe('Financial Report API Integration', () => {
         totalCount: 0,
         currentPage: 1,
         totalPages: 0,
-        limit: 10
+        limit: 10,
       });
     });
 
@@ -71,107 +72,86 @@ describe('Financial Report API Integration', () => {
     });
 
     it('should create and return a quarterly report', async () => {
-      try {
-        const report = new FinancialReport({
-          ReportID: 'TEST-2024-Q1',
-          Type: 'Quarterly',
-          TotalRevenue: 100000,
-          TotalExpenses: 75000,
-          NetIncome: 25000,
-          EquitySummary: ['Initial equity test'],
-          Timestamp: new Date(),
-          userId: testUserId,
-          lastModifiedBy: testUserId
-        });
+      const report = new FinancialReport({
+        ReportID: 'TEST-2024-Q1',
+        Type: 'Quarterly',
+        TotalRevenue: 100000,
+        TotalExpenses: 75000,
+        NetIncome: 25000,
+        EquitySummary: ['Initial equity test'],
+        Timestamp: new Date(),
+        userId: testUserId,
+        lastModifiedBy: testUserId,
+        Data: {
+          revenue: { q1: 100000 },
+          expenses: { q1: 75000 },
+        },
+      });
 
-        report.Data = {
-          revenue: new Map().set('q1', 100000),
-          expenses: new Map().set('q1', 75000)
-        };
+      console.log('Pre-save state:', {
+        type: report.Type,
+        data: report.Data,
+      });
 
-        console.log('Pre-save state:', {
-          type: report.Type,
-          data: {
-            revenue: report.Data.revenue instanceof Map ? 
-              Array.from(report.Data.revenue.entries()) : report.Data.revenue,
-            expenses: report.Data.expenses instanceof Map ? 
-              Array.from(report.Data.expenses.entries()) : report.Data.expenses
-          }
-        });
+      await report.save();
 
-        await report.save();
+      const response = await request(app)
+        .get('/api/financial-reports')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
 
-        const response = await request(app)
-          .get('/api/financial-reports')
-          .set('Authorization', `Bearer ${adminToken}`)
-          .expect(200);
-
-        expect(response.body.reports).toHaveLength(1);
-        expect(response.body.reports[0]).toMatchObject({
-          ReportID: report.ReportID,
-          Type: report.Type,
-          TotalRevenue: 100000,
-          TotalExpenses: 75000,
-          NetIncome: 25000
-        });
-
-      } catch (error) {
-        console.log('Error details:', error);
-        throw error;
-      }
+      expect(response.body.reports).toHaveLength(1);
+      expect(response.body.reports[0]).toMatchObject({
+        ReportID: report.ReportID,
+        Type: report.Type,
+        TotalRevenue: 100000,
+        TotalExpenses: 75000,
+        NetIncome: 25000,
+      });
     });
 
     it('should create and return an annual report with full quarterly data', async () => {
-      try {
-        const report = new FinancialReport({
-          ReportID: 'TEST-2024-ANNUAL',
-          Type: 'Annual',
-          TotalRevenue: 400000,
-          TotalExpenses: 300000,
-          NetIncome: 100000,
-          EquitySummary: ['Year-end equity summary'],
-          Timestamp: new Date(),
-          userId: testUserId,
-          lastModifiedBy: testUserId
-        });
+      const report = new FinancialReport({
+        ReportID: 'TEST-2024-ANNUAL',
+        Type: 'Annual',
+        TotalRevenue: 400000,
+        TotalExpenses: 300000,
+        NetIncome: 100000,
+        EquitySummary: ['Year-end equity summary'],
+        Timestamp: new Date(),
+        userId: testUserId,
+        lastModifiedBy: testUserId,
+        Data: {
+          revenue: { q1: 100000, q2: 100000, q3: 100000, q4: 100000 },
+          expenses: { q1: 75000, q2: 75000, q3: 75000, q4: 75000 },
+        },
+      });
 
-        report.Data = {
-          revenue: new Map([['q1', 100000], ['q2', 100000], ['q3', 100000], ['q4', 100000]]),
-          expenses: new Map([['q1', 75000], ['q2', 75000], ['q3', 75000], ['q4', 75000]])
-        };
+      await report.save();
 
-        await report.save();
+      const response = await request(app)
+        .get('/api/financial-reports')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
 
-        const response = await request(app)
-          .get('/api/financial-reports')
-          .set('Authorization', `Bearer ${adminToken}`)
-          .expect(200);
-
-        expect(response.body.reports).toHaveLength(1);
-        expect(response.body.reports[0]).toMatchObject({
-          ReportID: report.ReportID,
-          Type: report.Type,
-          TotalRevenue: 400000,
-          TotalExpenses: 300000,
-          NetIncome: 100000
-        });
-
-      } catch (error) {
-        console.log('Error details:', error);
-        throw error;
-      }
+      expect(response.body.reports).toHaveLength(1);
+      expect(response.body.reports[0]).toMatchObject({
+        ReportID: report.ReportID,
+        Type: report.Type,
+        TotalRevenue: 400000,
+        TotalExpenses: 300000,
+        NetIncome: 100000,
+      });
     });
 
-    // New test: Verify validation for missing fields in financial report creation
     it('should not create a report with missing required fields', async () => {
       const invalidReportData = {
         Type: 'Quarterly',
         TotalRevenue: 50000,
-        // Missing TotalExpenses and NetIncome
         EquitySummary: ['Partial equity summary'],
         Timestamp: new Date(),
         userId: testUserId,
-        lastModifiedBy: testUserId
+        lastModifiedBy: testUserId,
       };
 
       const response = await request(app)
@@ -182,6 +162,53 @@ describe('Financial Report API Integration', () => {
 
       expect(response.body).toHaveProperty('error');
       expect(response.body.error).toContain('Missing required fields');
+    });
+
+    it('should update an existing financial report', async () => {
+      const report = new FinancialReport({
+        ReportID: 'TEST-2024-Q1',
+        Type: 'Quarterly',
+        TotalRevenue: 100000,
+        TotalExpenses: 75000,
+        NetIncome: 25000,
+        EquitySummary: ['Initial equity test'],
+        Timestamp: new Date(),
+        userId: testUserId,
+        lastModifiedBy: testUserId,
+        Data: {
+          revenue: { q1: 100000 },
+          expenses: { q1: 75000 },
+        },
+      });
+      await report.save();
+
+      const updatedData = {
+        ReportID: report.ReportID,
+        Type: 'Quarterly',
+        TotalRevenue: 120000,
+        TotalExpenses: 80000,
+        NetIncome: 40000,
+        EquitySummary: ['Updated equity test'],
+        Data: {
+          revenue: { q1: 120000 },
+          expenses: { q1: 80000 },
+        },
+        Timestamp: report.Timestamp,
+        userId: testUserId,
+        lastModifiedBy: testUserId
+      };
+
+      await request(app)
+        .put(`/api/financial-reports/${report.ReportID}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updatedData)
+        .expect(200);
+
+      const updatedReport = await FinancialReport.findOne({ ReportID: report.ReportID });
+      expect(updatedReport).toBeTruthy();
+      expect(updatedReport.TotalRevenue).toBe(`${updatedData.TotalRevenue}.00`);
+      expect(updatedReport.TotalExpenses).toBe(`${updatedData.TotalExpenses}.00`);
+      expect(updatedReport.NetIncome).toBe(`${updatedData.NetIncome}.00`);
     });
   });
 });
