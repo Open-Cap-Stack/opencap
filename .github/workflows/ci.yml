@@ -14,7 +14,7 @@ jobs:
 
     services:
       mongodb:
-        image: mongo:latest
+        image: mongo:6.0 # Pin MongoDB version for consistency
         ports:
           - 27017:27017
 
@@ -29,28 +29,35 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '14'
+          node-version: '16' # Update Node.js version to a stable, supported version
 
       - name: Install dependencies
-        run: npm install mongoose@6.0.0
-
-      - name: Install dependencies
-        run: npm install
+        run: npm ci # Ensures clean installation from package-lock.json
 
       - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest mongoose sinon dotenv chai-http
+        run: npm install --save-dev jest chai supertest sinon dotenv chai-http
+
+      - name: Check installed packages
+        run: npm list mongoose # Debugging step to confirm mongoose version
+
+      - name: Set up MongoDB logs
+        run: mkdir -p logs && touch logs/mongo.log # Prepare logs directory for MongoDB
+
+      - name: Wait for MongoDB to start
+        run: |
+          sleep 10
+          echo "Waiting for MongoDB to start..." # Ensures MongoDB is ready before testing
 
       - name: Run tests
+        env:
+          MONGO_URI: ${{ env.MONGODB_URI }} # Explicitly pass env variables to the test step
         run: npm test
 
+      - name: Print MongoDB logs
+        run: docker logs $(docker ps -q --filter "ancestor=mongo:6.0") || echo "No MongoDB logs available"
+
       - name: Start application
+        env:
+          MONGO_URI: ${{ env.MONGODB_URI }} # Ensure the app uses the correct DB URI
+          PORT: ${{ env.PORT }}
         run: npm start
-
-      - name: Check Docker service
-        run: sudo systemctl status docker
-
-      - name: Pull MongoDB image
-        run: docker pull mongo:latest
-
-      - name: Print Docker logs
-        run: docker logs $(docker ps -q --filter "ancestor=mongo:latest")
