@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.557">
+  <testsuite name="ComplianceCheck Model" errors="0" failures="0" skipped="0" timestamp="2024-11-18T03:51:55" time="0.515" tests="1">
+    <testcase classname="ComplianceCheck Model" name="should not create a compliance check without required fields" time="0.04">
+    </testcase>
+  </testsuite>
+</testsuites>

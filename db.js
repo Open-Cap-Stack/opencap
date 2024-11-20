@@ -1,30 +1,42 @@
+// utils/db.js
 const mongoose = require('mongoose');
 
-const connectDB = async () => {
+async function connectDB() {
   try {
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/opencap_test', {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        useCreateIndex: true,
+        useFindAndModify: false
       });
       console.log('MongoDB Connected...');
     }
   } catch (err) {
-    console.error('Database connection error:', err.message);
-    process.exit(1); // Exit process with failure
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
   }
-};
+}
 
-const disconnectDB = async () => {
+async function disconnectDB() {
   try {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-      console.log('MongoDB Disconnected...');
-    }
+    await mongoose.connection.close();
+    console.log('MongoDB Disconnected...');
   } catch (err) {
-    console.error('Error disconnecting from the database:', err.message);
+    console.error('MongoDB disconnection error:', err);
   }
-};
+}
 
-module.exports = { connectDB, disconnectDB };
+async function clearDB() {
+  if (process.env.NODE_ENV === 'test') {
+    const collections = mongoose.connection.collections;
+    for (const key in collections) {
+      await collections[key].deleteMany();
+    }
+  }
+}
+
+module.exports = {
+  connectDB,
+  disconnectDB,
+  clearDB
+};

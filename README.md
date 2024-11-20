@@ -8,7 +8,7 @@ Follow these steps to set up the project on your local machine:
 
 ### Prerequisites ✅
 
-- Node.js (v14 or higher)
+- Node (v14 or higher)
 - MongoDB
 
 ### Clone the Repository 📂
@@ -26,14 +26,16 @@ npm install
 
 ### Set Up Environment Variables 🔐
 
-Create a `.env` file in the root of the project and add the following environment variables:
+## Environment Variables
+
+Create a `.env` file in the root directory and add the following:
 
 ```bash
-MONGODB_URI=mongodb://localhost:27017/opencap
+MONGODB_URI=mongodb://mongo:27017/opencap
 PORT=5000
 ```
 
-Replace `mongodb://localhost:27017/opencap` with your MongoDB connection string if it's different.
+Replace `mongodb://mongo:27017/opencap` with your MongoDB connection string if it's different.
 
 ## Running the Project ▶️
 
@@ -45,7 +47,7 @@ npm start
 
 This command starts the server on [http://localhost:5000](http://localhost:5000).
 
-### Start the Development Server with Nodemon 🔄
+### Start the Development Server 🔄
 
 For automatic restarts on code changes, use:
 
@@ -68,6 +70,7 @@ This command runs all the test cases defined in the `tests` directory.
 Here are the primary API endpoints for the project:
 
 ### Users 👤
+
 - **POST /api/users**: Create a new user
 - **GET /api/users**: Get all users
 - **GET /api/users/:id**: Get a user by ID
@@ -75,6 +78,7 @@ Here are the primary API endpoints for the project:
 - **DELETE /api/users/:id**: Delete a user by ID
 
 ### Stakeholders 👥
+
 - **POST /api/stakeholders**: Create a new stakeholder
 - **GET /api/stakeholders**: Get all stakeholders
 - **GET /api/stakeholders/:id**: Get a stakeholder by ID
@@ -82,13 +86,15 @@ Here are the primary API endpoints for the project:
 - **DELETE /api/stakeholders/:id**: Delete a stakeholder by ID
 
 ### Share Classes 🏦
-- **POST /api/shareclasses**: Create a new share class
-- **GET /api/shareclasses**: Get all share classes
-- **GET /api/shareclasses/:id**: Get a share class by ID
-- **PUT /api/shareclasses/:id**: Update a share class by ID
-- **DELETE /api/shareclasses/:id**: Delete a share class by ID
+
+- **POST /api/share-classes**: Create a new share class
+- **GET /api/share-classes**: Get all share classes
+- **GET /api/share-classes/:id**: Get a share class by ID
+- **PUT /api/share-classes/:id**: Update a share class by ID
+- **DELETE /api/share-classes/:id**: Delete a share class by ID
 
 ### Documents 📄
+
 - **POST /api/documents**: Create a new document
 - **GET /api/documents**: Get all documents
 - **GET /api/documents/:id**: Get a document by ID
@@ -96,6 +102,7 @@ Here are the primary API endpoints for the project:
 - **DELETE /api/documents/:id**: Delete a document by ID
 
 ### Activities 📋
+
 - **POST /api/activities**: Create a new activity
 - **GET /api/activities**: Get all activities
 - **GET /api/activities/:id**: Get an activity by ID
@@ -103,6 +110,7 @@ Here are the primary API endpoints for the project:
 - **DELETE /api/activities/:id**: Delete an activity by ID
 
 ### Notifications 🔔
+
 - **POST /api/notifications**: Create a new notification
 - **GET /api/notifications**: Get all notifications
 - **GET /api/notifications/:id**: Get a notification by ID
@@ -110,25 +118,28 @@ Here are the primary API endpoints for the project:
 - **DELETE /api/notifications/:id**: Delete a notification by ID
 
 ### Equity Simulations 📊
-- **POST /api/equitysimulations**: Create a new equity simulation
-- **GET /api/equitysimulations**: Get all equity simulations
-- **GET /api/equitysimulations/:id**: Get an equity simulation by ID
-- **PUT /api/equitysimulations/:id**: Update an equity simulation by ID
-- **DELETE /api/equitysimulations/:id**: Delete an equity simulation by ID
+
+- **POST /api/equity-simulations**: Create a new equity simulation
+- **GET /api/equity-simulations**: Get all equity simulations
+- **GET /api/equity-simulations/:id**: Get an equity simulation by ID
+- **PUT /api/equity-simulations/:id**: Update an equity simulation by ID
+- **DELETE /api/equity-simulations/:id**: Delete an equity simulation by ID
 
 ### Tax Calculations 💰
-- **POST /api/taxcalculations**: Create a new tax calculation
-- **GET /api/taxcalculations**: Get all tax calculations
-- **GET /api/taxcalculations/:id**: Get a tax calculation by ID
-- **PUT /api/taxcalculations/:id**: Update a tax calculation by ID
-- **DELETE /api/taxcalculations/:id**: Delete a tax calculation by ID
+
+- **POST /api/tax-calculations**: Create a new tax calculation
+- **GET /api/tax-calculations**: Get all tax calculations
+- **GET /api/tax-calculations/:id**: Get a tax calculation by ID
+- **PUT /api/tax-calculations/:id**: Update a tax calculation by ID
+- **DELETE /api/tax-calculations/:id**: Delete a tax calculation by ID
 
 ### Financial Reporting 📈
-- **POST /api/financialreports**: Create a new financial report
-- **GET /api/financialreports**: Get all financial reports
-- **GET /api/financialreports/:id**: Get a financial report by ID
-- **PUT /api/financialreports/:id**: Update a financial report by ID
-- **DELETE /api/financialreports/:id**: Delete a financial report by ID
+
+- **POST /api/financial-reports**: Create a new financial report
+- **GET /api/financial-reports**: Get all financial reports
+- **GET /api/financial-reports/:id**: Get a financial report by ID
+- **PUT /api/financial-reports/:id**: Update a financial report by ID
+- **DELETE /api/financial-reports/:id**: Delete a financial report by ID
 
 ## Project Structure 🗂️
 
@@ -262,14 +273,15 @@ Please follow these coding standards to maintain code quality and consistency:
   -
 
  Provide meaningful comments for complex code segments and functions.
-  - Document any public APIs and classes with clear explanations of their purpose and usage.
-  - Remove or update outdated comments as code changes.
+
+- Document any public APIs and classes with clear explanations of their purpose and usage.
+- Remove or update outdated comments as code changes.
 
 - **Code Structure**:
   - Organize code into modules and components.
   - Keep functions small and focused on a single task.
 
-- **Linting**: Ensure your code passes ESLint checks:
+- **Lint**: Ensure your code passes ESLint checks:
 
     ```bash
     npm run lint

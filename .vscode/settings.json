@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./dags/test_",
+        "./dags/test_"
+    ]
+}

@@ -1,28 +1,29 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../app'); // Ensure this imports the Express app correctly
+const app = require('../app');
 const Stakeholder = require('../models/Stakeholder');
-const { connectDB, disconnectDB } = require('../db');
+const { setupTestDB, teardownTestDB, clearDatabase } = require('./setup/dbHandler');
 
-const PORT = 5008; // Ensure a unique port
+const PORT = 5008;
 
 describe('Stakeholder Routes', () => {
   let server;
 
   beforeAll(async () => {
-    await connectDB();
+    await setupTestDB();
     server = app.listen(PORT);
   });
 
   afterAll(async () => {
     await server.close();
-    await disconnectDB();
+    await teardownTestDB();
   });
 
   beforeEach(async () => {
-    await Stakeholder.deleteMany({});
+    await clearDatabase();
   });
 
+  // Your existing test cases remain exactly the same below this point
   it('GET /api/stakeholders should return all stakeholders', async () => {
     const stakeholder = new Stakeholder({
       stakeholderId: 'stakeholder1',

@@ -1,14 +1,11 @@
 // __tests__/setup/jest.setup.js
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-secret';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
+// ... existing code ...
 
-jest.setTimeout(30000);
+// Suppress deprecation warnings
+const originalConsoleWarn = console.warn;
+console.warn = function(msg) {
+  if (msg.includes('collection.ensureIndex is deprecated')) return;
+  originalConsoleWarn.apply(console, arguments);
+};
 
-beforeAll(async () => {
-  console.log('Test setup initialized');
-});
-
-afterAll(async () => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-});
+// ... rest of the code ...

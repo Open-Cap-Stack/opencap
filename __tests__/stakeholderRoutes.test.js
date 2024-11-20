@@ -1,26 +1,28 @@
+// __tests__/stakeholderRoutes.test.js
+
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app'); // Ensure this imports the Express app correctly
 const Stakeholder = require('../models/Stakeholder');
 const { connectDB, disconnectDB } = require('../db');
 
-const PORT = 5008; // Ensure a unique port
+const PORT = 5008; // Ensure a unique port for each test
 
 describe('Stakeholder Routes', () => {
   let server;
 
   beforeAll(async () => {
-    await connectDB();
-    server = app.listen(PORT);
+    await connectDB(); // Ensure connection to the database
+    server = app.listen(PORT); // Start the server on the specified port
   });
 
   afterAll(async () => {
-    await server.close();
-    await disconnectDB();
+    await server.close(); // Close the server after all tests
+    await disconnectDB(); // Ensure the database connection is closed
   });
 
   beforeEach(async () => {
-    await Stakeholder.deleteMany({});
+    await Stakeholder.deleteMany({}); // Clear all stakeholders before each test
   });
 
   it('GET /api/stakeholders should return all stakeholders', async () => {
@@ -28,13 +30,13 @@ describe('Stakeholder Routes', () => {
       stakeholderId: 'stakeholder1',
       name: 'Jane Doe',
       role: 'Developer',
-      projectId: new mongoose.Types.ObjectId()
+      projectId: new mongoose.Types.ObjectId(),
     });
     await stakeholder.save();
 
     const response = await request(server).get('/api/stakeholders');
     expect(response.status).toBe(200);
-    expect(response.body.length).toBe(1); // Ensure response.body is an array
+    expect(response.body.length).toBe(1);
     expect(response.body[0].name).toBe('Jane Doe');
   });
 
@@ -43,7 +45,7 @@ describe('Stakeholder Routes', () => {
       stakeholderId: 'stakeholder2',
       name: 'John Doe',
       role: 'Manager',
-      projectId: new mongoose.Types.ObjectId()
+      projectId: new mongoose.Types.ObjectId(),
     };
 
     const response = await request(server).post('/api/stakeholders').send(stakeholderData);
@@ -57,7 +59,7 @@ describe('Stakeholder Routes', () => {
       stakeholderId: 'stakeholder3',
       name: 'Update Stakeholder',
       role: 'Tester',
-      projectId: new mongoose.Types.ObjectId()
+      projectId: new mongoose.Types.ObjectId(),
     });
     await stakeholder.save();
 
@@ -72,7 +74,7 @@ describe('Stakeholder Routes', () => {
       stakeholderId: 'stakeholder4',
       name: 'Delete Stakeholder',
       role: 'Analyst',
-      projectId: new mongoose.Types.ObjectId()
+      projectId: new mongoose.Types.ObjectId(),
     });
     await stakeholder.save();
 
