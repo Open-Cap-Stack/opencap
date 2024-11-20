@@ -2,34 +2,38 @@ const mongoose = require('mongoose');
 const sinon = require('sinon');
 const { expect } = require('@jest/globals');
 const ComplianceCheck = require('../models/ComplianceCheck');
-const complianceCheckController = require('../controllers/ComplianceCheck'); // Updated to match the correct file name
+const complianceCheckController = require('../controllers/ComplianceCheck');
+
+jest.setTimeout(30000); // Increase Jest timeout for MongoDB connections
 
 describe('ComplianceCheck Controller', function () {
   beforeAll(async () => {
     await mongoose.connect('mongodb://localhost:27017/test', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      autoIndex: false, // Disable indexing for test performance
     });
-    await mongoose.connection.dropDatabase();
+    await mongoose.connection.dropDatabase(); // Clear database before tests
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
+    await mongoose.connection.close(); // Properly close MongoDB connection
   });
 
   beforeEach(async () => {
-    await ComplianceCheck.deleteMany({});
+    await ComplianceCheck.deleteMany({}); // Clean up before each test
   });
 
   it('should create a new compliance check', async function () {
     const req = {
       body: {
-        CheckID: 'unique-check-id',
-        SPVID: 'spv123',
+        CheckID: 'UNIQUE-CHECK-ID',
+        SPVID: 'SPV-123',
         RegulationType: 'GDPR',
         Status: 'Compliant',
         Details: 'All checks passed',
         Timestamp: new Date(),
+        LastCheckedBy: 'Admin', // Required field
       },
     };
     const res = {
@@ -39,20 +43,21 @@ describe('ComplianceCheck Controller', function () {
 
     await complianceCheckController.createComplianceCheck(req, res);
 
-    expect(res.status.calledWith(201)).toBe(true);
-    expect(res.json.calledWith(sinon.match.has('CheckID', 'unique-check-id'))).toBe(true);
+    expect(res.status.calledWith(201)).toBe(true); // Expect HTTP 201 status
+    expect(res.json.calledWith(sinon.match.has('CheckID', 'UNIQUE-CHECK-ID'))).toBe(true); // Check response
   });
 
   it('should get all compliance checks', async function () {
     const complianceData = {
-      CheckID: 'unique-check-id',
-      SPVID: 'spv123',
+      CheckID: 'UNIQUE-CHECK-ID',
+      SPVID: 'SPV-123',
       RegulationType: 'GDPR',
       Status: 'Compliant',
       Details: 'All checks passed',
       Timestamp: new Date(),
+      LastCheckedBy: 'Admin',
     };
-    await new ComplianceCheck(complianceData).save();
+    await new ComplianceCheck(complianceData).save(); // Seed the database
 
     const req = {};
     const res = {
@@ -62,21 +67,22 @@ describe('ComplianceCheck Controller', function () {
 
     await complianceCheckController.getComplianceChecks(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    expect(res.json.args[0][0].complianceChecks).toBeInstanceOf(Array);
-    expect(res.json.args[0][0].complianceChecks[0].CheckID).toBe(complianceData.CheckID);
+    expect(res.status.calledWith(200)).toBe(true); // Expect HTTP 200 status
+    expect(res.json.args[0][0].complianceChecks).toBeInstanceOf(Array); // Check response type
+    expect(res.json.args[0][0].complianceChecks[0].CheckID).toBe(complianceData.CheckID); // Validate data
   });
 
   it('should delete a compliance check by ID', async function () {
     const complianceCheck = new ComplianceCheck({
-      CheckID: 'unique-check-id',
-      SPVID: 'spv123',
+      CheckID: 'UNIQUE-CHECK-ID',
+      SPVID: 'SPV-123',
       RegulationType: 'GDPR',
       Status: 'Compliant',
       Details: 'All checks passed',
       Timestamp: new Date(),
+      LastCheckedBy: 'Admin',
     });
-    await complianceCheck.save();
+    await complianceCheck.save(); // Save the document
 
     const req = {
       params: {
@@ -90,7 +96,7 @@ describe('ComplianceCheck Controller', function () {
 
     await complianceCheckController.deleteComplianceCheck(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    expect(res.json.calledWith(sinon.match.has('message', 'Compliance check deleted'))).toBe(true);
+    expect(res.status.calledWith(200)).toBe(true); // Expect HTTP 200 status
+    expect(res.json.calledWith(sinon.match.has('message', 'Compliance check deleted'))).toBe(true); // Validate response
   });
 });

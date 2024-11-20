@@ -1,69 +1,214 @@
 const axios = require('axios');
-const dotenv = require('dotenv');
-const path = require('path'); // Import path module
+const MockAdapter = require('axios-mock-adapter');
 
-// Load environment variables from .env file
-dotenv.config();
+describe('Airflow Integration Tests', () => {
+  let mock;
+  const airflowConfig = {
+    baseURL: 'http://localhost:8080/api/v1',
+    auth: {
+      username: 'admin',
+      password: 'admin_password'
+    },
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  };
 
-// Dummy processDataset function (since there is no 'dataProcessing' module)
-const processDataset = (datasetPath) => {
-  // Simulate processing the CSV dataset
-  const data = [
-    { name: 'Item 1', value: 100 },
-    { name: 'Item 2', value: 200 },
-  ];
-  return data;
-};
+  beforeAll(() => {
+    mock = new MockAdapter(axios);
+  });
 
-describe('Airflow Integration and Data Processing Test', () => {
-  const airflowUrl = process.env.AIRFLOW_URL || 'http://localhost:8081/api/v1/dags/test_dag/dagRuns';
+  afterAll(() => {
+    mock.restore();
+  });
 
-  // Test for triggering a DAG (unchanged, since it's already passing)
-  it('should trigger a DAG and receive a successful response', async () => {
-    try {
-      const response = await axios.post(
-        airflowUrl,
-        {},
-        {
-          auth: {
-            username: process.env.AIRFLOW_USERNAME || 'admin',
-            password: process.env.AIRFLOW_PASSWORD || 'admin_password',
-          },
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+  beforeEach(() => {
+    mock.reset();
+  });
+
+  it('should trigger DAG run with MinIO configuration', async () => {
+    const dagId = 'test_dag';
+    const dagRunId = `manual__${new Date().toISOString()}`;
+    const minioConfig = {
+      bucket: 'lakehouse-bucket',
+      object_name: 'test-dataset.csv',
+      minio_endpoint: 'localhost:9000'
+    };
+
+    mock.onPost(`${airflowConfig.baseURL}/dags/${dagId}/dagRuns`)
+      .reply(200, {
+        dag_id: dagId,
+        dag_run_id: dagRunId,
+        state: 'queued',
+        conf: minioConfig
+      });
+
+    const response = await axios.post(
+      `${airflowConfig.baseURL}/dags/${dagId}/dagRuns`,
+      { conf: minioConfig },
+      airflowConfig
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.dag_id).toBe(dagId);
+    expect(response.data.conf).toEqual(minioConfig);
+  });
+
+  it('should monitor DAG execution status', async () => {
+    const dagId = 'test_dag';
+    const dagRunId = `manual__${new Date().toISOString()}`;
+    const statusSequence = [
+      { state: 'queued' },
+      { state: 'running' },
+      { state: 'success' }
+    ];
+    
+    let statusCallCount = 0;
+    mock.onGet(`${airflowConfig.baseURL}/dags/${dagId}/dagRuns/${dagRunId}`)
+      .reply(() => {
+        const status = statusSequence[statusCallCount % statusSequence.length];
+        statusCallCount++;
+        return [200, {
+          dag_id: dagId,
+          dag_run_id: dagRunId,
+          ...status
+        }];
+      });
+
+    for (let i = 0; i < statusSequence.length; i++) {
+      const response = await axios.get(
+        `${airflowConfig.baseURL}/dags/${dagId}/dagRuns/${dagRunId}`,
+        airflowConfig
       );
-
-      expect(response.status).toBe(200);
-      expect(response.data).toHaveProperty('dag_id', 'test_dag');
-      expect(response.data).toHaveProperty('state', 'queued');
-      console.log('DAG triggered successfully:', response.data);
-    } catch (error) {
-      console.error('Error triggering DAG:', error.response ? error.response.data : error.message);
-      throw error;
+      expect(response.data.state).toBe(statusSequence[i].state);
     }
   });
 
-  // Refactor for the dataset processing test
-  it('should process the dataset correctly', () => {
-    // Path to the test dataset CSV file (assuming a mock dataset)
-    const datasetPath = path.join(__dirname, 'test-dataset.csv');
+  it('should handle DAG variables', async () => {
+    const variables = {
+      MINIO_BUCKET: 'lakehouse-bucket',
+      MINIO_ACCESS_KEY: 'minioadmin',
+      MINIO_SECRET_KEY: 'minioadmin',
+      PROCESSING_DATE: new Date().toISOString()
+    };
 
-    // Process the dataset
-    const processedData = processDataset(datasetPath);
+    mock.onPatch(`${airflowConfig.baseURL}/variables`)
+      .reply(200, variables);
 
-    // Assertions for the processed data
-    expect(processedData).toBeDefined();
-    expect(processedData.length).toBeGreaterThan(0);
+    mock.onGet(`${airflowConfig.baseURL}/variables`)
+      .reply(200, variables);
 
-    processedData.forEach((item) => {
-      expect(item).toHaveProperty('name');
-      expect(item).toHaveProperty('value');
-      expect(typeof item.name).toBe('string');
-      expect(typeof item.value).toBe('number');
-    });
+    const setResponse = await axios.patch(
+      `${airflowConfig.baseURL}/variables`,
+      variables,
+      airflowConfig
+    );
+    expect(setResponse.status).toBe(200);
 
-    console.log('Data processed successfully:', processedData);
+    const getResponse = await axios.get(
+      `${airflowConfig.baseURL}/variables`,
+      airflowConfig
+    );
+    expect(getResponse.data).toEqual(variables);
+  });
+
+  it('should verify DAG configuration', async () => {
+    const dagId = 'test_dag';
+    const expectedConfig = {
+      schedule_interval: '@once',
+      catchup: false,
+      max_active_runs: 1,
+      tags: ['minio', 'data-processing']
+    };
+
+    mock.onGet(`${airflowConfig.baseURL}/dags/${dagId}/details`)
+      .reply(200, {
+        dag_id: dagId,
+        ...expectedConfig,
+        is_active: true
+      });
+
+    const response = await axios.get(
+      `${airflowConfig.baseURL}/dags/${dagId}/details`,
+      airflowConfig
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.schedule_interval).toBe(expectedConfig.schedule_interval);
+    expect(response.data.catchup).toBe(expectedConfig.catchup);
+    expect(response.data.is_active).toBe(true);
+  });
+
+  it('should handle task instance retries', async () => {
+    const dagId = 'test_dag';
+    const taskId = 'upload_data_to_minio';
+    const dagRunId = `manual__${new Date().toISOString()}`;
+    const taskStates = [
+      { try_number: 1, state: 'failed' },
+      { try_number: 2, state: 'failed' },
+      { try_number: 3, state: 'success' }
+    ];
+
+    let tryNumber = 0;
+    mock.onGet(`${airflowConfig.baseURL}/dags/${dagId}/dagRuns/${dagRunId}/taskInstances/${taskId}`)
+      .reply(() => {
+        const state = taskStates[tryNumber % taskStates.length];
+        tryNumber++;
+        return [200, state];
+      });
+
+    for (let i = 0; i < taskStates.length; i++) {
+      const response = await axios.get(
+        `${airflowConfig.baseURL}/dags/${dagId}/dagRuns/${dagRunId}/taskInstances/${taskId}`,
+        airflowConfig
+      );
+      expect(response.data.try_number).toBe(taskStates[i].try_number);
+      expect(response.data.state).toBe(taskStates[i].state);
+    }
+  });
+
+  it('should handle connection timeout', async () => {
+    const dagId = 'test_dag';
+    
+    mock.onPost(`${airflowConfig.baseURL}/dags/${dagId}/dagRuns`)
+      .timeout();
+
+    try {
+      await axios.post(
+        `${airflowConfig.baseURL}/dags/${dagId}/dagRuns`,
+        {},
+        { ...airflowConfig, timeout: 1000 }
+      );
+      fail('Should have thrown a timeout error');
+    } catch (error) {
+      expect(error.code).toBe('ECONNABORTED');
+    }
+  });
+
+  it('should handle unauthorized access', async () => {
+    const dagId = 'test_dag';
+    
+    mock.onPost(`${airflowConfig.baseURL}/dags/${dagId}/dagRuns`)
+      .reply(401, {
+        detail: 'Unauthorized',
+        status: 401,
+        title: 'Unauthorized',
+        type: 'about:blank'
+      });
+
+    try {
+      await axios.post(
+        `${airflowConfig.baseURL}/dags/${dagId}/dagRuns`,
+        {},
+        {
+          ...airflowConfig,
+          auth: { username: 'wrong', password: 'wrong' }
+        }
+      );
+      fail('Should have thrown an unauthorized error');
+    } catch (error) {
+      expect(error.response.status).toBe(401);
+    }
   });
 });

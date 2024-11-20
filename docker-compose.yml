@@ -1,0 +1,127 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    command: nodemon app.js
+    depends_on:
+      - postgres
+      - minio
+      - spark
+      - airflow-webserver
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres:5432/opencap
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+      - NODE_ENV=development
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: opencap_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: opencap
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: opencap_minio
+    command: server /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - minio_data:/data
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: opencap_spark
+    environment:
+      - SPARK_MODE=standalone
+      - SPARK_MASTER_URL=spark://spark:7077
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - spark_data:/opt/bitnami/spark
+
+  airflow-webserver:
+    image: apache/airflow:2.7.2
+    container_name: opencap_airflow_webserver
+    restart: always
+    ports:
+      - "8085:8080"
+    depends_on:
+      - airflow-scheduler
+      - airflow-db
+      - airflow-redis
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW_UID=50000
+    volumes:
+      - airflow_data:/opt/airflow
+
+  airflow-db:
+    image: postgres:15-alpine
+    container_name: opencap_airflow_db
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+
+  airflow-redis:
+    image: redis:6-alpine
+    container_name: opencap_airflow_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.2
+    container_name: opencap_airflow_scheduler
+    restart: always
+    depends_on:
+      - airflow-db
+      - airflow-redis
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW_UID=50000
+    volumes:
+      - airflow_data:/opt/airflow
+
+volumes:
+  postgres_data:
+  minio_data:
+  spark_data:
+  airflow_data:
+  airflow_db_data:
+
