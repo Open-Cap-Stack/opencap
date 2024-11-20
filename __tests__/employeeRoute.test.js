@@ -1,23 +1,23 @@
-// test/employeeRoute.test.js
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app'); // Ensure this points to your Express app
 const Employee = require('../models/employeeModel');
 
 beforeAll(async () => {
-  await mongoose.connect("mongodb://localhost:27017/testDB", {
+  await mongoose.connect("mongodb://localhost:27017/opencap", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    useCreateIndex: true, // Addresses the ensureIndex deprecation warning
   });
 });
 
 afterAll(async () => {
-  await mongoose.connection.close();
+  await mongoose.connection.close(); // Ensures no open handles
 });
 
 describe("Employee Routes", () => {
   beforeEach(async () => {
-    await Employee.deleteMany({});
+    await Employee.deleteMany({}); // Cleans up the collection before each test
   });
 
   describe("GET /api/employees", () => {

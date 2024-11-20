@@ -1,4 +1,3 @@
-// test/CompanyController.test.js
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -10,7 +9,7 @@ jest.mock('../models/Company');
 
 const app = express();
 app.use(express.json());
-app.use("/api/companies", require("../routes/Company"));
+app.use("/api/companies", require("../routes/companyRoutes")); // Corrected file name
 
 describe('Company Controller', () => {
   beforeEach(() => {
@@ -25,7 +24,7 @@ describe('Company Controller', () => {
         CompanyType: 'corporation',
         RegisteredAddress: '456 New Avenue, New City, NC',
         TaxID: '987-65-4321',
-        corporationDate: new Date().toISOString(), // Ensure date is in ISO string format
+        corporationDate: new Date().toISOString(),
       };
 
       Company.prototype.save.mockResolvedValue(companyData);
