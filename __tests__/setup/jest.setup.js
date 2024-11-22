@@ -9,3 +9,17 @@ console.warn = function(msg) {
 };
 
 // ... rest of the code ...
+
+// jest.setup.js
+jest.setTimeout(30000);
+
+beforeAll(() => {
+  // Suppress console logs during tests
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterAll(() => {
+  // Restore console
+  jest.restoreAllMocks();
+});
