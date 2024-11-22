@@ -4,7 +4,6 @@ const Employee = require("../models/employeeModel");
 const should = chai.should();
 const { connectDB, disconnectDB } = require('../db');
 
-
 describe("Employee Model", () => {
   beforeAll(async function () {
     await connectDB();
@@ -15,7 +14,11 @@ describe("Employee Model", () => {
     await mongoose.connection.close();
   });
 
-  it("should create a new employee", (done) => {
+  it("should create a new employee", async () => {
+    const now = new Date();
+    const future = new Date(now);
+    future.setMonth(future.getMonth() + 1); // Set cliff date 1 month in future
+
     const employee = new Employee({
       EmployeeID: "E12345",
       Name: "John Doe",
@@ -27,8 +30,8 @@ describe("Employee Model", () => {
       },
       DocumentAccess: [],
       VestingSchedule: {
-        StartDate: new Date(),
-        CliffDate: new Date(),
+        StartDate: now,
+        CliffDate: future, // This ensures CliffDate is after StartDate
         VestingPeriod: 12,
         TotalEquity: 1000,
       },
@@ -37,11 +40,10 @@ describe("Employee Model", () => {
         TaxLiability: 300,
       },
     });
-    employee.save((err, savedEmployee) => {
-      should.not.exist(err);
-      savedEmployee.should.be.an("object");
-      savedEmployee.should.have.property("Name").eql("John Doe");
-      done();
-    });
+
+    const savedEmployee = await employee.save();
+    should.exist(savedEmployee);
+    savedEmployee.should.be.an("object");
+    savedEmployee.should.have.property("Name").eql("John Doe");
   });
 });

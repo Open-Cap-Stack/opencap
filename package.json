@@ -19,6 +19,9 @@
   "dependencies": {
     "@hapi/code": "^9.0.3",
     "@hapi/hoek": "^11.0.4",
+    "@langchain/anthropic": "^0.3.8",
+    "@langchain/core": "^0.3.18",
+    "@langchain/langgraph": "^0.2.22",
     "argon2": "^0.40.3",
     "bcrypt": "^5.1.1",
     "chai-http": "^5.0.0",
