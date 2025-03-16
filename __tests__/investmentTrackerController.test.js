@@ -24,10 +24,7 @@ jest.mock('../models/investmentTrackerModel', () => {
 
 describe('Investment Tracker Controller', () => {
   beforeAll(async () => {
-    await mongoose.connect('mongodb://127.0.0.1/investmentTrackerTestDB', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect('mongodb://127.0.0.1/investmentTrackerTestDB');
   });
 
   afterAll(async () => {

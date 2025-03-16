@@ -4,10 +4,7 @@ const investmentTracker = require('../models/investmentTrackerModel');
 describe('Investment Tracker Model', () => {
   beforeAll(async () => {
     const mongoUri = 'mongodb://127.0.0.1/investmentTrackerTestDB';
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {

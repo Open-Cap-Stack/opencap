@@ -36,6 +36,20 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  mongodb:
+    image: mongo:5.0
+    container_name: opencap_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: opencap
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: opencap
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-scripts/mongo:/docker-entrypoint-initdb.d
+
   minio:
     image: minio/minio:latest
     container_name: opencap_minio
@@ -53,24 +67,40 @@ services:
     image: bitnami/spark:latest
     container_name: opencap_spark
     environment:
-      - SPARK_MODE=standalone
-      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_MODE=master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
     ports:
       - "7077:7077"
       - "8080:8080"
     volumes:
       - spark_data:/opt/bitnami/spark
 
+  spark-worker:
+    image: bitnami/spark:latest
+    container_name: opencap_spark_worker
+    depends_on:
+      - spark
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    volumes:
+      - spark_worker_data:/opt/bitnami/spark
+
   airflow-webserver:
     image: apache/airflow:2.7.2
     container_name: opencap_airflow_webserver
     restart: always
+    command: webserver
     ports:
       - "8085:8080"
     depends_on:
       - airflow-scheduler
       - airflow-db
       - airflow-redis
+      - airflow-init
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
@@ -100,13 +130,35 @@ services:
     ports:
       - "6379:6379"
 
+  airflow-init:
+    image: apache/airflow:2.7.2
+    container_name: opencap_airflow_init
+    depends_on:
+      - airflow-db
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - _AIRFLOW_DB_UPGRADE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+      - _AIRFLOW_WWW_USER_EMAIL=admin@opencap.org
+    entrypoint: /bin/bash
+    command: -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@opencap.org && exit 0"
+
   airflow-scheduler:
     image: apache/airflow:2.7.2
     container_name: opencap_airflow_scheduler
     restart: always
+    command: scheduler
     depends_on:
       - airflow-db
       - airflow-redis
+      - airflow-init
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
@@ -122,6 +174,7 @@ volumes:
   postgres_data:
   minio_data:
   spark_data:
+  spark_worker_data:
   airflow_data:
   airflow_db_data:
-
+  mongodb_data:

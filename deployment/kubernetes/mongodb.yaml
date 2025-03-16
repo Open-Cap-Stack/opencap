@@ -1,0 +1,144 @@
+---
+# MongoDB Secret for storing credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: opencap
+type: Opaque
+data:
+  # Base64 encoded values
+  username: b3BlbmNhcA==  # opencap
+  password: cGFzc3dvcmQxMjM=  # password123
+  connection-string: bW9uZ29kYjovL29wZW5jYXA6cGFzc3dvcmQxMjNAbW9uZ29kYi5vcGVuY2FwLnN2Yy5jbHVzdGVyLmxvY2FsOjI3MDE3L29wZW5jYXA/YXV0aFNvdXJjZT1hZG1pbg==
+---
+# MongoDB ConfigMap for initialization scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-scripts
+  namespace: opencap
+data:
+  init-mongo.js: |
+    db = db.getSiblingDB('admin');
+    db.createUser({
+      user: "opencap",
+      pwd: "password123",
+      roles: [
+        { role: "userAdminAnyDatabase", db: "admin" },
+        { role: "readWriteAnyDatabase", db: "admin" }
+      ]
+    });
+    db = db.getSiblingDB('opencap');
+    db.createCollection("financialReport");
+    db.createCollection("users");
+    db.createCollection("documents");
+    db.createCollection("documentEmbedding");
+    db = db.getSiblingDB('opencap_test');
+    db.createCollection("financialReport");
+    db.createCollection("users");
+    db.createCollection("documents");
+    db.createCollection("documentEmbedding");
+---
+# MongoDB Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: opencap
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: opencap
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:5.0
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: password
+        - name: MONGO_INITDB_DATABASE
+          value: opencap
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: mongodb-data
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
+      - name: init-scripts
+        configMap:
+          name: mongodb-init-scripts
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: opencap
+  labels:
+    app: mongodb
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+  selector:
+    app: mongodb

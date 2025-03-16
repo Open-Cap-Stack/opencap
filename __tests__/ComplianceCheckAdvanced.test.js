@@ -94,10 +94,7 @@ describe('ComplianceCheck Advanced Features', () => {
   };
 
   beforeAll(async () => {
-    await mongoose.connect(global.__MONGO_URI__ || 'mongodb://localhost:27017/test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    await mongoose.connect(global.__MONGO_URI__ || 'mongodb://localhost:27017/test');
   });
 
   afterAll(async () => {

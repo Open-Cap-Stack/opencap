@@ -6,7 +6,7 @@ async function connectToMongoDB() {
   if (!mongoUri) {
     throw new Error('MongoDB URI is not defined.');
   }
-  await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await mongoose.connect(mongoUri);
   console.log('Connected to MongoDB for setup.');
 }
 

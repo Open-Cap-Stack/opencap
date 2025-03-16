@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const DocumentAccessModel = require('../models/DocumentAccessModel');
 
 beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/opencap', { useNewUrlParser: true, useUnifiedTopology: true });
+    await mongoose.connect('mongodb://localhost:27017/opencap');
 });
 
 afterAll(async () => {

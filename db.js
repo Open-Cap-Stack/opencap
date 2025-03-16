@@ -1,19 +1,18 @@
 // utils/db.js
 const mongoose = require('mongoose');
 
+// Set strictQuery to true to suppress the deprecation warning and maintain consistent query behavior
+mongoose.set('strictQuery', true);
+
 async function connectDB() {
   try {
     if (mongoose.connection.readyState === 0) {
       const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/opencap_test', {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        useFindAndModify: false,
-        useCreateIndex: true,
-        // Add timeouts to prevent hanging connections
+        // Remove deprecated options that are no longer supported in mongoose 6.x// These options are removed in mongoose 6.x
+        ////// Add timeouts to prevent hanging connections
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-      });
+        socketTimeoutMS: 45000 });
       console.log('MongoDB Connected...');
       return conn;
     }

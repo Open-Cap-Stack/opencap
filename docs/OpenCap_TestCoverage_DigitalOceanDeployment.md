@@ -43,6 +43,29 @@ The Jest configuration in `jest.config.js` includes:
      'utils/**/*.js',
      // Exclusions...
    ],
+   coverageReporters: ['text', 'lcov', 'html', 'json-summary', 'cobertura'],
+   
+   // Coverage Thresholds - Enforcing minimum test coverage
+   coverageThreshold: {
+     global: {
+       branches: 70,
+       functions: 80,
+       lines: 80,
+       statements: 80
+     },
+     './controllers/': {
+       branches: 75,
+       functions: 85,
+       lines: 85,
+       statements: 85
+     },
+     './models/': {
+       branches: 80,
+       functions: 90,
+       lines: 90,
+       statements: 90
+     }
+   }
    ```
 
 2. **Test Types**:
@@ -51,11 +74,58 @@ The Jest configuration in `jest.config.js` includes:
    - Unit tests: `npm run test:unit`
    - CI tests: `npm run test:ci`
    - Docker-based tests: `npm run test:docker`
+   - Coverage report generation: `npm run coverage:report`
+   - Coverage threshold validation: `npm run coverage:check`
+   - Coverage badge generation: `npm run coverage:badge`
 
-3. **Potential Coverage Gaps**:
+3. **Coverage Analysis Tools**:
+   - **Codecov Integration**: For coverage trend analysis and PR feedback
+   - **HTML Reports**: For detailed coverage visualization
+   - **JSON Summary**: For integration with CI/CD systems
+   - **Cobertura Reports**: For compatibility with Jenkins and other CI tools
+
+4. **Potential Coverage Gaps**:
    - Tests are primarily focused on back-end functionality
    - Some MongoDB authentication edge cases may not be fully covered
    - Error handling coverage may be inconsistent
+
+### Enhanced Test Coverage Integration
+
+1. **Automated Coverage Reporting**:
+   - The `scripts/generate-coverage-report.js` tool creates detailed coverage reports
+   - Reports include directory-level analysis and recommendations
+   - HTML, JSON, and markdown formats are generated for different audiences
+
+2. **CI/CD Integration**:
+   - GitHub Actions workflow now includes enhanced coverage steps:
+     ```yaml
+     - name: Run tests
+       run: npm run test:ci
+
+     - name: Generate Coverage Report
+       run: npm run coverage:report
+       if: success() || failure()  # Run even if tests fail to get coverage data
+
+     - name: Upload coverage reports to Codecov
+       uses: codecov/codecov-action@v3
+       with:
+         fail_ci_if_error: false
+
+     - name: Upload Coverage Report as Artifact
+       uses: actions/upload-artifact@v3
+       if: success() || failure()  # Run even if tests fail
+       with:
+         name: test-coverage-report
+         path: |
+           coverage/
+           docs/test-coverage-report.md
+         retention-days: 14
+     ```
+
+3. **Coverage Badge Integration**:
+   - README.md now displays real-time coverage badges
+   - Coverage trends are visualized in Codecov dashboards
+   - PRs include coverage impact analysis
 
 ### Recommendations for Improving Test Coverage
 
@@ -67,10 +137,17 @@ The Jest configuration in `jest.config.js` includes:
 2. **Standardize Test Structure**:
    - Ensure all tests follow the BDD pattern as per Semantic Seed standards
    - Add more descriptive test names
+   - Implement the RED pattern (Request, Exception, Dependency)
 
 3. **Integration Test Enhancement**:
    - Expand API-to-database integration tests
    - Add tests for the entire request lifecycle
+   - Implement more advanced mocking strategies
+
+4. **Security-Focused Testing**:
+   - Increase test coverage on authentication/authorization flows
+   - Add specific tests for input validation and sanitization
+   - Implement tests for rate limiting and API abuse prevention
 
 ## Digital Ocean Deployment with Kong API Gateway
 

@@ -2,12 +2,14 @@
 
 const calculateFinancialMetrics = (reportData) => {
     try {
-      const revenue = parseFloat(reportData.TotalRevenue);
-      const expenses = parseFloat(reportData.TotalExpenses);
-      const reportedNetIncome = parseFloat(reportData.NetIncome);
+      const revenue = Number(reportData.TotalRevenue);
+      const expenses = Number(reportData.TotalExpenses);
+      const reportedNetIncome = Number(reportData.NetIncome);
   
-      const calculatedNetIncome = (revenue - expenses).toFixed(2);
-      const isValid = calculatedNetIncome === reportedNetIncome.toFixed(2);
+      // For very large numbers, use a tolerance for floating point arithmetic
+      const calculatedNetIncome = revenue - expenses;
+      const tolerance = Math.max(Math.abs(calculatedNetIncome), Math.abs(reportedNetIncome)) * 1e-10;
+      const isValid = Math.abs(calculatedNetIncome - reportedNetIncome) <= tolerance;
   
       return {
         isValid,
@@ -28,10 +30,19 @@ const calculateFinancialMetrics = (reportData) => {
   
       if (Type === 'Annual') {
         const requiredQuarters = ['q1', 'q2', 'q3', 'q4'];
-        const hasAllQuarters = requiredQuarters.every(quarter => 
-          Data.revenue[quarter] !== undefined && 
-          Data.expenses[quarter] !== undefined
-        );
+        let hasAllQuarters = true;
+        
+        // More flexible validation to handle both object and Map structures
+        if (Data.revenue instanceof Map) {
+          hasAllQuarters = requiredQuarters.every(quarter => 
+            Data.revenue.has(quarter) && Data.expenses.has(quarter)
+          );
+        } else {
+          hasAllQuarters = requiredQuarters.every(quarter => 
+            Data.revenue[quarter] !== undefined && 
+            Data.expenses[quarter] !== undefined
+          );
+        }
   
         if (!hasAllQuarters) {
           return {
@@ -42,9 +53,16 @@ const calculateFinancialMetrics = (reportData) => {
       }
   
       if (Type === 'Quarterly') {
-        const hasQuarterlyData = 
-          Object.keys(Data.revenue).length === 1 && 
-          Object.keys(Data.expenses).length === 1;
+        let hasQuarterlyData = false;
+        
+        // Handle both object and Map structures
+        if (Data.revenue instanceof Map && Data.expenses instanceof Map) {
+          hasQuarterlyData = Data.revenue.size === 1 && Data.expenses.size === 1;
+        } else {
+          hasQuarterlyData = 
+            Object.keys(Data.revenue).length === 1 && 
+            Object.keys(Data.expenses).length === 1;
+        }
   
         if (!hasQuarterlyData) {
           return {
@@ -78,7 +96,7 @@ const calculateFinancialMetrics = (reportData) => {
         'Timestamp'
       ];
   
-      const missingFields = requiredFields.filter(field => !reportData[field]);
+      const missingFields = requiredFields.filter(field => reportData[field] === undefined);
       if (missingFields.length > 0) {
         return {
           isValid: false,
@@ -87,21 +105,30 @@ const calculateFinancialMetrics = (reportData) => {
       }
   
       const financialFields = ['TotalRevenue', 'TotalExpenses', 'NetIncome'];
-      const hasNegativeValues = financialFields.some(field => 
-        parseFloat(reportData[field]) < 0
-      );
+      const hasNegativeValues = financialFields.some(field => {
+        const value = Number(reportData[field]);
+        return isNaN(value) || value < 0;
+      });
   
       if (hasNegativeValues) {
         return {
           isValid: false,
-          error: 'Financial values cannot be negative'
+          error: 'Financial values cannot be negative or non-numeric'
         };
       }
   
       if (reportData.Data) {
-        const hasNegativeQuarterlyData = Object.values(reportData.Data).some(category =>
-          Object.values(category).some(value => value < 0)
-        );
+        let hasNegativeQuarterlyData = false;
+        
+        // Handle both Map and regular object structures
+        if (reportData.Data.revenue instanceof Map) {
+          hasNegativeQuarterlyData = Array.from(reportData.Data.revenue.values()).some(v => v < 0) ||
+                                     Array.from(reportData.Data.expenses.values()).some(v => v < 0);
+        } else {
+          hasNegativeQuarterlyData = Object.values(reportData.Data).some(category =>
+            Object.values(category).some(value => value < 0)
+          );
+        }
   
         if (hasNegativeQuarterlyData) {
           return {

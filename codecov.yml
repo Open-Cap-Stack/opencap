@@ -1,0 +1,57 @@
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        # basic settings
+        target: 80%
+        threshold: 2%
+        base: auto
+        # advanced settings
+        branches:
+          - main
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
+    patch:
+      default:
+        # basic settings
+        target: 80%
+        threshold: 5%
+        base: auto
+        # advanced settings
+        branches:
+          - main
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+ignore:
+  - "__tests__/**/*"
+  - "node_modules/**/*"
+  - "coverage/**/*"
+  - "dist/**/*"
+  - "docs/**/*"
+  - "*.js" # Ignore root level js files like babel.config.js
