@@ -35,7 +35,7 @@ jobs:
         if: always()  # Run even if security audit fails
 
       - name: Upload security report as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         if: always()  # Always upload the security report
         with:
           name: security-audit-report
