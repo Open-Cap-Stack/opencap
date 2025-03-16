@@ -79,7 +79,7 @@ jobs:
         if: success() || failure()  # Run even if tests fail to get coverage data
 
       - name: Upload Coverage Report as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         if: success() || failure()  # Run even if tests fail
         with:
           name: test-coverage-report
@@ -99,23 +99,18 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: docker/setup-buildx-action@v2
 
+      # Use docker/login-action which is the recommended approach for Docker Hub auth
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+          
       - name: Push Docker image
         if: github.ref == 'refs/heads/main'
         run: |
-          # Verify if login worked by checking if we're logged in
-          if docker info | grep -q "Username"; then
-            echo "Logged into Docker Hub, pushing images..."
-            docker push opencap/api:${{ github.sha }}
-            docker push opencap/api:latest
-            echo "Successfully pushed Docker images"
-          else
-            echo "Docker login verification failed, skipping push"
-            exit 1
-          fi
+          # Verify we're logged in before pushing
+          docker push opencap/api:${{ github.sha }} || (echo "Failed to push Docker image, check credentials" && exit 1)
+          docker push opencap/api:latest
+          echo "Successfully pushed Docker images to Docker Hub"
