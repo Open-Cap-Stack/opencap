@@ -5,10 +5,7 @@ const Employee = require('../models/employeeModel');
 
 describe('Employee Controller Tests', () => {
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test');
   });
 
   afterAll(async () => {
@@ -42,15 +39,20 @@ describe('Employee Controller Tests', () => {
   });
 
   it('should handle duplicate key errors', async () => {
+    // First create an employee
     await Employee.create({
       EmployeeID: 'E001',
       Name: 'Duplicate Test',
       Email: 'duplicate@example.com',
     });
 
+    // Wait a moment to ensure the first operation is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Then try to create another with the same EmployeeID
     const response = await request(app).post('/api/employees').send({
-      EmployeeID: 'E001',
-      Name: 'Duplicate Test',
+      EmployeeID: 'E001', // Same ID as the one we just created
+      Name: 'Duplicate Test Two',
       Email: 'test@example.com',
     });
 

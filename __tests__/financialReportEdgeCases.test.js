@@ -16,11 +16,7 @@ describe('Financial Report API Edge Cases', () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = await mongoServer.getUri();
 
-    await mongoose.connect(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        useCreateIndex: true,
-        serverSelectionTimeoutMS: 20000 // Increase timeout to avoid test interruptions
+    await mongoose.connect(mongoUri, {serverSelectionTimeoutMS: 20000 // Increase timeout to avoid test interruptions
       });
 
     testUserId = new mongoose.Types.ObjectId();
@@ -90,13 +86,10 @@ describe('Financial Report API Edge Cases', () => {
         .send(report);
 
       // Reconnect for subsequent tests
-      await mongoose.connect(mongoServer.getUri(), {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      await mongoose.connect(mongoServer.getUri());
 
       expect(response.status).toBe(500);
-      expect(response.body.error).toMatch(/connection|buffering|timed out/);
+      expect(response.body.error).toMatch(/connection|buffering|timed out|Client must be connected/);
     });
 
     it('should reject an expired API key', async () => {

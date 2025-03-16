@@ -71,7 +71,7 @@ describe('DocumentEmbedding Model Test', () => {
         }
     
         expect(err).toBeDefined();
-        expect(err.name).toBe('MongoError'); // Updated to check for 'MongoError'
+        expect(err.name).toBe('MongoServerError'); // Updated to check for 'MongoServerError' in newer MongoDB versions
         expect(err.code).toBe(11000); // Duplicate key error code
     });
     

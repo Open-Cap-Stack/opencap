@@ -3,14 +3,13 @@ const mongoose = require('mongoose');
 const app = require('../app');
 const Employee = require('../models/employeeModel');
 
+// Set strictQuery option to suppress deprecation warning
+mongoose.set('strictQuery', false);
+
 describe('Employee Routes', () => {
   beforeAll(async () => {
     const mongoURI = process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test';
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useFindAndModify: false // Add this to fix deprecation warning
-    });
+    await mongoose.connect(mongoURI);
   });
 
   afterAll(async () => {
