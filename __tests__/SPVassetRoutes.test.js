@@ -10,10 +10,7 @@ app.use('/api/spvassets', spvAssetRoutes);
 
 describe('SPVAsset Routes', () => {
   beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect('mongodb://localhost:27017/test');
     await mongoose.connection.dropDatabase();
   });
 

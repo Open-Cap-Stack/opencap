@@ -14,12 +14,7 @@ describe('Financial Report API Integration', () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = await mongoServer.getUri();
 
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useCreateIndex: true,
-      useFindAndModify: false,
-    });
+    await mongoose.connect(mongoUri);
 
     testUserId = new mongoose.Types.ObjectId();
     adminToken = auth.generateToken({

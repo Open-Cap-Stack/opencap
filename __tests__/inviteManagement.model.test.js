@@ -8,10 +8,7 @@ beforeEach(async () => {
 // Connect to a test database
 beforeAll(async () => {
   const mongoUri = "mongodb://127.0.0.1/inviteManagementTestDB";
-  await mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  await mongoose.connect(mongoUri);
 });
 
 afterAll(async () => {

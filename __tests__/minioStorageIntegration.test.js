@@ -21,7 +21,7 @@ describe('MinIO Data Storage Integration Test', () => {
     // Setup MinIO client
     minioClient = new MinioClient({
       endPoint: 'localhost',
-      port: 9000,
+      port: 9090,
       useSSL: false,
       accessKey: 'minioadmin',
       secretKey: 'minioadmin'

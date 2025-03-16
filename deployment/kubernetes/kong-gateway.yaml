@@ -1,0 +1,199 @@
+---
+# Kong API Gateway Configuration
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kong
+---
+# Kong API Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-proxy
+  namespace: kong
+spec:
+  type: LoadBalancer
+  ports:
+  - name: proxy
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: proxy-ssl
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    app: kong
+---
+# Kong API Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.3
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: /kong/declarative/kong.yml
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_LISTEN
+          value: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+        ports:
+        - name: proxy
+          containerPort: 8000
+        - name: proxy-ssl
+          containerPort: 8443
+        - name: admin
+          containerPort: 8001
+        - name: admin-ssl
+          containerPort: 8444
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong/declarative
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+---
+# Kong API Gateway ConfigMap for storing configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: kong
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    services:
+      - name: opencap-api
+        url: http://opencap-api-service.opencap.svc.cluster.local:80
+        routes:
+          - name: opencap-api-route
+            paths:
+              - /api
+            strip_path: true
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+              key_in_body: false
+              hide_credentials: true
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - OPTIONS
+                - PATCH
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-MD5
+                - Content-Type
+                - Date
+                - X-Auth-Token
+                - Authorization
+              exposed_headers:
+                - X-Auth-Token
+              credentials: true
+              max_age: 3600
+              preflight_continue: false
+    consumers:
+      - username: opencap-consumer
+        keyauth_credentials:
+          - key: OpenCapAPIKey1234
+---
+# Kong API Gateway Ingress Controller
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opencap-ingress
+  namespace: opencap
+  annotations:
+    kubernetes.io/ingress.class: "kong"
+    konghq.com/strip-path: "true"
+spec:
+  rules:
+  - host: api.opencap.example.com
+    http:
+      paths:
+      - path: /financial
+        pathType: Prefix
+        backend:
+          service:
+            name: opencap-api-service
+            port:
+              number: 80
+      - path: /documents
+        pathType: Prefix
+        backend:
+          service:
+            name: opencap-api-service
+            port:
+              number: 80
+      - path: /users
+        pathType: Prefix
+        backend:
+          service:
+            name: opencap-api-service
+            port:
+              number: 80
+      - path: /compliance
+        pathType: Prefix
+        backend:
+          service:
+            name: opencap-api-service
+            port:
+              number: 80

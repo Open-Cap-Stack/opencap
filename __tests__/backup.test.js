@@ -14,10 +14,7 @@ describe('Financial Report API Integration', () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = await mongoServer.getUri();
 
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useCreateIndex: true  // Suppresses the ensureIndex deprecation warning
+    await mongoose.connect(mongoUri, {// Suppresses the ensureIndex deprecation warning
     });
 
     testUserId = new mongoose.Types.ObjectId();

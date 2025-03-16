@@ -1,0 +1,147 @@
+---
+# OpenCap API Deployment Configuration
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opencap
+---
+# OpenCap API ConfigMap for environment-specific configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencap-api-config
+  namespace: opencap
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+---
+# OpenCap API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencap-api
+  namespace: opencap
+  labels:
+    app: opencap-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: opencap-api
+  template:
+    metadata:
+      labels:
+        app: opencap-api
+    spec:
+      containers:
+      - name: api
+        image: ${DOCKER_REGISTRY}/opencap/api:${IMAGE_TAG}
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: opencap-api-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: opencap-api-config
+              key: PORT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: opencap-api-config
+              key: LOG_LEVEL
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: connection-string
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: connection-string
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: opencap-api-secret
+              key: jwt-secret
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+---
+# OpenCap API Secret for storing sensitive information
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opencap-api-secret
+  namespace: opencap
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual secrets in production
+  jwt-secret: T3BlbkNhcEpXVFNlY3JldEtleQ==  # OpenCapJWTSecretKey
+---
+# OpenCap API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencap-api-service
+  namespace: opencap
+  labels:
+    app: opencap-api
+spec:
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: opencap-api
+---
+# OpenCap API Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opencap-api-hpa
+  namespace: opencap
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opencap-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

@@ -5,12 +5,7 @@ const Employee = require('../models/employeeModel');
 
 describe('Employee Controller Coverage', () => {
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useFindAndModify: false,
-      useCreateIndex: true,
-    });
+    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test');
   });
 
   afterAll(async () => {
@@ -20,10 +15,7 @@ describe('Employee Controller Coverage', () => {
 
   beforeEach(async () => {
     if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test', {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test');
     }
     await Employee.deleteMany({});
   });
@@ -147,8 +139,7 @@ describe('Employee Controller Coverage', () => {
         const employee1 = await Employee.create({
           EmployeeID: 'TEST001',
           Name: 'Employee One',
-          Email: 'employee1@example.com',
-        });
+          Email: 'employee1@example.com' });
       
         // Add a delay to ensure the first employee is fully saved
         await new Promise(resolve => setTimeout(resolve, 100));

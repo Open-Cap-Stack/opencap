@@ -18,6 +18,13 @@
     "test:docker:logs": "docker-compose -f docker-compose.test.yml logs -f",
     "test:docker:restart": "docker-compose -f docker-compose.test.yml restart",
     "test:docker:clean": "docker-compose -f docker-compose.test.yml down -v && docker-compose -f docker-compose.test.yml up -d",
+    "coverage:report": "node scripts/generate-coverage-report.js",
+    "coverage:check": "jest --config=jest.config.js --coverage --coverageThreshold='{\"global\":{\"branches\":70,\"functions\":80,\"lines\":80,\"statements\":80}}' --detectOpenHandles --forceExit",
+    "coverage:badge": "jest --coverage && npx istanbul-badges-readme",
+    "security:audit": "node scripts/security-audit.js",
+    "security:audit:ci": "node scripts/security-audit.js --ci",
+    "security:fix": "npm audit fix",
+    "security:weekly": "npm run security:audit && npm run coverage:check",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

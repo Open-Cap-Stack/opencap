@@ -5,12 +5,7 @@ const Employee = require('../models/employeeModel');
 
 describe('Employee Controller Additional Coverage', () => {
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useFindAndModify: false,
-      useCreateIndex: true,
-    });
+    await mongoose.connect(process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/opencap-test');
   });
 
   afterAll(async () => {

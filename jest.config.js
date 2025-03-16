@@ -53,7 +53,29 @@ module.exports = {
     '!**/coverage/**',
     '!**/dist/**'
   ],
-  coverageReporters: ['text', 'lcov'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary', 'cobertura'],
+  
+  // Coverage Thresholds - Enforcing minimum test coverage
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 80,
+      lines: 80,
+      statements: 80
+    },
+    './controllers/': {
+      branches: 75,
+      functions: 85,
+      lines: 85,
+      statements: 85
+    },
+    './models/': {
+      branches: 80,
+      functions: 90,
+      lines: 90,
+      statements: 90
+    }
+  },
   
   // Transform and Timing
   transform: {

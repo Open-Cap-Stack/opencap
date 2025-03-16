@@ -8,10 +8,7 @@ jest.setTimeout(30000); // Increase Jest timeout for MongoDB connections
 
 describe('ComplianceCheck Controller', function () {
   beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      autoIndex: false, // Disable indexing for test performance
+    await mongoose.connect('mongodb://localhost:27017/test', {autoIndex: false, // Disable indexing for test performance
     });
     await mongoose.connection.dropDatabase(); // Clear database before tests
   });
