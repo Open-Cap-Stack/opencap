@@ -16,7 +16,7 @@ const {
   
         const result = calculateFinancialMetrics(reportData);
         expect(result.isValid).toBe(true);
-        expect(result.calculatedNetIncome).toBe('400000.00');
+        expect(result.calculatedNetIncome).toBe(400000);
       });
   
       it('should handle currency rounding properly', () => {
@@ -28,7 +28,7 @@ const {
   
         const result = calculateFinancialMetrics(reportData);
         expect(result.isValid).toBe(true);
-        expect(result.calculatedNetIncome).toBe('400000.11');
+        expect(result.calculatedNetIncome).toBe(400000.11);
       });
   
       it('should detect incorrect calculations', () => {
