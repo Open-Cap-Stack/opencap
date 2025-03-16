@@ -14,50 +14,87 @@ jobs:
 
     services:
       mongodb:
-        image: mongo:6.0 # Pin MongoDB version for consistency
+        image: mongo:5.0 # Match our development MongoDB version
         ports:
           - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: opencap
+          MONGO_INITDB_ROOT_PASSWORD: password123
+          MONGO_INITDB_DATABASE: opencap_test
+        options: >-
+          --health-cmd "echo 'db.runCommand({ ping: 1 })' | mongosh --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: opencap_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
-      MONGODB_URI: mongodb://localhost:27017/open-cap-stack
-      PORT: 5000
+      MONGO_URI: mongodb://opencap:password123@localhost:27017/opencap_test?authSource=admin
+      DATABASE_URL: postgres://postgres:password@localhost:5432/opencap_test
+      PORT: 3000
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: '16' # Update Node.js version to a stable, supported version
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci # Ensures clean installation from package-lock.json
+        run: npm ci
 
-      - name: Install dev dependencies
-        run: npm install --save-dev jest chai supertest sinon dotenv chai-http
-
-      - name: Check installed packages
-        run: npm list mongoose # Debugging step to confirm mongoose version
-
-      - name: Set up MongoDB logs
-        run: mkdir -p logs && touch logs/mongo.log # Prepare logs directory for MongoDB
-
-      - name: Wait for MongoDB to start
+      - name: Create MongoDB user
         run: |
-          sleep 10
-          echo "Waiting for MongoDB to start..." # Ensures MongoDB is ready before testing
+          mongosh --host localhost --eval 'db.getSiblingDB("admin").createUser({user: "opencap", pwd: "password123", roles: [{role: "root", db: "admin"}]})'
+          mongosh --host localhost --eval 'db.getSiblingDB("opencap_test").createCollection("financialReport")'
+          mongosh --host localhost --eval 'db.getSiblingDB("opencap_test").createCollection("users")'
+          mongosh --host localhost --eval 'db.getSiblingDB("opencap_test").createCollection("documents")'
+
+      - name: Wait for databases to be ready
+        run: |
+          echo "Waiting for MongoDB and PostgreSQL to be ready..."
+          sleep 5
 
       - name: Run tests
-        env:
-          MONGO_URI: ${{ env.MONGODB_URI }} # Explicitly pass env variables to the test step
-        run: npm test
+        run: npm run test:ci
 
-      - name: Print MongoDB logs
-        run: docker logs $(docker ps -q --filter "ancestor=mongo:6.0") || echo "No MongoDB logs available"
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
-      - name: Start application
-        env:
-          MONGO_URI: ${{ env.MONGODB_URI }} # Ensure the app uses the correct DB URI
-          PORT: ${{ env.PORT }}
-        run: npm start
+      - name: Build Docker image
+        if: github.ref == 'refs/heads/main'
+        run: docker build -t opencap/api:${{ github.sha }} .
+
+      - name: Set up Docker Buildx
+        if: github.ref == 'refs/heads/main'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image
+        if: github.ref == 'refs/heads/main'
+        run: docker push opencap/api:${{ github.sha }}
