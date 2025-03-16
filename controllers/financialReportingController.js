@@ -297,7 +297,11 @@ class FinancialReportController {
   static async createFinancialReport(req, res, next) {
     let session;
     try {
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+      // Check if Mongoose connection is ready and supports transactions
+      if (mongoose.connection.readyState === 1 && 
+          mongoose.connection.db && 
+          mongoose.connection.db.serverConfig && 
+          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
         session = await mongoose.startSession();
         session.startTransaction();
       }
@@ -367,7 +371,11 @@ class FinancialReportController {
   static async updateFinancialReport(req, res, next) {
     let session;
     try {
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+      // Check if Mongoose connection is ready and supports transactions
+      if (mongoose.connection.readyState === 1 && 
+          mongoose.connection.db && 
+          mongoose.connection.db.serverConfig && 
+          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
         session = await mongoose.startSession();
         session.startTransaction();
       }
@@ -419,7 +427,11 @@ class FinancialReportController {
   static async deleteFinancialReport(req, res, next) {
     let session;
     try {
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+      // Check if Mongoose connection is ready and supports transactions
+      if (mongoose.connection.readyState === 1 && 
+          mongoose.connection.db && 
+          mongoose.connection.db.serverConfig && 
+          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
         session = await mongoose.startSession();
         session.startTransaction();
       }
@@ -454,7 +466,11 @@ class FinancialReportController {
   static async generateReport(req, res, next) {
     let session;
     try {
-      if (mongoose.connection.readyState === 1 && mongoose.connection.db.serverConfig.replset) {
+      // Check if Mongoose connection is ready and supports transactions
+      if (mongoose.connection.readyState === 1 && 
+          mongoose.connection.db && 
+          mongoose.connection.db.serverConfig && 
+          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
         session = await mongoose.startSession();
         session.startTransaction();
       }
