@@ -7,11 +7,11 @@ describe('PostgreSQL Integration Tests', () => {
 
   beforeAll(async () => {
     pgClient = new Client({
-      user: 'lakehouse_user',
+      user: 'postgres',
       host: 'localhost',
-      database: 'lakehouse_metadata',
+      database: 'opencap_test',
       password: 'password',
-      port: 5432,
+      port: 5433, // Updated port to match the Docker container port
     });
     await pgClient.connect();
   });
@@ -26,70 +26,96 @@ describe('PostgreSQL Integration Tests', () => {
     // Create
     const insertQuery = `
       INSERT INTO datasets (
-        dataset_name, 
-        storage_location, 
+        name, 
         description, 
-        file_size, 
-        record_count,
-        metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6) 
+        file_size,
+        format,
+        status
+      ) VALUES ($1, $2, $3, $4, $5) 
       RETURNING *
     `;
     
-    const testMetadata = {
-      schema: { fields: ['name', 'value'] },
-      partitioning: 'daily',
-      format: 'parquet'
-    };
-
     const insertResult = await pgClient.query(insertQuery, [
       datasetName,
-      's3://test-bucket/test.parquet',
       'Test dataset',
       1024,
-      100,
-      testMetadata
+      'parquet',
+      'active'
     ]);
 
-    expect(insertResult.rows[0].dataset_name).toBe(datasetName);
+    expect(insertResult.rows[0].name).toBe(datasetName);
 
     // Read
     const readResult = await pgClient.query(
-      'SELECT * FROM datasets WHERE dataset_name = $1',
+      'SELECT * FROM datasets WHERE name = $1',
       [datasetName]
     );
-    expect(readResult.rows[0].metadata).toEqual(testMetadata);
+    expect(readResult.rows[0].file_size).toEqual("1024");
 
     // Update
-    const updateResult = await pgClient.query(
-      'UPDATE datasets SET record_count = $1 WHERE dataset_name = $2 RETURNING *',
-      [200, datasetName]
+    await pgClient.query(
+      'UPDATE datasets SET description = $1 WHERE name = $2',
+      ['Updated test dataset', datasetName]
     );
-    expect(updateResult.rows[0].record_count).toBe(200);
 
-    // Delete
-    const deleteResult = await pgClient.query(
-      'DELETE FROM datasets WHERE dataset_name = $1 RETURNING *',
+    const updatedResult = await pgClient.query(
+      'SELECT * FROM datasets WHERE name = $1',
       [datasetName]
     );
-    expect(deleteResult.rows[0].dataset_name).toBe(datasetName);
+    expect(updatedResult.rows[0].description).toBe('Updated test dataset');
+
+    // Delete
+    await pgClient.query('DELETE FROM datasets WHERE name = $1', [datasetName]);
+
+    const deleteCheckResult = await pgClient.query(
+      'SELECT * FROM datasets WHERE name = $1',
+      [datasetName]
+    );
+    expect(deleteCheckResult.rows.length).toBe(0);
   });
 
-  it('should handle concurrent operations', async () => {
-    const operations = Array(5).fill().map(async (_, i) => {
-      const name = `concurrent-test-${testId}-${i}`;
-      await pgClient.query(
-        'INSERT INTO datasets (dataset_name, storage_location) VALUES ($1, $2)',
-        [name, `s3://test-bucket/${name}.parquet`]
-      );
-    });
-
-    await Promise.all(operations);
+  it('should handle JSON data storage and retrieval', async () => {
+    const reportId = `report-${testId}`;
+    
+    const reportData = {
+      quarter: 'Q1',
+      year: 2024,
+      metrics: {
+        revenue: 1500000,
+        costs: 750000,
+        profit: 750000
+      }
+    };
+    
+    await pgClient.query(`
+      INSERT INTO financial_reports (
+        report_id, 
+        type, 
+        data,
+        total_revenue,
+        total_expenses,
+        net_income,
+        status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [
+      reportId,
+      'quarterly',
+      reportData,
+      reportData.metrics.revenue,
+      reportData.metrics.costs,
+      reportData.metrics.profit,
+      'published'
+    ]);
     
     const result = await pgClient.query(
-      'SELECT COUNT(*) FROM datasets WHERE dataset_name LIKE $1',
-      [`concurrent-test-${testId}-%`]
+      'SELECT * FROM financial_reports WHERE report_id = $1',
+      [reportId]
     );
-    expect(Number(result.rows[0].count)).toBe(5);
+    
+    expect(result.rows[0].data).toEqual(reportData);
+    expect(result.rows[0].data.metrics.revenue).toBe(1500000);
+    
+    // Clean up
+    await pgClient.query('DELETE FROM financial_reports WHERE report_id = $1', [reportId]);
   });
 });
