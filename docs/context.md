@@ -267,6 +267,63 @@ The MongoDB authentication in the test environment was failing due to several is
 3. Implement consistent cleanup between test runs
 4. Document MongoDB authentication schema for developers
 
+### Container Connection IPv4/IPv6 Issues
+
+#### Problem Overview
+The integration tests were failing with connection errors to Docker containers due to IPv6 resolution issues.
+
+#### Diagnosis Process
+1. **Container Connectivity Verification**
+   - Verified that all Docker containers were running: `docker ps`
+   - Tested direct connections to containers from the host using: `nc -zv localhost PORT`
+   - Confirmed containers were accessible via IPv4 but tests were failing due to IPv6 lookups
+
+2. **Root Cause**
+   - Tests were failing because Node.js was preferring IPv6 (`::1`) when resolving `localhost`
+   - Docker containers were only listening on IPv4 interfaces
+
+3. **Solution**
+   - Modified Docker test environment configuration to use explicit IPv4 addresses
+   - Updated connection strings in `docker-test-env.js`:
+     ```javascript
+     // Changed from localhost to explicit IPv4
+     process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27017/opencap_test?authSource=admin';
+     process.env.DATABASE_URL = 'postgres://postgres:password@127.0.0.1:5433/opencap_test';
+     process.env.PG_HOST = '127.0.0.1';
+     process.env.MINIO_ENDPOINT = '127.0.0.1';
+     ```
+   - Integration tests now reliably connect to Docker containers
+
+#### Verification
+All tests now pass successfully with proper connections to:
+- MongoDB test container at 127.0.0.1:27017
+- PostgreSQL test container at 127.0.0.1:5433
+- MinIO test container at 127.0.0.1:9090
+
+### Container State Verification
+
+To verify that all required containers for OpenCap are running properly:
+
+1. **Check Test Environment Containers**
+   ```bash
+   docker-compose -f docker-compose.test.yml ps
+   ```
+
+2. **Check Production/Development Environment Containers**
+   ```bash
+   docker-compose ps
+   ```
+
+3. **Resolve Port Conflicts**
+   - If starting both test and production environments simultaneously, port conflicts may occur
+   - Stop test containers before starting production containers:
+     ```bash
+     docker-compose -f docker-compose.test.yml down
+     docker-compose up -d
+     ```
+
+4. **Container Access Points**
+
 ## Initialization Scripts
 
 ### MongoDB Initialization

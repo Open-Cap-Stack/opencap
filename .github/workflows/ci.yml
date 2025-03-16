@@ -37,30 +37,16 @@ jobs:
       # Docker Hub login with basic approach
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
-        run: |
-          # First check if credentials exist
-          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "Docker credentials found, attempting login..."
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-            if [ $? -eq 0 ]; then
-              echo "Successfully logged into Docker Hub"
-            else
-              echo "Docker Hub login failed, check credentials"
-              # Don't fail the build if Docker login fails
-            fi
-          else
-            echo "Docker Hub credentials not provided, skipping login"
-          fi
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Push step only runs if login succeeds
       - name: Push Docker image
         if: github.ref == 'refs/heads/main'
-        run: |
-          # Check if we're logged in by checking Docker config
-          if grep -q "index.docker.io" ~/.docker/config.json 2>/dev/null; then
-            echo "Docker login verified, pushing image..."
-            docker push opencap/api:latest
-            echo "Successfully pushed image to Docker Hub"
-          else
-            echo "Not logged in to Docker Hub, skipping push"
-          fi
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/opencap:latest
