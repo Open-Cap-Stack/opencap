@@ -36,6 +36,12 @@ const CommunicationSchema = new mongoose.Schema({
     required: [true, 'Content is required'],
     trim: true,
     maxlength: [5000, 'Content cannot exceed 5000 characters']
+  },
+  threadId: {
+    type: String,
+    trim: true,
+    index: true,
+    default: null
   }
 }, {
   timestamps: true
@@ -45,6 +51,7 @@ const CommunicationSchema = new mongoose.Schema({
 CommunicationSchema.index({ communicationId: 1 }, { unique: true });
 CommunicationSchema.index({ Sender: 1, Timestamp: -1 });
 CommunicationSchema.index({ Recipient: 1, Timestamp: -1 });
+CommunicationSchema.index({ threadId: 1, Timestamp: 1 }); // Index for thread-based sorting
 
 const Communication = mongoose.model('Communication', CommunicationSchema);
 

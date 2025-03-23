@@ -84,4 +84,71 @@ describe('Communication Model', function () {
       expect(error.code).to.equal(11000); // Duplicate key error code
     }
   });
+  
+  it('should create a communication with a threadId', async function () {
+    const threadId = 'test-thread-001';
+    const communicationData = {
+      communicationId: 'threaded-communication-id',
+      MessageType: 'email',
+      Sender: mongoose.Types.ObjectId(),
+      Recipient: mongoose.Types.ObjectId(),
+      Timestamp: new Date(),
+      Content: 'This is a threaded communication.',
+      threadId: threadId
+    };
+
+    const communication = new Communication(communicationData);
+    const savedCommunication = await communication.save();
+
+    expect(savedCommunication.threadId).to.equal(threadId);
+  });
+
+  it('should find all communications in a thread', async function () {
+    const threadId = 'test-thread-002';
+    
+    // Create multiple communications in the same thread
+    const communicationsData = [
+      {
+        communicationId: 'thread-msg-1',
+        MessageType: 'email',
+        Sender: mongoose.Types.ObjectId(),
+        Recipient: mongoose.Types.ObjectId(),
+        Timestamp: new Date(Date.now() - 2000),
+        Content: 'First message in thread',
+        threadId: threadId
+      },
+      {
+        communicationId: 'thread-msg-2',
+        MessageType: 'email',
+        Sender: mongoose.Types.ObjectId(),
+        Recipient: mongoose.Types.ObjectId(),
+        Timestamp: new Date(Date.now() - 1000),
+        Content: 'Second message in thread',
+        threadId: threadId
+      },
+      {
+        communicationId: 'thread-msg-3',
+        MessageType: 'email',
+        Sender: mongoose.Types.ObjectId(),
+        Recipient: mongoose.Types.ObjectId(),
+        Timestamp: new Date(),
+        Content: 'Third message in thread',
+        threadId: threadId
+      }
+    ];
+    
+    // Save all communications
+    for (const data of communicationsData) {
+      const communication = new Communication(data);
+      await communication.save();
+    }
+    
+    // Find communications by threadId
+    const threadedCommunications = await Communication.find({ threadId: threadId }).sort({ Timestamp: 1 });
+    
+    expect(threadedCommunications).to.have.lengthOf(3);
+    expect(threadedCommunications[0].communicationId).to.equal('thread-msg-1');
+    expect(threadedCommunications[1].communicationId).to.equal('thread-msg-2');
+    expect(threadedCommunications[2].communicationId).to.equal('thread-msg-3');
+  });
 });
