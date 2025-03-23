@@ -2,20 +2,34 @@
 
 **OpenCap Stack** is a comprehensive MERN stack application designed to manage stakeholders, share classes, documents, activities, notifications, equity simulations, tax calculations, and financial reporting. The project follows a Test-Driven Development (TDD) approach to ensure code quality and reliability and is fully aligned with the Open Cap Table Alliance (OCTA) schema.
 
+## Development Workflow 📝
+
+This project follows the Semantic Seed Venture Studio Coding Standards (SSCS) which emphasizes:
+
+- **Structured Backlog Management** with proper story IDs (OCAE-XXX, OCDI-XXX format)
+- **Test-Driven Development (TDD)** with Red-Green-Refactor cycle
+- **Consistent Branch Naming** (`feature/OCAE-XXX`, `bug/OCAE-XXX`, `chore/OCAE-XXX`)
+- **Daily Commits** with proper prefixes (including "WIP:" for work in progress)
+- **Pull Request Process** that maintains traceability to backlog items
+
+For detailed workflow guidelines, see [SSCS_Workflow_Guide.md](docs/SSCS_Workflow_Guide.md).
+
 ## Installation 🛠️
 
 Follow these steps to set up the project on your local machine:
 
 ### Prerequisites ✅
 
-- Node (v14 or higher)
+- Node.js (v14 or higher)
 - MongoDB
+- Docker and Docker Compose (for containerized development)
+- Git
 
 ### Clone the Repository 📂
 
 ```bash
-git clone https://github.com/your-username/your-repository.git
-cd your-repository
+git clone https://github.com/Open-Cap-Stack/opencap.git
+cd opencap
 ```
 
 ### Install Dependencies 📦
@@ -55,6 +69,29 @@ For automatic restarts on code changes, use:
 npm run dev
 ```
 
+## Running with Docker 🐳
+
+For a containerized development environment:
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+### Running Tests with Docker 🧪
+
+```bash
+docker-compose -f docker-compose.test.yml up --build
+```
+
+This will run all tests in a containerized environment, ensuring consistent test results across different development machines.
+
 ## Running Tests 🧪
 
 The project uses Jest for testing. To run the tests, use the following command:
@@ -64,6 +101,55 @@ npm test
 ```
 
 This command runs all the test cases defined in the `tests` directory.
+
+### Code Coverage
+
+We measure test coverage locally for development purposes only:
+
+```bash
+npm run test:coverage
+```
+
+**Important Note**: We do NOT integrate with Codecov or any other third-party coverage service. All coverage reporting should be performed locally and documented in pull requests when relevant.
+
+## CI/CD Pipeline 🔄
+
+Our continuous integration and deployment pipeline focuses on:
+
+1. **Docker Hub**: For container image storage and versioning
+2. **Digital Ocean**: For deployment and hosting
+
+### Required GitHub Secrets
+
+The following secrets are required for our CI/CD pipeline:
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+- `DIGITALOCEAN_ACCESS_TOKEN`
+
+### Deployment
+
+We follow the deployment plan outlined in [OpenCap_TestCoverage_DigitalOceanDeployment.md](docs/OpenCap_TestCoverage_DigitalOceanDeployment.md).
+
+## Resource Management Best Practices 🔧
+
+To maintain codebase integrity and avoid conflicts:
+
+1. **Verify Existing Docker Resources**:
+   ```bash
+   docker ps -a        # Check existing containers
+   docker volume ls    # Check existing volumes
+   ```
+
+2. **Check Existing Files and Directories**:
+   ```bash
+   ls -la [directory]  # List directory contents
+   find . -name "pattern"  # Find files matching pattern
+   ```
+
+3. **Review Configurations**: Always check current configuration before making changes
+4. **Database Schema Changes**: Analyze existing schemas before modifications
+
+These practices prevent duplication, conflicts, and ensure proper integration with the existing codebase.
 
 ## API Endpoints 📡
 
@@ -84,6 +170,45 @@ Here are the primary API endpoints for the project:
 - **GET /api/stakeholders/:id**: Get a stakeholder by ID
 - **PUT /api/stakeholders/:id**: Update a stakeholder by ID
 - **DELETE /api/stakeholders/:id**: Delete a stakeholder by ID
+
+### Communication API 💬
+
+- **POST /api/communications**: Create a new communication
+- **GET /api/communications**: Get all communications
+- **GET /api/communications/:id**: Get a communication by ID
+- **PUT /api/communications/:id**: Update a communication
+- **GET /api/communications/threads/:threadId**: Get communications by thread ID
+- **POST /api/communications/threads**: Create a new thread
+
+### SPV (Special Purpose Vehicle) API 🏢
+
+- **POST /api/spv**: Create a new SPV
+- **GET /api/spv**: Get all SPVs
+- **GET /api/spv/:id**: Get an SPV by ID
+- **PUT /api/spv/:id**: Update an SPV
+- **GET /api/spv/status/:statusId**: Get SPVs by status
+
+### SPV Asset API 💰
+
+- **POST /api/spv-assets**: Create a new SPV asset
+- **GET /api/spv-assets**: Get all SPV assets
+- **GET /api/spv-assets/:id**: Get an SPV asset by ID
+- **PUT /api/spv-assets/:id**: Update an SPV asset
+- **POST /api/spv-assets/:id/valuation**: Add a valuation to an SPV asset
+
+### Compliance Check API ✓
+
+- **POST /api/compliance-checks**: Create a new compliance check
+- **GET /api/compliance-checks**: Get all compliance checks
+- **GET /api/compliance-checks/:id**: Get a compliance check by ID
+- **PUT /api/compliance-checks/:id**: Update a compliance check
+
+### Tax Calculator API 📊
+
+- **POST /api/taxCalculations**: Create a new tax calculation
+- **GET /api/taxCalculations**: Get all tax calculations
+- **GET /api/taxCalculations/:id**: Get a tax calculation by ID
+- **PUT /api/taxCalculations/:id**: Update a tax calculation
 
 ### Share Classes 🏦
 
@@ -150,17 +275,25 @@ opencap/
 ├── controllers/       # Controllers for handling API requests
 ├── models/            # Mongoose models
 ├── routes/            # API routes
-├── tests/             # Test cases
+├── __tests__/         # Test cases (unit, integration)
+├── docs/              # Project documentation
+├── dags/              # Airflow DAGs for data pipelines
 ├── .env               # Environment variables
+├── .github/           # GitHub workflows for CI/CD
+├── docker-compose.yml # Docker compose configuration
 ├── .gitignore         # Files to ignore in Git
-├── db.js              # Database connection
+├── CODE_OF_CONDUCT.md # Contributor code of conduct
 ├── package.json       # Project metadata and dependencies
 ├── README.md          # Project documentation
 ```
 
 ## Contributing 🤝
 
-Contributions are welcome! Please fork the repository and submit a pull request for any changes. This project follows a Test-Driven Development (TDD) approach, and all contributions should adhere to this coding style.
+Contributions are welcome! This project follows the Semantic Seed Venture Studio Coding Standards (SSCS) with a Test-Driven Development (TDD) approach. All contributions should adhere to these standards for consistent workflow and code quality.
+
+### Code of Conduct 📝
+
+This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please read the [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details on our code of conduct.
 
 ### Guidelines for Contributing 📝
 
@@ -170,41 +303,56 @@ Contributions are welcome! Please fork the repository and submit a pull request 
     git fork https://github.com/Open-Cap-Stack/opencap.git
     ```
 
-2. **Create a new branch**:
+2. **Create a new branch following SSCS naming conventions**:
 
     ```bash
-    git checkout -b feature-branch
+    git checkout -b feature/OCAE-XXX  # For new features
+    git checkout -b bug/OCAE-XXX      # For bug fixes
+    git checkout -b chore/OCAE-XXX    # For maintenance tasks
     ```
 
-3. **Write tests first**:
-    - Ensure you write test cases for any new functionality or changes before writing the actual code.
-    - Place your tests in the `tests` directory.
+3. **Write tests first (Red Tests)**:
+    - Write tests that demonstrate the functionality is NOT already present.
+    - Make a WIP commit:
 
-4. **Implement the functionality**:
+    ```bash
+    git add .
+    git commit -m "WIP: OCAE-XXX: Red Tests for feature description"
+    ```
+
+4. **Implement code to pass the tests (Green Tests)**:
     - Write the minimum amount of code required to pass the tests.
-
-5. **Run tests**:
-
-    ```bash
-    npm test
-    ```
-
-    - Ensure all tests pass before committing your changes.
-
-6. **Commit your changes**:
+    - Make a WIP commit when tests pass:
 
     ```bash
-    git commit -am 'Add new feature'
+    git add .
+    git commit -m "WIP: OCAE-XXX: Green Tests for feature description"
     ```
 
-7. **Push to your branch**:
+5. **Refactor your code**:
+    - Refactor to improve code quality without changing functionality.
+    - Re-run the tests and commit with a final message:
 
     ```bash
-    git push origin feature-branch
+    git add .
+    git commit -m "OCAE-XXX: Implement feature description"
     ```
 
-8. **Create a Pull Request**:
-    - Go to the repository on GitHub and create a pull request from your branch.
+6. **Push your branch and create a pull request**:
+
+    ```bash
+    git push origin feature/OCAE-XXX
+    ```
+
+    - Create a PR on GitHub with the story ID in the title.
+    - Include story details in the description.
+    - Mark the story as "Finished" in Shortcut.
+
+7. **Daily Commits Required**:
+    - Even for incomplete work, commit daily with "WIP:" prefix.
+    - This ensures visibility and allows for collaboration.
+
+For more detailed guidelines, refer to our [SSCS_Workflow_Guide.md](docs/SSCS_Workflow_Guide.md).
 
 ## Submitting Changes 🚀
 
