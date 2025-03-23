@@ -71,6 +71,104 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Add a route to find non-compliant checks - MOVED BEFORE :id ROUTES TO PREVENT ROUTE MATCHING ISSUES
+router.get('/non-compliant', async (req, res) => {
+  try {
+    const nonCompliantChecks = await ComplianceCheck.findNonCompliant();
+    res.status(200).json({ complianceChecks: nonCompliantChecks });
+  } catch (error) {
+    console.error('Fetch non-compliant checks error:', error);
+    res.status(500).json({
+      message: 'Failed to retrieve non-compliant checks',
+      error: error.message
+    });
+  }
+});
+
+// Get compliance check by ID - New Endpoint
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: 'Invalid compliance check ID format'
+      });
+    }
+
+    const complianceCheck = await ComplianceCheck.findById(id);
+    if (!complianceCheck) {
+      return res.status(404).json({
+        message: 'Compliance check not found'
+      });
+    }
+
+    res.status(200).json(complianceCheck);
+  } catch (error) {
+    console.error('Get compliance check by ID error:', error);
+    res.status(500).json({
+      message: 'Failed to retrieve compliance check',
+      error: error.message
+    });
+  }
+});
+
+// Update compliance check by ID - New Endpoint
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: 'Invalid compliance check ID format'
+      });
+    }
+
+    // Check if compliance check exists
+    const existingCheck = await ComplianceCheck.findById(id);
+    if (!existingCheck) {
+      return res.status(404).json({
+        message: 'Compliance check not found'
+      });
+    }
+
+    // Allow updating certain fields but prevent updating CheckID
+    if (req.body.CheckID && req.body.CheckID !== existingCheck.CheckID) {
+      return res.status(400).json({
+        message: 'CheckID cannot be modified'
+      });
+    }
+
+    try {
+      // Update the document with validation
+      const updatedCheck = await ComplianceCheck.findByIdAndUpdate(
+        id,
+        req.body,
+        { new: true, runValidators: true }
+      );
+      
+      res.status(200).json(updatedCheck);
+    } catch (validationError) {
+      // Handle validation errors
+      if (validationError.name === 'ValidationError') {
+        return res.status(400).json({
+          message: 'Validation failed',
+          error: validationError.message
+        });
+      }
+      throw validationError; // Rethrow if it's not a validation error
+    }
+  } catch (error) {
+    console.error('Update compliance check error:', error);
+    res.status(500).json({
+      message: 'Failed to update compliance check',
+      error: error.message
+    });
+  }
+});
+
 // Delete a compliance check
 router.delete('/:id', async (req, res) => {
   try {
@@ -98,20 +196,6 @@ router.delete('/:id', async (req, res) => {
     console.error('Delete compliance check error:', error);
     res.status(500).json({
       message: 'Failed to delete compliance check',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to find non-compliant checks
-router.get('/non-compliant', async (req, res) => {
-  try {
-    const nonCompliantChecks = await ComplianceCheck.findNonCompliant();
-    res.status(200).json({ complianceChecks: nonCompliantChecks });
-  } catch (error) {
-    console.error('Fetch non-compliant checks error:', error);
-    res.status(500).json({
-      message: 'Failed to retrieve non-compliant checks',
       error: error.message
     });
   }
