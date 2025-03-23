@@ -56,11 +56,11 @@ const routes = {
   authRoutes: require("./routes/authRoutes"),
 
   // Optional routes that might not exist in all environments
-  communicationRoutes: safeRequire("./routes/communicationRoutes"),
+  communicationRoutes: safeRequire("./routes/Communication"),
   notificationRoutes: safeRequire("./routes/notificationRoutes"),
   inviteManagementRoutes: safeRequire("./routes/inviteManagementRoutes"),
-  spvRoutes: safeRequire("./routes/spvRoutes"),
-  spvAssetRoutes: safeRequire("./routes/spvAssetRoutes"),
+  spvRoutes: safeRequire("./routes/SPV"),
+  spvAssetRoutes: safeRequire("./routes/SPVasset"),
   complianceCheckRoutes: safeRequire("./routes/complianceCheckRoutes"),
   integrationModuleRoutes: safeRequire("./routes/integrationModuleRoutes"),
   taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes")
@@ -87,8 +87,8 @@ const routeMappings = {
   '/api/communications': 'communicationRoutes',
   '/api/notifications': 'notificationRoutes',
   '/api/invites': 'inviteManagementRoutes',
-  '/api/spv': 'spvRoutes',
-  '/api/spv-assets': 'spvAssetRoutes',
+  '/api/spvs': 'spvRoutes',
+  '/api/spvassets': 'spvAssetRoutes',
   '/api/compliance-checks': 'complianceCheckRoutes',
   '/api/integration-modules': 'integrationModuleRoutes',
   '/api/taxCalculations': 'taxCalculatorRoutes'
