@@ -30,12 +30,18 @@ const CommunicationSchema = new mongoose.Schema({
   Timestamp: {
     type: Date,
     required: [true, 'Timestamp is required'],
+    default: Date.now
   },
   Content: {
     type: String,
     required: [true, 'Content is required'],
     trim: true,
     maxlength: [5000, 'Content cannot exceed 5000 characters']
+  },
+  ThreadId: {
+    type: String,
+    required: false,
+    index: true
   }
 }, {
   timestamps: true
@@ -45,6 +51,7 @@ const CommunicationSchema = new mongoose.Schema({
 CommunicationSchema.index({ communicationId: 1 }, { unique: true });
 CommunicationSchema.index({ Sender: 1, Timestamp: -1 });
 CommunicationSchema.index({ Recipient: 1, Timestamp: -1 });
+CommunicationSchema.index({ ThreadId: 1, Timestamp: 1 });
 
 const Communication = mongoose.model('Communication', CommunicationSchema);
 
