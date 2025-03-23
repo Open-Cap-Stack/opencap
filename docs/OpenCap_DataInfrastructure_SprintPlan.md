@@ -51,19 +51,19 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Establish development workflows
 
 **Backend Team Stories**:
-- [Feature] Define data models for Neo4j integration (5 points)
-- [Feature] Create Node.js connector service for Neo4j (5 points)
-- [Chore] Set up testing framework for Neo4j integration (3 points)
+- [Feature] OCDI-001: Define data models for Neo4j integration (5 points)
+- [Feature] OCDI-002: Create Node.js connector service for Neo4j (5 points)
+- [Chore] OCDI-003: Set up testing framework for Neo4j integration (3 points)
 
 **Database Team Stories**:
-- [Feature] Install and configure Neo4j in development environment (3 points)
-- [Feature] Design initial Neo4j schema based on existing MongoDB models (5 points)
-- [Feature] Create scripts for sample data generation (3 points)
+- [Feature] OCDI-004: Install and configure Neo4j in development environment (3 points)
+- [Feature] OCDI-005: Design initial Neo4j schema based on existing MongoDB models (5 points)
+- [Feature] OCDI-006: Create scripts for sample data generation (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Update Docker compose with Neo4j container (3 points)
-- [Feature] Configure networking between services (2 points)
-- [Chore] Update CI/CD pipeline for new services (5 points)
+- [Feature] OCDI-007: Update Docker compose with Neo4j container (3 points)
+- [Feature] OCDI-008: Configure networking between services (2 points)
+- [Chore] OCDI-009: Update CI/CD pipeline for new services (5 points)
 
 **Definition of Done**:
 - Neo4j container running in development environment
@@ -78,26 +78,32 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Configure enhanced Spark cluster
 - Develop initial ETL job templates
 - Create bridge between Node.js and Spark
+- Test data pipeline with MinIO integration
 
 **Backend Team Stories**:
-- [Feature] Implement REST API bridge for Spark integration (5 points)
-- [Feature] Create Node.js service for Spark job management (5 points)
-- [Chore] Set up testing framework for Spark integration (3 points)
+- [Feature] OCDI-010: Implement REST API bridge for Spark integration (5 points)
+- [Feature] OCDI-011: Create Node.js service for Spark job management (5 points)
+- [Chore] OCDI-012: Set up testing framework for Spark integration (3 points)
+- [Feature] OCDI-013: Test Airflow-based data pipeline with MinIO (3 points) - COMPLETED
 
 **Database Team Stories**:
-- [Feature] Configure test data for Spark processing (3 points)
-- [Feature] Create initial data transformations for existing MongoDB data (5 points)
+- [Feature] OCDI-014: Configure test data for Spark processing (3 points)
+- [Feature] OCDI-015: Create initial data transformations for existing MongoDB data (5 points)
+- [Feature] OCDI-016: Implement bucket creation and object storage in MinIO (2 points) - COMPLETED
 
 **Infrastructure Team Stories**:
-- [Feature] Enhance Spark cluster configuration (5 points)
-- [Feature] Set up resource management for Spark with YARN (5 points)
-- [Chore] Configure monitoring for Spark cluster (3 points)
+- [Feature] OCDI-017: Enhance Spark cluster configuration (5 points)
+- [Feature] OCDI-018: Set up resource management for Spark with YARN (5 points)
+- [Chore] OCDI-019: Configure monitoring for Spark cluster (3 points)
+- [Chore] OCDI-020: Troubleshoot container networking for data services (3 points) - COMPLETED
 
 **Definition of Done**:
 - Enhanced Spark cluster running
 - REST API endpoints for job submission
 - Initial ETL job templates created and tested
 - All tests passing for implemented features
+- MinIO integration verified with successful data uploads and downloads
+- Data processing pipeline demonstrated with pandas integration
 
 ### Phase 2: Core Services (Weeks 5-8)
 
@@ -107,27 +113,35 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Deploy Neo4j with initial data model
 - Implement data synchronization service
 - Develop basic graph queries
+- Implement missing API endpoints for data pipeline access
 
 **Backend Team Stories**:
-- [Feature] Implement Neo4j data service layer (5 points)
-- [Feature] Develop bidirectional sync service for MongoDB to Neo4j (8 points)
-- [Feature] Create basic graph query endpoints (5 points)
+- [Feature] OCDI-021: Implement Neo4j data service layer (5 points)
+- [Feature] OCDI-022: Develop bidirectional sync service for MongoDB to Neo4j (8 points)
+- [Feature] OCDI-023: Create basic graph query endpoints (5 points)
+- [Feature] OCDI-024: Implement Storage API endpoints for MinIO integration (5 points)
+  - GET/POST /api/storage/buckets
+  - GET/POST/DELETE storage objects endpoints
+  - Integration with document management system
 
 **Database Team Stories**:
-- [Feature] Finalize Neo4j schema with indexes and constraints (5 points)
-- [Feature] Develop data migration scripts for existing data (5 points)
-- [Feature] Implement transaction handling for sync operations (3 points)
+- [Feature] OCDI-025: Finalize Neo4j schema with indexes and constraints (5 points)
+- [Feature] OCDI-026: Develop data migration scripts for existing data (5 points)
+- [Feature] OCDI-027: Implement transaction handling for sync operations (3 points)
+- [Feature] OCDI-028: Create data models for storage API integration (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Configure Neo4j clustering for production (5 points)
-- [Feature] Set up backup procedures for Neo4j (3 points)
-- [Chore] Integrate Neo4j monitoring with existing systems (3 points)
+- [Feature] OCDI-029: Configure Neo4j clustering for production (5 points)
+- [Feature] OCDI-030: Set up backup procedures for Neo4j (3 points)
+- [Chore] OCDI-031: Integrate Neo4j monitoring with existing systems (3 points)
 
 **Definition of Done**:
 - Neo4j fully deployed with production schema
 - Data synchronization service operational
 - Basic graph queries working and tested
 - Performance tests completed for sync operations
+- Storage API endpoints implemented and tested
+- MinIO integration accessible through REST API
 
 #### Sprint 4 (Weeks 7-8): "MinIO Optimization"
 
@@ -135,27 +149,36 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Implement tiered storage strategy
 - Enhance document processing pipeline
 - Configure security features
+- Develop Pipeline Management API endpoints
 
 **Backend Team Stories**:
-- [Feature] Implement document processing service (5 points)
-- [Feature] Create metadata extraction service (5 points)
-- [Feature] Develop object lifecycle management (3 points)
+- [Feature] OCDI-032: Implement document processing service (5 points)
+- [Feature] OCDI-033: Create metadata extraction service (5 points)
+- [Feature] OCDI-034: Develop object lifecycle management (3 points)
+- [Feature] OCDI-035: Implement Data Pipeline Management API (8 points)
+  - GET/POST /api/pipelines/dags endpoints
+  - GET/POST pipeline runs and tasks endpoints
+  - Pipeline execution monitoring endpoints
 
 **Database Team Stories**:
-- [Feature] Configure document metadata storage in MongoDB (3 points)
-- [Feature] Implement versioning strategy for documents (5 points)
+- [Feature] OCDI-036: Configure document metadata storage in MongoDB (3 points)
+- [Feature] OCDI-037: Implement versioning strategy for documents (5 points)
+- [Feature] OCDI-038: Design schema for pipeline execution history (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Configure tiered storage buckets in MinIO (5 points)
-- [Feature] Implement server-side encryption (5 points)
-- [Feature] Set up IAM policies for MinIO access (3 points)
-- [Chore] Create backup procedures for MinIO data (3 points)
+- [Feature] OCDI-039: Configure tiered storage buckets in MinIO (5 points)
+- [Feature] OCDI-040: Implement server-side encryption (5 points)
+- [Feature] OCDI-041: Set up IAM policies for MinIO access (3 points)
+- [Chore] OCDI-042: Create backup procedures for MinIO data (3 points)
+- [Feature] OCDI-043: Implement Airflow API connection service (5 points)
 
 **Definition of Done**:
 - MinIO tiered storage implemented
 - Document processing pipeline operational
 - Encryption and security features configured
 - All tests passing for implemented features
+- Pipeline Management API endpoints implemented and tested
+- Integration tests for triggering data pipelines via API
 
 ### Phase 3: Integration (Weeks 9-12)
 
@@ -167,18 +190,18 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Create initial model serving infrastructure
 
 **Backend Team Stories**:
-- [Feature] Develop pipeline configuration system (5 points)
-- [Feature] Implement pipeline execution service (8 points)
-- [Feature] Create model registry service (5 points)
+- [Feature] OCDI-044: Develop pipeline configuration system (5 points)
+- [Feature] OCDI-045: Implement pipeline execution service (8 points)
+- [Feature] OCDI-046: Create model registry service (5 points)
 
 **Database Team Stories**:
-- [Feature] Design and implement pipeline metadata storage (3 points)
-- [Feature] Create schema for model versioning (3 points)
+- [Feature] OCDI-047: Design and implement pipeline metadata storage (3 points)
+- [Feature] OCDI-048: Create schema for model versioning (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Set up model serving infrastructure (5 points)
-- [Feature] Configure GPU resources for model training (if applicable) (5 points)
-- [Chore] Set up monitoring for AI services (3 points)
+- [Feature] OCDI-049: Set up model serving infrastructure (5 points)
+- [Feature] OCDI-050: Configure GPU resources for model training (if applicable) (5 points)
+- [Chore] OCDI-051: Set up monitoring for AI services (3 points)
 
 **Definition of Done**:
 - AI pipeline architecture implemented
@@ -194,18 +217,18 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Create feature engineering pipelines
 
 **Backend Team Stories**:
-- [Feature] Implement job template service (5 points)
-- [Feature] Develop feature engineering service (5 points)
-- [Feature] Create document analysis service (5 points)
+- [Feature] OCDI-052: Implement job template service (5 points)
+- [Feature] OCDI-053: Develop feature engineering service (5 points)
+- [Feature] OCDI-054: Create document analysis service (5 points)
 
 **Database Team Stories**:
-- [Feature] Set up feature store in PostgreSQL (5 points)
-- [Feature] Configure document analysis results storage (3 points)
+- [Feature] OCDI-055: Set up feature store in PostgreSQL (5 points)
+- [Feature] OCDI-056: Configure document analysis results storage (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Optimize Spark for feature engineering workloads (5 points)
-- [Feature] Configure data partitioning strategy (3 points)
-- [Chore] Set up monitoring for data processing jobs (3 points)
+- [Feature] OCDI-057: Optimize Spark for feature engineering workloads (5 points)
+- [Feature] OCDI-058: Configure data partitioning strategy (3 points)
+- [Chore] OCDI-059: Set up monitoring for data processing jobs (3 points)
 
 **Definition of Done**:
 - Batch processing framework operational
@@ -223,18 +246,18 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Create real-time analytics capabilities
 
 **Backend Team Stories**:
-- [Feature] Implement Kafka producer service (5 points)
-- [Feature] Develop stream processing service (8 points)
-- [Feature] Create real-time analytics endpoints (5 points)
+- [Feature] OCDI-060: Implement Kafka producer service (5 points)
+- [Feature] OCDI-061: Develop stream processing service (8 points)
+- [Feature] OCDI-062: Create real-time analytics endpoints (5 points)
 
 **Database Team Stories**:
-- [Feature] Set up real-time data storage (3 points)
-- [Feature] Configure streaming data schema (3 points)
+- [Feature] OCDI-063: Set up real-time data storage (3 points)
+- [Feature] OCDI-064: Configure streaming data schema (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Deploy and configure Kafka cluster (5 points)
-- [Feature] Set up Spark Streaming (5 points)
-- [Chore] Implement monitoring for stream processing (3 points)
+- [Feature] OCDI-065: Deploy and configure Kafka cluster (5 points)
+- [Feature] OCDI-066: Set up Spark Streaming (5 points)
+- [Chore] OCDI-067: Implement monitoring for stream processing (3 points)
 
 **Definition of Done**:
 - Kafka cluster operational
@@ -250,17 +273,17 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Create relationship analytics services
 
 **Backend Team Stories**:
-- [Feature] Implement graph query service (5 points)
-- [Feature] Develop relationship analytics service (5 points)
-- [Feature] Create compliance tracking service (5 points)
+- [Feature] OCDI-068: Implement graph query service (5 points)
+- [Feature] OCDI-069: Develop relationship analytics service (5 points)
+- [Feature] OCDI-070: Create compliance tracking service (5 points)
 
 **Database Team Stories**:
-- [Feature] Implement graph algorithms in Neo4j (5 points)
-- [Feature] Configure path finding for compliance tracking (5 points)
+- [Feature] OCDI-071: Implement graph algorithms in Neo4j (5 points)
+- [Feature] OCDI-072: Configure path finding for compliance tracking (5 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Optimize Neo4j for visualization queries (3 points)
-- [Chore] Set up caching for frequently accessed graph patterns (3 points)
+- [Feature] OCDI-073: Optimize Neo4j for visualization queries (3 points)
+- [Chore] OCDI-074: Set up caching for frequently accessed graph patterns (3 points)
 
 **Definition of Done**:
 - Graph visualization components implemented
@@ -278,18 +301,18 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Configure secure data access controls
 
 **Backend Team Stories**:
-- [Feature] Implement fine-grained access control (5 points)
-- [Feature] Develop audit logging service (5 points)
-- [Feature] Create security event monitoring (5 points)
+- [Feature] OCDI-075: Implement fine-grained access control (5 points)
+- [Feature] OCDI-076: Develop audit logging service (5 points)
+- [Feature] OCDI-077: Create security event monitoring (5 points)
 
 **Database Team Stories**:
-- [Feature] Implement data masking for sensitive information (5 points)
-- [Feature] Configure row-level security in databases (5 points)
+- [Feature] OCDI-078: Implement data masking for sensitive information (5 points)
+- [Feature] OCDI-079: Configure row-level security in databases (5 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Conduct security audit and implement fixes (8 points)
-- [Feature] Configure network security policies (5 points)
-- [Chore] Implement security monitoring and alerting (3 points)
+- [Feature] OCDI-080: Conduct security audit and implement fixes (8 points)
+- [Feature] OCDI-081: Configure network security policies (5 points)
+- [Chore] OCDI-082: Implement security monitoring and alerting (3 points)
 
 **Definition of Done**:
 - Security audit completed
@@ -305,20 +328,20 @@ This sprint plan outlines a 20-week (5-month) implementation timeline for the Op
 - Finalize documentation and training
 
 **Backend Team Stories**:
-- [Feature] Optimize service performance (5 points)
-- [Feature] Implement caching strategies (5 points)
-- [Chore] Create comprehensive API documentation (3 points)
+- [Feature] OCDI-083: Optimize service performance (5 points)
+- [Feature] OCDI-084: Implement caching strategies (5 points)
+- [Chore] OCDI-085: Create comprehensive API documentation (3 points)
 
 **Database Team Stories**:
-- [Feature] Optimize database queries and indexes (5 points)
-- [Feature] Implement query caching (3 points)
-- [Chore] Document database schemas and relationships (3 points)
+- [Feature] OCDI-086: Optimize database queries and indexes (5 points)
+- [Feature] OCDI-087: Implement query caching (3 points)
+- [Chore] OCDI-088: Document database schemas and relationships (3 points)
 
 **Infrastructure Team Stories**:
-- [Feature] Configure auto-scaling policies (5 points)
-- [Feature] Implement load balancing optimizations (3 points)
-- [Chore] Create deployment documentation (3 points)
-- [Chore] Prepare production deployment plan (5 points)
+- [Feature] OCDI-089: Configure auto-scaling policies (5 points)
+- [Feature] OCDI-090: Implement load balancing optimizations (3 points)
+- [Chore] OCDI-091: Create deployment documentation (3 points)
+- [Chore] OCDI-092: Prepare production deployment plan (5 points)
 
 **Definition of Done**:
 - Performance optimizations implemented
