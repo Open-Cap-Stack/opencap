@@ -8,7 +8,7 @@ services:
     container_name: opencap_mongodb_test
     restart: always
     ports:
-      - "27017:27017"
+      - "27018:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=opencap
       - MONGO_INITDB_ROOT_PASSWORD=password123
