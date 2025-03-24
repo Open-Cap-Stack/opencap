@@ -3,6 +3,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const { connectToMongoDB } = require('./db/mongoConnection');
+const { addVersionHeaders, createVersionedRoutes, validateApiVersion } = require('./middleware/apiVersioning');
 
 // Initialize dotenv to load environment variables
 dotenv.config();
@@ -10,6 +11,10 @@ dotenv.config();
 // Initialize the Express app
 const app = express();
 app.use(express.json());
+
+// Apply API versioning middleware
+app.use(addVersionHeaders);
+app.use(validateApiVersion);
 
 // Determine if the environment is a test environment
 const isTestEnv = process.env.NODE_ENV === "test";
@@ -89,12 +94,15 @@ const routeMappings = {
   '/api/taxCalculations': 'taxCalculatorRoutes'
 };
 
-// Mount routes only if they exist
+// Mount legacy routes only if they exist
 Object.entries(routeMappings).forEach(([path, routeName]) => {
   if (routes[routeName]) {
     app.use(path, routes[routeName]);
   }
 });
+
+// Create versioned routes (e.g., /api/v1/spvs)
+createVersionedRoutes(app, routes, routeMappings);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
