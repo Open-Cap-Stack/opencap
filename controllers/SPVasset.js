@@ -1,12 +1,15 @@
 /**
  * SPV Asset Management API Controller
  * Feature: OCAE-212: Implement SPV Asset Management API
- * Previously tracked as OCAE-003
  */
 const SPVAsset = require('../models/SPVasset');
 const mongoose = require('mongoose');
 
-// Create a new SPVAsset
+/**
+ * Create a new SPV Asset
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.createSPVAsset = async (req, res) => {
   try {
     const { AssetID, SPVID, Type, Value, Description, AcquisitionDate } = req.body;
@@ -31,7 +34,11 @@ exports.createSPVAsset = async (req, res) => {
   }
 };
 
-// Get all SPVAssets
+/**
+ * Get all SPV Assets
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getSPVAssets = async (req, res) => {
   try {
     const assets = await SPVAsset.find();
@@ -41,7 +48,11 @@ exports.getSPVAssets = async (req, res) => {
   }
 };
 
-// Get SPVAsset by ID
+/**
+ * Get SPV Asset by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getSPVAssetById = async (req, res) => {
   try {
     // Validate ID format
@@ -61,7 +72,11 @@ exports.getSPVAssetById = async (req, res) => {
   }
 };
 
-// Get assets by SPV ID
+/**
+ * Get assets by SPV ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getAssetsBySPVId = async (req, res) => {
   try {
     const spvId = req.params.spvId;
@@ -77,7 +92,11 @@ exports.getAssetsBySPVId = async (req, res) => {
   }
 };
 
-// Calculate total valuation for a specific SPV
+/**
+ * Calculate total valuation for a specific SPV
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getSPVValuation = async (req, res) => {
   try {
     const spvId = req.params.spvId;
@@ -105,7 +124,11 @@ exports.getSPVValuation = async (req, res) => {
   }
 };
 
-// Calculate total valuation by asset type
+/**
+ * Calculate total valuation by asset type
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getAssetTypeValuation = async (req, res) => {
   try {
     const assetType = req.params.type;
@@ -133,7 +156,11 @@ exports.getAssetTypeValuation = async (req, res) => {
   }
 };
 
-// Update an SPV Asset by ID
+/**
+ * Update an SPV Asset by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.updateSPVAsset = async (req, res) => {
   try {
     // Validate ID format
@@ -171,7 +198,11 @@ exports.updateSPVAsset = async (req, res) => {
   }
 };
 
-// Delete an SPVAsset by ID
+/**
+ * Delete an SPV Asset by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.deleteSPVAsset = async (req, res) => {
   try {
     const deletedAsset = await SPVAsset.findByIdAndDelete(req.params.id);
