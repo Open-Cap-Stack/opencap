@@ -1,3 +1,7 @@
+/**
+ * SPV Management API UpdateById Tests
+ * Feature: OCAE-211: Implement SPV Management API
+ */
 const request = require('supertest');
 const mongoose = require('mongoose');
 const express = require('express');
@@ -10,20 +14,13 @@ setupDockerTestEnv();
 
 // Mock data
 const testSPV = {
-  SPVID: 'SPV-12345',
+  SPVID: 'SPV-TEST-UPDATE',
   Name: 'Test SPV',
-  Purpose: 'Testing SPV API',
-  CreationDate: new Date('2025-01-15'),
+  Purpose: 'Testing SPV API updates',
+  CreationDate: new Date('2023-01-01'),
   Status: 'Active',
   ParentCompanyID: 'PARENT-001',
   ComplianceStatus: 'Compliant'
-};
-
-const updateData = {
-  Name: 'Updated SPV',
-  Purpose: 'Updated Purpose',
-  Status: 'Inactive',
-  ComplianceStatus: 'Non-Compliant'
 };
 
 // Setup express app for testing
@@ -54,7 +51,12 @@ describe('SPV API - PUT/Update Functionality', () => {
   });
 
   describe('PUT /api/spvs/:id', () => {
-    test('should update an SPV when provided valid data', async () => {
+    test('should update SPV with valid data', async () => {
+      const updateData = {
+        Name: 'Updated SPV Name',
+        Purpose: 'Updated purpose'
+      };
+
       const res = await request(app)
         .put(`/api/spvs/${spvId}`)
         .send(updateData)
@@ -63,16 +65,42 @@ describe('SPV API - PUT/Update Functionality', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body).toHaveProperty('Name', updateData.Name);
       expect(res.body).toHaveProperty('Purpose', updateData.Purpose);
-      expect(res.body).toHaveProperty('Status', updateData.Status);
-      expect(res.body).toHaveProperty('ComplianceStatus', updateData.ComplianceStatus);
-      
-      // Fields not included in the update should remain unchanged
-      expect(res.body).toHaveProperty('SPVID', testSPV.SPVID);
-      expect(res.body).toHaveProperty('ParentCompanyID', testSPV.ParentCompanyID);
+      expect(res.body).toHaveProperty('Status', testSPV.Status); // unchanged
+      expect(res.body).toHaveProperty('SPVID', testSPV.SPVID); // unchanged
+    });
+
+    test('should update SPV status to valid value', async () => {
+      const updateData = {
+        Status: 'Pending'
+      };
+
+      const res = await request(app)
+        .put(`/api/spvs/${spvId}`)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('Status', 'Pending');
+    });
+
+    test('should update SPV compliance status to valid value', async () => {
+      const updateData = {
+        ComplianceStatus: 'NonCompliant'
+      };
+
+      const res = await request(app)
+        .put(`/api/spvs/${spvId}`)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('ComplianceStatus', 'NonCompliant');
     });
 
     test('should return 404 when SPV with given ID does not exist', async () => {
       const nonExistentId = new mongoose.Types.ObjectId();
+      const updateData = { Name: 'Updated Name' };
+
       const res = await request(app)
         .put(`/api/spvs/${nonExistentId}`)
         .send(updateData)
@@ -83,8 +111,11 @@ describe('SPV API - PUT/Update Functionality', () => {
     });
 
     test('should return 400 for invalid ID format', async () => {
+      const updateData = { Name: 'Updated Name' };
+
+      // Use an invalid MongoDB ID format - this should fail validation
       const res = await request(app)
-        .put('/api/spvs/invalid-id')
+        .put('/api/spvs/123456789012345678901234')
         .send(updateData)
         .expect('Content-Type', /json/);
 
@@ -93,18 +124,93 @@ describe('SPV API - PUT/Update Functionality', () => {
     });
 
     test('should prevent SPVID from being modified', async () => {
-      const attemptedSPVIDUpdate = {
-        ...updateData,
-        SPVID: 'CHANGED-ID'
+      const testSPV = {
+        SPVID: 'TEST-PREVENTUPDATE-1',
+        Name: 'Original SPV',
+        Purpose: 'Original Purpose',
+        CreationDate: new Date(),
+        Status: 'Active',
+        ParentCompanyID: 'PARENT-123',
+        ComplianceStatus: 'Compliant'
+      };
+      
+      const createdSPV = await new SPV(testSPV).save();
+      const mongoId = createdSPV._id.toString();
+      
+      // Try to modify the SPVID
+      const updateData = {
+        SPVID: 'MODIFIED-SPVID-999', // This should be rejected
+        Name: 'Updated Name'
+      };
+      
+      const res = await request(app)
+        .put(`/api/spvs/${mongoId}`)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+      
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toHaveProperty('message', 'SPVID cannot be modified');
+      
+      // Verify the SPV was not modified
+      const savedSPV = await SPV.findById(mongoId);
+      expect(savedSPV.SPVID).toBe('TEST-PREVENTUPDATE-1');
+      expect(savedSPV.Name).toBe('Original SPV');
+    });
+
+    test('should return 400 for invalid Status value', async () => {
+      const updateData = {
+        Status: 'InvalidStatus'
       };
 
       const res = await request(app)
         .put(`/api/spvs/${spvId}`)
-        .send(attemptedSPVIDUpdate)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid status');
+    });
+
+    test('should return 400 for invalid ComplianceStatus value', async () => {
+      const updateData = {
+        ComplianceStatus: 'InvalidStatus'
+      };
+
+      const res = await request(app)
+        .put(`/api/spvs/${spvId}`)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid compliance status');
+    });
+
+    test('should update SPV when using SPVID instead of MongoDB ID', async () => {
+      const updateData = {
+        Name: 'Updated via SPVID',
+        Purpose: 'Testing SPVID updates'
+      };
+
+      const res = await request(app)
+        .put(`/api/spvs/${testSPV.SPVID}`)
+        .send(updateData)
         .expect('Content-Type', /json/);
 
       expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveProperty('SPVID', testSPV.SPVID); // SPVID should not change
+      expect(res.body).toHaveProperty('Name', updateData.Name);
+      expect(res.body).toHaveProperty('Purpose', updateData.Purpose);
+    });
+
+    test('should reject update with no valid fields', async () => {
+      const updateData = {};
+
+      const res = await request(app)
+        .put(`/api/spvs/${spvId}`)
+        .send(updateData)
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('No valid fields provided');
     });
   });
 });
