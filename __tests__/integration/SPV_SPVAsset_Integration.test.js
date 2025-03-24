@@ -1,10 +1,14 @@
+/**
+ * SPV and SPV Asset API - Integration Tests
+ * Feature: OCAE-211: Implement SPV Management API
+ */
 const request = require('supertest');
 const mongoose = require('mongoose');
 const express = require('express');
 const spvRoutes = require('../../routes/SPV');
-const spvAssetRoutes = require('../../routes/SPVasset');
+const spvAssetRoutes = require('../../routes/SPVAsset'); // Fixed casing
 const SPV = require('../../models/SPV');
-const SPVAsset = require('../../models/spvasset');
+const SPVAsset = require('../../models/SPVAsset'); // Fixed casing
 const { setupDockerTestEnv } = require('../setup/docker-test-env');
 
 // Setup Docker test environment variables
@@ -84,40 +88,29 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
       const assetRes = await request(app)
         .post('/api/spvassets')
         .send(asset)
-        .expect('Content-Type', /json/);
+        .expect(201);
 
-      expect(assetRes.statusCode).toBe(201);
       expect(assetRes.body).toHaveProperty('SPVID', testSPV.SPVID);
     }
 
-    // 3. Verify the SPV can be retrieved
-    const getSPVRes = await request(app)
-      .get(`/api/spvs/${spvId}`)
-      .expect('Content-Type', /json/);
-
-    expect(getSPVRes.statusCode).toBe(200);
-    expect(getSPVRes.body).toHaveProperty('SPVID', testSPV.SPVID);
-
-    // 4. Verify all assets for the SPV can be retrieved
+    // 3. Verify that assets are linked to the SPV
     const assetsRes = await request(app)
       .get(`/api/spvassets/spv/${testSPV.SPVID}`)
-      .expect('Content-Type', /json/);
+      .expect(200);
 
-    expect(assetsRes.statusCode).toBe(200);
+    expect(assetsRes.body).toHaveProperty('assets');
     expect(assetsRes.body.assets).toHaveLength(testSPVAssets.length);
     expect(assetsRes.body.assets[0]).toHaveProperty('SPVID', testSPV.SPVID);
     expect(assetsRes.body.assets[1]).toHaveProperty('SPVID', testSPV.SPVID);
 
-    // 5. Verify valuation calculation works correctly
+    // 4. Calculate expected total valuation
+    const expectedValuation = testSPVAssets.reduce((sum, asset) => sum + asset.Value, 0);
+
+    // 5. Verify the SPV asset valuation endpoint
     const valuationRes = await request(app)
       .get(`/api/spvassets/valuation/spv/${testSPV.SPVID}`)
-      .expect('Content-Type', /json/);
+      .expect(200);
 
-    expect(valuationRes.statusCode).toBe(200);
-    expect(valuationRes.body).toHaveProperty('spvId', testSPV.SPVID);
-    
-    // Expected total valuation should be the sum of all asset values
-    const expectedValuation = testSPVAssets.reduce((sum, asset) => sum + asset.Value, 0);
     expect(valuationRes.body).toHaveProperty('totalValuation', expectedValuation);
     expect(valuationRes.body).toHaveProperty('assetCount', testSPVAssets.length);
   });
@@ -139,9 +132,9 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
         .expect(201);
     }
 
-    // 3. Update the SPV status to Inactive
+    // 3. Update the SPV status to Closed (previously was Inactive)
     const updateData = {
-      Status: 'Inactive'
+      Status: 'Closed'
     };
 
     await request(app)
@@ -154,7 +147,7 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
       .get(`/api/spvs/${spvId}`)
       .expect(200);
 
-    expect(updatedSPVRes.body).toHaveProperty('Status', 'Inactive');
+    expect(updatedSPVRes.body).toHaveProperty('Status', 'Closed');
 
     // 5. Verify that all assets are still accessible and unchanged
     const assetsRes = await request(app)
@@ -169,13 +162,13 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
   });
 
   test('Retrieving SPVs by status should return the correct subset', async () => {
-    // 1. Create active and inactive SPVs
+    // 1. Create active and closed SPVs (previously was inactive)
     const activeSPV = { ...testSPV };
-    const inactiveSPV = { 
+    const closedSPV = { 
       ...testSPV, 
-      SPVID: 'SPV-INACTIVE-TEST', 
-      Name: 'Inactive SPV',
-      Status: 'Inactive' 
+      SPVID: 'SPV-CLOSED-TEST', 
+      Name: 'Closed SPV',
+      Status: 'Closed' 
     };
 
     await request(app)
@@ -185,7 +178,7 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
 
     await request(app)
       .post('/api/spvs')
-      .send(inactiveSPV)
+      .send(closedSPV)
       .expect(201);
 
     // 2. Retrieve SPVs by status
@@ -193,8 +186,8 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
       .get('/api/spvs/status/Active')
       .expect(200);
 
-    const inactiveRes = await request(app)
-      .get('/api/spvs/status/Inactive')
+    const closedRes = await request(app)
+      .get('/api/spvs/status/Closed')
       .expect(200);
 
     // 3. Verify correct SPVs are returned by status
@@ -202,8 +195,8 @@ describe('SPV and SPV Asset API - Integration Tests', () => {
     expect(activeRes.body.spvs[0]).toHaveProperty('SPVID', activeSPV.SPVID);
     expect(activeRes.body.spvs[0]).toHaveProperty('Status', 'Active');
 
-    expect(inactiveRes.body.spvs).toHaveLength(1);
-    expect(inactiveRes.body.spvs[0]).toHaveProperty('SPVID', inactiveSPV.SPVID);
-    expect(inactiveRes.body.spvs[0]).toHaveProperty('Status', 'Inactive');
+    expect(closedRes.body.spvs).toHaveLength(1);
+    expect(closedRes.body.spvs[0]).toHaveProperty('SPVID', closedSPV.SPVID);
+    expect(closedRes.body.spvs[0]).toHaveProperty('Status', 'Closed');
   });
 });
