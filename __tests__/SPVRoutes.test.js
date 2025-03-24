@@ -76,6 +76,6 @@ describe('SPV Routes', () => {
     const res = await request(app).delete(`/api/spvs/${spv._id}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.message).toBe('SPV deleted');
+    expect(res.body.message).toBe('SPV deleted successfully');
   });
 });
