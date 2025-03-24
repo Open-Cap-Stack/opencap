@@ -1,8 +1,8 @@
 // app.js
 const express = require("express");
-const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const fs = require("fs");
+const { connectToMongoDB } = require('./db/mongoConnection');
 
 // Initialize dotenv to load environment variables
 dotenv.config();
@@ -16,13 +16,8 @@ const isTestEnv = process.env.NODE_ENV === "test";
 
 // Conditionally connect to MongoDB unless in a test environment
 if (!isTestEnv) {
-  const mongoURI = process.env.MONGODB_URI || "mongodb://mongo:27017/opencap";
-  mongoose.connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-    .then(() => console.log("MongoDB connected"))
-    .catch(err => console.error("MongoDB connection error:", err));
+  connectToMongoDB()
+    .catch(err => console.error("MongoDB connection failed:", err));
 }
 
 // Function to safely require routes
