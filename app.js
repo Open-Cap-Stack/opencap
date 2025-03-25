@@ -63,7 +63,10 @@ const routes = {
   spvAssetRoutes: safeRequire("./routes/SPVasset"),
   complianceCheckRoutes: safeRequire("./routes/complianceCheckRoutes"),
   integrationModuleRoutes: safeRequire("./routes/integrationModuleRoutes"),
-  taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes")
+  taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes"),
+  
+  // OCAE-208: Enhanced V1 Routes 
+  v1ShareClassRoutes: safeRequire("./routes/v1/shareClassRoutes")
 };
 
 // Route mapping with paths
@@ -94,15 +97,33 @@ const routeMappings = {
   '/api/taxCalculations': 'taxCalculatorRoutes'
 };
 
-// Mount legacy routes only if they exist
+// Mount legacy routes
 Object.entries(routeMappings).forEach(([path, routeName]) => {
   if (routes[routeName]) {
     app.use(path, routes[routeName]);
   }
 });
 
-// Create versioned routes (e.g., /api/v1/spvs)
-createVersionedRoutes(app, routes, routeMappings);
+// Create versioned routes for legacy endpoints (except those with custom v1 implementations)
+const excludeFromAutoVersioning = ['shareClasses']; // Routes with custom v1 implementations
+
+const filteredMappings = Object.fromEntries(
+  Object.entries(routeMappings)
+    .filter(([path]) => {
+      // Extract resource path (e.g., '/api/shareClasses' -> 'shareClasses')
+      const resourcePath = path.replace('/api/', '');
+      return !excludeFromAutoVersioning.includes(resourcePath);
+    })
+);
+
+// Apply versioning to legacy routes (not including those with custom v1 implementations) 
+createVersionedRoutes(app, routes, filteredMappings);
+
+// Mount custom v1 routes directly
+if (routes.v1ShareClassRoutes) {
+  app.use('/api/v1/shareClasses', routes.v1ShareClassRoutes);
+  console.log('Registered custom v1 route: /api/v1/shareClasses -> v1ShareClassRoutes');
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
