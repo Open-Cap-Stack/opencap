@@ -60,10 +60,6 @@ const FinancialReportSchema = new Schema({
       type: Number,
       default: 0,
       min: 0
-    },
-    validate: {
-      validator: validatePositiveValues,
-      message: 'All revenue values must be positive numbers'
     }
   },
   expenses: {
@@ -86,10 +82,6 @@ const FinancialReportSchema = new Schema({
       type: Number,
       default: 0,
       min: 0
-    },
-    validate: {
-      validator: validatePositiveValues,
-      message: 'All expense values must be positive numbers'
     }
   },
   totalRevenue: {
@@ -120,6 +112,15 @@ const FinancialReportSchema = new Schema({
 }, {
   timestamps: true
 });
+
+// Validation for positive values
+FinancialReportSchema.path('revenue').validate(function(value) {
+  return validatePositiveValues(value);
+}, 'All revenue values must be positive numbers');
+
+FinancialReportSchema.path('expenses').validate(function(value) {
+  return validatePositiveValues(value);
+}, 'All expense values must be positive numbers');
 
 // Indexes for improved query performance
 FinancialReportSchema.index({ companyId: 1, reportingPeriod: 1 }, { unique: true });
