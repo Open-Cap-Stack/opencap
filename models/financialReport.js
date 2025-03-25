@@ -1,103 +1,118 @@
+/**
+ * Financial Report Model
+ * 
+ * [Feature] OCAE-205: Implement financial reporting endpoints
+ * Schema for financial reports with revenue/expense tracking and calculations
+ */
+
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const FinancialReportSchema = new Schema({
-  ReportID: { 
-    type: String, 
-    required: true, 
-    unique: true,
+  companyId: {
+    type: String,
+    required: true,
+    trim: true,
+    index: true
+  },
+  reportingPeriod: {
+    type: String,
+    required: true,
     trim: true
   },
-  Type: { 
-    type: String, 
-    enum: ['Annual', 'Quarterly'], 
-    required: true 
+  reportDate: {
+    type: Date,
+    required: true,
+    default: Date.now
   },
-  Data: {
-    revenue: {
-      type: Map,
-      of: Number,  // Simplified - just Number instead of object
-      validate: {
-        validator: function(v) {
-          if (!v) return false;
-          if (this.Type === 'Annual') {
-            return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
-          }
-          return v.size === 1;  // Use size instead of Object.keys().length
-        },
-        message: props => `Invalid quarters for ${props.value} report type`
-      },
-      required: true,
-      _id: false  // Disable _id for subdocuments
+  reportType: {
+    type: String,
+    enum: ['annual', 'quarterly', 'monthly'],
+    required: true
+  },
+  revenue: {
+    sales: {
+      type: Number,
+      default: 0
     },
-    expenses: {
-      type: Map,
-      of: Number,  // Simplified - just Number instead of object
-      validate: {
-        validator: function(v) {
-          if (!v) return false;
-          if (this.Type === 'Annual') {
-            return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
-          }
-          return v.size === 1;  // Use size instead of Object.keys().length
-        },
-        message: props => `Invalid quarters for ${props.value} report type`
-      },
-      required: true,
-      _id: false  // Disable _id for subdocuments
+    services: {
+      type: Number,
+      default: 0
+    },
+    other: {
+      type: Number,
+      default: 0
     }
   },
-  TotalRevenue: { 
+  expenses: {
+    salaries: {
+      type: Number,
+      default: 0
+    },
+    marketing: {
+      type: Number,
+      default: 0
+    },
+    operations: {
+      type: Number,
+      default: 0
+    },
+    other: {
+      type: Number,
+      default: 0
+    }
+  },
+  totalRevenue: {
     type: Number,
-    required: true,
-    min: 0,
-    get: v => v.toFixed(2),
-    set: v => parseFloat(v)
+    min: 0
   },
-  TotalExpenses: { 
+  totalExpenses: {
     type: Number,
-    required: true,
-    min: 0,
-    get: v => v.toFixed(2),
-    set: v => parseFloat(v)
+    min: 0
   },
-  NetIncome: { 
-    type: Number,
-    required: true,
-    get: v => v.toFixed(2),
-    set: v => parseFloat(v)
+  netIncome: {
+    type: Number
   },
-  EquitySummary: [String],
-  Timestamp: { 
-    type: Date, 
-    required: true,
-    default: Date.now 
+  notes: {
+    type: String,
+    trim: true
   },
-  userId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'User',
-    required: true,
+  tags: [String],
+  userId: {
+    type: Schema.Types.Mixed, 
     index: true
   },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-  lastModifiedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  lastModifiedBy: { type: Schema.Types.Mixed } 
 }, {
-  timestamps: true,
-  strict: false  // Allow flexible Map contents
+  timestamps: true
 });
 
 // Indexes
-FinancialReportSchema.index({ ReportID: 1 }, { unique: true });
-FinancialReportSchema.index({ Timestamp: -1 });
+FinancialReportSchema.index({ reportingPeriod: 1, companyId: 1 }, { unique: true });
+FinancialReportSchema.index({ reportDate: -1 });
 
-// Methods
+/**
+ * Calculate totals from revenue and expense items
+ */
 FinancialReportSchema.methods.calculateTotals = function() {
-  const revenue = Array.from(this.Data.revenue.values()).reduce((a, b) => a + b, 0);
-  const expenses = Array.from(this.Data.expenses.values()).reduce((a, b) => a + b, 0);
-  this.TotalRevenue = revenue;
-  this.TotalExpenses = expenses;
-  this.NetIncome = revenue - expenses;
+  // Calculate total revenue
+  this.totalRevenue = Object.values(this.revenue || {}).reduce((sum, val) => sum + (val || 0), 0);
+  
+  // Calculate total expenses
+  this.totalExpenses = Object.values(this.expenses || {}).reduce((sum, val) => sum + (val || 0), 0);
+  
+  // Calculate net income
+  this.netIncome = this.totalRevenue - this.totalExpenses;
 };
+
+/**
+ * Pre-save middleware to ensure totals are calculated
+ */
+FinancialReportSchema.pre('save', function(next) {
+  this.calculateTotals();
+  next();
+});
 
 module.exports = mongoose.model('FinancialReport', FinancialReportSchema);
