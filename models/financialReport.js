@@ -1,6 +1,30 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
+/**
+ * Validates quarter names for financial reports
+ * @param {Map} map - Map containing quarter data
+ * @returns {boolean} - Whether all keys are valid quarter names
+ */
+const validateQuarterNames = (map) => {
+  const validQuarters = ['q1', 'q2', 'q3', 'q4'];
+  return Array.from(map.keys()).every(k => validQuarters.includes(k));
+};
+
+/**
+ * Validates that all values in a map are positive numbers
+ * @param {Map} map - Map containing financial data
+ * @returns {boolean} - Whether all values are positive numbers
+ */
+const validatePositiveValues = (map) => {
+  return Array.from(map.values()).every(val => val >= 0);
+};
+
+/**
+ * Financial Report Schema for quarterly and annual financial data
+ * Includes enhanced validation for quarter names, positive values,
+ * and proper calculation of totals
+ */
 const FinancialReportSchema = new Schema({
   ReportID: { 
     type: String, 
@@ -19,6 +43,7 @@ const FinancialReportSchema = new Schema({
       of: Number,
       validate: [
         {
+          // Validate quarters based on report type
           validator: function(v) {
             if (!v) return false;
             if (this.Type === 'Annual') {
@@ -30,17 +55,12 @@ const FinancialReportSchema = new Schema({
         },
         {
           // Validate quarter names
-          validator: function(v) {
-            const validQuarters = ['q1', 'q2', 'q3', 'q4'];
-            return Array.from(v.keys()).every(k => validQuarters.includes(k));
-          },
+          validator: validateQuarterNames,
           message: props => `Invalid quarter names. Must be one of: q1, q2, q3, q4`
         },
         {
           // Validate positive values
-          validator: function(v) {
-            return Array.from(v.values()).every(val => val >= 0);
-          },
+          validator: validatePositiveValues,
           message: props => `All revenue values must be positive numbers`
         }
       ],
@@ -52,6 +72,7 @@ const FinancialReportSchema = new Schema({
       of: Number,
       validate: [
         {
+          // Validate quarters based on report type
           validator: function(v) {
             if (!v) return false;
             if (this.Type === 'Annual') {
@@ -63,17 +84,12 @@ const FinancialReportSchema = new Schema({
         },
         {
           // Validate quarter names
-          validator: function(v) {
-            const validQuarters = ['q1', 'q2', 'q3', 'q4'];
-            return Array.from(v.keys()).every(k => validQuarters.includes(k));
-          },
+          validator: validateQuarterNames,
           message: props => `Invalid quarter names. Must be one of: q1, q2, q3, q4`
         },
         {
           // Validate positive values
-          validator: function(v) {
-            return Array.from(v.values()).every(val => val >= 0);
-          },
+          validator: validatePositiveValues,
           message: props => `All expense values must be positive numbers`
         }
       ],
@@ -121,21 +137,34 @@ const FinancialReportSchema = new Schema({
   strict: false
 });
 
-// Indexes
+// Indexes for improved query performance
 FinancialReportSchema.index({ ReportID: 1 }, { unique: true });
 FinancialReportSchema.index({ Timestamp: -1 });
+FinancialReportSchema.index({ userId: 1, Timestamp: -1 });
 
-// Methods
+/**
+ * Calculate totals for revenue, expenses, and net income
+ * This method should be called before saving to ensure totals are accurate
+ */
 FinancialReportSchema.methods.calculateTotals = function() {
   const revenue = Array.from(this.Data.revenue.values()).reduce((a, b) => a + b, 0);
   const expenses = Array.from(this.Data.expenses.values()).reduce((a, b) => a + b, 0);
   this.TotalRevenue = revenue;
   this.TotalExpenses = expenses;
   this.NetIncome = revenue - expenses;
+  return this;
 };
 
-// Pre-validate hook to ensure calculated totals match provided totals
+/**
+ * Pre-validate hook to ensure calculated totals match provided totals
+ * This prevents inconsistencies between detailed data and summary totals
+ */
 FinancialReportSchema.pre('validate', function(next) {
+  // Skip validation if we're missing data
+  if (!this.Data || !this.Data.revenue || !this.Data.expenses) {
+    return next();
+  }
+  
   // Calculate expected totals
   const expectedRevenue = Array.from(this.Data.revenue.values()).reduce((a, b) => a + b, 0);
   const expectedExpenses = Array.from(this.Data.expenses.values()).reduce((a, b) => a + b, 0);
