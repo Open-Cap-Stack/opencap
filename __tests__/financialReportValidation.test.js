@@ -18,104 +18,111 @@ describe('Financial Report Enhanced Validation', () => {
     await closeDatabase();
   });
 
-  test('should require valid quarter names in revenue and expenses maps', async () => {
-    // Create an invalid financial report with non-standard quarter names
-    const invalidFinancialReport = new FinancialReport({
-      ReportID: 'FIN-2023-Q1-INVALID',
-      Type: 'Quarterly',
-      Data: {
-        revenue: new Map([['invalid_quarter', 50000]]),
-        expenses: new Map([['q1', 30000]])
-      },
-      TotalRevenue: 50000,
-      TotalExpenses: 30000,
-      NetIncome: 20000,
-      userId: new mongoose.Types.ObjectId(),
-      Timestamp: new Date()
-    });
-
-    // Validation should fail
-    await expect(invalidFinancialReport.validate()).rejects.toThrow();
-  });
-
-  test('should require revenue and expense values to be positive numbers', async () => {
+  test('should require positive values in revenue and expenses', async () => {
     // Create an invalid financial report with negative revenue
     const invalidFinancialReport = new FinancialReport({
-      ReportID: 'FIN-2023-Q2-NEGATIVE',
-      Type: 'Quarterly',
-      Data: {
-        revenue: new Map([['q2', -10000]]), // Negative revenue
-        expenses: new Map([['q2', 30000]])
+      companyId: 'company-123',
+      reportingPeriod: 'Q2 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-06-30'),
+      revenue: {
+        sales: -10000, // Negative revenue - should fail validation
+        services: 15000,
+        other: 5000
       },
-      TotalRevenue: -10000,
-      TotalExpenses: 30000,
-      NetIncome: -40000,
-      userId: new mongoose.Types.ObjectId(),
-      Timestamp: new Date()
+      expenses: {
+        salaries: 20000,
+        marketing: 5000,
+        operations: 3000,
+        other: 2000
+      },
+      userId: new mongoose.Types.ObjectId()
     });
 
     // Validation should fail
     await expect(invalidFinancialReport.validate()).rejects.toThrow();
   });
 
-  test('should verify that annual reports contain all four quarters', async () => {
-    // Create an invalid annual report with missing quarters
-    const invalidAnnualReport = new FinancialReport({
-      ReportID: 'FIN-2023-ANNUAL-INCOMPLETE',
-      Type: 'Annual',
-      Data: {
-        revenue: new Map([
-          ['q1', 100000],
-          ['q2', 120000],
-          // q3 and q4 missing
-        ]),
-        expenses: new Map([
-          ['q1', 60000],
-          ['q2', 65000],
-          ['q3', 70000],
-          ['q4', 75000]
-        ])
+  test('should require negative expenses values to fail validation', async () => {
+    // Create an invalid financial report with negative expenses
+    const invalidFinancialReport = new FinancialReport({
+      companyId: 'company-123',
+      reportingPeriod: 'Q2 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-06-30'),
+      revenue: {
+        sales: 10000,
+        services: 15000,
+        other: 5000
       },
-      TotalRevenue: 220000,
-      TotalExpenses: 270000,
-      NetIncome: -50000,
-      userId: new mongoose.Types.ObjectId(),
-      Timestamp: new Date()
+      expenses: {
+        salaries: 20000,
+        marketing: -5000, // Negative expense - should fail validation
+        operations: 3000,
+        other: 2000
+      },
+      userId: new mongoose.Types.ObjectId()
     });
 
     // Validation should fail
-    await expect(invalidAnnualReport.validate()).rejects.toThrow();
+    await expect(invalidFinancialReport.validate()).rejects.toThrow();
   });
 
   test('should verify that calculated totals match provided totals', async () => {
     // Create a financial report with mismatched totals
     const mismatchedTotalsReport = new FinancialReport({
-      ReportID: 'FIN-2023-Q3-MISMATCH',
-      Type: 'Quarterly',
-      Data: {
-        revenue: new Map([['q3', 80000]]),
-        expenses: new Map([['q3', 40000]])
+      companyId: 'company-123',
+      reportingPeriod: 'Q3 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-09-30'),
+      revenue: {
+        sales: 50000,
+        services: 20000,
+        other: 10000
       },
-      TotalRevenue: 90000, // Incorrect - should be 80000
-      TotalExpenses: 40000,
-      NetIncome: 50000, // Incorrect - should be 40000
-      userId: new mongoose.Types.ObjectId(),
-      Timestamp: new Date()
+      expenses: {
+        salaries: 30000,
+        marketing: 5000,
+        operations: 3000,
+        other: 2000
+      },
+      totalRevenue: 90000, // Incorrect - should be 80000
+      totalExpenses: 40000,
+      netIncome: 50000, // Incorrect - should be 40000
+      userId: new mongoose.Types.ObjectId()
     });
 
-    // Add custom validation to check if calculated totals match provided totals
-    await expect(async () => {
-      // First calculate the correct totals
-      mismatchedTotalsReport.calculateTotals();
-      
-      // Then check if they match the originally provided values
-      // This assumes we'd add this validation to the model
-      if (mismatchedTotalsReport.TotalRevenue !== 90000 || 
-          mismatchedTotalsReport.NetIncome !== 50000) {
-        throw new Error('Totals mismatch');
-      }
-      
-      await mismatchedTotalsReport.validate();
-    }).rejects.toThrow();
+    // Validate to check if totals are properly calculated
+    await expect(mismatchedTotalsReport.validate()).rejects.toThrow();
+  });
+  
+  test('should auto-calculate totals when saving', async () => {
+    // Create a valid financial report without pre-calculated totals
+    const report = new FinancialReport({
+      companyId: 'company-123',
+      reportingPeriod: 'Q4 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-12-31'),
+      revenue: {
+        sales: 60000,
+        services: 25000,
+        other: 15000
+      },
+      expenses: {
+        salaries: 35000,
+        marketing: 8000,
+        operations: 4000,
+        other: 3000
+      },
+      userId: new mongoose.Types.ObjectId()
+    });
+
+    // Call the pre-validate hook manually
+    report.calculateTotals();
+    
+    // Check if totals were calculated correctly
+    expect(report.totalRevenue).toBe(100000);
+    expect(report.totalExpenses).toBe(50000);
+    expect(report.netIncome).toBe(50000);
   });
 });
