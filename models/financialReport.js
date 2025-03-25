@@ -60,7 +60,8 @@ const FinancialReportSchema = new Schema({
       type: Number,
       default: 0,
       min: 0
-    }
+    },
+    _id: false
   },
   expenses: {
     salaries: {
@@ -82,7 +83,8 @@ const FinancialReportSchema = new Schema({
       type: Number,
       default: 0,
       min: 0
-    }
+    },
+    _id: false
   },
   totalRevenue: {
     type: Number,
@@ -110,17 +112,44 @@ const FinancialReportSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
   lastModifiedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, {
-  timestamps: true
+  timestamps: true,
+  validate: {
+    validator: function() {
+      // Validate positive values in revenue and expenses
+      if (this.revenue && !validatePositiveValues(this.revenue)) {
+        return false;
+      }
+  
+      if (this.expenses && !validatePositiveValues(this.expenses)) {
+        return false;
+      }
+  
+      // Skip further validation if we're missing data
+      if (!this.revenue || !this.expenses) {
+        return true;
+      }
+  
+      // Calculate expected totals
+      const expectedRevenue = Object.values(this.revenue)
+        .filter(val => typeof val === 'number')
+        .reduce((sum, val) => sum + val, 0);
+        
+      const expectedExpenses = Object.values(this.expenses)
+        .filter(val => typeof val === 'number')
+        .reduce((sum, val) => sum + val, 0);
+        
+      const expectedNetIncome = expectedRevenue - expectedExpenses;
+  
+      // Check if provided totals match calculated totals (allow small floating point differences)
+      const isRevenueMatch = !this.totalRevenue || Math.abs(this.totalRevenue - expectedRevenue) < 0.01;
+      const isExpensesMatch = !this.totalExpenses || Math.abs(this.totalExpenses - expectedExpenses) < 0.01;
+      const isNetIncomeMatch = !this.netIncome || Math.abs(this.netIncome - expectedNetIncome) < 0.01;
+  
+      return isRevenueMatch && isExpensesMatch && isNetIncomeMatch;
+    },
+    message: 'Provided totals do not match calculated totals'
+  }
 });
-
-// Validation for positive values
-FinancialReportSchema.path('revenue').validate(function(value) {
-  return validatePositiveValues(value);
-}, 'All revenue values must be positive numbers');
-
-FinancialReportSchema.path('expenses').validate(function(value) {
-  return validatePositiveValues(value);
-}, 'All expense values must be positive numbers');
 
 // Indexes for improved query performance
 FinancialReportSchema.index({ companyId: 1, reportingPeriod: 1 }, { unique: true });
@@ -147,39 +176,6 @@ FinancialReportSchema.methods.calculateTotals = function() {
   
   return this;
 };
-
-/**
- * Pre-validate hook to ensure calculated totals match provided totals
- * This prevents inconsistencies between detailed data and summary totals
- */
-FinancialReportSchema.pre('validate', function(next) {
-  // Skip validation if we're missing data
-  if (!this.revenue || !this.expenses) {
-    return next();
-  }
-  
-  // Calculate expected totals
-  const expectedRevenue = Object.values(this.revenue)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
-    
-  const expectedExpenses = Object.values(this.expenses)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
-    
-  const expectedNetIncome = expectedRevenue - expectedExpenses;
-  
-  // Check if provided totals match calculated totals (allow small floating point differences)
-  const isRevenueMatch = !this.totalRevenue || Math.abs(this.totalRevenue - expectedRevenue) < 0.01;
-  const isExpensesMatch = !this.totalExpenses || Math.abs(this.totalExpenses - expectedExpenses) < 0.01;
-  const isNetIncomeMatch = !this.netIncome || Math.abs(this.netIncome - expectedNetIncome) < 0.01;
-  
-  if (!isRevenueMatch || !isExpensesMatch || !isNetIncomeMatch) {
-    return next(new Error('Provided totals do not match calculated totals'));
-  }
-  
-  next();
-});
 
 /**
  * Pre-save middleware to ensure totals are calculated
