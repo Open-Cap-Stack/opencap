@@ -22,6 +22,9 @@ jest.mock('../models/financialReport');
 describe('Database Seed Script', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Setup FinancialReport.create mock for tests
+    FinancialReport.create = jest.fn().mockImplementation(data => Promise.resolve(data));
   });
   
   afterEach(() => {
@@ -67,7 +70,7 @@ describe('Database Seed Script', () => {
       
       // Verify
       expect(Company.exists).toHaveBeenCalled();
-      expect(Company.create).toHaveBeenCalledTimes(expect.any(Number));
+      expect(Company.create).toHaveBeenCalled();
       expect(Company.create).toHaveBeenCalledWith(expect.objectContaining({
         companyId: expect.any(String),
         CompanyName: expect.any(String)
@@ -84,20 +87,19 @@ describe('Database Seed Script', () => {
       
       // Verify
       expect(ShareClass.exists).toHaveBeenCalled();
-      expect(ShareClass.create).toHaveBeenCalledTimes(expect.any(Number));
+      expect(ShareClass.create).toHaveBeenCalled();
     });
     
     it('should seed sample financial reports', async () => {
       // Setup
       FinancialReport.exists.mockResolvedValue(false);
-      FinancialReport.create.mockImplementation(data => Promise.resolve(data));
       
       // Test
       await seedDatabase();
       
       // Verify
       expect(FinancialReport.exists).toHaveBeenCalled();
-      expect(FinancialReport.create).toHaveBeenCalledTimes(expect.any(Number));
+      expect(FinancialReport.create).toHaveBeenCalled();
     });
   });
   
@@ -105,19 +107,17 @@ describe('Database Seed Script', () => {
     it('should clear all collections in development environment', async () => {
       // Setup
       process.env.NODE_ENV = 'development';
-      const collections = [
-        { deleteMany: jest.fn().mockResolvedValue({ deletedCount: 5 }) },
-        { deleteMany: jest.fn().mockResolvedValue({ deletedCount: 3 }) }
-      ];
-      mongoose.connection.collections = collections;
+      mongoose.connection.collections = {
+        users: { deleteMany: jest.fn().mockResolvedValue({ deletedCount: 5 }) },
+        companies: { deleteMany: jest.fn().mockResolvedValue({ deletedCount: 3 }) }
+      };
       
       // Test
       await clearDatabase();
       
       // Verify
-      collections.forEach(collection => {
-        expect(collection.deleteMany).toHaveBeenCalledWith({});
-      });
+      expect(mongoose.connection.collections.users.deleteMany).toHaveBeenCalledWith({});
+      expect(mongoose.connection.collections.companies.deleteMany).toHaveBeenCalledWith({});
       
       // Reset
       process.env.NODE_ENV = 'test';
@@ -126,19 +126,17 @@ describe('Database Seed Script', () => {
     it('should not clear collections in production environment', async () => {
       // Setup
       process.env.NODE_ENV = 'production';
-      const collections = [
-        { deleteMany: jest.fn() },
-        { deleteMany: jest.fn() }
-      ];
-      mongoose.connection.collections = collections;
+      mongoose.connection.collections = {
+        users: { deleteMany: jest.fn() },
+        companies: { deleteMany: jest.fn() }
+      };
       
       // Test
       await expect(clearDatabase()).rejects.toThrow();
       
       // Verify
-      collections.forEach(collection => {
-        expect(collection.deleteMany).not.toHaveBeenCalled();
-      });
+      expect(mongoose.connection.collections.users.deleteMany).not.toHaveBeenCalled();
+      expect(mongoose.connection.collections.companies.deleteMany).not.toHaveBeenCalled();
       
       // Reset
       process.env.NODE_ENV = 'test';
