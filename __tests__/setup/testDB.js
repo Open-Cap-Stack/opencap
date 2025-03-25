@@ -1,62 +1,85 @@
 /**
- * Test Database Setup
+ * Test Database Utilities
  * 
+ * [Feature] OCAE-205: Implement financial reporting endpoints
+ * [Feature] OCAE-206: Enhanced validation for financial reports
  * [Feature] OCAE-208: Implement share class management endpoints
- * DB connection utilities for testing
+ * DB connection utilities for isolated testing
  */
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
-let mongod;
+let mongoServer;
 
-// Connect to the in-memory database
+/**
+ * Connect to in-memory MongoDB for testing
+ */
 const connectDB = async () => {
   try {
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
+    mongoServer = await MongoMemoryServer.create();
+    const uri = mongoServer.getUri();
     
-    await mongoose.connect(uri, {
+    const mongooseOpts = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-    });
+    };
     
-    console.log('✅ Connected to test database');
+    await mongoose.connect(uri, mongooseOpts);
+    console.log('✅ Connected to in-memory MongoDB server for testing');
   } catch (error) {
     console.error('❌ Error connecting to test database:', error);
     process.exit(1);
   }
 };
 
-// Close the database connection
-const disconnectDB = async () => {
+/**
+ * Drop database, close the connection and stop mongod.
+ */
+const closeDatabase = async () => {
   try {
-    await mongoose.disconnect();
-    if (mongod) {
-      await mongod.stop();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.dropDatabase();
+      await mongoose.connection.close();
+      
+      if (mongoServer) {
+        await mongoServer.stop();
+        console.log('✅ Disconnected from in-memory MongoDB server');
+      }
     }
-    console.log('✅ Disconnected from test database');
   } catch (error) {
     console.error('❌ Error disconnecting from test database:', error);
   }
 };
 
-// Clear all data in the database
-const clearDB = async () => {
+/**
+ * Remove all the data for all db collections.
+ */
+const clearDatabase = async () => {
   try {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-      const collection = collections[key];
-      await collection.deleteMany({});
+    if (mongoose.connection.readyState !== 0) {
+      const collections = mongoose.connection.collections;
+
+      for (const key in collections) {
+        const collection = collections[key];
+        await collection.deleteMany({});
+      }
+      console.log('✅ Test database cleared');
     }
-    console.log('✅ Test database cleared');
   } catch (error) {
     console.error('❌ Error clearing test database:', error);
   }
 };
 
+// Aliases for compatibility with both naming conventions
+const disconnectDB = closeDatabase;
+const clearDB = clearDatabase;
+
 module.exports = {
   connectDB,
+  closeDatabase,
+  clearDatabase,
+  // Aliases
   disconnectDB,
   clearDB
 };
