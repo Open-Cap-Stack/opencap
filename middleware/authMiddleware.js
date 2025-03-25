@@ -1,55 +1,51 @@
 /**
  * Authentication Middleware
  * 
- * [Feature] OCAE-301: Implement JWT authentication
- * 
- * This middleware validates JWT tokens for protected routes.
+ * [Feature] OCAE-208: Implement share class management endpoints
+ * JWT-based authentication middleware for API routes
  */
 
 const jwt = require('jsonwebtoken');
 
 /**
- * Middleware to verify JWT token and add user to request
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
+ * Verifies the JWT token in the Authorization header
+ * Usage: Add this middleware to routes that require authentication
  */
-const authMiddleware = (req, res, next) => {
-  // Check for Authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  // Extract token
-  const token = authHeader.split(' ')[1];
-
+const auth = (req, res, next) => {
   try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Extract token from "Bearer TOKEN" format
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
     // Verify token
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'testsecret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'testsecret');
     
-    // Add user object to request
-    req.user = {
-      id: decodedToken.id,
-      email: decodedToken.email,
-      roles: decodedToken.roles || []
-    };
+    // Add user data to request
+    req.user = decoded;
     
+    // Continue with the request
     next();
   } catch (error) {
-    // Handle token verification errors
-    console.error('JWT verification error:', error.message);
-    
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired' });
     }
-    
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
     
-    res.status(401).json({ error: 'Authentication failed' });
+    console.error('Authentication error:', error);
+    res.status(500).json({ error: 'Authentication error' });
   }
 };
 
-module.exports = authMiddleware;
+module.exports = auth;
