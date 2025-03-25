@@ -16,35 +16,69 @@ const FinancialReportSchema = new Schema({
   Data: {
     revenue: {
       type: Map,
-      of: Number,  // Simplified - just Number instead of object
-      validate: {
-        validator: function(v) {
-          if (!v) return false;
-          if (this.Type === 'Annual') {
-            return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
-          }
-          return v.size === 1;  // Use size instead of Object.keys().length
+      of: Number,
+      validate: [
+        {
+          validator: function(v) {
+            if (!v) return false;
+            if (this.Type === 'Annual') {
+              return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
+            }
+            return v.size === 1;
+          },
+          message: props => `Invalid quarters for ${props.value} report type`
         },
-        message: props => `Invalid quarters for ${props.value} report type`
-      },
+        {
+          // Validate quarter names
+          validator: function(v) {
+            const validQuarters = ['q1', 'q2', 'q3', 'q4'];
+            return Array.from(v.keys()).every(k => validQuarters.includes(k));
+          },
+          message: props => `Invalid quarter names. Must be one of: q1, q2, q3, q4`
+        },
+        {
+          // Validate positive values
+          validator: function(v) {
+            return Array.from(v.values()).every(val => val >= 0);
+          },
+          message: props => `All revenue values must be positive numbers`
+        }
+      ],
       required: true,
-      _id: false  // Disable _id for subdocuments
+      _id: false
     },
     expenses: {
       type: Map,
-      of: Number,  // Simplified - just Number instead of object
-      validate: {
-        validator: function(v) {
-          if (!v) return false;
-          if (this.Type === 'Annual') {
-            return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
-          }
-          return v.size === 1;  // Use size instead of Object.keys().length
+      of: Number,
+      validate: [
+        {
+          validator: function(v) {
+            if (!v) return false;
+            if (this.Type === 'Annual') {
+              return ['q1', 'q2', 'q3', 'q4'].every(q => v.has(q));
+            }
+            return v.size === 1;
+          },
+          message: props => `Invalid quarters for ${props.value} report type`
         },
-        message: props => `Invalid quarters for ${props.value} report type`
-      },
+        {
+          // Validate quarter names
+          validator: function(v) {
+            const validQuarters = ['q1', 'q2', 'q3', 'q4'];
+            return Array.from(v.keys()).every(k => validQuarters.includes(k));
+          },
+          message: props => `Invalid quarter names. Must be one of: q1, q2, q3, q4`
+        },
+        {
+          // Validate positive values
+          validator: function(v) {
+            return Array.from(v.values()).every(val => val >= 0);
+          },
+          message: props => `All expense values must be positive numbers`
+        }
+      ],
       required: true,
-      _id: false  // Disable _id for subdocuments
+      _id: false
     }
   },
   TotalRevenue: { 
@@ -84,7 +118,7 @@ const FinancialReportSchema = new Schema({
   lastModifiedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, {
   timestamps: true,
-  strict: false  // Allow flexible Map contents
+  strict: false
 });
 
 // Indexes
@@ -99,5 +133,24 @@ FinancialReportSchema.methods.calculateTotals = function() {
   this.TotalExpenses = expenses;
   this.NetIncome = revenue - expenses;
 };
+
+// Pre-validate hook to ensure calculated totals match provided totals
+FinancialReportSchema.pre('validate', function(next) {
+  // Calculate expected totals
+  const expectedRevenue = Array.from(this.Data.revenue.values()).reduce((a, b) => a + b, 0);
+  const expectedExpenses = Array.from(this.Data.expenses.values()).reduce((a, b) => a + b, 0);
+  const expectedNetIncome = expectedRevenue - expectedExpenses;
+  
+  // Check if provided totals match calculated totals (allow small floating point differences)
+  const isRevenueMatch = Math.abs(this.TotalRevenue - expectedRevenue) < 0.01;
+  const isExpensesMatch = Math.abs(this.TotalExpenses - expectedExpenses) < 0.01;
+  const isNetIncomeMatch = Math.abs(this.NetIncome - expectedNetIncome) < 0.01;
+  
+  if (!isRevenueMatch || !isExpensesMatch || !isNetIncomeMatch) {
+    return next(new Error('Provided totals do not match calculated totals'));
+  }
+  
+  next();
+});
 
 module.exports = mongoose.model('FinancialReport', FinancialReportSchema);
