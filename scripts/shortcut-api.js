@@ -115,20 +115,45 @@ async function getEpics() {
 }
 
 /**
- * Get all stories
+ * Get stories using search
  * 
  * @param {Object} params - Query parameters
  * @returns {Promise} - List of stories
  */
 async function getStories(params = {}) {
   try {
-    const response = await axios.get(`${API_BASE_URL}/stories`, { 
-      headers,
-      params
-    });
+    // For stories/search endpoint, remove page_size as it's not supported
+    // API documentation: https://developer.shortcut.com/api/rest/v3#Search-Stories
+    const searchParams = {
+      ...params
+    };
+    
+    // Use the stories/search endpoint with POST instead of GET /stories
+    const response = await axios.post(
+      `${API_BASE_URL}/stories/search`,
+      searchParams,
+      { headers }
+    );
+    
     return response.data;
   } catch (error) {
     console.error('Error getting stories:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get a single story by ID
+ * 
+ * @param {number} storyId - The story ID
+ * @returns {Promise} - The story data
+ */
+async function getStory(storyId) {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/stories/${storyId}`, { headers });
+    return response.data;
+  } catch (error) {
+    console.error(`Error getting story ${storyId}:`, error.response?.data || error.message);
     throw error;
   }
 }
@@ -144,6 +169,65 @@ async function getWorkflows() {
     return response.data;
   } catch (error) {
     console.error('Error getting workflows:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get unstarted stories (stories in Ready state)
+ * 
+ * @returns {Promise} - List of unstarted stories
+ */
+async function getUnstartedStories() {
+  try {
+    // Get workflows first to find the "To Do" state ID
+    const workflows = await getWorkflows();
+    const primaryWorkflow = workflows[0];
+    const todoState = primaryWorkflow.states.find(state => state.name === 'To Do');
+    
+    if (!todoState) {
+      throw new Error('Could not find "To Do" state in workflows');
+    }
+    
+    // Search for stories in the "To Do" state
+    const searchParams = {
+      workflow_state_id: todoState.id
+    };
+    
+    const stories = await getStories(searchParams);
+    return stories;
+  } catch (error) {
+    console.error('Error getting unstarted stories:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get the top unstarted story (following Semantic Seed workflow)
+ * 
+ * @returns {Promise} - The top unstarted story or null if none found
+ */
+async function getNextStory() {
+  try {
+    const unstarted = await getUnstartedStories();
+    
+    if (!unstarted || unstarted.length === 0) {
+      console.log('No unstarted stories found in "To Do" state');
+      return null;
+    }
+    
+    // Sort by position (if available) or creation date
+    const sortedStories = unstarted.sort((a, b) => {
+      if (a.position && b.position) {
+        return a.position - b.position;
+      }
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
+    
+    // Return the top story
+    return sortedStories[0];
+  } catch (error) {
+    console.error('Error getting next story:', error.message);
     throw error;
   }
 }
@@ -200,22 +284,26 @@ async function example() {
     // Create stories under that epic
     const stories = [
       {
-        name: 'OCDI-001: Set up MongoDB connection',
-        description: 'Implement MongoDB connection with proper error handling',
+        name: '[Feature] OCDI-001: Create Neo4j data connector',
+        description: 'Implement a connector for Neo4j graph database',
         type: 'feature'
       },
       {
-        name: 'OCDI-002: Create data models',
-        description: 'Implement core data models for financial entities',
-        type: 'feature'
+        name: '[Chore] OCDI-002: Setup database schema validation',
+        description: 'Set up schema validation for all database models',
+        type: 'chore'
       }
     ];
     
-    // Assuming you've identified the correct workflow state ID
-    const backlogStateId = 500000011; // Replace with actual ID
-    await createStoriesBatch(epic.id, stories, backlogStateId);
+    // Find the "Ready" workflow state
+    const workflowStateId = workflows[0].states.find(s => s.name === 'Ready').id;
+    
+    // Create the stories
+    await createStoriesBatch(epic.id, stories, workflowStateId);
+    
+    console.log('Created epic and stories successfully!');
   } catch (error) {
-    console.error('Example failed:', error);
+    console.error('Example failed:', error.message);
   }
 }
 
@@ -225,6 +313,10 @@ module.exports = {
   updateStoryWorkflowState,
   getEpics,
   getStories,
+  getStory,
   getWorkflows,
-  createStoriesBatch
+  getUnstartedStories,
+  getNextStory,
+  createStoriesBatch,
+  example
 };
