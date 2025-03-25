@@ -92,8 +92,13 @@ describe('Financial Report Enhanced Validation', () => {
       userId: new mongoose.Types.ObjectId()
     });
 
-    // Validate to check if totals are properly calculated
-    await expect(mismatchedTotalsReport.validate()).rejects.toThrow();
+    // Test saving to trigger full validation
+    try {
+      await mismatchedTotalsReport.save();
+      fail('Saving should have failed due to mismatched totals');
+    } catch (error) {
+      expect(error.message).toContain('Provided totals do not match calculated totals');
+    }
   });
   
   test('should auto-calculate totals when saving', async () => {
