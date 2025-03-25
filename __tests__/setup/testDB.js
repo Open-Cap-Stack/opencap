@@ -3,7 +3,8 @@
  * 
  * [Feature] OCAE-205: Implement financial reporting endpoints
  * [Feature] OCAE-206: Enhanced validation for financial reports
- * In-memory MongoDB for isolated testing
+ * [Feature] OCAE-208: Implement share class management endpoints
+ * DB connection utilities for isolated testing
  */
 
 const mongoose = require('mongoose');
@@ -15,30 +16,39 @@ let mongoServer;
  * Connect to in-memory MongoDB for testing
  */
 const connectDB = async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  
-  const mongooseOpts = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  };
-  
-  await mongoose.connect(uri, mongooseOpts);
-  console.log('Connected to in-memory MongoDB server for testing');
+  try {
+    mongoServer = await MongoMemoryServer.create();
+    const uri = mongoServer.getUri();
+    
+    const mongooseOpts = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    };
+    
+    await mongoose.connect(uri, mongooseOpts);
+    console.log('✅ Connected to in-memory MongoDB server for testing');
+  } catch (error) {
+    console.error('❌ Error connecting to test database:', error);
+    process.exit(1);
+  }
 };
 
 /**
  * Drop database, close the connection and stop mongod.
  */
 const closeDatabase = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    
-    if (mongoServer) {
-      await mongoServer.stop();
-      console.log('Disconnected from in-memory MongoDB server');
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.dropDatabase();
+      await mongoose.connection.close();
+      
+      if (mongoServer) {
+        await mongoServer.stop();
+        console.log('✅ Disconnected from in-memory MongoDB server');
+      }
     }
+  } catch (error) {
+    console.error('❌ Error disconnecting from test database:', error);
   }
 };
 
@@ -46,14 +56,18 @@ const closeDatabase = async () => {
  * Remove all the data for all db collections.
  */
 const clearDatabase = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    const collections = mongoose.connection.collections;
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      const collections = mongoose.connection.collections;
 
-    for (const key in collections) {
-      const collection = collections[key];
-      await collection.deleteMany({});
+      for (const key in collections) {
+        const collection = collections[key];
+        await collection.deleteMany({});
+      }
+      console.log('✅ Test database cleared');
     }
-    console.log('Cleared all collections');
+  } catch (error) {
+    console.error('❌ Error clearing test database:', error);
   }
 };
 
