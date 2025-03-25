@@ -69,6 +69,12 @@ const routes = {
   v1ShareClassRoutes: safeRequire("./routes/v1/shareClassRoutes")
 };
 
+// Import custom v1 routes
+const v1Routes = {
+  shareClassRoutes: require('./routes/v1/shareClassRoutes'),
+  financialReportRoutes: require('./routes/v1/financialReportRoutes')
+};
+
 // Route mapping with paths
 const routeMappings = {
   '/api/financial-reports': 'financialReportRoutes',
@@ -97,33 +103,35 @@ const routeMappings = {
   '/api/taxCalculations': 'taxCalculatorRoutes'
 };
 
-// Mount legacy routes
+// Keep track of routes that have custom v1 implementations
+const hasCustomV1Implementation = ['shareClassRoutes', 'financialReportRoutes']; // Routes with custom v1 implementations
+
+// Mount legacy routes only if they exist and don't have a custom v1 implementation
 Object.entries(routeMappings).forEach(([path, routeName]) => {
-  if (routes[routeName]) {
+  if (routes[routeName] && !hasCustomV1Implementation.includes(routeName)) {
     app.use(path, routes[routeName]);
   }
 });
 
 // Create versioned routes for legacy endpoints (except those with custom v1 implementations)
-const excludeFromAutoVersioning = ['shareClasses']; // Routes with custom v1 implementations
-
 const filteredMappings = Object.fromEntries(
   Object.entries(routeMappings)
-    .filter(([path]) => {
-      // Extract resource path (e.g., '/api/shareClasses' -> 'shareClasses')
-      const resourcePath = path.replace('/api/', '');
-      return !excludeFromAutoVersioning.includes(resourcePath);
-    })
+    .filter(([path, routeName]) => !hasCustomV1Implementation.includes(routeName))
 );
 
 // Apply versioning to legacy routes (not including those with custom v1 implementations) 
 createVersionedRoutes(app, routes, filteredMappings);
 
 // Mount custom v1 routes directly
+// OCAE-208: Share class routes
 if (routes.v1ShareClassRoutes) {
   app.use('/api/v1/shareClasses', routes.v1ShareClassRoutes);
   console.log('Registered custom v1 route: /api/v1/shareClasses -> v1ShareClassRoutes');
 }
+
+// OCAE-206: Financial report routes
+app.use('/api/v1/financial-reports', v1Routes.financialReportRoutes);
+console.log('Registered custom v1 route: /api/v1/financial-reports -> financialReportRoutes');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
