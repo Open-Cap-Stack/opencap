@@ -130,4 +130,48 @@ describe('Financial Report Enhanced Validation', () => {
     expect(report.totalExpenses).toBe(50000);
     expect(report.netIncome).toBe(50000);
   });
+
+  test('should handle missing revenue or expenses gracefully', async () => {
+    // Create a partial financial report with missing revenue
+    const partialReport = new FinancialReport({
+      companyId: 'company-123',
+      reportingPeriod: 'Q1 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-03-31'),
+      // revenue is intentionally missing
+      expenses: {
+        salaries: 30000,
+        marketing: 5000,
+        operations: 3000,
+        other: 2000
+      },
+      userId: new mongoose.Types.ObjectId()
+    });
+
+    // Should not throw an error during validation
+    await expect(partialReport.validate()).resolves.not.toThrow();
+    
+    // Should not throw an error when calculating totals on a partial document
+    expect(() => partialReport.calculateTotals()).not.toThrow();
+  });
+
+  test('should auto-calculate totals on save for partially filled reports', async () => {
+    // Create a report with only the minimum required fields
+    const minimalReport = new FinancialReport({
+      companyId: 'company-123',
+      reportingPeriod: 'Q1 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-03-31'),
+      userId: new mongoose.Types.ObjectId()
+    });
+
+    // Pre-save hook should not throw errors even without revenue/expenses
+    await expect(minimalReport.validate()).resolves.not.toThrow();
+    
+    // Check that we can calculate totals with empty data
+    minimalReport.calculateTotals();
+    expect(minimalReport.totalRevenue).toBe(0);
+    expect(minimalReport.totalExpenses).toBe(0);
+    expect(minimalReport.netIncome).toBe(0);
+  });
 });
