@@ -22,6 +22,40 @@ const validatePositiveValues = (obj) => {
 };
 
 /**
+ * Validates that provided totals match calculated totals
+ * @param {Object} doc - The document being validated
+ * @returns {boolean} - Whether totals match
+ */
+const validateTotalsMatch = (doc) => {
+  if (!doc.revenue || !doc.expenses) return true;
+  
+  // If no totals are provided, they will be calculated during save
+  if (doc.totalRevenue === undefined && 
+      doc.totalExpenses === undefined && 
+      doc.netIncome === undefined) {
+    return true;
+  }
+    
+  // Calculate expected totals
+  const expectedRevenue = Object.values(doc.revenue)
+    .filter(val => typeof val === 'number')
+    .reduce((sum, val) => sum + val, 0);
+    
+  const expectedExpenses = Object.values(doc.expenses)
+    .filter(val => typeof val === 'number')
+    .reduce((sum, val) => sum + val, 0);
+    
+  const expectedNetIncome = expectedRevenue - expectedExpenses;
+  
+  // Check if provided totals match calculated totals (allow small floating point differences)
+  const isRevenueMatch = !doc.totalRevenue || Math.abs(doc.totalRevenue - expectedRevenue) < 0.01;
+  const isExpensesMatch = !doc.totalExpenses || Math.abs(doc.totalExpenses - expectedExpenses) < 0.01;
+  const isNetIncomeMatch = !doc.netIncome || Math.abs(doc.netIncome - expectedNetIncome) < 0.01;
+  
+  return isRevenueMatch && isExpensesMatch && isNetIncomeMatch;
+};
+
+/**
  * Financial Report Schema for quarterly and annual financial data
  * Includes enhanced validation for proper values and calculation of totals
  */
@@ -144,7 +178,7 @@ FinancialReportSchema.methods.calculateTotals = function() {
 };
 
 /**
- * Validate positive values in revenue and expenses
+ * Validate positive values and totals matching
  */
 FinancialReportSchema.pre('validate', function(next) {
   // Validate positive values in revenue
@@ -157,38 +191,21 @@ FinancialReportSchema.pre('validate', function(next) {
     return next(new Error('All expense values must be positive numbers'));
   }
   
+  // Validate that provided totals match calculated totals
+  if (!validateTotalsMatch(this)) {
+    return next(new Error('Provided totals do not match calculated totals'));
+  }
+  
   next();
 });
 
 /**
- * Validate that calculated totals match provided totals
+ * Pre-save hook to ensure totals are calculated
  */
 FinancialReportSchema.pre('save', function(next) {
-  // Always calculate totals before saving
-  this.calculateTotals();
-  
-  // If revenue and expenses exist, validate that provided totals match calculated ones
-  if (this.revenue && this.expenses && 
-      (this.totalRevenue !== undefined || this.totalExpenses !== undefined || this.netIncome !== undefined)) {
-    
-    const expectedRevenue = Object.values(this.revenue)
-      .filter(val => typeof val === 'number')
-      .reduce((sum, val) => sum + val, 0);
-      
-    const expectedExpenses = Object.values(this.expenses)
-      .filter(val => typeof val === 'number')
-      .reduce((sum, val) => sum + val, 0);
-      
-    const expectedNetIncome = expectedRevenue - expectedExpenses;
-    
-    // Check if provided totals match calculated totals (allow small floating point differences)
-    const isRevenueMatch = !this.totalRevenue || Math.abs(this.totalRevenue - expectedRevenue) < 0.01;
-    const isExpensesMatch = !this.totalExpenses || Math.abs(this.totalExpenses - expectedExpenses) < 0.01;
-    const isNetIncomeMatch = !this.netIncome || Math.abs(this.netIncome - expectedNetIncome) < 0.01;
-    
-    if (!isRevenueMatch || !isExpensesMatch || !isNetIncomeMatch) {
-      return next(new Error('Provided totals do not match calculated totals'));
-    }
+  // Always calculate totals before saving if they're not set
+  if (!this.totalRevenue || !this.totalExpenses || !this.netIncome) {
+    this.calculateTotals();
   }
   
   next();
