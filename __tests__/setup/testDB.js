@@ -1,21 +1,30 @@
+/**
+ * Test Database Utilities
+ * 
+ * [Feature] OCAE-205: Implement financial reporting endpoints
+ * [Feature] OCAE-206: Enhanced validation for financial reports
+ * In-memory MongoDB for isolated testing
+ */
+
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 let mongoServer;
 
 /**
- * Connect to the in-memory database.
+ * Connect to in-memory MongoDB for testing
  */
 const connectDB = async () => {
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
-
+  
   const mongooseOpts = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   };
-
+  
   await mongoose.connect(uri, mongooseOpts);
+  console.log('Connected to in-memory MongoDB server for testing');
 };
 
 /**
@@ -25,8 +34,11 @@ const closeDatabase = async () => {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongoServer.stop();
-    console.log('Disconnected from in-memory MongoDB server');
+    
+    if (mongoServer) {
+      await mongoServer.stop();
+      console.log('Disconnected from in-memory MongoDB server');
+    }
   }
 };
 
@@ -45,8 +57,15 @@ const clearDatabase = async () => {
   }
 };
 
+// Aliases for compatibility with both naming conventions
+const disconnectDB = closeDatabase;
+const clearDB = clearDatabase;
+
 module.exports = {
   connectDB,
   closeDatabase,
-  clearDatabase
+  clearDatabase,
+  // Aliases
+  disconnectDB,
+  clearDB
 };
