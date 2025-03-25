@@ -66,6 +66,12 @@ const routes = {
   taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes")
 };
 
+// Import custom v1 routes
+const v1Routes = {
+  shareClassRoutes: require('./routes/v1/shareClassRoutes'),
+  financialReportRoutes: require('./routes/v1/financialReportRoutes')
+};
+
 // Route mapping with paths
 const routeMappings = {
   '/api/financial-reports': 'financialReportRoutes',
@@ -94,15 +100,27 @@ const routeMappings = {
   '/api/taxCalculations': 'taxCalculatorRoutes'
 };
 
-// Mount legacy routes only if they exist
+// Keep track of routes that have custom v1 implementations
+const hasCustomV1Implementation = Object.keys(v1Routes);
+
+// Mount legacy routes only if they exist and don't have a custom v1 implementation
 Object.entries(routeMappings).forEach(([path, routeName]) => {
-  if (routes[routeName]) {
+  // Skip routes that have custom v1 implementations
+  if (routes[routeName] && !hasCustomV1Implementation.includes(routeName)) {
     app.use(path, routes[routeName]);
   }
 });
 
-// Create versioned routes (e.g., /api/v1/spvs)
-createVersionedRoutes(app, routes, routeMappings);
+// Create versioned routes (e.g., /api/v1/spvs) but skip those with custom v1 implementations
+const filteredRouteMappings = Object.entries(routeMappings)
+  .filter(([_, routeName]) => !hasCustomV1Implementation.includes(routeName))
+  .reduce((acc, [path, routeName]) => ({ ...acc, [path]: routeName }), {});
+
+createVersionedRoutes(app, routes, filteredRouteMappings);
+
+// Mount custom v1 routes manually
+app.use('/api/v1/share-classes', v1Routes.shareClassRoutes);
+app.use('/api/v1/financial-reports', v1Routes.financialReportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
