@@ -178,4 +178,69 @@ describe('Financial Report Enhanced Validation', () => {
     expect(minimalReport.totalExpenses).toBe(0);
     expect(minimalReport.netIncome).toBe(0);
   });
+  
+  test('should save a report with some pre-calculated totals', async () => {
+    // Create a report with some totals already calculated
+    const partiallyCalculatedReport = new FinancialReport({
+      companyId: 'company-123',
+      reportingPeriod: 'Q1 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-03-31'),
+      revenue: {
+        sales: 25000,
+        services: 10000,
+        other: 5000
+      },
+      expenses: {
+        salaries: 15000,
+        marketing: 5000,
+        operations: 2000,
+        other: 3000
+      },
+      // Only set some totals - the others should be auto-calculated
+      totalRevenue: 40000,
+      userId: new mongoose.Types.ObjectId()
+    });
+
+    // Save should process without issues
+    await expect(partiallyCalculatedReport.save()).resolves.not.toThrow();
+    
+    // Verify that missing totals were calculated
+    expect(partiallyCalculatedReport.totalExpenses).toBe(25000);
+    expect(partiallyCalculatedReport.netIncome).toBe(15000);
+  });
+  
+  test('should save valid reports with all totals correctly calculated', async () => {
+    // Create a report with all totals already correctly calculated
+    const fullyCalculatedReport = new FinancialReport({
+      companyId: 'company-456',
+      reportingPeriod: 'Q2 2023',
+      reportType: 'quarterly',
+      reportDate: new Date('2023-06-30'),
+      revenue: {
+        sales: 30000,
+        services: 15000,
+        other: 5000
+      },
+      expenses: {
+        salaries: 20000,
+        marketing: 5000,
+        operations: 3000,
+        other: 2000
+      },
+      // Set all totals correctly
+      totalRevenue: 50000,
+      totalExpenses: 30000,
+      netIncome: 20000,
+      userId: new mongoose.Types.ObjectId()
+    });
+
+    // Save should succeed as all totals match
+    await expect(fullyCalculatedReport.save()).resolves.not.toThrow();
+    
+    // Verify that totals remain unchanged
+    expect(fullyCalculatedReport.totalRevenue).toBe(50000);
+    expect(fullyCalculatedReport.totalExpenses).toBe(30000);
+    expect(fullyCalculatedReport.netIncome).toBe(20000);
+  });
 });
