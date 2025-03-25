@@ -93,12 +93,16 @@ describe('Financial Report Enhanced Validation', () => {
     });
 
     // Test saving to trigger full validation
+    let saveError;
     try {
       await mismatchedTotalsReport.save();
-      fail('Saving should have failed due to mismatched totals');
     } catch (error) {
-      expect(error.message).toContain('Provided totals do not match calculated totals');
+      saveError = error;
     }
+    
+    // Expect that an error was thrown and contains our expected message
+    expect(saveError).toBeDefined();
+    expect(saveError.message).toContain('Provided totals do not match calculated totals');
   });
   
   test('should auto-calculate totals when saving', async () => {
