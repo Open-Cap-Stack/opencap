@@ -15,6 +15,7 @@ const { Schema } = mongoose;
  * @returns {boolean} - Whether all values are positive numbers
  */
 const validatePositiveValues = (obj) => {
+  if (!obj || typeof obj !== 'object') return true;
   return Object.values(obj).every(val => 
     typeof val === 'number' ? val >= 0 : true
   );
@@ -126,15 +127,15 @@ FinancialReportSchema.index({ userId: 1, reportDate: -1 });
  * This method should be called before saving to ensure totals are accurate
  */
 FinancialReportSchema.methods.calculateTotals = function() {
-  // Sum up all revenue values
-  this.totalRevenue = Object.values(this.revenue)
+  // Sum up all revenue values, handling the case where revenue might be missing
+  this.totalRevenue = this.revenue ? Object.values(this.revenue)
     .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
+    .reduce((sum, val) => sum + val, 0) : 0;
     
-  // Sum up all expense values
-  this.totalExpenses = Object.values(this.expenses)
+  // Sum up all expense values, handling the case where expenses might be missing
+  this.totalExpenses = this.expenses ? Object.values(this.expenses)
     .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
+    .reduce((sum, val) => sum + val, 0) : 0;
     
   // Calculate net income
   this.netIncome = this.totalRevenue - this.totalExpenses;
@@ -163,34 +164,31 @@ FinancialReportSchema.pre('validate', function(next) {
  * Validate that calculated totals match provided totals
  */
 FinancialReportSchema.pre('save', function(next) {
-  // Skip validation if we're missing data
-  if (!this.revenue || !this.expenses) {
-    return next();
-  }
+  // Always calculate totals before saving
+  this.calculateTotals();
   
-  // Calculate expected totals
-  const expectedRevenue = Object.values(this.revenue)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
+  // If revenue and expenses exist, validate that provided totals match calculated ones
+  if (this.revenue && this.expenses && 
+      (this.totalRevenue !== undefined || this.totalExpenses !== undefined || this.netIncome !== undefined)) {
     
-  const expectedExpenses = Object.values(this.expenses)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0);
+    const expectedRevenue = Object.values(this.revenue)
+      .filter(val => typeof val === 'number')
+      .reduce((sum, val) => sum + val, 0);
+      
+    const expectedExpenses = Object.values(this.expenses)
+      .filter(val => typeof val === 'number')
+      .reduce((sum, val) => sum + val, 0);
+      
+    const expectedNetIncome = expectedRevenue - expectedExpenses;
     
-  const expectedNetIncome = expectedRevenue - expectedExpenses;
-  
-  // Check if provided totals match calculated totals (allow small floating point differences)
-  const isRevenueMatch = !this.totalRevenue || Math.abs(this.totalRevenue - expectedRevenue) < 0.01;
-  const isExpensesMatch = !this.totalExpenses || Math.abs(this.totalExpenses - expectedExpenses) < 0.01;
-  const isNetIncomeMatch = !this.netIncome || Math.abs(this.netIncome - expectedNetIncome) < 0.01;
-  
-  if (!isRevenueMatch || !isExpensesMatch || !isNetIncomeMatch) {
-    return next(new Error('Provided totals do not match calculated totals'));
-  }
-  
-  // Calculate totals if they're not set
-  if (!this.totalRevenue || !this.totalExpenses || !this.netIncome) {
-    this.calculateTotals();
+    // Check if provided totals match calculated totals (allow small floating point differences)
+    const isRevenueMatch = !this.totalRevenue || Math.abs(this.totalRevenue - expectedRevenue) < 0.01;
+    const isExpensesMatch = !this.totalExpenses || Math.abs(this.totalExpenses - expectedExpenses) < 0.01;
+    const isNetIncomeMatch = !this.netIncome || Math.abs(this.netIncome - expectedNetIncome) < 0.01;
+    
+    if (!isRevenueMatch || !isExpensesMatch || !isNetIncomeMatch) {
+      return next(new Error('Provided totals do not match calculated totals'));
+    }
   }
   
   next();
