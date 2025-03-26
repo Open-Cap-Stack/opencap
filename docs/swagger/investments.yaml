@@ -1,0 +1,572 @@
+# Investments API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/investments:
+  get:
+    tags:
+      - Investment Management
+    summary: Get all investments
+    description: Returns a paginated list of all investments
+    operationId: getAllInvestments
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of investments
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Investment unique identifier
+                      investorId:
+                        type: string
+                        description: Investor ID making the investment
+                      companyId:
+                        type: string
+                        description: Company ID receiving the investment
+                      spvId:
+                        type: string
+                        description: SPV ID if applicable
+                      amount:
+                        type: number
+                        description: Investment amount
+                      currency:
+                        type: string
+                        description: Currency code (e.g., USD)
+                      investmentType:
+                        type: string
+                        enum: [equity, convertible_note, safe, debt]
+                        description: Type of investment
+                      shareClassId:
+                        type: string
+                        description: Share class ID if equity investment
+                      shareCount:
+                        type: number
+                        description: Number of shares for equity investment
+                      status:
+                        type: string
+                        enum: [pending, completed, cancelled, refunded]
+                        description: Current status of the investment
+                      investmentDate:
+                        type: string
+                        format: date
+                        description: Date of investment
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Investment Management
+    summary: Create a new investment
+    description: Records a new investment in the system
+    operationId: createInvestment
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - investorId
+              - amount
+              - investmentType
+            properties:
+              investorId:
+                type: string
+                description: Investor ID making the investment
+              companyId:
+                type: string
+                description: Company ID receiving the investment
+              spvId:
+                type: string
+                description: SPV ID if applicable
+              amount:
+                type: number
+                description: Investment amount
+              currency:
+                type: string
+                description: Currency code (e.g., USD)
+                default: USD
+              investmentType:
+                type: string
+                enum: [equity, convertible_note, safe, debt]
+                description: Type of investment
+              shareClassId:
+                type: string
+                description: Share class ID if equity investment
+              shareCount:
+                type: number
+                description: Number of shares for equity investment
+              status:
+                type: string
+                enum: [pending, completed, cancelled, refunded]
+                description: Current status of the investment
+                default: pending
+              investmentDate:
+                type: string
+                format: date
+                description: Date of investment
+              terms:
+                type: object
+                description: Investment-specific terms
+                additionalProperties: true
+    responses:
+      '201':
+        description: Investment created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Investment unique identifier
+                investorId:
+                  type: string
+                  description: Investor ID making the investment
+                companyId:
+                  type: string
+                  description: Company ID receiving the investment
+                spvId:
+                  type: string
+                  description: SPV ID if applicable
+                amount:
+                  type: number
+                  description: Investment amount
+                currency:
+                  type: string
+                  description: Currency code (e.g., USD)
+                investmentType:
+                  type: string
+                  enum: [equity, convertible_note, safe, debt]
+                  description: Type of investment
+                shareClassId:
+                  type: string
+                  description: Share class ID if equity investment
+                shareCount:
+                  type: number
+                  description: Number of shares for equity investment
+                status:
+                  type: string
+                  enum: [pending, completed, cancelled, refunded]
+                  description: Current status of the investment
+                investmentDate:
+                  type: string
+                  format: date
+                  description: Date of investment
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investments/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Investment ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Investment Management
+    summary: Get investment by ID
+    description: Returns a single investment by its ID
+    operationId: getInvestmentById
+    responses:
+      '200':
+        description: Investment found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Investment unique identifier
+                investorId:
+                  type: string
+                  description: Investor ID making the investment
+                companyId:
+                  type: string
+                  description: Company ID receiving the investment
+                spvId:
+                  type: string
+                  description: SPV ID if applicable
+                amount:
+                  type: number
+                  description: Investment amount
+                currency:
+                  type: string
+                  description: Currency code (e.g., USD)
+                investmentType:
+                  type: string
+                  enum: [equity, convertible_note, safe, debt]
+                  description: Type of investment
+                shareClassId:
+                  type: string
+                  description: Share class ID if equity investment
+                shareCount:
+                  type: number
+                  description: Number of shares for equity investment
+                status:
+                  type: string
+                  enum: [pending, completed, cancelled, refunded]
+                  description: Current status of the investment
+                investmentDate:
+                  type: string
+                  format: date
+                  description: Date of investment
+                terms:
+                  type: object
+                  description: Investment-specific terms
+                  additionalProperties: true
+                documents:
+                  type: array
+                  description: Associated documents
+                  items:
+                    type: string
+                    description: Document ID
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Investment Management
+    summary: Update investment
+    description: Updates an existing investment
+    operationId: updateInvestment
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              amount:
+                type: number
+                description: Investment amount
+              currency:
+                type: string
+                description: Currency code (e.g., USD)
+              shareCount:
+                type: number
+                description: Number of shares for equity investment
+              status:
+                type: string
+                enum: [pending, completed, cancelled, refunded]
+                description: Current status of the investment
+              investmentDate:
+                type: string
+                format: date
+                description: Date of investment
+              terms:
+                type: object
+                description: Investment-specific terms
+                additionalProperties: true
+              documents:
+                type: array
+                description: Associated documents
+                items:
+                  type: string
+                  description: Document ID
+    responses:
+      '200':
+        description: Investment updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Investment unique identifier
+                amount:
+                  type: number
+                  description: Investment amount
+                status:
+                  type: string
+                  enum: [pending, completed, cancelled, refunded]
+                  description: Current status of the investment
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Investment Management
+    summary: Delete investment
+    description: Deletes an investment by ID
+    operationId: deleteInvestment
+    responses:
+      '204':
+        description: Investment deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investments/investor/{investorId}:
+  parameters:
+    - name: investorId
+      in: path
+      required: true
+      description: Investor ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Investment Management
+    summary: Get investments by investor
+    description: Returns all investments made by a specific investor
+    operationId: getInvestmentsByInvestor
+    responses:
+      '200':
+        description: Investments found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Investment unique identifier
+                      companyId:
+                        type: string
+                        description: Company ID receiving the investment
+                      spvId:
+                        type: string
+                        description: SPV ID if applicable
+                      amount:
+                        type: number
+                        description: Investment amount
+                      currency:
+                        type: string
+                        description: Currency code (e.g., USD)
+                      investmentType:
+                        type: string
+                        enum: [equity, convertible_note, safe, debt]
+                        description: Type of investment
+                      status:
+                        type: string
+                        enum: [pending, completed, cancelled, refunded]
+                        description: Current status of the investment
+                      investmentDate:
+                        type: string
+                        format: date
+                        description: Date of investment
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investments/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Investment Management
+    summary: Get investments by company
+    description: Returns all investments made into a specific company
+    operationId: getInvestmentsByCompany
+    responses:
+      '200':
+        description: Investments found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Investment unique identifier
+                      investorId:
+                        type: string
+                        description: Investor ID making the investment
+                      amount:
+                        type: number
+                        description: Investment amount
+                      currency:
+                        type: string
+                        description: Currency code (e.g., USD)
+                      investmentType:
+                        type: string
+                        enum: [equity, convertible_note, safe, debt]
+                        description: Type of investment
+                      status:
+                        type: string
+                        enum: [pending, completed, cancelled, refunded]
+                        description: Current status of the investment
+                      investmentDate:
+                        type: string
+                        format: date
+                        description: Date of investment
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investments/analytics/summary:
+  get:
+    tags:
+      - Investment Management
+    summary: Get investment analytics summary
+    description: Returns summary analytics for investments
+    operationId: getInvestmentAnalyticsSummary
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        description: Start date for analytics period
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for analytics period
+        schema:
+          type: string
+          format: date
+      - name: investmentType
+        in: query
+        description: Filter by investment type
+        schema:
+          type: string
+          enum: [equity, convertible_note, safe, debt]
+    responses:
+      '200':
+        description: Investment analytics summary
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totalInvestments:
+                  type: number
+                  description: Total number of investments
+                totalAmount:
+                  type: number
+                  description: Total investment amount
+                byStatus:
+                  type: object
+                  description: Breakdown by status
+                  properties:
+                    pending:
+                      type: number
+                      description: Number of pending investments
+                    completed:
+                      type: number
+                      description: Number of completed investments
+                    cancelled:
+                      type: number
+                      description: Number of cancelled investments
+                byType:
+                  type: object
+                  description: Breakdown by investment type
+                  properties:
+                    equity:
+                      type: number
+                      description: Number of equity investments
+                    convertible_note:
+                      type: number
+                      description: Number of convertible note investments
+                    safe:
+                      type: number
+                      description: Number of SAFE investments
+                    debt:
+                      type: number
+                      description: Number of debt investments
+                trends:
+                  type: object
+                  description: Time-based investment trends
+                  additionalProperties: true
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

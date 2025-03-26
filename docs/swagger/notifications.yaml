@@ -1,0 +1,616 @@
+# Notifications API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/notifications:
+  get:
+    tags:
+      - Notifications
+    summary: Get user notifications
+    description: Returns a paginated list of notifications for the current user
+    operationId: getUserNotifications
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+      - name: read
+        in: query
+        description: Filter by read status
+        schema:
+          type: boolean
+      - name: type
+        in: query
+        description: Filter by notification type
+        schema:
+          type: string
+          enum: [system, document, investment, compliance, user, other]
+    responses:
+      '200':
+        description: A list of notifications
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Notification unique identifier
+                      userId:
+                        type: string
+                        description: User ID the notification is for
+                      title:
+                        type: string
+                        description: Notification title
+                      message:
+                        type: string
+                        description: Notification message
+                      type:
+                        type: string
+                        enum: [system, document, investment, compliance, user, other]
+                        description: Type of notification
+                      read:
+                        type: boolean
+                        description: Whether the notification has been read
+                      priority:
+                        type: string
+                        enum: [low, normal, high]
+                        description: Notification priority
+                      link:
+                        type: string
+                        description: Optional link to related content
+                      metadata:
+                        type: object
+                        description: Additional data related to the notification
+                        additionalProperties: true
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                unreadCount:
+                  type: integer
+                  description: Count of unread notifications
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Notifications
+    summary: Create a notification
+    description: Creates a new notification for one or more users
+    operationId: createNotification
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - userIds
+              - title
+              - message
+              - type
+            properties:
+              userIds:
+                type: array
+                description: Array of user IDs to notify
+                items:
+                  type: string
+              title:
+                type: string
+                description: Notification title
+              message:
+                type: string
+                description: Notification message
+              type:
+                type: string
+                enum: [system, document, investment, compliance, user, other]
+                description: Type of notification
+              priority:
+                type: string
+                enum: [low, normal, high]
+                description: Notification priority
+                default: normal
+              link:
+                type: string
+                description: Optional link to related content
+              metadata:
+                type: object
+                description: Additional data related to the notification
+                additionalProperties: true
+    responses:
+      '201':
+        description: Notification created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+                notificationIds:
+                  type: array
+                  description: IDs of created notifications
+                  items:
+                    type: string
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Notification ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Notifications
+    summary: Get notification by ID
+    description: Returns a single notification by ID
+    operationId: getNotificationById
+    responses:
+      '200':
+        description: Notification found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Notification unique identifier
+                userId:
+                  type: string
+                  description: User ID the notification is for
+                title:
+                  type: string
+                  description: Notification title
+                message:
+                  type: string
+                  description: Notification message
+                type:
+                  type: string
+                  enum: [system, document, investment, compliance, user, other]
+                  description: Type of notification
+                read:
+                  type: boolean
+                  description: Whether the notification has been read
+                priority:
+                  type: string
+                  enum: [low, normal, high]
+                  description: Notification priority
+                link:
+                  type: string
+                  description: Optional link to related content
+                metadata:
+                  type: object
+                  description: Additional data related to the notification
+                  additionalProperties: true
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Notifications
+    summary: Mark notification as read
+    description: Marks a notification as read
+    operationId: markNotificationAsRead
+    responses:
+      '200':
+        description: Notification marked as read
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Notification unique identifier
+                read:
+                  type: boolean
+                  description: Read status (should be true)
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Notifications
+    summary: Delete notification
+    description: Deletes a notification
+    operationId: deleteNotification
+    responses:
+      '204':
+        description: Notification deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/read-all:
+  put:
+    tags:
+      - Notifications
+    summary: Mark all notifications as read
+    description: Marks all of the current user's notifications as read
+    operationId: markAllNotificationsAsRead
+    responses:
+      '200':
+        description: All notifications marked as read
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+                count:
+                  type: integer
+                  description: Number of notifications marked as read
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/count:
+  get:
+    tags:
+      - Notifications
+    summary: Get notification count
+    description: Returns the count of notifications for the current user, including unread count
+    operationId: getNotificationCount
+    responses:
+      '200':
+        description: Notification counts
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: Total number of notifications
+                unread:
+                  type: integer
+                  description: Number of unread notifications
+                byType:
+                  type: object
+                  description: Counts grouped by notification type
+                  additionalProperties:
+                    type: integer
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/user/{userId}:
+  parameters:
+    - name: userId
+      in: path
+      required: true
+      description: User ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Notifications
+    summary: Get notifications by user ID
+    description: Returns notifications for a specific user (admin only)
+    operationId: getNotificationsByUserId
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: Notifications found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Notification unique identifier
+                      title:
+                        type: string
+                        description: Notification title
+                      message:
+                        type: string
+                        description: Notification message
+                      type:
+                        type: string
+                        description: Type of notification
+                      read:
+                        type: boolean
+                        description: Whether the notification has been read
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/preferences:
+  get:
+    tags:
+      - Notifications
+    summary: Get notification preferences
+    description: Returns the current user's notification preferences
+    operationId: getNotificationPreferences
+    responses:
+      '200':
+        description: Notification preferences
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: object
+                  description: Email notification preferences
+                  properties:
+                    system:
+                      type: boolean
+                      description: Receive system notifications via email
+                    document:
+                      type: boolean
+                      description: Receive document notifications via email
+                    investment:
+                      type: boolean
+                      description: Receive investment notifications via email
+                    compliance:
+                      type: boolean
+                      description: Receive compliance notifications via email
+                    user:
+                      type: boolean
+                      description: Receive user notifications via email
+                push:
+                  type: object
+                  description: Push notification preferences
+                  properties:
+                    system:
+                      type: boolean
+                      description: Receive system notifications via push
+                    document:
+                      type: boolean
+                      description: Receive document notifications via push
+                    investment:
+                      type: boolean
+                      description: Receive investment notifications via push
+                    compliance:
+                      type: boolean
+                      description: Receive compliance notifications via push
+                    user:
+                      type: boolean
+                      description: Receive user notifications via push
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Notifications
+    summary: Update notification preferences
+    description: Updates the current user's notification preferences
+    operationId: updateNotificationPreferences
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: object
+                description: Email notification preferences
+                properties:
+                  system:
+                    type: boolean
+                    description: Receive system notifications via email
+                  document:
+                    type: boolean
+                    description: Receive document notifications via email
+                  investment:
+                    type: boolean
+                    description: Receive investment notifications via email
+                  compliance:
+                    type: boolean
+                    description: Receive compliance notifications via email
+                  user:
+                    type: boolean
+                    description: Receive user notifications via email
+              push:
+                type: object
+                description: Push notification preferences
+                properties:
+                  system:
+                    type: boolean
+                    description: Receive system notifications via push
+                  document:
+                    type: boolean
+                    description: Receive document notifications via push
+                  investment:
+                    type: boolean
+                    description: Receive investment notifications via push
+                  compliance:
+                    type: boolean
+                    description: Receive compliance notifications via push
+                  user:
+                    type: boolean
+                    description: Receive user notifications via push
+    responses:
+      '200':
+        description: Notification preferences updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/subscribe:
+  post:
+    tags:
+      - Notifications
+    summary: Subscribe to push notifications
+    description: Registers a device for push notifications
+    operationId: subscribeToPushNotifications
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - deviceToken
+              - platform
+            properties:
+              deviceToken:
+                type: string
+                description: Device token for push notifications
+              platform:
+                type: string
+                enum: [ios, android, web]
+                description: Device platform
+              deviceName:
+                type: string
+                description: Name of the device
+    responses:
+      '200':
+        description: Successfully subscribed to push notifications
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+                subscriptionId:
+                  type: string
+                  description: Subscription ID
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/notifications/unsubscribe:
+  post:
+    tags:
+      - Notifications
+    summary: Unsubscribe from push notifications
+    description: Unregisters a device from push notifications
+    operationId: unsubscribeFromPushNotifications
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - deviceToken
+            properties:
+              deviceToken:
+                type: string
+                description: Device token for push notifications
+    responses:
+      '200':
+        description: Successfully unsubscribed from push notifications
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
