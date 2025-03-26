@@ -1,0 +1,411 @@
+openapi: 3.0.0
+info:
+  title: OpenCap SPV API
+  description: Special Purpose Vehicle Management Endpoints
+  version: 1.0.0
+
+paths:
+  /api/spvs:
+    get:
+      tags:
+        - SPV Management
+      summary: Get all SPVs
+      description: Retrieve a list of all SPVs the user has access to
+      operationId: getSPVs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of records to return
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+      responses:
+        '200':
+          description: List of SPVs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SPV'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - SPV Management
+      summary: Create a new SPV
+      description: Create a new Special Purpose Vehicle record
+      operationId: createSPV
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SPVInput'
+      responses:
+        '201':
+          description: SPV created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SPV'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spvs/{id}:
+    get:
+      tags:
+        - SPV Management
+      summary: Get SPV by ID
+      description: Retrieve details of a specific SPV by ID
+      operationId: getSPVById
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: SPV ID
+      responses:
+        '200':
+          description: SPV details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SPV'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - SPV Management
+      summary: Update SPV
+      description: Update details of a specific SPV
+      operationId: updateSPV
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: SPV ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SPVInput'
+      responses:
+        '200':
+          description: SPV updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SPV'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - SPV Management
+      summary: Delete SPV
+      description: Delete a specific SPV by ID
+      operationId: deleteSPV
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: SPV ID
+      responses:
+        '200':
+          description: SPV deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  id:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spvs/status/{status}:
+    get:
+      tags:
+        - SPV Management
+      summary: Get SPVs by status
+      description: Retrieve SPVs filtered by their operational status
+      operationId: getSPVsByStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: status
+          required: true
+          schema:
+            type: string
+            enum: [Active, Pending, Closed]
+          description: SPV status
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of records to return
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+      responses:
+        '200':
+          description: List of SPVs with the specified status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SPV'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spvs/compliance/{status}:
+    get:
+      tags:
+        - SPV Management
+      summary: Get SPVs by compliance status
+      description: Retrieve SPVs filtered by their compliance status
+      operationId: getSPVsByComplianceStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: status
+          required: true
+          schema:
+            type: string
+            enum: [Compliant, NonCompliant, PendingReview]
+          description: Compliance status
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of records to return
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+      responses:
+        '200':
+          description: List of SPVs with the specified compliance status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SPV'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    SPV:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: SPV unique identifier
+        name:
+          type: string
+          description: Name of the SPV
+        status:
+          type: string
+          enum: [Active, Pending, Closed]
+          description: Operational status of the SPV
+        complianceStatus:
+          type: string
+          enum: [Compliant, NonCompliant, PendingReview]
+          description: Regulatory compliance status
+        parentCompany:
+          type: string
+          description: ID of the parent company managing this SPV
+        formation:
+          type: object
+          properties:
+            date:
+              type: string
+              format: date
+              description: Formation date of the SPV
+            state:
+              type: string
+              description: State where the SPV was formed
+            ein:
+              type: string
+              description: Employer Identification Number
+        fundingGoal:
+          type: number
+          format: float
+          description: Target funding amount
+        currentFunding:
+          type: number
+          format: float
+          description: Current amount raised
+        investors:
+          type: array
+          items:
+            type: string
+          description: IDs of investors in this SPV
+        assets:
+          type: array
+          items:
+            type: string
+          description: IDs of assets owned by this SPV
+        documents:
+          type: array
+          items:
+            type: string
+          description: IDs of documents related to this SPV
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        
+    SPVInput:
+      type: object
+      required:
+        - name
+        - status
+        - complianceStatus
+        - parentCompany
+      properties:
+        name:
+          type: string
+          description: Name of the SPV
+        status:
+          type: string
+          enum: [Active, Pending, Closed]
+          description: Operational status of the SPV
+        complianceStatus:
+          type: string
+          enum: [Compliant, NonCompliant, PendingReview]
+          description: Regulatory compliance status
+        parentCompany:
+          type: string
+          description: ID of the parent company managing this SPV
+        formation:
+          type: object
+          properties:
+            date:
+              type: string
+              format: date
+              description: Formation date of the SPV
+            state:
+              type: string
+              description: State where the SPV was formed
+            ein:
+              type: string
+              description: Employer Identification Number
+        fundingGoal:
+          type: number
+          format: float
+          description: Target funding amount
+        currentFunding:
+          type: number
+          format: float
+          description: Current amount raised
+        investors:
+          type: array
+          items:
+            type: string
+          description: IDs of investors in this SPV
+        assets:
+          type: array
+          items:
+            type: string
+          description: IDs of assets owned by this SPV
+        documents:
+          type: array
+          items:
+            type: string
+          description: IDs of documents related to this SPV
+          
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of records
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Number of records per page
+        pages:
+          type: integer
+          description: Total number of pages

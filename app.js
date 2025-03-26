@@ -11,6 +11,7 @@ const corsMiddleware = require('./middleware/security/cors');
 const { rateLimiter, authRateLimiter } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
 const testEndpoints = require('./middleware/testEndpoints');
+const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 
 // Initialize dotenv to load environment variables
 dotenv.config();
@@ -48,6 +49,9 @@ app.use('/auth', authRateLimiter);
 // Apply API versioning middleware
 app.use(addVersionHeaders);
 app.use(validateApiVersion);
+
+// OCAE-210: Setup Swagger documentation middleware
+setupSwagger(app);
 
 // Mount test endpoints for middleware testing
 app.use('/api', testEndpoints);
