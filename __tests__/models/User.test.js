@@ -77,39 +77,42 @@ describe('User Model (OCDI-102)', () => {
     });
 
     it('should enforce unique email constraint', async () => {
-      // Create first user
+      // Create first user with unique userId and email
       const userData1 = {
-        userId: 'user123',
+        userId: new mongoose.Types.ObjectId().toString(), // Generate unique userId
         firstName: 'John',
         lastName: 'Doe',
-        displayName: 'John Doe',
-        email: 'duplicate@example.com',
+        email: `duplicate-test-${Date.now()}@example.com`, // Ensure unique email
         password: 'hashedPassword123',
         role: 'user',
         status: 'active'
       };
       
-      await new User(userData1).save();
+      // Save the first user
+      const user1 = await new User(userData1).save();
+      expect(user1._id).toBeDefined();
       
-      // Attempt to create second user with same email
+      // Attempt to create second user with same email but different userId
       const userData2 = {
-        userId: 'user456',
+        userId: new mongoose.Types.ObjectId().toString(), // Generate unique userId
         firstName: 'Jane',
         lastName: 'Smith',
-        displayName: 'Jane Smith',
-        email: 'duplicate@example.com',
+        email: userData1.email, // Use the same email as the first user
         password: 'hashedPassword456',
         role: 'user',
         status: 'active'
       };
       
+      // Try to save and catch the duplicate key error
       let duplicateError;
       try {
-        await new User(userData2).save();
+        const duplicateUser = new User(userData2);
+        await duplicateUser.save();
       } catch (error) {
         duplicateError = error;
       }
       
+      // Check that we got an error and it's the right type
       expect(duplicateError).toBeDefined();
       expect(duplicateError.name).toBe('MongoServerError');
       expect(duplicateError.code).toBe(11000); // MongoDB duplicate key error code

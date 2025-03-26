@@ -1,0 +1,178 @@
+# **OpenCap Coding Standards v1.0 (Aligned with Semantic Seed V2.0)**
+
+## **🏗️ Purpose**
+These coding standards guide developers working on **OpenCap Stack**, emphasizing **clarity, consistency, test coverage, and production-readiness**. Designed to pair effectively with AI coding assistants and LLM copilots, this standard enforces behaviors that yield **secure, maintainable, and test-driven Python/FastAPI backend services**.
+
+---
+
+## **🧠 LLM Context First: Structured Prompts**
+
+Each standard section includes **LLM prompts** for inline or IDE-based copilot usage. These prompts provide deterministic guidance to keep the LLM aligned with **Semantic Seed’s discipline, TDD-first workflow, and OpenCap’s stack**.
+
+---
+
+## **📋 Task & Backlog Management (Shortcut)**
+
+> 💡 Use these prompts when starting a new story or task.
+
+**Prompt 1:**  
+*"You are building a new feature in OpenCap from a Shortcut story. Generate the TDD commit sequence and appropriate Git branch naming based on the story type."*
+
+**Prompt 2:**  
+*"Given a Shortcut task with acceptance criteria, scaffold the test-first development sequence with a focus on BDD in Python (pytest + Gherkin-style naming)."*
+
+### **Workflow Summary**
+1. **Start the top unstarted Shortcut story**
+2. **Branch Naming**
+   - `feature/{id}-{slug}`  
+   - `bugfix/{id}-{slug}`  
+   - `chore/{id}-{slug}`  
+3. **Workflow**
+   - `WIP: Add failing test for {story goal}`  
+   - `WIP: Make test pass with minimum implementation`  
+   - `WIP: Refactor & document`  
+   - `READY: All tests passing`  
+   - Create PR > Review > Merge > Mark Delivered
+
+---
+
+## **📖 Story Classification & Estimation**
+
+**Prompt 3:**  
+*"Classify this story as a feature, bug, or chore and recommend a Fibonacci point value based on scope, test coverage, and implementation depth in FastAPI."*
+
+### **Estimation**
+- 0 → Typo, config tweak  
+- 1 → Clear one-file fixes  
+- 2 → Simple CRUD endpoint + tests  
+- 3 → Cross-model interaction, auth + tests  
+- 5–8 → Multi-model workflows, new modules  
+
+---
+
+## **🎨 Code Style & Structure (Python/FastAPI/Supabase)**
+
+**Prompt 4:**  
+*"Refactor this FastAPI route handler to follow best practices: async def, type hints, dependency injection, and consistent naming."*
+
+**Prompt 5:**  
+*"Rewrite this SQLAlchemy model to use PascalCase for class names and snake_case for fields. Include docstrings."*
+
+### **Key Standards**
+- **Python Naming**:
+  - `PascalCase` for classes (models, schemas)
+  - `snake_case` for variables, functions, routes
+- **Indentation**: 4 spaces  
+- **Line Length**: 88 chars (Black default)
+- **Docstrings**: Required for all modules, functions, classes
+
+### **File Structure (Simplified Example)**:
+```
+opencap/
+├── api/
+│   └── v1/
+│       └── users.py
+├── models/
+│   └── user.py
+├── schemas/
+│   └── user.py
+├── tests/
+│   └── api/
+│       └── test_users.py
+```
+
+---
+
+## **🧪 Testing (TDD/BDD)**
+
+**Prompt 6:**  
+*"Write a BDD-style pytest unit test for a FastAPI endpoint that retrieves a user's investments."*
+
+**Prompt 7:**  
+*"Generate an integration test using HTTPX and pytest that checks access control across /api/investments endpoints."*
+
+### **Test Types**
+- **Unit Tests**: Isolated logic (pytest, mock dependencies)  
+- **Integration Tests**: API to DB (use `TestClient`)  
+- **Functional/Workflow Tests**: End-to-end flows  
+- **Regression & Performance**: Sprint 5+  
+
+### **Test File Structure**
+```
+tests/
+├── unit/
+│   └── test_tax_calculator.py
+├── integration/
+│   └── test_compliance_check_api.py
+├── functional/
+│   └── test_full_equity_plan_workflow.py
+```
+
+### **Example Test (pytest-bdd style)**:
+```python
+def test_addition():
+    result = add(2, 3)
+    assert result == 5
+```
+
+---
+
+## **🔄 CI/CD (GitHub Actions + Supabase + Docker)**
+
+**Prompt 8:**  
+*"Create a GitHub Actions YAML file for FastAPI with steps for linting, testing, and deploying to staging via Docker."*
+
+**Prompt 9:**  
+*"List the critical failure cases in a CI pipeline and propose rollback/retry logic for staging deployments."*
+
+### **CI/CD Expectations**
+- PR triggers auto-lint + test + Docker build  
+- Staging deploys from `main`  
+- Supabase migrations should be auto-applied (use Alembic)  
+- Manual approval gates for production  
+
+---
+
+## **🧰 Git Workflow & WIP Discipline**
+
+**Prompt 10:**  
+*"Write a concise but informative commit message for a PR that implements the Notification API with test coverage."*
+
+**Prompt 11:**  
+*"Explain why WIP commits and daily end-of-day commits are critical in pair programming with an LLM."*
+
+### **Practices**
+- Branch per Shortcut story  
+- Push at least once per day  
+- Use `[WIP]`, `[READY]`, `[MERGE]` in commit prefixes  
+- Always create PRs with linked Shortcut story  
+
+---
+
+## **📚 API Documentation Standards**
+
+**Prompt 12:**  
+*"Generate OpenAPI schema for a FastAPI route that allows POSTing a new SPV asset, including status code definitions and error schema."*
+
+**Prompt 13:**  
+*"Write documentation for the Tax Calculator API including example request/response payloads."*
+
+### **Standards**
+- Auto-generated docs via FastAPI/OpenAPI  
+- Custom Swagger UI with examples  
+- Include 200, 400, 401, 403, 422, 500 responses  
+- Update API portal in Sprint 5  
+
+---
+
+## **📌 Final Note: LLM Rules Summary**
+
+**LLM Co-Pilot Rules of Engagement for OpenCap**
+- Start with a TDD plan  
+- Ask for structured prompt output  
+- Use file-accurate naming  
+- Infer test case types from endpoint logic  
+- Include Swagger/OpenAPI output by default  
+- Recommend error handling (422, 500) in all route handlers  
+- Suggest performance optimizations on data access (SQLAlchemy, Supabase RPC)
+
