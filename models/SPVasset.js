@@ -1,3 +1,8 @@
+/**
+ * SPV Asset Management API Model
+ * Feature: OCAE-212: Implement SPV Asset Management API
+ * Previously tracked as OCAE-003
+ */
 const mongoose = require('mongoose');
 
 const SPVAssetSchema = new mongoose.Schema({
