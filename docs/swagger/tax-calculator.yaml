@@ -1,0 +1,483 @@
+# Tax Calculator API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/taxCalculations:
+  get:
+    tags:
+      - Tax Calculator
+    summary: Get all tax calculations
+    description: Returns a paginated list of previous tax calculations
+    operationId: getAllTaxCalculations
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of tax calculations
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Calculation unique identifier
+                      userId:
+                        type: string
+                        description: User who performed the calculation
+                      companyId:
+                        type: string
+                        description: Associated company ID
+                      calculationType:
+                        type: string
+                        enum: [409a, 83b, exercise, AMT]
+                        description: Type of tax calculation
+                      inputParameters:
+                        type: object
+                        description: Input parameters used for calculation
+                      results:
+                        type: object
+                        description: Calculation results
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Calculation timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Tax Calculator
+    summary: Perform a new tax calculation
+    description: Performs a new tax calculation based on input parameters
+    operationId: performTaxCalculation
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - calculationType
+              - parameters
+            properties:
+              companyId:
+                type: string
+                description: Associated company ID
+              calculationType:
+                type: string
+                enum: [409a, 83b, exercise, AMT]
+                description: Type of tax calculation
+              parameters:
+                type: object
+                description: Input parameters for calculation (varies by calculation type)
+                additionalProperties: true
+    responses:
+      '200':
+        description: Tax calculation performed successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Calculation unique identifier
+                calculationType:
+                  type: string
+                  enum: [409a, 83b, exercise, AMT]
+                  description: Type of tax calculation
+                inputParameters:
+                  type: object
+                  description: Input parameters used for calculation
+                results:
+                  type: object
+                  description: Calculation results
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Calculation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/taxCalculations/409a:
+  post:
+    tags:
+      - Tax Calculator
+    summary: Perform 409A valuation calculation
+    description: Calculates a 409A valuation based on input parameters
+    operationId: perform409ACalculation
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - companyId
+              - valuationMethod
+              - financialData
+            properties:
+              companyId:
+                type: string
+                description: Associated company ID
+              valuationMethod:
+                type: string
+                enum: [DCF, comparable, precedent, hybrid]
+                description: Valuation method to use
+              valuationDate:
+                type: string
+                format: date
+                description: Date for the valuation
+              financialData:
+                type: object
+                description: Financial data for valuation calculation
+                additionalProperties: true
+              recentFundingInfo:
+                type: object
+                description: Recent funding information (if available)
+                additionalProperties: true
+    responses:
+      '200':
+        description: 409A valuation calculated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Calculation unique identifier
+                companyId:
+                  type: string
+                  description: Associated company ID
+                valuationMethod:
+                  type: string
+                  enum: [DCF, comparable, precedent, hybrid]
+                  description: Valuation method used
+                commonStockValue:
+                  type: number
+                  description: Calculated common stock value
+                preferredStockValue:
+                  type: number
+                  description: Calculated preferred stock value (if applicable)
+                enterpriseValue:
+                  type: number
+                  description: Calculated enterprise value
+                valuationDetails:
+                  type: object
+                  description: Detailed valuation breakdown
+                  additionalProperties: true
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Calculation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/taxCalculations/83b:
+  post:
+    tags:
+      - Tax Calculator
+    summary: Perform 83(b) election calculation
+    description: Calculates tax implications of filing an 83(b) election
+    operationId: perform83bCalculation
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - grantInfo
+              - personalInfo
+            properties:
+              grantInfo:
+                type: object
+                required:
+                  - shareCount
+                  - fairMarketValue
+                  - purchasePrice
+                properties:
+                  shareCount:
+                    type: number
+                    description: Number of shares granted
+                  fairMarketValue:
+                    type: number
+                    description: Fair market value per share
+                  purchasePrice:
+                    type: number
+                    description: Purchase price per share
+                  grantDate:
+                    type: string
+                    format: date
+                    description: Date of grant
+              personalInfo:
+                type: object
+                required:
+                  - incomeBracket
+                  - state
+                properties:
+                  incomeBracket:
+                    type: string
+                    enum: [low, medium, high, very_high]
+                    description: Income tax bracket
+                  state:
+                    type: string
+                    description: State of residence for tax purposes
+                  filingStatus:
+                    type: string
+                    enum: [single, married_joint, married_separate, head_household]
+                    description: Tax filing status
+    responses:
+      '200':
+        description: 83(b) election calculation performed successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Calculation unique identifier
+                ordinaryIncomeTax:
+                  type: number
+                  description: Ordinary income tax if 83(b) is not filed
+                taxWith83b:
+                  type: number
+                  description: Tax amount with 83(b) election
+                taxWithout83b:
+                  type: number
+                  description: Projected tax amount without 83(b) election
+                potentialSavings:
+                  type: number
+                  description: Potential tax savings with 83(b) election
+                calculations:
+                  type: object
+                  description: Detailed calculation breakdown
+                  additionalProperties: true
+                deadline:
+                  type: string
+                  format: date
+                  description: Deadline to file 83(b) election
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Calculation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/taxCalculations/exercise:
+  post:
+    tags:
+      - Tax Calculator
+    summary: Perform option exercise tax calculation
+    description: Calculates tax implications of exercising stock options
+    operationId: performExerciseCalculation
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - optionInfo
+              - personalInfo
+            properties:
+              optionInfo:
+                type: object
+                required:
+                  - optionType
+                  - shareCount
+                  - strikePrice
+                  - fairMarketValue
+                properties:
+                  optionType:
+                    type: string
+                    enum: [ISO, NSO]
+                    description: Type of stock option
+                  shareCount:
+                    type: number
+                    description: Number of options to exercise
+                  strikePrice:
+                    type: number
+                    description: Strike price per share
+                  fairMarketValue:
+                    type: number
+                    description: Current fair market value per share
+                  grantDate:
+                    type: string
+                    format: date
+                    description: Date of option grant
+                  exerciseDate:
+                    type: string
+                    format: date
+                    description: Planned exercise date
+              personalInfo:
+                type: object
+                required:
+                  - incomeBracket
+                  - state
+                properties:
+                  incomeBracket:
+                    type: string
+                    enum: [low, medium, high, very_high]
+                    description: Income tax bracket
+                  state:
+                    type: string
+                    description: State of residence for tax purposes
+                  filingStatus:
+                    type: string
+                    enum: [single, married_joint, married_separate, head_household]
+                    description: Tax filing status
+                  holdingPeriod:
+                    type: string
+                    enum: [short_term, long_term]
+                    description: Planned holding period after exercise
+    responses:
+      '200':
+        description: Exercise tax calculation performed successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Calculation unique identifier
+                bargainElement:
+                  type: number
+                  description: Bargain element (spread between FMV and strike price)
+                federalIncomeTax:
+                  type: number
+                  description: Estimated federal income tax
+                stateTax:
+                  type: number
+                  description: Estimated state tax
+                medicareTax:
+                  type: number
+                  description: Estimated Medicare tax
+                socialSecurityTax:
+                  type: number
+                  description: Estimated Social Security tax
+                AMTImpact:
+                  type: number
+                  description: Potential AMT impact (for ISOs)
+                totalTaxLiability:
+                  type: number
+                  description: Total estimated tax liability
+                calculations:
+                  type: object
+                  description: Detailed calculation breakdown
+                  additionalProperties: true
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Calculation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/taxCalculations/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Tax calculation ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Tax Calculator
+    summary: Get tax calculation by ID
+    description: Returns a single tax calculation by its ID
+    operationId: getTaxCalculationById
+    responses:
+      '200':
+        description: Tax calculation found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Calculation unique identifier
+                userId:
+                  type: string
+                  description: User who performed the calculation
+                companyId:
+                  type: string
+                  description: Associated company ID
+                calculationType:
+                  type: string
+                  enum: [409a, 83b, exercise, AMT]
+                  description: Type of tax calculation
+                inputParameters:
+                  type: object
+                  description: Input parameters used for calculation
+                results:
+                  type: object
+                  description: Calculation results
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Calculation timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Tax Calculator
+    summary: Delete tax calculation
+    description: Deletes a tax calculation by ID
+    operationId: deleteTaxCalculation
+    responses:
+      '204':
+        description: Tax calculation deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

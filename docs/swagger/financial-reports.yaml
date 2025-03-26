@@ -1,0 +1,272 @@
+# Financial Reports API specification
+/api/financial-reports:
+  get:
+    tags:
+      - Financial Reports
+    summary: Get all financial reports
+    description: Returns a paginated list of all financial reports
+    operationId: getAllFinancialReports
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of financial reports
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FinancialReport'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Financial Reports
+    summary: Create a new financial report
+    description: Creates a new financial report in the system
+    operationId: createFinancialReport
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialReportInput'
+    responses:
+      '201':
+        description: Financial report created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialReport'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/financial-reports/search:
+  get:
+    tags:
+      - Financial Reports
+    summary: Search financial reports
+    description: Search for financial reports matching specific criteria
+    operationId: searchFinancialReports
+    parameters:
+      - name: query
+        in: query
+        description: Search query
+        schema:
+          type: string
+      - name: reportType
+        in: query
+        description: Type of report
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        description: Start date for filtering reports
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for filtering reports
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+    responses:
+      '200':
+        description: Search results
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FinancialReport'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/financial-reports/analytics:
+  get:
+    tags:
+      - Financial Reports
+    summary: Get financial report analytics
+    description: Get analytical data and insights from financial reports
+    operationId: getFinancialReportAnalytics
+    parameters:
+      - name: reportType
+        in: query
+        description: Type of report for analytics
+        schema:
+          type: string
+      - name: timeframe
+        in: query
+        description: Timeframe for analytics (e.g., monthly, quarterly, yearly)
+        schema:
+          type: string
+          enum: [daily, weekly, monthly, quarterly, yearly]
+    responses:
+      '200':
+        description: Analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  additionalProperties: true
+                  description: Analytics data structure
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/financial-reports/bulk:
+  post:
+    tags:
+      - Financial Reports
+    summary: Create multiple financial reports
+    description: Bulk create multiple financial reports in a single request
+    operationId: bulkCreateFinancialReports
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reports:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinancialReportInput'
+    responses:
+      '201':
+        description: Financial reports created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FinancialReport'
+                count:
+                  type: integer
+                  description: Number of reports created
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/financial-reports/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Financial report ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Financial Reports
+    summary: Get financial report by ID
+    description: Returns a single financial report by its ID
+    operationId: getFinancialReportById
+    responses:
+      '200':
+        description: Financial report found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialReport'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Financial Reports
+    summary: Update financial report
+    description: Updates an existing financial report
+    operationId: updateFinancialReport
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialReportInput'
+    responses:
+      '200':
+        description: Financial report updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialReport'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Financial Reports
+    summary: Delete financial report
+    description: Deletes a financial report by ID
+    operationId: deleteFinancialReport
+    responses:
+      '204':
+        description: Financial report deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

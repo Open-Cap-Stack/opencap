@@ -1,0 +1,465 @@
+# Equity Plans API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/equityPlans:
+  get:
+    tags:
+      - Equity Plans
+    summary: Get all equity plans
+    description: Returns a paginated list of all equity plans
+    operationId: getAllEquityPlans
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of equity plans
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Unique identifier for the equity plan
+                      name:
+                        type: string
+                        description: Plan name
+                      companyId:
+                        type: string
+                        description: Associated company ID
+                      planType:
+                        type: string
+                        enum: [ISO, NSO, RSU, SAR, PSU]
+                        description: Type of equity plan
+                      shareClassId:
+                        type: string
+                        description: Associated share class ID
+                      totalShares:
+                        type: number
+                        description: Total shares allocated to this plan
+                      availableShares:
+                        type: number
+                        description: Remaining shares available for grants
+                      startDate:
+                        type: string
+                        format: date
+                        description: Plan start date
+                      expirationDate:
+                        type: string
+                        format: date
+                        description: Plan expiration date
+                      status:
+                        type: string
+                        enum: [active, expired, terminated]
+                        description: Current plan status
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Equity Plans
+    summary: Create a new equity plan
+    description: Creates a new equity plan in the system
+    operationId: createEquityPlan
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - companyId
+              - planType
+              - shareClassId
+              - totalShares
+            properties:
+              name:
+                type: string
+                description: Plan name
+              companyId:
+                type: string
+                description: Associated company ID
+              planType:
+                type: string
+                enum: [ISO, NSO, RSU, SAR, PSU]
+                description: Type of equity plan
+              shareClassId:
+                type: string
+                description: Associated share class ID
+              totalShares:
+                type: number
+                description: Total shares allocated to this plan
+              startDate:
+                type: string
+                format: date
+                description: Plan start date
+              expirationDate:
+                type: string
+                format: date
+                description: Plan expiration date
+              documentId:
+                type: string
+                description: ID of the plan document
+              status:
+                type: string
+                enum: [active, expired, terminated]
+                description: Current plan status
+                default: active
+    responses:
+      '201':
+        description: Equity plan created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Unique identifier for the equity plan
+                name:
+                  type: string
+                  description: Plan name
+                companyId:
+                  type: string
+                  description: Associated company ID
+                planType:
+                  type: string
+                  enum: [ISO, NSO, RSU, SAR, PSU]
+                  description: Type of equity plan
+                shareClassId:
+                  type: string
+                  description: Associated share class ID
+                totalShares:
+                  type: number
+                  description: Total shares allocated to this plan
+                availableShares:
+                  type: number
+                  description: Remaining shares available for grants
+                startDate:
+                  type: string
+                  format: date
+                  description: Plan start date
+                expirationDate:
+                  type: string
+                  format: date
+                  description: Plan expiration date
+                status:
+                  type: string
+                  enum: [active, expired, terminated]
+                  description: Current plan status
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/equityPlans/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Equity plan ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Equity Plans
+    summary: Get equity plan by ID
+    description: Returns a single equity plan by its ID
+    operationId: getEquityPlanById
+    responses:
+      '200':
+        description: Equity plan found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Unique identifier for the equity plan
+                name:
+                  type: string
+                  description: Plan name
+                companyId:
+                  type: string
+                  description: Associated company ID
+                planType:
+                  type: string
+                  enum: [ISO, NSO, RSU, SAR, PSU]
+                  description: Type of equity plan
+                shareClassId:
+                  type: string
+                  description: Associated share class ID
+                totalShares:
+                  type: number
+                  description: Total shares allocated to this plan
+                availableShares:
+                  type: number
+                  description: Remaining shares available for grants
+                startDate:
+                  type: string
+                  format: date
+                  description: Plan start date
+                expirationDate:
+                  type: string
+                  format: date
+                  description: Plan expiration date
+                status:
+                  type: string
+                  enum: [active, expired, terminated]
+                  description: Current plan status
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Equity Plans
+    summary: Update equity plan
+    description: Updates an existing equity plan
+    operationId: updateEquityPlan
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Plan name
+              totalShares:
+                type: number
+                description: Total shares allocated to this plan
+              startDate:
+                type: string
+                format: date
+                description: Plan start date
+              expirationDate:
+                type: string
+                format: date
+                description: Plan expiration date
+              documentId:
+                type: string
+                description: ID of the plan document
+              status:
+                type: string
+                enum: [active, expired, terminated]
+                description: Current plan status
+    responses:
+      '200':
+        description: Equity plan updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Unique identifier for the equity plan
+                name:
+                  type: string
+                  description: Plan name
+                companyId:
+                  type: string
+                  description: Associated company ID
+                planType:
+                  type: string
+                  enum: [ISO, NSO, RSU, SAR, PSU]
+                  description: Type of equity plan
+                shareClassId:
+                  type: string
+                  description: Associated share class ID
+                totalShares:
+                  type: number
+                  description: Total shares allocated to this plan
+                availableShares:
+                  type: number
+                  description: Remaining shares available for grants
+                startDate:
+                  type: string
+                  format: date
+                  description: Plan start date
+                expirationDate:
+                  type: string
+                  format: date
+                  description: Plan expiration date
+                status:
+                  type: string
+                  enum: [active, expired, terminated]
+                  description: Current plan status
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Equity Plans
+    summary: Delete equity plan
+    description: Deletes an equity plan by ID
+    operationId: deleteEquityPlan
+    responses:
+      '204':
+        description: Equity plan deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/equityPlans/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Equity Plans
+    summary: Get equity plans by company
+    description: Returns all equity plans for a specific company
+    operationId: getEquityPlansByCompany
+    responses:
+      '200':
+        description: Equity plans found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Unique identifier for the equity plan
+                      name:
+                        type: string
+                        description: Plan name
+                      planType:
+                        type: string
+                        enum: [ISO, NSO, RSU, SAR, PSU]
+                        description: Type of equity plan
+                      totalShares:
+                        type: number
+                        description: Total shares allocated to this plan
+                      availableShares:
+                        type: number
+                        description: Remaining shares available for grants
+                      status:
+                        type: string
+                        enum: [active, expired, terminated]
+                        description: Current plan status
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/equityPlans/{id}/grants:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Equity plan ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Equity Plans
+    summary: Get grants for an equity plan
+    description: Returns all grants issued under a specific equity plan
+    operationId: getEquityPlanGrants
+    responses:
+      '200':
+        description: Equity plan grants found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Grant ID
+                      employeeId:
+                        type: string
+                        description: Employee ID
+                      grantDate:
+                        type: string
+                        format: date
+                        description: Date the grant was issued
+                      sharesGranted:
+                        type: number
+                        description: Number of shares granted
+                      vestingSchedule:
+                        type: object
+                        description: Vesting schedule details
+                      status:
+                        type: string
+                        enum: [active, cancelled, exercised]
+                        description: Grant status
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
