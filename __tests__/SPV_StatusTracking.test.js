@@ -1,3 +1,7 @@
+/**
+ * SPV Management API Status Tracking Tests
+ * Feature: OCAE-211: Implement SPV Management API
+ */
 const request = require('supertest');
 const mongoose = require('mongoose');
 const express = require('express');
@@ -20,11 +24,11 @@ const testSPVs = [
     ComplianceStatus: 'Compliant'
   },
   {
-    SPVID: 'SPV-INACTIVE-1',
-    Name: 'Inactive SPV 1',
+    SPVID: 'SPV-PENDING-1',
+    Name: 'Pending SPV 1',
     Purpose: 'Testing SPV API',
     CreationDate: new Date('2025-01-15'),
-    Status: 'Inactive',
+    Status: 'Pending',
     ParentCompanyID: 'PARENT-001',
     ComplianceStatus: 'Compliant'
   },
@@ -35,7 +39,16 @@ const testSPVs = [
     CreationDate: new Date('2025-01-10'),
     Status: 'Active',
     ParentCompanyID: 'PARENT-002',
-    ComplianceStatus: 'Non-Compliant'
+    ComplianceStatus: 'NonCompliant'
+  },
+  {
+    SPVID: 'SPV-CLOSED-1',
+    Name: 'Closed SPV 1',
+    Purpose: 'Testing SPV API',
+    CreationDate: new Date('2024-12-10'),
+    Status: 'Closed',
+    ParentCompanyID: 'PARENT-002',
+    ComplianceStatus: 'PendingReview'
   }
 ];
 
@@ -77,23 +90,33 @@ describe('SPV API - Status Tracking Functionality', () => {
       expect(res.body.spvs[1]).toHaveProperty('Status', 'Active');
     });
 
-    test('should get all inactive SPVs', async () => {
-      const res = await request(app)
-        .get('/api/spvs/status/Inactive')
-        .expect('Content-Type', /json/);
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.spvs).toHaveLength(1);
-      expect(res.body.spvs[0]).toHaveProperty('Status', 'Inactive');
-    });
-
-    test('should return 404 when no SPVs with given status exist', async () => {
+    test('should get all pending SPVs', async () => {
       const res = await request(app)
         .get('/api/spvs/status/Pending')
         .expect('Content-Type', /json/);
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body).toHaveProperty('message', 'No SPVs found with status: Pending');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.spvs).toHaveLength(1);
+      expect(res.body.spvs[0]).toHaveProperty('Status', 'Pending');
+    });
+
+    test('should get all closed SPVs', async () => {
+      const res = await request(app)
+        .get('/api/spvs/status/Closed')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.spvs).toHaveLength(1);
+      expect(res.body.spvs[0]).toHaveProperty('Status', 'Closed');
+    });
+
+    test('should return 400 for invalid status parameter', async () => {
+      const res = await request(app)
+        .get('/api/spvs/status/Invalid')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid status parameter');
     });
   });
 
@@ -111,21 +134,62 @@ describe('SPV API - Status Tracking Functionality', () => {
 
     test('should get all non-compliant SPVs', async () => {
       const res = await request(app)
-        .get('/api/spvs/compliance/Non-Compliant')
+        .get('/api/spvs/compliance/NonCompliant')
         .expect('Content-Type', /json/);
 
       expect(res.statusCode).toBe(200);
       expect(res.body.spvs).toHaveLength(1);
-      expect(res.body.spvs[0]).toHaveProperty('ComplianceStatus', 'Non-Compliant');
+      expect(res.body.spvs[0]).toHaveProperty('ComplianceStatus', 'NonCompliant');
     });
 
-    test('should return 404 when no SPVs with given compliance status exist', async () => {
+    test('should get all pending review SPVs', async () => {
       const res = await request(app)
-        .get('/api/spvs/compliance/Unknown')
+        .get('/api/spvs/compliance/PendingReview')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.spvs).toHaveLength(1);
+      expect(res.body.spvs[0]).toHaveProperty('ComplianceStatus', 'PendingReview');
+    });
+
+    test('should return 400 for invalid compliance status parameter', async () => {
+      const res = await request(app)
+        .get('/api/spvs/compliance/Invalid')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid compliance status parameter');
+    });
+  });
+
+  describe('GET /api/spvs/parent/:id', () => {
+    test('should get all SPVs for a specific parent company', async () => {
+      const res = await request(app)
+        .get('/api/spvs/parent/PARENT-001')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.spvs).toHaveLength(2);
+      expect(res.body.spvs[0]).toHaveProperty('ParentCompanyID', 'PARENT-001');
+      expect(res.body.spvs[1]).toHaveProperty('ParentCompanyID', 'PARENT-001');
+    });
+
+    test('should return 404 when no SPVs found for parent company', async () => {
+      const res = await request(app)
+        .get('/api/spvs/parent/NONEXISTENT')
         .expect('Content-Type', /json/);
 
       expect(res.statusCode).toBe(404);
-      expect(res.body).toHaveProperty('message', 'No SPVs found with compliance status: Unknown');
+      expect(res.body.message).toContain('No SPVs found for parent company');
+    });
+
+    test('should return 404 for empty parent company ID parameter', async () => {
+      const res = await request(app)
+        .get('/api/spvs/parent/')
+        .expect('Content-Type', /json/);
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body).toHaveProperty('message', 'SPV not found');
     });
   });
 });
