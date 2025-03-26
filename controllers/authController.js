@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const mongoose = require('mongoose');
 const { blacklistToken } = require('../middleware/authMiddleware');
 
 // Initialize Google OAuth client
@@ -72,6 +73,14 @@ const registerUser = async (req, res) => {
       });
     }
 
+    // Validate role is one of the allowed values
+    const allowedRoles = ['admin', 'manager', 'user', 'client'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Role must be one of: ${allowedRoles.join(', ')}`
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -81,14 +90,17 @@ const registerUser = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
+    // Create new user object with a unique userId
+    const userId = new mongoose.Types.ObjectId().toString();
     const newUser = new User({
+      userId,
       firstName,
       lastName,
       email,
       password: hashedPassword,
       role,
-      companyId,
+      status: 'pending',
+      companyId: companyId || null,
       emailVerified: false
     });
 
@@ -107,7 +119,10 @@ const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error.message);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -125,6 +140,9 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    // Log the incoming request for debugging
+    console.log('Login attempt:', { email, passwordProvided: !!password });
+
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
@@ -139,13 +157,13 @@ const loginUser = async (req, res) => {
 
     // Generate tokens
     const accessToken = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user.userId || user._id, role: user.role },
       process.env.JWT_SECRET || 'testsecret',
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
-      { userId: user._id },
+      { userId: user.userId || user._id },
       process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
       { expiresIn: '7d' }
     );
@@ -201,12 +219,16 @@ const oauthLogin = async (req, res) => {
 
     // Create user if not exists
     if (!user) {
+      // Create a new user
+      const userId = new mongoose.Types.ObjectId().toString();
       user = new User({
+        userId,
         firstName: userInfo.given_name,
         lastName: userInfo.family_name,
         email: userInfo.email,
         password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
         role: 'user',
+        status: 'active',
         emailVerified: true,
         oauthProvider: provider,
         oauthId: userInfo.sub
@@ -217,13 +239,13 @@ const oauthLogin = async (req, res) => {
 
     // Generate tokens
     const accessToken = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user.userId || user._id, role: user.role },
       process.env.JWT_SECRET || 'testsecret',
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
-      { userId: user._id },
+      { userId: user.userId || user._id },
       process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
       { expiresIn: '7d' }
     );
@@ -262,14 +284,20 @@ const refreshToken = async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'refresh-testsecret');
 
       // Find user
-      const user = await User.findById(decoded.userId);
+      const user = await User.findOne({
+        $or: [
+          { _id: decoded.userId },
+          { userId: decoded.userId }
+        ]
+      });
+      
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
 
       // Generate new access token
       const accessToken = jwt.sign(
-        { userId: user._id, role: user.role },
+        { userId: user.userId || user._id, role: user.role },
         process.env.JWT_SECRET || 'testsecret',
         { expiresIn: '1h' }
       );
@@ -312,6 +340,7 @@ const logout = async (req, res) => {
 
 /**
  * Request password reset email
+ * Feature: OCAE-303: Implement password reset functionality
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -325,35 +354,38 @@ const requestPasswordReset = async (req, res) => {
 
     // Find user by email
     const user = await User.findOne({ email });
-    if (!user) {
-      // For security reasons, still return success even if user doesn't exist
-      return res.status(200).json({ message: 'If your email exists in our system, you will receive a password reset link' });
+    
+    // Only generate token and send email if user exists
+    if (user) {
+      // Generate reset token
+      const resetToken = jwt.sign(
+        { userId: user.userId || user._id },
+        process.env.JWT_RESET_SECRET || 'reset-testsecret',
+        { expiresIn: '1h' }
+      );
+
+      // Send reset email
+      const transporter = createEmailTransporter();
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || 'support@opencap.com',
+        to: user.email,
+        subject: 'OpenCap - Password Reset',
+        html: `
+          <h1>Password Reset</h1>
+          <p>You requested a password reset. Please click the link below to reset your password:</p>
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}">
+            Reset Password
+          </a>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you didn't request this, please ignore this email.</p>
+        `
+      });
     }
 
-    // Generate reset token
-    const resetToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_RESET_SECRET || 'reset-testsecret',
-      { expiresIn: '1h' }
-    );
-
-    // Send reset email
-    const transporter = createEmailTransporter();
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'support@opencap.com',
-      to: user.email,
-      subject: 'OpenCap - Password Reset',
-      html: `
-        <h1>Password Reset</h1>
-        <p>You requested a password reset. Please click the link below to reset your password:</p>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}">
-          Reset Password
-        </a>
-        <p>This link will expire in 1 hour.</p>
-      `
+    // For security reasons, still return success even if user doesn't exist
+    return res.status(200).json({ 
+      message: 'If an account exists with that email, a password reset link has been sent' 
     });
-
-    return res.status(200).json({ message: 'Password reset email sent' });
   } catch (error) {
     console.error('Password reset request error:', error.message);
     return res.status(500).json({ message: 'Internal server error' });
@@ -362,12 +394,13 @@ const requestPasswordReset = async (req, res) => {
 
 /**
  * Verify reset token
+ * Feature: OCAE-303: Implement password reset functionality
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const verifyResetToken = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { token } = req.params || req.body;
     
     // Check if token is provided
     if (!token) {
@@ -375,13 +408,35 @@ const verifyResetToken = async (req, res) => {
     }
     
     try {
-      // Verify token
-      jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
+      // Verify token in a nested try-catch to ensure proper error handling
+      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
       
-      // If verification succeeds, token is valid
-      return res.status(200).json({ message: 'Token is valid' });
-    } catch (error) {
-      // If verification fails, token is invalid
+      try {
+        // Check if user exists - wrap in another try-catch to separate database errors
+        const user = await User.findOne({
+          $or: [
+            { _id: decoded.userId },
+            { userId: decoded.userId }
+          ]
+        });
+        
+        // If user not found
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Token is valid
+        return res.status(200).json({ 
+          message: 'Token is valid', 
+          userId: decoded.userId 
+        });
+      } catch (dbError) {
+        // Database errors should return 500
+        console.error('Token verification error:', dbError.message);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+    } catch (tokenError) {
+      // Handle JWT errors - always return 400 for invalid tokens
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
   } catch (error) {
@@ -430,7 +485,12 @@ const resetPassword = async (req, res) => {
       try {
         // Database operations in separate try-catch for proper error handling
         // Find user
-        const user = await User.findById(decoded.userId);
+        const user = await User.findOne({
+          $or: [
+            { _id: decoded.userId },
+            { userId: decoded.userId }
+          ]
+        });
         
         // If user not found
         if (!user) {
@@ -441,11 +501,19 @@ const resetPassword = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         
         // Update user's password
-        await User.findByIdAndUpdate(
-          user._id,
-          { password: hashedPassword },
-          { new: true }
-        );
+        if (user.userId) {
+          await User.findOneAndUpdate(
+            { userId: user.userId },
+            { password: hashedPassword },
+            { new: true }
+          );
+        } else {
+          await User.findByIdAndUpdate(
+            user._id,
+            { password: hashedPassword },
+            { new: true }
+          );
+        }
         
         return res.status(200).json({ message: 'Password has been reset successfully' });
       } catch (dbError) {
@@ -474,7 +542,13 @@ const getUserProfile = async (req, res) => {
     const userId = req.user.userId;
 
     // Find user
-    const user = await User.findById(userId).select('-password');
+    const user = await User.findOne({
+      $or: [
+        { _id: userId },
+        { userId: userId }
+      ]
+    }).select('-password');
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -498,7 +572,13 @@ const updateUserProfile = async (req, res) => {
     const { firstName, lastName, email, currentPassword, newPassword } = req.body;
 
     // Find user
-    const user = await User.findById(userId);
+    const user = await User.findOne({
+      $or: [
+        { _id: userId },
+        { userId: userId }
+      ]
+    });
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -511,7 +591,8 @@ const updateUserProfile = async (req, res) => {
     if (email && email !== user.email) {
       // Check if email is already used by another user
       const existingUser = await User.findOne({ email });
-      if (existingUser && existingUser._id.toString() !== userId) {
+      if (existingUser && (existingUser._id.toString() !== userId.toString()) && 
+          (existingUser.userId !== userId)) {
         return res.status(400).json({ message: 'Email already in use' });
       }
       
@@ -568,7 +649,13 @@ const sendVerificationEmail = async (req, res) => {
     const userId = req.user.userId;
 
     // Find user
-    const user = await User.findById(userId);
+    const user = await User.findOne({
+      $or: [
+        { _id: userId },
+        { userId: userId }
+      ]
+    });
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -589,8 +676,8 @@ const sendVerificationEmail = async (req, res) => {
 };
 
 /**
- * Verify user email with verification token
- * @param {Object} req - Express request object with token parameter
+ * Verify user email with token
+ * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const verifyEmail = async (req, res) => {
@@ -606,16 +693,22 @@ const verifyEmail = async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret');
 
       // Find user
-      const user = await User.findById(decoded.userId);
+      const user = await User.findOne({
+        $or: [
+          { _id: decoded.userId },
+          { userId: decoded.userId }
+        ]
+      });
+      
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Update user's email verification status
+      // Mark email as verified
       user.emailVerified = true;
       await user.save();
 
-      return res.status(200).json({ message: 'Email verification successful' });
+      return res.status(200).json({ message: 'Email verified successfully' });
     } catch (error) {
       return res.status(400).json({ message: 'Invalid or expired verification token' });
     }
@@ -626,7 +719,7 @@ const verifyEmail = async (req, res) => {
 };
 
 /**
- * Check email verification token requirements
+ * Check verification token
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -641,7 +734,7 @@ const checkVerificationToken = (req, res) => {
 const sendVerificationEmailToUser = async (user) => {
   // Generate verification token
   const verificationToken = jwt.sign(
-    { userId: user._id }, 
+    { userId: user.userId || user._id }, 
     process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret', 
     { expiresIn: '24h' }
   );
