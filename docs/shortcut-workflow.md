@@ -87,6 +87,51 @@ Follow the steps provided by `get-next-story.js`:
    node scripts/update-story-status.js 79 "Done"
    ```
 
+### 4. Example: API Documentation Workflow (OCAE-210)
+
+This real-world example demonstrates how we followed the workflow for adding comprehensive Swagger documentation:
+
+1. Identify the story in Shortcut:
+   ```bash
+   node scripts/search-stories.js "OCAE-210"
+   ```
+
+2. Create a feature branch:
+   ```bash
+   git checkout -b feature/OCAE-210
+   ```
+
+3. Update the story status:
+   ```bash
+   node scripts/update-story-status.js 210 "In Progress"
+   ```
+
+4. Follow TDD workflow with proper commit messages:
+   ```bash
+   # First commit (documentation structure)
+   git commit -m "WIP: OCAE-210: Create initial documentation structure"
+   
+   # Second commit (add core endpoint documentation)
+   git commit -m "WIP: OCAE-210: Add documentation for core endpoints"
+   
+   # More commits for different document sections
+   git commit -m "WIP: OCAE-210: Add documentation for analytics endpoints"
+   git commit -m "WIP: OCAE-210: Add documentation for webhooks endpoints"
+   
+   # Final commit
+   git commit -m "OCAE-210: Complete comprehensive Swagger documentation"
+   ```
+
+5. Create a Pull Request and mark the story as "Done":
+   ```bash
+   node scripts/update-story-status.js 210 "Done"
+   ```
+
+The documentation was added using a structured approach:
+- Each API domain in its own YAML file under `docs/swagger/`
+- Consistent schemas and endpoint patterns
+- Complete examples and response definitions
+
 ## ID System Reference
 
 OpenCap uses two parallel ID systems for stories:
