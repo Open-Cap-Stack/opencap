@@ -1,13 +1,70 @@
 /**
  * Update Story Status Script
  * 
- * [Chore] OCAE-302: Integrate Shortcut API for Backlog Management
+ * [Chore] OCDI-103: Integrate Shortcut API for Transaction data model
  * 
  * This script updates the status of a story in Shortcut.
  */
 
 const shortcut = require('./shortcut-api');
 require('dotenv').config();
+
+/**
+ * Get all workflows from Shortcut
+ * @returns {Promise<Array>} Array of workflow objects
+ * @deprecated Use shortcut.getWorkflows() instead
+ */
+async function getWorkflowsLegacy() {
+  try {
+    const shortcutApiToken = process.env.SHORTCUT_API_TOKEN;
+    if (!shortcutApiToken) {
+      console.error('❌ SHORTCUT_API_TOKEN environment variable is not set');
+      process.exit(1);
+    }
+    
+    const axios = require('axios');
+    const shortcutApiUrl = 'https://api.app.shortcut.com/api/v3';
+    
+    const response = await axios.get(`${shortcutApiUrl}/workflows`, {
+      headers: { 'Shortcut-Token': shortcutApiToken }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching workflows:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update story workflow state
+ * @param {number} storyId - Story ID
+ * @param {number} workflowStateId - Workflow state ID
+ * @returns {Promise<Object>} Updated story object
+ * @deprecated Use shortcut.updateStoryWorkflowState() instead
+ */
+async function updateStoryWorkflowStateLegacy(storyId, workflowStateId) {
+  try {
+    const shortcutApiToken = process.env.SHORTCUT_API_TOKEN;
+    if (!shortcutApiToken) {
+      console.error('❌ SHORTCUT_API_TOKEN environment variable is not set');
+      process.exit(1);
+    }
+    
+    const axios = require('axios');
+    const shortcutApiUrl = 'https://api.app.shortcut.com/api/v3';
+    
+    const response = await axios.put(
+      `${shortcutApiUrl}/stories/${storyId}`,
+      { workflow_state_id: workflowStateId },
+      { headers: { 'Shortcut-Token': shortcutApiToken } }
+    );
+    console.log(`Story ${storyId} updated to workflow state ${workflowStateId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating story ${storyId}:`, error.message);
+    throw error;
+  }
+}
 
 async function updateStoryStatus(storyId, newStatusName) {
   try {

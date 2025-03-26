@@ -20,7 +20,7 @@ const SPVSchema = new mongoose.Schema({
   },
   Status: {
     type: String,
-    enum: ['Active', 'Inactive'], // Modify these as needed
+    enum: ['Active', 'Pending', 'Closed'],
     required: true,
   },
   ParentCompanyID: {
@@ -29,9 +29,13 @@ const SPVSchema = new mongoose.Schema({
   },
   ComplianceStatus: {
     type: String,
-    enum: ['Compliant', 'Non-Compliant'], // Modify these as needed
+    enum: ['Compliant', 'NonCompliant', 'PendingReview'],
     required: true,
   },
-});
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { timestamps: true });
 
 module.exports = mongoose.model('SPV', SPVSchema);

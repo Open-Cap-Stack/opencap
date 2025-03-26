@@ -1,13 +1,34 @@
 # OpenCap API Enhancement Sprint Plan
+# Detailed Implementation Roadmap
 
 **Version**: 1.1  
-**Date**: March 22, 2025  
+**Date**: March 23, 2025  
 **Author**: Development Team  
-**Status**: In Progress - Sprint 1 Completed  
+**Status**: Active - Sprint 1 Completed
 
 ## Overview
 
-This sprint plan outlines a 10-week (5 sprint) implementation timeline for enhancing the OpenCap API layer, ensuring all functional code has properly exposed endpoints and resolving duplicate/inconsistent implementations. The plan follows Semantic Seed Venture Studio's Coding Standards V2.0, implementing Test-Driven Development (TDD) and Behavior-Driven Development (BDD) throughout.
+This document outlines the sprint plan for enhancing the OpenCap platform's APIs, focusing on implementing and improving APIs that are critical for the platform's functionality. The plan follows the Semantic Seed Venture Studio Coding Standards (SSCS) to ensure consistent tracking, proper workflow in Shortcut, and alignment with the project's branching strategy.
+
+This is a 10-week (5 sprint) implementation timeline for enhancing the OpenCap API layer, ensuring all functional code has properly exposed endpoints and resolving duplicate/inconsistent implementations. The plan implements Test-Driven Development (TDD) and Behavior-Driven Development (BDD) throughout.
+
+## Sprint Goals
+
+The primary goals of this API enhancement initiative are:
+
+1. Implement fully functional APIs for all core platform features
+2. Enhance existing APIs with additional functionality
+3. Ensure comprehensive test coverage for all APIs
+4. Improve API documentation and developer experience
+5. Implement integration points between different API modules
+
+## Backlog Structure
+
+All backlog items follow the Semantic Seed Venture Studio Coding Standards with:
+
+- **Story ID Format**: OCAE-XXX (OpenCap API Enhancement)
+- **Story Types**: [Feature], [Bug], or [Chore]
+- **Point Estimation**: Fibonacci scale (0, 1, 2, 3, 5, 8)
 
 ## Current API Inventory
 
@@ -81,65 +102,126 @@ The following APIs are already properly exposed in the OpenCap platform:
   - Login, registration, OAuth functionality
   - Token management
 
-### Optional/Partially Implemented APIs
-The following APIs are registered in the app.js file but use `safeRequire` which means they might not be available in all environments or might be partially implemented:
+## Phase 1: Core API Implementation
 
-- **Communication API** (`/api/communications`)
-  - Messaging functionality
-  - Communication history
+### Sprint 1: Foundation APIs
 
-- **Notification API** (`/api/notifications`)
-  - User notification management
-  - Notification preferences
+**Backend Team Stories**:
+- [Feature] OCAE-001: Implement Communication API with thread management (5 points)
+- [Feature] OCAE-002: Implement SPV API with status tracking (5 points)
+- [Feature] OCAE-003: Implement SPVAsset API with valuation support (5 points)
+- [Feature] OCAE-004: Implement integration tests for API cross-functionality (3 points)
+- [Feature] OCAE-005: Create API documentation with endpoint specifications (2 points)
+- [Feature] OCAE-006: Implement ComplianceCheck API with CRUD operations (3 points)
+- [Feature] OCAE-007: Enhance TaxCalculator API with update functionality (3 points)
+- [Chore] OCAE-008: Update infrastructure configuration and dependencies (2 points)
+- [Chore] OCAE-009: Create product roadmap and protocol documentation (2 points)
+- [Chore] OCAE-010: Update README with SSCS workflow and API endpoints (1 point)
 
-- **Invite Management API** (`/api/invites`)
-  - User invitation system
-  - Invitation tracking and management
+**Testing & QA Team Stories**:
+- [Feature] OCAE-011: Create end-to-end tests for Communication-SPV interactions (5 points)
+- [Feature] OCAE-012: Implement validation test suite for all API inputs (3 points)
+- [Bug] OCAE-013: Fix validation errors in Communication model tests (2 points)
+- [Chore] OCAE-014: Set up continuous integration for API tests (2 points)
 
-- **SPV API** (`/api/spv`)
-  - Special Purpose Vehicle management
-  - Investment vehicle structuring
+### Sprint 2: Extended Functionality
 
-- **SPV Asset API** (`/api/spv-assets`)
-  - Assets within SPVs
-  - Asset allocation and tracking
+**Backend Team Stories**:
+- [Feature] OCAE-015: Implement Notification API with subscription management (5 points)
+- [Feature] OCAE-016: Create Invite Management API with tracking capabilities (5 points)
+- [Feature] OCAE-017: Enhance SPV API with document attachment support (3 points)
+- [Feature] OCAE-018: Add batch operations to SPVAsset API (3 points)
+- [Feature] OCAE-019: Implement caching layer for frequently accessed endpoints (5 points)
+- [Bug] OCAE-020: Fix concurrency issues in TaxCalculator API (3 points)
+- [Chore] OCAE-021: Refactor route handlers for consistency (2 points)
 
-- **Compliance Check API** (`/api/compliance-checks`)
-  - Regulatory compliance verification
-  - Compliance history tracking
+**Testing & QA Team Stories**:
+- [Feature] OCAE-022: Implement performance tests for API endpoints (5 points)
+- [Feature] OCAE-023: Create security test suite for authentication and authorization (5 points)
+- [Bug] OCAE-024: Address edge cases in ComplianceCheck validation (2 points)
+- [Chore] OCAE-025: Update API documentation with examples (2 points)
 
-- **Integration Module API** (`/api/integration-modules`)
-  - Third-party service integration
-  - API connectors management
+## Phase 2: Integration & Optimization
 
-- **Tax Calculator API** (`/api/taxCalculations`)
-  - Tax estimation tools
-  - Tax calculation history
+### Sprint 3: Integration Focus
 
-## Missing API Endpoints
+**Backend Team Stories**:
+- [Feature] OCAE-026: Implement Integration Module API for third-party services (8 points)
+- [Feature] OCAE-027: Create unified search API across all entity types (5 points)
+- [Feature] OCAE-028: Implement webhooks for key entity events (5 points)
+- [Feature] OCAE-029: Add reporting endpoints for activity aggregation (5 points)
+- [Bug] OCAE-030: Fix data consistency issues between related APIs (3 points)
+- [Chore] OCAE-031: Optimize database queries for high-traffic endpoints (3 points)
 
-Despite being listed in the app.js file with `safeRequire`, the following APIs need proper implementation or enhancement to ensure they are fully functional:
+**Testing & QA Team Stories**:
+- [Feature] OCAE-032: Create integration test suite for third-party services (5 points)
+- [Feature] OCAE-033: Implement load testing for high-traffic endpoints (5 points)
+- [Bug] OCAE-034: Resolve timeout issues in long-running operations (3 points)
+- [Chore] OCAE-035: Document API integration patterns and best practices (2 points)
 
-1. **Data Pipeline APIs**
-   - MinIO Storage Operations (not implemented)
-   - Airflow DAG Management (not implemented)
+### Sprint 4: Performance & Security
 
-2. **Compliance and Reporting**
-   - Compliance Checks API (partial implementation in ComplianceCheck.js)
-   - Tax Calculator API (partial implementation in TaxCalculator.js)
+**Backend Team Stories**:
+- [Feature] OCAE-036: Implement role-based access control for all APIs (8 points)
+- [Feature] OCAE-037: Add rate limiting and request throttling (5 points)
+- [Feature] OCAE-038: Create audit logging system for API operations (5 points)
+- [Feature] OCAE-039: Implement data encryption for sensitive fields (5 points)
+- [Bug] OCAE-040: Fix memory leaks in long-running API operations (3 points)
+- [Chore] OCAE-041: Optimize Docker container configurations (2 points)
 
-3. **Financial Instruments**
-   - SPV Management API (partial implementation in SPV.js)
-   - SPV Asset Management API (partial implementation in SPVasset.js)
+**Testing & QA Team Stories**:
+- [Feature] OCAE-042: Implement security penetration testing suite (8 points)
+- [Feature] OCAE-043: Create compliance verification tests (5 points)
+- [Bug] OCAE-044: Address security vulnerabilities from scan reports (3 points)
+- [Chore] OCAE-045: Document security best practices for API consumption (2 points)
 
-4. **User Experience**
-   - Notifications API (partial implementation in Notification.js)
-   - Communications API (partial implementation in Communication.js)
+## Sprint 5: Completion & Optimization
 
-5. **Integration Services**
-   - Integration Module API (minimal implementation in integration.js)
+**Backend Team Stories**:
+- [Feature] Implement Storage API for large file handling (5 points)
+- [Feature] Create Pipeline Management API for workflow automation (5 points)
+- [Feature] Add advanced filtering to all list endpoints (3 points)
+- [Feature] Implement export functionality for data endpoints (3 points)
+- [Bug] Fix pagination inconsistencies across APIs (2 points)
+- [Chore] Perform final code quality review (2 points)
 
-Our sprint plan will focus on completing the implementation of these partially implemented APIs and adding the completely missing data pipeline APIs.
+**Testing & QA Team Stories**:
+- [Feature] Complete comprehensive regression test suite (5 points)
+- [Feature] Create automated integration tests for entire API ecosystem (5 points)
+- [Feature] Implement integration tests with existing document system (3 points)
+
+**Documentation Team Stories**:
+- [Feature] Create API documentation for Storage API (3 points)
+- [Feature] Create API documentation for Pipeline Management API (3 points)
+
+## Development Workflow
+
+All API implementations will follow the SSCS workflow:
+
+1. **Create Feature Branch**:
+   ```bash
+   git checkout -b feature/OCAE-XXX
+   ```
+
+2. **Test-Driven Development Flow**:
+   - First commit: "WIP: OCAE-XXX: Red tests for [feature]"
+   - Second commit: "WIP: OCAE-XXX: Green tests for [feature]"
+   - Final commit: "OCAE-XXX: Implement [feature] with tests"
+
+3. **Pull Request Process**:
+   - Mark story as Finished in Shortcut
+   - Create PR with the story ID in the title
+   - Include the story details in the description
+
+## Sprint 1 Progress Update
+
+The first sprint has been completed with the following achievements:
+
+- Successfully implemented all missing endpoints for ComplianceCheck and TaxCalculator APIs
+- Created comprehensive test suites following BDD approach
+- Generated detailed API documentation
+- Fixed routing issue with special routes vs. ID-based routes in ComplianceCheck API
+- Added automatic tax recalculation when updating tax calculation entries
 
 ## Team Structure
 
