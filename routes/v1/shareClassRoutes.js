@@ -1,28 +1,32 @@
 /**
- * Share Class Routes (v1)
+ * V1 ShareClass Routes
  * 
  * [Feature] OCAE-208: Implement share class management endpoints
- * Versioned routes for share class management with JWT auth
+ * Enhanced routes with authentication, validation, filtering, and analytics
  */
 
 const express = require('express');
 const router = express.Router();
 const shareClassController = require('../../controllers/v1/shareClassController');
-const authMiddleware = require('../../middleware/authMiddleware');
+const auth = require('../../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(auth);
 
-// CRUD Routes
-router.post('/', shareClassController.createShareClass);
+// GET routes
 router.get('/', shareClassController.getAllShareClasses);
-router.get('/:id', shareClassController.getShareClassById);
-router.put('/:id', shareClassController.updateShareClass);
-router.delete('/:id', shareClassController.deleteShareClass);
-
-// Special endpoints
 router.get('/search', shareClassController.searchShareClasses);
 router.get('/analytics', shareClassController.getShareClassAnalytics);
+router.get('/:id', shareClassController.getShareClassById);
+
+// POST routes
+router.post('/', shareClassController.createShareClass);
 router.post('/bulk', shareClassController.bulkCreateShareClasses);
+
+// PUT routes
+router.put('/:id', shareClassController.updateShareClass);
+
+// DELETE routes
+router.delete('/:id', shareClassController.deleteShareClass);
 
 module.exports = router;
