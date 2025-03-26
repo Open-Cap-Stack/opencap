@@ -377,3 +377,141 @@ This project follows the Semantic Seed Venture Studio Coding Standards V2.0, whi
 
 ## Running the Application
 The Node.js application automatically starts when running `docker-compose up -d`. The application is built from the Dockerfile in the project root, which installs all necessary dependencies from package.json.
+
+## Data Pipeline Testing and Configuration (2025-03-16)
+
+### Infrastructure Components
+- **Airflow**: Container-based deployment with webserver and scheduler containers
+  - Container Names: `opencap_airflow_webserver`, `opencap_airflow_scheduler`
+  - DAG Files Location: `/opt/airflow/dags/`
+  - DAG ID: `opencap_test_pipeline`
+  - Task IDs: `create_test_dataset`, `upload_dataset_to_minio`, `process_data_with_pandas`, `verify_results`
+
+- **MinIO**: Object storage service for data lake implementation
+  - Container Name: `opencap_minio`
+  - Access Credentials: Username=`minio`, Password=`minio123`
+  - Internal Network IP: `172.18.0.7`
+  - Port: `9000`
+  - Test Bucket: `opencap-test`
+
+- **Docker Network**: 
+  - Network Name: `opencap_default`
+  - Container Communication: Direct IP addresses instead of service names for reliability
+
+### Configuration Implementation Details
+- **MinIO Client Configuration**:
+```python
+client = Minio(
+    endpoint='172.18.0.7:9000',
+    access_key='minio',
+    secret_key='minio123',
+    secure=False
+)
+```
+
+- **Bucket Creation Logic**:
+```python
+if not client.bucket_exists(bucket_name):
+    print(f"Bucket {bucket_name} does not exist, creating it.")
+    client.make_bucket(bucket_name)
+    print(f"Bucket {bucket_name} created successfully.")
+```
+
+- **File Upload to MinIO**:
+```python
+result = client.fput_object(
+    bucket_name, 
+    object_name, 
+    file_path
+)
+```
+
+- **Data Processing Pipeline**:
+```python
+# Download data from MinIO
+download_from_minio(bucket_name, object_name, local_file)
+
+# Process with pandas
+df = pd.read_csv(local_file)
+dept_avg_salary = df.groupby('department')['salary'].mean().reset_index()
+dept_avg_salary.columns = ['department', 'avg_salary']
+
+# Save results locally
+result_path = os.path.join(temp_dir, 'department_salary_avg.csv')
+dept_avg_salary.to_csv(result_path, index=False)
+
+# Upload results back to MinIO
+upload_to_minio(bucket_name, result_path, result_object)
+```
+
+### Issues Encountered and Solutions
+1. **MinIO Connection Issues**:
+   - **Problem**: Initial connection attempts failed using `localhost:9000`
+   - **Cause**: Container networking prevents direct localhost access between containers
+   - **Solution**: Used direct container IP address (`172.18.0.7:9000`) instead of service name
+
+2. **MinIO Authentication Issues**:
+   - **Problem**: Authentication failed with default credentials (`minioadmin/minioadmin`)
+   - **Cause**: Container was configured with different credentials 
+   - **Solution**: Used correct credentials from container environment variables (`minio/minio123`)
+
+3. **Bucket Existence Issues**:
+   - **Problem**: Upload operations failed when bucket didn't exist
+   - **Solution**: Implemented automatic bucket creation logic before upload operations
+
+4. **PySpark Integration Challenges**:
+   - **Problem**: Java gateway errors when trying to establish Spark connection
+   - **Error**: `[JAVA_GATEWAY_EXITED] Java gateway process exited before sending its port number`
+   - **Solution**: Used pandas directly for data processing as a simpler alternative for testing purposes
+   - **Future Work**: Proper Spark integration requires Java environment configuration in Airflow containers
+
+5. **Airflow XCom Data Exchange**:
+   - **Problem**: Data exchange between tasks used incorrect key/value structure
+   - **Solution**: Standardized XCom usage with consistent key names and proper task_ids parameters
+
+### Test Results
+- **Dataset Creation**: Successfully created synthetic employee data with departments and salaries
+- **MinIO Storage**: Validated upload and download operations with the `opencap-test` bucket
+- **Data Processing**: Calculated average salaries per department with results:
+```
+department,avg_salary
+Engineering,122500.0
+Finance,107500.0
+Marketing,95000.0
+```
+
+### Airflow DAG Management Commands
+- **List DAGs**: `docker exec opencap_airflow_webserver airflow dags list`
+- **Show DAG Status**: `docker exec opencap_airflow_webserver airflow dags list-runs -d opencap_test_pipeline`
+- **Trigger DAG**: `docker exec opencap_airflow_webserver airflow dags trigger opencap_test_pipeline`
+- **Check Task Status**: `docker exec opencap_airflow_webserver airflow tasks states-for-dag-run opencap_test_pipeline <run_id>`
+- **Delete DAG**: `docker exec opencap_airflow_webserver airflow dags delete opencap_test_pipeline -y`
+- **Reserialize DAGs**: `docker exec opencap_airflow_scheduler airflow dags reserialize`
+
+### File Deployment Workflow
+1. Update DAG files locally in `/Users/tobymorning/opencap/dags/`
+2. Copy to containers:
+```bash
+docker cp /Users/tobymorning/opencap/dags/file.py opencap_airflow_webserver:/opt/airflow/dags/
+docker cp /Users/tobymorning/opencap/dags/file.py opencap_airflow_scheduler:/opt/airflow/dags/
+```
+3. Reserialize DAGs and trigger runs for testing
+
+### Future Enhancement Requirements
+1. **Spark Integration**:
+   - Add Java environment to Airflow containers
+   - Configure proper network settings for Spark master/worker communication
+   - Implement Spark operator for more reliable execution
+
+2. **Error Handling**:
+   - Implement comprehensive error handling with appropriate status reporting
+   - Add retry mechanisms with exponential backoff for transient failures
+
+3. **Data Validation**:
+   - Implement schema validation on input/output datasets
+   - Add data quality checks at various pipeline stages
+
+4. **Security Enhancements**:
+   - Use Docker secrets for credential management
+   - Implement proper access control for MinIO buckets
+   - Configure secure network communication between components

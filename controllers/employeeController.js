@@ -19,6 +19,24 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
+    // Check for existing employee with same EmployeeID (explicit duplicate check)
+    const existingEmployee = await Employee.findOne({ EmployeeID });
+    if (existingEmployee) {
+      return res.status(400).json({
+        error: 'Duplicate key error',
+        message: 'Duplicate field: EmployeeID',
+      });
+    }
+
+    // Check for existing employee with same Email (explicit duplicate check)
+    const existingEmail = await Employee.findOne({ Email });
+    if (existingEmail) {
+      return res.status(400).json({
+        error: 'Duplicate key error',
+        message: 'Duplicate field: Email',
+      });
+    }
+
     const newEmployee = new Employee(req.body);
     const validationError = newEmployee.validateSync();
     if (validationError) {

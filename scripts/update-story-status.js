@@ -1,28 +1,30 @@
 /**
  * Update Story Status Script
  * 
- * [Feature] OCDI-101: Set up MongoDB connection
+ * [Chore] OCDI-103: Integrate Shortcut API for Transaction data model
  * 
  * This script updates the status of a story in Shortcut.
  */
 
-const axios = require('axios');
+const shortcut = require('./shortcut-api');
 require('dotenv').config();
-
-const shortcutApiToken = process.env.SHORTCUT_API_TOKEN;
-if (!shortcutApiToken) {
-  console.error('❌ SHORTCUT_API_TOKEN environment variable is not set');
-  process.exit(1);
-}
-
-const shortcutApiUrl = 'https://api.app.shortcut.com/api/v3';
 
 /**
  * Get all workflows from Shortcut
  * @returns {Promise<Array>} Array of workflow objects
+ * @deprecated Use shortcut.getWorkflows() instead
  */
-async function getWorkflows() {
+async function getWorkflowsLegacy() {
   try {
+    const shortcutApiToken = process.env.SHORTCUT_API_TOKEN;
+    if (!shortcutApiToken) {
+      console.error('❌ SHORTCUT_API_TOKEN environment variable is not set');
+      process.exit(1);
+    }
+    
+    const axios = require('axios');
+    const shortcutApiUrl = 'https://api.app.shortcut.com/api/v3';
+    
     const response = await axios.get(`${shortcutApiUrl}/workflows`, {
       headers: { 'Shortcut-Token': shortcutApiToken }
     });
@@ -38,9 +40,19 @@ async function getWorkflows() {
  * @param {number} storyId - Story ID
  * @param {number} workflowStateId - Workflow state ID
  * @returns {Promise<Object>} Updated story object
+ * @deprecated Use shortcut.updateStoryWorkflowState() instead
  */
-async function updateStoryWorkflowState(storyId, workflowStateId) {
+async function updateStoryWorkflowStateLegacy(storyId, workflowStateId) {
   try {
+    const shortcutApiToken = process.env.SHORTCUT_API_TOKEN;
+    if (!shortcutApiToken) {
+      console.error('❌ SHORTCUT_API_TOKEN environment variable is not set');
+      process.exit(1);
+    }
+    
+    const axios = require('axios');
+    const shortcutApiUrl = 'https://api.app.shortcut.com/api/v3';
+    
     const response = await axios.put(
       `${shortcutApiUrl}/stories/${storyId}`,
       { workflow_state_id: workflowStateId },
@@ -59,7 +71,7 @@ async function updateStoryStatus(storyId, newStatusName) {
     console.log(`Updating story ${storyId} status to "${newStatusName}"...`);
     
     // 1. Get workflows to find the correct state ID
-    const workflows = await getWorkflows();
+    const workflows = await shortcut.getWorkflows();
     const primaryWorkflow = workflows[0]; // Using the first workflow
     
     // 2. Find the state with the matching name
@@ -74,7 +86,7 @@ async function updateStoryStatus(storyId, newStatusName) {
     console.log(`Found state "${targetState.name}" (ID: ${targetState.id})`);
     
     // 3. Update the story status
-    const updatedStory = await updateStoryWorkflowState(storyId, targetState.id);
+    const updatedStory = await shortcut.updateStoryWorkflowState(storyId, targetState.id);
     
     console.log(`✅ Successfully updated story ${storyId} to status "${targetState.name}"`);
     return updatedStory;
@@ -93,7 +105,7 @@ const newStatus = process.argv[3];
 
 if (!storyId || !newStatus) {
   console.error('Usage: node update-story-status.js [STORY_ID] [NEW_STATUS]');
-  console.error('Example: node update-story-status.js 123 "Done"');
+  console.error('Example: node update-story-status.js 123 "Finished"');
   process.exit(1);
 }
 

@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  build:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,16 +25,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
-
+      # Run tests with code coverage for local measurement (not external services)
+      - name: Run tests with coverage
+        run: npm run test:ci
+        
+      # WIP commit before implementing solution (following Semantic Seed standards)
+      - name: Create WIP commit for tests
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "WIP: Tests passed with code coverage"
+          
       # Only run Docker steps for main branch
       - name: Build Docker image
         if: github.ref == 'refs/heads/main'
         run: |
           docker build -t opencap/api:latest .
+          docker tag opencap/api:latest opencap/api:${{ github.sha }}
 
-      # Docker Hub login with basic approach
+      # Docker Hub login
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v2
@@ -43,10 +51,49 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Push step only runs if login succeeds
-      - name: Push Docker image
+      - name: Push Docker image to Docker Hub
         if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v4
+        run: |
+          docker push opencap/api:latest
+          docker push opencap/api:${{ github.sha }}
+          
+  deploy-to-digital-ocean:
+    needs: test-and-build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
         with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/opencap:latest
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      
+      # Log in to Digital Ocean container registry
+      - name: Log in to Digital Ocean Container Registry
+        run: doctl registry login
+      
+      # Build and push Docker image to Digital Ocean
+      - name: Build and push to Digital Ocean
+        run: |
+          # Tag the image for DO registry
+          docker pull opencap/api:${{ github.sha }}
+          docker tag opencap/api:${{ github.sha }} registry.digitalocean.com/opencap/api:${{ github.sha }}
+          docker push registry.digitalocean.com/opencap/api:${{ github.sha }}
+      
+      # Update Kubernetes deployment if cluster exists
+      - name: Update Kubernetes deployment
+        run: |
+          # Verify if cluster exists before attempting to access it
+          CLUSTER_EXISTS=$(doctl kubernetes cluster list --format Name --no-header | grep -c "opencap-cluster" || true)
+          
+          if [ "$CLUSTER_EXISTS" -gt 0 ]; then
+            echo "Updating Kubernetes deployment"
+            doctl kubernetes cluster kubeconfig save opencap-cluster
+            kubectl set image deployment/opencap-api opencap-api=registry.digitalocean.com/opencap/api:${{ github.sha }} --record
+          else
+            echo "Kubernetes cluster 'opencap-cluster' not found. Skipping deployment."
+            echo "Please create the cluster first using the steps in OpenCap_TestCoverage_DigitalOceanDeployment.md"
+          fi
