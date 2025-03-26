@@ -4,17 +4,53 @@ const dotenv = require("dotenv");
 const fs = require("fs");
 const { connectToMongoDB } = require('./db/mongoConnection');
 const { addVersionHeaders, createVersionedRoutes, validateApiVersion } = require('./middleware/apiVersioning');
+const compression = require('compression');
+const cookieParser = require('cookie-parser');
+const helmetMiddleware = require('./middleware/security/helmet');
+const corsMiddleware = require('./middleware/security/cors');
+const { rateLimiter, authRateLimiter } = require('./middleware/security/rateLimit');
+const getLoggingMiddleware = require('./middleware/logging');
+const testEndpoints = require('./middleware/testEndpoints');
 
 // Initialize dotenv to load environment variables
 dotenv.config();
 
 // Initialize the Express app
 const app = express();
+
+// Apply security middleware first
+app.use(helmetMiddleware);
+app.use(corsMiddleware);
+
+// Apply compression middleware early in the pipeline
+app.use(compression());
+
+// Request logging middleware
+const loggingMiddleware = getLoggingMiddleware();
+if (Array.isArray(loggingMiddleware)) {
+  loggingMiddleware.forEach(middleware => app.use(middleware));
+} else {
+  app.use(loggingMiddleware);
+}
+
+// Body parsers
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Cookie parser middleware
+app.use(cookieParser());
+
+// Apply rate limiting
+app.use(rateLimiter);
+// Apply stricter rate limiting to auth routes
+app.use('/auth', authRateLimiter);
 
 // Apply API versioning middleware
 app.use(addVersionHeaders);
 app.use(validateApiVersion);
+
+// Mount test endpoints for middleware testing
+app.use('/api', testEndpoints);
 
 // Determine if the environment is a test environment
 const isTestEnv = process.env.NODE_ENV === "test";
