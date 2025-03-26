@@ -1,0 +1,607 @@
+# Webhooks API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/webhooks:
+  get:
+    tags:
+      - Webhooks
+    summary: Get webhooks
+    description: Returns all webhooks configured for the current user or company
+    operationId: getWebhooks
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Filter by webhook status
+        schema:
+          type: string
+          enum: [active, inactive]
+      - name: eventType
+        in: query
+        description: Filter by event type
+        schema:
+          type: string
+    responses:
+      '200':
+        description: A list of webhooks
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Webhook unique identifier
+                      name:
+                        type: string
+                        description: Webhook name
+                      url:
+                        type: string
+                        description: Endpoint URL
+                      eventTypes:
+                        type: array
+                        description: Event types to trigger this webhook
+                        items:
+                          type: string
+                      status:
+                        type: string
+                        enum: [active, inactive]
+                        description: Webhook status
+                      secret:
+                        type: string
+                        description: Secret key for webhook signature (partially masked)
+                      createdBy:
+                        type: string
+                        description: ID of the user who created the webhook
+                      companyId:
+                        type: string
+                        description: Associated company ID
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Webhooks
+    summary: Create webhook
+    description: Creates a new webhook endpoint
+    operationId: createWebhook
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - url
+              - eventTypes
+            properties:
+              name:
+                type: string
+                description: Webhook name
+              url:
+                type: string
+                description: Endpoint URL
+              eventTypes:
+                type: array
+                description: Event types to trigger this webhook
+                items:
+                  type: string
+                  enum:
+                    - user.created
+                    - user.updated
+                    - user.deleted
+                    - investor.created
+                    - investor.updated
+                    - investor.deleted
+                    - company.created
+                    - company.updated
+                    - company.deleted
+                    - share_class.created
+                    - share_class.updated
+                    - share_class.deleted
+                    - equity_plan.created
+                    - equity_plan.updated
+                    - equity_plan.deleted
+                    - employee.created
+                    - employee.updated
+                    - employee.deleted
+                    - investment.created
+                    - investment.updated
+                    - investment.deleted
+                    - document.created
+                    - document.updated
+                    - document.deleted
+                    - compliance.check.completed
+                    - compliance.check.failed
+                    - notification.created
+                    - spv.created
+                    - spv.updated
+                    - spv.deleted
+              description:
+                type: string
+                description: Webhook description
+              companyId:
+                type: string
+                description: Associated company ID
+    responses:
+      '201':
+        description: Webhook created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Webhook unique identifier
+                name:
+                  type: string
+                  description: Webhook name
+                url:
+                  type: string
+                  description: Endpoint URL
+                eventTypes:
+                  type: array
+                  description: Event types
+                  items:
+                    type: string
+                secret:
+                  type: string
+                  description: Secret key for webhook signature
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  description: Webhook status
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Webhook ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Webhooks
+    summary: Get webhook by ID
+    description: Returns a single webhook by ID
+    operationId: getWebhookById
+    responses:
+      '200':
+        description: Webhook found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Webhook unique identifier
+                name:
+                  type: string
+                  description: Webhook name
+                url:
+                  type: string
+                  description: Endpoint URL
+                eventTypes:
+                  type: array
+                  description: Event types
+                  items:
+                    type: string
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  description: Webhook status
+                secret:
+                  type: string
+                  description: Secret key for webhook signature (partially masked)
+                description:
+                  type: string
+                  description: Webhook description
+                createdBy:
+                  type: string
+                  description: ID of the user who created the webhook
+                companyId:
+                  type: string
+                  description: Associated company ID
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Webhooks
+    summary: Update webhook
+    description: Updates an existing webhook
+    operationId: updateWebhook
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Webhook name
+              url:
+                type: string
+                description: Endpoint URL
+              eventTypes:
+                type: array
+                description: Event types
+                items:
+                  type: string
+              status:
+                type: string
+                enum: [active, inactive]
+                description: Webhook status
+              description:
+                type: string
+                description: Webhook description
+    responses:
+      '200':
+        description: Webhook updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Webhook unique identifier
+                name:
+                  type: string
+                  description: Webhook name
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  description: Webhook status
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Webhooks
+    summary: Delete webhook
+    description: Deletes a webhook
+    operationId: deleteWebhook
+    responses:
+      '204':
+        description: Webhook deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/{id}/rotate-secret:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Webhook ID
+      schema:
+        type: string
+  post:
+    tags:
+      - Webhooks
+    summary: Rotate webhook secret
+    description: Rotates the secret key for the specified webhook
+    operationId: rotateWebhookSecret
+    responses:
+      '200':
+        description: Secret rotated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Webhook unique identifier
+                secret:
+                  type: string
+                  description: New secret key
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/{id}/test:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Webhook ID
+      schema:
+        type: string
+  post:
+    tags:
+      - Webhooks
+    summary: Test webhook
+    description: Sends a test event to the webhook endpoint
+    operationId: testWebhook
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              eventType:
+                type: string
+                description: Event type to simulate
+    responses:
+      '200':
+        description: Test executed successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  description: Whether the test was successful
+                statusCode:
+                  type: integer
+                  description: HTTP status code received
+                message:
+                  type: string
+                  description: Response message
+                responseTime:
+                  type: number
+                  description: Response time in milliseconds
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/{id}/deliveries:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Webhook ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Webhooks
+    summary: Get webhook deliveries
+    description: Returns a list of recent webhook delivery attempts
+    operationId: getWebhookDeliveries
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - name: status
+        in: query
+        description: Filter by delivery status
+        schema:
+          type: string
+          enum: [success, failed]
+      - name: eventType
+        in: query
+        description: Filter by event type
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Webhook deliveries
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Delivery unique identifier
+                      webhookId:
+                        type: string
+                        description: Webhook ID
+                      eventType:
+                        type: string
+                        description: Event type
+                      status:
+                        type: string
+                        enum: [success, failed]
+                        description: Delivery status
+                      statusCode:
+                        type: integer
+                        description: HTTP status code
+                      responseTime:
+                        type: number
+                        description: Response time in milliseconds
+                      requestPayload:
+                        type: object
+                        description: Request payload sent
+                      responseBody:
+                        type: string
+                        description: Response body received
+                      error:
+                        type: string
+                        description: Error message if failed
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Delivery timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/event-types:
+  get:
+    tags:
+      - Webhooks
+    summary: Get webhook event types
+    description: Returns all available webhook event types
+    operationId: getWebhookEventTypes
+    responses:
+      '200':
+        description: Available event types
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      eventType:
+                        type: string
+                        description: Event type identifier
+                      description:
+                        type: string
+                        description: Description of the event
+                      category:
+                        type: string
+                        description: Category of the event
+                      payloadSchema:
+                        type: object
+                        description: Schema of the event payload
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/webhooks/delivery/{deliveryId}/retry:
+  parameters:
+    - name: deliveryId
+      in: path
+      required: true
+      description: Webhook delivery ID
+      schema:
+        type: string
+  post:
+    tags:
+      - Webhooks
+    summary: Retry webhook delivery
+    description: Retries a failed webhook delivery
+    operationId: retryWebhookDelivery
+    responses:
+      '200':
+        description: Retry initiated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+                deliveryId:
+                  type: string
+                  description: New delivery ID for the retry
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
