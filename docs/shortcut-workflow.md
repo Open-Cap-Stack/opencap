@@ -200,9 +200,71 @@ Changes a story's workflow state:
    - API operations: Use numeric IDs
    - Git operations: Use formatted IDs
 
-4. **Keep the backlog organized**:
-   - Regularly review and update story statuses
-   - Move the next priority stories to "To Do" state
+### 5. Backlog Maintenance and Story Archiving
+
+Maintaining a clean backlog is essential for productivity and compliance with Semantic Seed standards. All stories must follow the proper ID naming convention (OCAE-XXX or OCDI-XXX).
+
+#### Managing Unformatted Stories
+
+Unformatted stories (those without proper OCAE-XXX or OCDI-XXX identifiers) should be archived to keep the backlog clean. Use this script to archive them:
+
+```bash
+# Create an archiving script
+node scripts/archive-unformatted-stories.js
+```
+
+Example implementation:
+```javascript
+const axios = require('axios');
+require('dotenv').config();
+
+const SHORTCUT_API_TOKEN = process.env.SHORTCUT_API_TOKEN;
+
+// IDs of unformatted stories to archive
+const storyIdsToArchive = [
+  // List of story IDs without proper formatting
+];
+
+async function archiveStory(storyId) {
+  try {
+    console.log(`Archiving story ${storyId}...`);
+    
+    await axios.put(
+      `https://api.app.shortcut.com/api/v3/stories/${storyId}`,
+      { archived: true },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Shortcut-Token': SHORTCUT_API_TOKEN
+        }
+      }
+    );
+    
+    console.log(`✅ Successfully archived story ${storyId}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error archiving story ${storyId}:`, error.message);
+    return false;
+  }
+}
+
+// Execute archiving process for all stories
+archiveAllStories();
+```
+
+#### Benefits of Backlog Cleanliness
+
+1. **Standards Compliance**: Ensures all visible stories follow Semantic Seed Venture Studio naming conventions
+2. **Focused Development**: Team only sees properly formatted stories in active states
+3. **Better Tracking**: All work is properly identified with project-related IDs
+4. **Clearer Priorities**: Priority setting is easier with consistent naming
+
+#### When to Archive Stories
+
+- During backlog refinement sessions
+- When preparing for sprint planning
+- After migrating stories from other systems
+- When stories don't align with current project scope
 
 ## Troubleshooting
 
