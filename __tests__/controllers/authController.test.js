@@ -5,7 +5,7 @@
 
 // Start by mocking modules before importing any other modules
 jest.mock('../../models/User', () => {
-  return jest.fn().mockImplementation((userData) => {
+  const UserMock = jest.fn().mockImplementation((userData) => {
     return {
       ...userData,
       save: jest.fn().mockResolvedValue(undefined),
@@ -15,6 +15,11 @@ jest.mock('../../models/User', () => {
       })
     };
   });
+  
+  UserMock.findOne = jest.fn();
+  UserMock.findOneAndUpdate = jest.fn();
+  
+  return UserMock;
 });
 
 jest.mock('bcrypt', () => ({
@@ -33,7 +38,8 @@ jest.mock('mongoose', () => {
 });
 
 jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn().mockReturnValue('mock-jwt-token')
+  sign: jest.fn().mockReturnValue('mock-jwt-token'),
+  verify: jest.fn().mockReturnValue({ userId: 'user-123' })
 }));
 
 // Mock the Google OAuth client
@@ -52,13 +58,27 @@ jest.mock('google-auth-library', () => {
   };
 });
 
-// Now we can import the modules
-const authController = require('../../controllers/authController');
+// Mock nodemailer
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'mock-message-id' })
+  })
+}));
+
+const { 
+  registerUser, 
+  loginUser, 
+  oauthLogin,
+  requestPasswordReset,
+  verifyResetToken,
+  resetPassword
+} = require('../../controllers/authController');
 const User = require('../../models/User');
 const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const nodemailer = require('nodemailer');
 
 describe('Auth Controller (OCAE-202)', () => {
   let req, res, next;
@@ -98,19 +118,20 @@ describe('Auth Controller (OCAE-202)', () => {
         lastName: 'User',
         email: 'test@example.com',
         password: 'SecurePassword123!',
-        role: 'user'
+        role: 'user',
+        companyId: 'company-123'
       };
 
-      // Mock User.findOne to return null (user doesn't exist)
+      // Mock that email doesn't exist
       User.findOne.mockResolvedValueOnce(null);
       
-      // Call the function
-      await authController.registerUser(req, res);
-
-      // Assert that the user findOne function was called with the correct email
+      // Execute the controller function
+      await registerUser(req, res);
+      
+      // Assert that email existence was checked
       expect(User.findOne).toHaveBeenCalledWith({ email: req.body.email });
       
-      // Assert that bcrypt was called to hash the password
+      // Assert password was hashed
       expect(bcrypt.hash).toHaveBeenCalledWith(req.body.password, 10);
       
       // Assert that User constructor was called
@@ -121,14 +142,14 @@ describe('Auth Controller (OCAE-202)', () => {
         email: req.body.email,
         password: 'hashedPassword123',
         role: req.body.role,
+        companyId: req.body.companyId,
         status: 'pending'
       }));
       
-      // Assert the response
+      // Assert response
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        message: 'User registered successfully',
-        user: expect.any(Object)
+        message: 'User registered successfully'
       }));
     });
 
@@ -148,13 +169,11 @@ describe('Auth Controller (OCAE-202)', () => {
       });
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        message: 'Email already exists'
-      });
+      expect(res.json).toHaveBeenCalledWith({ message: 'Email already exists' });
       
       // Assert that User constructor was not called
       expect(User).not.toHaveBeenCalled();
@@ -169,7 +188,7 @@ describe('Auth Controller (OCAE-202)', () => {
       };
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -190,7 +209,7 @@ describe('Auth Controller (OCAE-202)', () => {
       };
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -210,7 +229,7 @@ describe('Auth Controller (OCAE-202)', () => {
       };
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -230,7 +249,7 @@ describe('Auth Controller (OCAE-202)', () => {
       };
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -250,7 +269,7 @@ describe('Auth Controller (OCAE-202)', () => {
       };
 
       // Call the function
-      await authController.registerUser(req, res);
+      await registerUser(req, res);
 
       // Assert response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -268,39 +287,30 @@ describe('Auth Controller (OCAE-202)', () => {
         password: 'SecurePassword123!',
         role: 'user'
       };
-
-      // Mock User.findOne to return null (user doesn't exist)
+      
+      // Mock that email doesn't exist
       User.findOne.mockResolvedValueOnce(null);
-
-      // Create a mock save method that rejects with an error
+      
+      // Setup mock error
       const mockError = new Error('Database error');
       
-      // Mock the User implementation for this test only
-      User.mockImplementationOnce(() => ({
-        userId: 'mock-object-id',
-        firstName: 'Test',
-        lastName: 'User',
-        email: 'test@example.com',
-        password: 'hashedPassword123',
-        role: 'user',
-        status: 'pending',
-        save: jest.fn().mockRejectedValueOnce(mockError),
-        toJSON: jest.fn().mockReturnThis()
-      }));
-
+      // Create a mock User instance with a failing save method
+      const mockUserInstance = {
+        save: jest.fn().mockRejectedValue(mockError),
+        toJSON: jest.fn().mockReturnValue({})
+      };
+      
+      // Mock the User constructor to return our mock instance
+      User.mockImplementationOnce(() => mockUserInstance);
+      
       // Mock console.error to prevent console output during tests
       console.error = jest.fn();
-
-      // Call the function
-      await authController.registerUser(req, res);
-
-      // Assert that console.error was called with the error
-      expect(console.error).toHaveBeenCalledWith(
-        'Error during user registration:',
-        mockError
-      );
       
-      // Assert the response
+      // Execute the controller function
+      await registerUser(req, res);
+      
+      // Assert error handling
+      expect(console.error).toHaveBeenCalledWith('Error during user registration:', mockError);
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         message: 'Internal server error'
@@ -337,7 +347,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify User.findOne was called with correct email
       expect(User.findOne).toHaveBeenCalledWith({ email: req.body.email });
@@ -370,7 +380,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify response
       expect(res.status).toHaveBeenCalledWith(404);
@@ -399,7 +409,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -428,7 +438,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -460,7 +470,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify response
       expect(res.status).toHaveBeenCalledWith(400);
@@ -483,7 +493,7 @@ describe('Auth Controller (OCAE-202)', () => {
       console.log = jest.fn();
       
       // Call the function
-      await authController.loginUser(req, res);
+      await loginUser(req, res);
       
       // Verify error handling
       expect(console.error).toHaveBeenCalledWith('Error during login:', mockError.message);
@@ -520,7 +530,7 @@ describe('Auth Controller (OCAE-202)', () => {
       User.findOne.mockResolvedValueOnce(mockUser);
       
       // Call the function
-      await authController.oauthLogin(req, res);
+      await oauthLogin(req, res);
       
       // Verify OAuth client was called correctly
       expect(mockOAuthClient.verifyIdToken).toHaveBeenCalledWith({
@@ -557,7 +567,7 @@ describe('Auth Controller (OCAE-202)', () => {
       User.findOne.mockResolvedValueOnce(null);
       
       // Call the function
-      await authController.oauthLogin(req, res);
+      await oauthLogin(req, res);
       
       // Verify User.findOne was called with the correct email
       expect(User.findOne).toHaveBeenCalledWith({ email: 'oauth-user@example.com' });
@@ -601,7 +611,7 @@ describe('Auth Controller (OCAE-202)', () => {
       User.findOne.mockResolvedValueOnce(null);
       
       // Call the function
-      await authController.oauthLogin(req, res);
+      await oauthLogin(req, res);
       
       // Verify User constructor was called with correct name split
       expect(User).toHaveBeenCalledWith(expect.objectContaining({
@@ -625,7 +635,7 @@ describe('Auth Controller (OCAE-202)', () => {
       mockOAuthClient.verifyIdToken.mockRejectedValueOnce(mockError);
       
       // Call the function
-      await authController.oauthLogin(req, res);
+      await oauthLogin(req, res);
       
       // Verify error handling
       expect(res.status).toHaveBeenCalledWith(500);
@@ -638,33 +648,498 @@ describe('Auth Controller (OCAE-202)', () => {
         token: 'google-oauth-token'
       };
       
-      // Mock User.findOne to return null (user doesn't exist)
+      // Mock that user doesn't exist
       User.findOne.mockResolvedValueOnce(null);
       
-      // Create a mock save method that rejects with an error
+      // Setup mock error
       const mockError = new Error('Database error');
       
-      // Mock the User implementation for this test only
-      User.mockImplementationOnce(() => ({
-        userId: 'mock-object-id',
-        firstName: 'OAuth',
-        lastName: 'User',
-        email: 'oauth-user@example.com',
-        role: 'user',
-        status: 'active',
-        save: jest.fn().mockRejectedValueOnce(mockError)
-      }));
+      // Create a mock User instance with a failing save method
+      const mockUserInstance = {
+        save: jest.fn().mockRejectedValue(mockError),
+        toJSON: jest.fn().mockReturnValue({})
+      };
+      
+      // Mock the User constructor to return our mock instance
+      User.mockImplementationOnce(() => mockUserInstance);
       
       // Mock console.error to prevent console output during tests
       console.error = jest.fn();
       
       // Call the function
-      await authController.oauthLogin(req, res);
+      await oauthLogin(req, res);
       
       // Verify error handling
       expect(console.error).toHaveBeenCalledWith('Error during OAuth login:', mockError.message);
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ message: 'Internal server error' });
+    });
+  });
+
+  describe('Password Reset Functionality (OCAE-303)', () => {
+    let req, res;
+  
+    // Setup request and response mocks before each test
+    beforeEach(() => {
+      req = {
+        body: {},
+        params: {}
+      };
+      
+      res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      
+      // Reset all mocks before each test
+      jest.clearAllMocks();
+    });
+  
+    describe('requestPasswordReset function', () => {
+      it('should send a password reset email when user exists', async () => {
+        // Setup
+        const mockUser = {
+          _id: 'user-123',
+          userId: 'user-123',
+          email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User'
+        };
+        
+        // Mock User.findOne to return a user
+        User.findOne.mockResolvedValueOnce(mockUser);
+        
+        // Set environment variables needed for the test
+        process.env.JWT_RESET_SECRET = 'test-reset-secret';
+        process.env.FRONTEND_URL = 'http://localhost:3000';
+        
+        // Set email in request body
+        req.body = { email: 'test@example.com' };
+        
+        // Execute function
+        await requestPasswordReset(req, res);
+        
+        // Verify JWT token was created with correct params including expiresIn
+        expect(jwt.sign).toHaveBeenCalledWith(
+          { userId: mockUser.userId },
+          process.env.JWT_RESET_SECRET,
+          { expiresIn: '1h' }
+        );
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'If an account exists with that email, a password reset link has been sent'
+        });
+      });
+      
+      it('should send the same response even when user does not exist (security)', async () => {
+        // Mock User.findOne to return null (user not found)
+        User.findOne.mockResolvedValueOnce(null);
+        
+        // Set email in request body
+        req.body = { email: 'nonexistent@example.com' };
+        
+        // Execute function
+        await requestPasswordReset(req, res);
+        
+        // Verify JWT sign was not called
+        expect(jwt.sign).not.toHaveBeenCalled();
+        
+        // Verify we still return a success response for security
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'If an account exists with that email, a password reset link has been sent'
+        });
+      });
+      
+      it('should return 400 if email is not provided', async () => {
+        // Set empty request body
+        req.body = {};
+        
+        // Execute function
+        await requestPasswordReset(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Email is required'
+        });
+      });
+      
+      it('should handle server errors', async () => {
+        // Mock User.findOne to throw an error
+        User.findOne.mockRejectedValueOnce(new Error('Database error'));
+        
+        // Set email in request body
+        req.body = { email: 'test@example.com' };
+        
+        // Execute function
+        await requestPasswordReset(req, res);
+        
+        // Verify error response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
+      
+      it('should handle email sending failures', async () => {
+        // Setup
+        const mockUser = {
+          _id: 'user-123',
+          email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User'
+        };
+        
+        // Mock User.findOne to return a user
+        User.findOne.mockResolvedValueOnce(mockUser);
+        
+        // Set environment variables needed for the test
+        process.env.JWT_RESET_SECRET = 'test-reset-secret';
+        process.env.FRONTEND_URL = 'http://localhost:3000';
+        
+        // Mock email sending failure
+        const mockTransport = { sendMail: jest.fn().mockRejectedValueOnce(new Error('Email sending failed')) };
+        nodemailer.createTransport.mockReturnValueOnce(mockTransport);
+        
+        // Set email in request body
+        req.body = { email: 'test@example.com' };
+        
+        // Execute function
+        await requestPasswordReset(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
+    });
+  
+    describe('verifyResetToken function', () => {
+      it('should verify a valid reset token', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock User.findOne to return a user
+        User.findOne.mockResolvedValueOnce({
+          userId: 'user-123',
+          email: 'test@example.com'
+        });
+        
+        // Set token in request params
+        req.params.token = 'valid-token';
+        
+        // Execute function
+        await verifyResetToken(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Token is valid',
+          userId: 'user-123'
+        });
+      });
+      
+      it('should return 400 if token is not provided', async () => {
+        // No token in request params
+        req.params = {};
+        
+        // Execute function
+        await verifyResetToken(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Token is required'
+        });
+      });
+      
+      it('should return 400 for an invalid token', async () => {
+        // Mock JWT verification error
+        jwt.verify.mockImplementationOnce(() => {
+          throw new Error('Invalid token');
+        });
+        
+        // Set token in request params
+        req.params.token = 'invalid-token';
+        
+        // Execute function
+        await verifyResetToken(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Invalid or expired token'
+        });
+      });
+      
+      it('should return 404 if user not found', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'nonexistent-user' });
+        
+        // Mock User.findOne to return null (user not found)
+        User.findOne.mockResolvedValueOnce(null);
+        
+        // Set token in request params
+        req.params.token = 'valid-token';
+        
+        // Execute function
+        await verifyResetToken(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'User not found'
+        });
+      });
+      
+      it('should handle server errors', async () => {
+        // Mock token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock a server error
+        User.findOne.mockRejectedValueOnce(new Error('Database error'));
+        
+        // Set token in request params
+        req.params.token = 'valid-token';
+        
+        // Execute function
+        await verifyResetToken(req, res);
+        
+        // Verify error response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
+    });
+  
+    describe('resetPassword function', () => {
+      it('should reset the password with a valid token', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock User.findOne to return a user
+        const mockUser = {
+          userId: 'user-123',
+          email: 'test@example.com'
+        };
+        User.findOne.mockResolvedValueOnce(mockUser);
+        
+        // Mock bcrypt.hash to return hashed password
+        bcrypt.hash.mockResolvedValueOnce('hashed-password');
+        
+        // Mock User.findOneAndUpdate to return updated user
+        User.findOneAndUpdate.mockResolvedValueOnce({ 
+          ...mockUser, 
+          password: 'hashed-password' 
+        });
+        
+        // Set token in request params and password in body
+        req.params.token = 'valid-token';
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify password was hashed
+        expect(bcrypt.hash).toHaveBeenCalledWith('NewSecurePassword123!', 10);
+        
+        // Verify password was updated
+        expect(User.findOneAndUpdate).toHaveBeenCalledWith(
+          { userId: 'user-123' },
+          { password: 'hashed-password' },
+          { new: true }
+        );
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Password has been reset successfully'
+        });
+      });
+      
+      it('should return 400 if token is not provided', async () => {
+        // No token in request params
+        req.params = {};
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Token is required'
+        });
+      });
+      
+      it('should return 400 if password is not provided', async () => {
+        // Set token in request params but no password
+        req.params.token = 'valid-token';
+        req.body = {};
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Password is required'
+        });
+      });
+      
+      it('should validate password strength', async () => {
+        // Set token in request params and short password
+        req.params.token = 'valid-token';
+        req.body.password = 'short';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Password must be at least 8 characters long'
+        });
+      });
+      
+      it('should validate password complexity', async () => {
+        // Set token in request params and simple password
+        req.params.token = 'valid-token';
+        req.body.password = 'password12345';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+        });
+      });
+      
+      it('should return 400 for an invalid token', async () => {
+        // Mock JWT verification error
+        jwt.verify.mockImplementationOnce(() => {
+          throw new Error('Invalid token');
+        });
+        
+        // Set token in request params and password in body
+        req.params.token = 'invalid-token';
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Invalid or expired token'
+        });
+      });
+      
+      it('should return 404 if user not found', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'nonexistent-user' });
+        
+        // Mock User.findOne to return null (user not found)
+        User.findOne.mockResolvedValueOnce(null);
+        
+        // Set token in request params and password in body
+        req.params.token = 'valid-token';
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify response
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'User not found'
+        });
+      });
+      
+      it('should handle server errors', async () => {
+        // Mock token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock a server error during user lookup
+        User.findOne.mockRejectedValueOnce(new Error('Database error'));
+        
+        // Set request params and body
+        req.params.token = 'valid-token';
+        req.body = { password: 'NewSecurePassword123!' };
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify error response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
+      
+      it('should handle password hashing errors', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock User.findOne to return a user
+        User.findOne.mockResolvedValueOnce({
+          userId: 'user-123',
+          email: 'test@example.com'
+        });
+        
+        // Mock bcrypt.hash to throw an error
+        bcrypt.hash.mockRejectedValueOnce(new Error('Hashing failed'));
+        
+        // Set token in request params and password in body
+        req.params.token = 'valid-token';
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify error response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
+      
+      it('should handle database update errors', async () => {
+        // Mock successful token verification
+        jwt.verify.mockReturnValueOnce({ userId: 'user-123' });
+        
+        // Mock User.findOne to return a user
+        User.findOne.mockResolvedValueOnce({
+          userId: 'user-123',
+          email: 'test@example.com'
+        });
+        
+        // Mock bcrypt.hash to succeed
+        bcrypt.hash.mockResolvedValueOnce('new-hashed-password');
+        
+        // Mock findOneAndUpdate to fail
+        User.findOneAndUpdate.mockRejectedValueOnce(new Error('Update failed'));
+        
+        // Set token in request params and password in body
+        req.params.token = 'valid-token';
+        req.body.password = 'NewSecurePassword123!';
+        
+        // Execute function
+        await resetPassword(req, res);
+        
+        // Verify error response
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Internal server error'
+        });
+      });
     });
   });
 });
