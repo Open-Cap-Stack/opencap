@@ -97,11 +97,23 @@ FinancialReportSchema.index({ reportDate: -1 });
  * Calculate totals from revenue and expense items
  */
 FinancialReportSchema.methods.calculateTotals = function() {
-  // Calculate total revenue
-  this.totalRevenue = Object.values(this.revenue || {}).reduce((sum, val) => sum + (val || 0), 0);
+  // Ensure revenue and expenses are properly initialized
+  this.revenue = this.revenue || {};
+  this.expenses = this.expenses || {};
   
-  // Calculate total expenses
-  this.totalExpenses = Object.values(this.expenses || {}).reduce((sum, val) => sum + (val || 0), 0);
+  // Calculate total revenue by summing all values, handling null/undefined
+  this.totalRevenue = Object.values(this.revenue).reduce((sum, val) => {
+    // Handle undefined, null, NaN or other invalid values
+    const numVal = (val === undefined || val === null || isNaN(val)) ? 0 : val;
+    return sum + numVal;
+  }, 0);
+  
+  // Calculate total expenses by summing all values, handling null/undefined
+  this.totalExpenses = Object.values(this.expenses).reduce((sum, val) => {
+    // Handle undefined, null, NaN or other invalid values
+    const numVal = (val === undefined || val === null || isNaN(val)) ? 0 : val;
+    return sum + numVal;
+  }, 0);
   
   // Calculate net income
   this.netIncome = this.totalRevenue - this.totalExpenses;
