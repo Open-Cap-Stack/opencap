@@ -285,6 +285,10 @@ Our sprint plan will focus on completing the implementation of these partially i
 - [Feature] Create BDD test suite for Notification API (3 points)
 - [Feature] Create BDD test suite for Integration Module API (3 points)
 - [Feature] Create error handling test cases for all APIs (5 points)
+- [Feature] OCAE-202: Improve User Authentication Tests (3 points) 
+  - Implement comprehensive test coverage for auth controller
+  - Ensure all User model tests are reliable and complete
+  - Meet coverage thresholds (>85% for controllers, >90% for models)
 
 **Documentation Team Stories**:
 - [Feature] Create API documentation for Notification API (3 points)

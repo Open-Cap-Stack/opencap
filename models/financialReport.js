@@ -161,16 +161,24 @@ FinancialReportSchema.index({ userId: 1, reportDate: -1 });
  * This method should be called before saving to ensure totals are accurate
  */
 FinancialReportSchema.methods.calculateTotals = function() {
-  // Sum up all revenue values, handling the case where revenue might be missing
-  this.totalRevenue = this.revenue ? Object.values(this.revenue)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0) : 0;
-    
-  // Sum up all expense values, handling the case where expenses might be missing
-  this.totalExpenses = this.expenses ? Object.values(this.expenses)
-    .filter(val => typeof val === 'number')
-    .reduce((sum, val) => sum + val, 0) : 0;
-    
+  // Ensure revenue and expenses are properly initialized
+  this.revenue = this.revenue || {};
+  this.expenses = this.expenses || {};
+  
+  // Calculate total revenue by summing all values, handling null/undefined
+  this.totalRevenue = Object.values(this.revenue).reduce((sum, val) => {
+    // Handle undefined, null, NaN or other invalid values
+    const numVal = (val === undefined || val === null || isNaN(val)) ? 0 : val;
+    return sum + numVal;
+  }, 0);
+  
+  // Calculate total expenses by summing all values, handling null/undefined
+  this.totalExpenses = Object.values(this.expenses).reduce((sum, val) => {
+    // Handle undefined, null, NaN or other invalid values
+    const numVal = (val === undefined || val === null || isNaN(val)) ? 0 : val;
+    return sum + numVal;
+  }, 0);
+  
   // Calculate net income
   this.netIncome = this.totalRevenue - this.totalExpenses;
   
