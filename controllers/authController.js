@@ -1,11 +1,17 @@
-const User = require('../models/userModel');
+const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const { blacklistToken } = require('../middleware/authMiddleware');
 
-// Create transporter for sending emails
+// Initialize Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+/**
+ * Create transporter for sending emails
+ * @returns {Object} Nodemailer transporter object
+ */
 const createEmailTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.example.com',
@@ -20,33 +26,50 @@ const createEmailTransporter = () => {
 
 /**
  * Register a new user
+ * Feature: OCAE-202: Implement user registration endpoint
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, confirmPassword, role = 'user' } = req.body;
+    const { firstName, lastName, email, password, confirmPassword, role = 'user', companyId } = req.body;
 
-    // Validate input fields
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Validate required fields
+    const errors = [];
+    if (!firstName) errors.push('First name is required');
+    if (!lastName) errors.push('Last name is required');
+    if (!email) errors.push('Email is required');
+    if (!password) errors.push('Password is required');
+    
+    if (errors.length > 0) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors
+      });
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    // Check if passwords match
-    if (password !== confirmPassword) {
+    // Check if passwords match when confirmPassword is provided
+    if (confirmPassword && password !== confirmPassword) {
       return res.status(400).json({ message: 'Passwords do not match' });
     }
 
     // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+    
+    // Check for password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
     if (!passwordRegex.test(password)) {
-      return res.status(400).json({ message: 'Password too weak' });
+      return res.status(400).json({
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
     }
 
     // Check if user already exists
@@ -65,27 +88,26 @@ const registerUser = async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      status: 'pending',
+      companyId,
+      emailVerified: false
     });
 
-    await newUser.save();
+    const savedUser = await newUser.save();
 
-    // Send welcome email with verification link
-    await sendVerificationEmailToUser(newUser);
+    // Generate verification token and send email
+    await sendVerificationEmailToUser(savedUser);
 
-    res.status(201).json({ 
+    // Remove password from response
+    const userResponse = savedUser.toObject();
+    delete userResponse.password;
+
+    return res.status(201).json({
       message: 'User registered successfully',
-      userId: newUser._id 
+      user: userResponse
     });
   } catch (error) {
     console.error('Registration error:', error.message);
-    
-    // Handle duplicate key error (e.g., unique index violation)
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Email or username already in use' });
-    }
-    
-    res.status(500).json({ message: 'Server error during registration' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -98,7 +120,7 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input fields
+    // Validate input
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
@@ -109,129 +131,116 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check if password matches
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    // Compare passwords
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Create tokens
-    const token = jwt.sign(
-      { userId: user.userId, role: user.UserRoles }, 
-      process.env.JWT_SECRET || 'testsecret', 
+    // Generate tokens
+    const accessToken = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET || 'testsecret',
       { expiresIn: '1h' }
     );
-    
+
     const refreshToken = jwt.sign(
-      { userId: user.userId }, 
-      process.env.JWT_REFRESH_SECRET || 'refresh-testsecret', 
+      { userId: user._id },
+      process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
       { expiresIn: '7d' }
     );
 
-    res.status(200).json({ 
-      token,
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      message: 'Login successful',
+      accessToken,
       refreshToken,
-      userId: user.userId,
-      user: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.UserRoles
-      }
+      user: userResponse
     });
   } catch (error) {
     console.error('Login error:', error.message);
-    res.status(500).json({ message: 'Server error during login' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 /**
- * Handle OAuth login
+ * OAuth login (Google, Facebook, etc.)
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const oauthLogin = async (req, res) => {
   try {
-    const { tokenId, provider } = req.body;
-    
-    // Check if token and provider are provided
-    if (!tokenId || !provider) {
-      return res.status(400).json({ message: 'Token ID and provider are required' });
+    const { token, provider } = req.body;
+
+    if (!token || !provider) {
+      return res.status(400).json({ message: 'Token and provider are required' });
     }
-    
-    // Check if provider is supported
-    const supportedProviders = ['google', 'facebook', 'apple'];
-    if (!supportedProviders.includes(provider.toLowerCase())) {
-      return res.status(400).json({ message: 'Provider not supported' });
-    }
-    
-    // Placeholder for verifying token with provider (would use actual SDK in production)
-    let userData;
-    try {
-      // Simulate token verification with provider
-      if (provider.toLowerCase() === 'google') {
-        // In a real app, we would use the Google API client library
-        userData = { email: 'google@example.com', name: 'Google User', id: 'google123' };
-      } else if (provider.toLowerCase() === 'facebook') {
-        // In a real app, we would use the Facebook SDK
-        userData = { email: 'facebook@example.com', name: 'Facebook User', id: 'facebook123' };
-      } else if (provider.toLowerCase() === 'apple') {
-        // In a real app, we would use the Apple Sign In API
-        userData = { email: 'apple@example.com', name: 'Apple User', id: 'apple123' };
+
+    let userInfo;
+
+    // Verify token based on provider
+    if (provider === 'google') {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: token,
+          audience: process.env.GOOGLE_CLIENT_ID
+        });
+        userInfo = ticket.getPayload();
+      } catch (error) {
+        return res.status(401).json({ message: 'Invalid OAuth token' });
       }
-    } catch (verificationError) {
-      return res.status(401).json({ message: 'Invalid authentication token' });
+    } else {
+      return res.status(400).json({ message: 'Unsupported OAuth provider' });
     }
-    
-    // Find user by provider ID or email
-    let user = await User.findOne({
-      $or: [
-        { [`${provider}Id`]: userData.id },
-        { email: userData.email }
-      ]
-    });
-    
+
+    // Check if user exists
+    let user = await User.findOne({ email: userInfo.email });
+
     // Create user if not exists
     if (!user) {
       user = new User({
-        username: userData.name.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random() * 1000),
-        email: userData.email,
-        [`${provider}Id`]: userData.id,
-        isEmailVerified: true, // OAuth providers usually verify emails
-        status: 'active',
-        UserRoles: ['User']
+        firstName: userInfo.given_name,
+        lastName: userInfo.family_name,
+        email: userInfo.email,
+        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+        role: 'user',
+        emailVerified: true,
+        oauthProvider: provider,
+        oauthId: userInfo.sub
       });
-      
+
       await user.save();
     }
-    
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.userId, roles: user.UserRoles },
-      process.env.JWT_SECRET || 'test-secret',
+
+    // Generate tokens
+    const accessToken = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET || 'testsecret',
       { expiresIn: '1h' }
     );
-    
-    // Generate refresh token
+
     const refreshToken = jwt.sign(
-      { userId: user.userId },
+      { userId: user._id },
       process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
       { expiresIn: '7d' }
     );
-    
-    res.status(200).json({
-      token,
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      message: 'OAuth login successful',
+      accessToken,
       refreshToken,
-      user: {
-        userId: user.userId,
-        username: user.username,
-        email: user.email,
-        UserRoles: user.UserRoles
-      }
+      user: userResponse
     });
   } catch (error) {
     console.error('OAuth login error:', error.message);
-    res.status(500).json({ message: 'Server error during OAuth login' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -242,46 +251,39 @@ const oauthLogin = async (req, res) => {
  */
 const refreshToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
-    
-    if (!refreshToken) {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
       return res.status(400).json({ message: 'Refresh token is required' });
     }
-    
-    // Verify the refresh token
+
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh-testsecret');
-      
-      // Find the user
-      const user = await User.findOne({ userId: decoded.userId });
-      
+      // Verify refresh token
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'refresh-testsecret');
+
+      // Find user
+      const user = await User.findById(decoded.userId);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
-      
-      // Generate new tokens
-      const newAccessToken = jwt.sign(
-        { userId: user.userId, roles: user.UserRoles }, 
-        process.env.JWT_SECRET || 'testsecret', 
+
+      // Generate new access token
+      const accessToken = jwt.sign(
+        { userId: user._id, role: user.role },
+        process.env.JWT_SECRET || 'testsecret',
         { expiresIn: '1h' }
       );
-      
-      const newRefreshToken = jwt.sign(
-        { userId: user.userId }, 
-        process.env.JWT_REFRESH_SECRET || 'refresh-testsecret', 
-        { expiresIn: '7d' }
-      );
-      
-      res.json({ token: newAccessToken, refreshToken: newRefreshToken });
+
+      return res.status(200).json({
+        message: 'Token refreshed successfully',
+        accessToken
+      });
     } catch (error) {
-      console.error('Error refreshing token:', error.message);
-      
-      // Always return 401 for any token verification error
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
   } catch (error) {
-    console.error('Server error refreshing token:', error.message);
-    res.status(500).json({ message: 'Server error while refreshing token' });
+    console.error('Token refresh error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -290,21 +292,21 @@ const refreshToken = async (req, res) => {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const logout = (req, res) => {
+const logout = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
-      return res.status(401).json({ message: 'No token provided' });
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
     }
-    
-    const token = authHeader.split(' ')[1];
-    blacklistToken(token);
-    
-    res.status(200).json({ message: 'Logged out successfully' });
+
+    // Blacklist token
+    await blacklistToken(token);
+
+    return res.status(200).json({ message: 'Logout successful' });
   } catch (error) {
     console.error('Logout error:', error.message);
-    res.status(500).json({ message: 'Server error during logout' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -316,59 +318,50 @@ const logout = (req, res) => {
 const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
     }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
-    }
-    
-    // Find user
+
+    // Find user by email
     const user = await User.findOne({ email });
-    
-    // Create transporter for sending email
-    const transporter = createEmailTransporter();
-    
-    // Only send email if user exists, but don't indicate this in the response
-    if (user) {
-      // Generate reset token
-      const resetToken = jwt.sign(
-        { userId: user.userId }, 
-        process.env.JWT_RESET_SECRET || 'reset-testsecret', 
-        { expiresIn: '15m' }
-      );
-      
-      // Send reset email
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'support@opencap.com',
-        to: user.email,
-        subject: 'OpenCap - Password Reset',
-        html: `
-          <h1>Password Reset</h1>
-          <p>You have requested a password reset. Please click the link below to reset your password:</p>
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}">
-            Reset Password
-          </a>
-          <p>This link will expire in 15 minutes.</p>
-          <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
-        `
-      });
+    if (!user) {
+      // For security reasons, still return success even if user doesn't exist
+      return res.status(200).json({ message: 'If your email exists in our system, you will receive a password reset link' });
     }
-    
-    // Always return success (for security reasons)
-    res.status(200).json({ message: 'Password reset email sent' });
+
+    // Generate reset token
+    const resetToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_RESET_SECRET || 'reset-testsecret',
+      { expiresIn: '1h' }
+    );
+
+    // Send reset email
+    const transporter = createEmailTransporter();
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'support@opencap.com',
+      to: user.email,
+      subject: 'OpenCap - Password Reset',
+      html: `
+        <h1>Password Reset</h1>
+        <p>You requested a password reset. Please click the link below to reset your password:</p>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}">
+          Reset Password
+        </a>
+        <p>This link will expire in 1 hour.</p>
+      `
+    });
+
+    return res.status(200).json({ message: 'Password reset email sent' });
   } catch (error) {
     console.error('Password reset request error:', error.message);
-    res.status(500).json({ message: 'Server error processing reset request' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 /**
- * Verify password reset token
+ * Verify reset token
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -380,73 +373,93 @@ const verifyResetToken = async (req, res) => {
     if (!token) {
       return res.status(400).json({ message: 'Token is required' });
     }
-
-    // Verify token
-    jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
     
-    res.status(200).json({ message: 'Token is valid' });
-  } catch (error) {
-    console.error('Error verifying reset token:', error.message);
-    
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Invalid or expired token' });
+    try {
+      // Verify token
+      jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
+      
+      // If verification succeeds, token is valid
+      return res.status(200).json({ message: 'Token is valid' });
+    } catch (error) {
+      // If verification fails, token is invalid
+      return res.status(400).json({ message: 'Invalid or expired token' });
     }
-    
-    res.status(500).json({ message: 'Server error verifying token' });
+  } catch (error) {
+    console.error('Token verification error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 /**
  * Reset user password with valid token
+ * Feature: OCAE-303: Implement password reset functionality
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword, confirmPassword } = req.body;
+    const { token } = req.params;
+    const { password } = req.body;
     
-    // Check if all fields are provided
-    if (!token || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Validate inputs
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
     }
     
-    // Check if passwords match
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match' });
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
     }
     
     // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
-    if (!passwordRegex.test(newPassword)) {
-      return res.status(400).json({ message: 'Password too weak' });
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
     
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
-    
-    // Find user
-    const user = await User.findOne({ userId: decoded.userId });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Validate password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
     }
     
-    // Hash new password - use a simpler approach that's easier to mock in tests
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
-    // Update user password
-    user.password = hashedPassword;
-    await user.save();
-    
-    // Return success
-    res.status(200).json({ message: 'Password reset successful' });
+    try {
+      // Verify token - wrap this in another try-catch to return 400 instead of 500
+      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
+      
+      try {
+        // Database operations in separate try-catch for proper error handling
+        // Find user
+        const user = await User.findById(decoded.userId);
+        
+        // If user not found
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Update user's password
+        await User.findByIdAndUpdate(
+          user._id,
+          { password: hashedPassword },
+          { new: true }
+        );
+        
+        return res.status(200).json({ message: 'Password has been reset successfully' });
+      } catch (dbError) {
+        // Database errors should return 500
+        console.error('Password reset error:', dbError.message);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+    } catch (tokenError) {
+      // Handle JWT errors - always return 400 for invalid tokens
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
   } catch (error) {
     console.error('Password reset error:', error.message);
-    
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-    
-    res.status(500).json({ message: 'Server error during password reset' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -457,27 +470,19 @@ const resetPassword = async (req, res) => {
  */
 const getUserProfile = async (req, res) => {
   try {
+    // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
-    
+
     // Find user
-    const user = await User.findOne({ userId });
+    const user = await User.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Return user profile (excluding sensitive data)
-    res.status(200).json(user.toJSON ? user.toJSON() : {
-      userId: user.userId,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.UserRoles,
-      isEmailVerified: user.isEmailVerified
-    });
+
+    return res.status(200).json({ user });
   } catch (error) {
-    console.error('Get user profile error:', error.message);
-    res.status(500).json({ message: 'Server error retrieving profile' });
+    console.error('Get profile error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -488,44 +493,67 @@ const getUserProfile = async (req, res) => {
  */
 const updateUserProfile = async (req, res) => {
   try {
+    // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
-    const { username, email, firstName, lastName } = req.body;
-    
+    const { firstName, lastName, email, currentPassword, newPassword } = req.body;
+
     // Find user
-    const user = await User.findOne({ userId });
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Validate email format if provided
-    if (email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-      
-      user.email = email;
-      user.isEmailVerified = false; // Require re-verification of new email
-    }
-    
-    // Update other fields if provided
-    if (username) user.username = username;
+
+    // Update basic info
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     
-    // Save updated user
+    // Update email if provided and different
+    if (email && email !== user.email) {
+      // Check if email is already used by another user
+      const existingUser = await User.findOne({ email });
+      if (existingUser && existingUser._id.toString() !== userId) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      
+      user.email = email;
+      user.emailVerified = false;
+      
+      // Send verification email for new email
+      await sendVerificationEmailToUser(user);
+    }
+
+    // Update password if both current and new passwords are provided
+    if (currentPassword && newPassword) {
+      // Validate current password
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Current password is incorrect' });
+      }
+
+      // Validate new password strength
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({ message: 'New password does not meet requirements' });
+      }
+
+      // Hash and set new password
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    // Save updates
     await user.save();
-    
-    res.status(200).json({ message: 'Profile updated successfully' });
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      user: userResponse
+    });
   } catch (error) {
     console.error('Update profile error:', error.message);
-    
-    // Handle duplicate key error (e.g., unique index violation)
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Email or username already in use' });
-    }
-    
-    res.status(500).json({ message: 'Server error updating profile' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -536,43 +564,27 @@ const updateUserProfile = async (req, res) => {
  */
 const sendVerificationEmail = async (req, res) => {
   try {
+    // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
-    
+
     // Find user
-    const user = await User.findOne({ userId });
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Generate verification token and send email
-    const transporter = createEmailTransporter();
-    
-    // Generate verification token
-    const verificationToken = jwt.sign(
-      { userId: user.userId }, 
-      process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret', 
-      { expiresIn: '24h' }
-    );
-    
+
+    // Check if email is already verified
+    if (user.emailVerified) {
+      return res.status(400).json({ message: 'Email is already verified' });
+    }
+
     // Send verification email
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'support@opencap.com',
-      to: user.email,
-      subject: 'OpenCap - Verify Your Email',
-      html: `
-        <h1>Email Verification</h1>
-        <p>Thank you for registering. Please click the link below to verify your email address:</p>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${verificationToken}">
-          Verify Email
-        </a>
-        <p>This link will expire in 24 hours.</p>
-      `
-    });
-    
-    res.status(200).json({ message: 'Verification email sent' });
+    await sendVerificationEmailToUser(user);
+
+    return res.status(200).json({ message: 'Verification email sent' });
   } catch (error) {
     console.error('Send verification email error:', error.message);
-    res.status(500).json({ message: 'Server error sending verification email' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -582,45 +594,34 @@ const sendVerificationEmail = async (req, res) => {
  * @param {Object} res - Express response object
  */
 const verifyEmail = async (req, res) => {
-  // Get token from params
-  const { token } = req.params;
-
-  // Check if token exists
-  if (!token || token.trim() === '') {
-    return res.status(400).json({ message: 'Verification token is required' });
-  }
-
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret');
-    
-    // Get user from database
-    const user = await User.findOne({ userId: decoded.userId });
-    
-    // Check if user exists
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' });
     }
-    
-    // Update user verification status
-    user.isEmailVerified = true;
-    user.status = 'active';
-    
-    // Save user with updated verification status
-    await user.save();
-    
-    // Return success response
-    res.status(200).json({ message: 'Email verified successfully' });
+
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret');
+
+      // Find user
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Update user's email verification status
+      user.emailVerified = true;
+      await user.save();
+
+      return res.status(200).json({ message: 'Email verification successful' });
+    } catch (error) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' });
+    }
   } catch (error) {
     console.error('Email verification error:', error.message);
-    
-    // Handle token verification errors
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Invalid or expired verification token' });
-    }
-    
-    // Server error
-    res.status(500).json({ message: 'Server error during email verification' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -640,7 +641,7 @@ const checkVerificationToken = (req, res) => {
 const sendVerificationEmailToUser = async (user) => {
   // Generate verification token
   const verificationToken = jwt.sign(
-    { userId: user.userId }, 
+    { userId: user._id }, 
     process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret', 
     { expiresIn: '24h' }
   );
@@ -662,6 +663,7 @@ const sendVerificationEmailToUser = async (user) => {
   });
 };
 
+// Export all controller functions
 module.exports = {
   registerUser,
   loginUser,
