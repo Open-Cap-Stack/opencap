@@ -8,7 +8,13 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const helmetMiddleware = require('./middleware/security/helmet');
 const corsMiddleware = require('./middleware/security/cors');
-const { rateLimiter, authRateLimiter } = require('./middleware/security/rateLimit');
+const { 
+  rateLimiter, 
+  authRateLimiter,
+  createRouteRateLimit,
+  createTieredRateLimit,
+  includeAdvancedHeaders 
+} = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
 const testEndpoints = require('./middleware/testEndpoints');
 
@@ -40,10 +46,34 @@ app.use(express.urlencoded({ extended: true }));
 // Cookie parser middleware
 app.use(cookieParser());
 
-// Apply rate limiting
+// Apply advanced rate limiting headers
+app.use(includeAdvancedHeaders());
+
+// Create route-specific rate limiters
+const apiRateLimiter = createRouteRateLimit('api', 100, 15 * 60 * 1000);
+const adminRateLimiter = createRouteRateLimit('admin', 50, 15 * 60 * 1000);
+
+// Apply default rate limiting
 app.use(rateLimiter);
+
 // Apply stricter rate limiting to auth routes
 app.use('/auth', authRateLimiter);
+
+// Apply route-specific rate limiting
+app.use('/api', apiRateLimiter);
+app.use('/admin', adminRateLimiter);
+
+// Apply tiered rate limiting to premium routes if user is authenticated
+app.use('/api/premium', (req, res, next) => {
+  // Check if user exists and has a role/tier
+  if (req.user && req.user.tier) {
+    // Apply appropriate tier limiter
+    const tierLimiter = createTieredRateLimit(req.user.tier);
+    return tierLimiter(req, res, next);
+  }
+  // If no user or tier, proceed without tier-specific rate limiting
+  next();
+});
 
 // Apply API versioning middleware
 app.use(addVersionHeaders);
