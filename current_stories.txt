@@ -1,0 +1,42 @@
+Fetching all stories from Shortcut...
+
+Found 36 stories:
+
+| Numeric ID | Formatted ID | Name | State |
+|------------|--------------|------|-------|
+| 86 | OCAE-205 | [Feature] OCAE-205: Implement financial reporti... | Done |
+| 87 | OCAE-210 | [Feature] OCAE-210: Create comprehensive Swagge... | Done |
+| 92 | OCAE-301 | [Feature] OCAE-301: Implement JWT authentication | Done |
+| 94 | OCAE-303 | [Feature] OCAE-303: Implement password reset fu... | Done |
+| 84 | OCAE-203 | [Feature] OCAE-203: Implement user authenticati... | Done |
+| 85 | OCAE-202 | [Feature] OCAE-202: Implement user registration... | Done |
+| 80 | OCAE-201 | [Feature] OCAE-201: Set up Express server with ... | Done |
+| 77 | OCDI-108 | [Feature] OCDI-108: Create Document data model | Done |
+| 76 | OCDI-107 | [Chore] OCDI-107: Implement database migration ... | Done |
+| 74 | OCDI-106 | [Feature] OCDI-106: Database seed script | Done |
+| 75 | OCDI-104 | [Feature] OCDI-104: Create Financial Report dat... | Done |
+| 73 | OCDI-103 | [Feature] OCDI-103: Create Company data model | Done |
+| 78 | OCDI-105 | [Feature] OCDI-105: Create Share Class data model | Done |
+| 83 | OCAE-206 | [Feature] OCAE-206: Implement document upload e... | Done |
+| 79 | OCAE-208 | [Feature] OCAE-208: Implement share class manag... | Done |
+| 81 | OCAE-207 | [Feature] OCAE-207: Implement admin management ... | Done |
+| 88 | OCAE-209 | [Chore] OCAE-209: Implement API versioning | Done |
+| 104 | OCAE-211 | [Feature] OCAE-211: Implement SPV Management API | Done |
+| 105 | OCAE-212 | [Feature] OCAE-212: Implement SPV Asset Managem... | Done |
+| 72 | OCDI-102 | [Feature] OCDI-102: Create User data model | Done |
+| 71 | OCDI-101 | [Feature] OCDI-101: Set up MongoDB connection | Done |
+| 65 | N/A | [Chore] OCAE-TEST: Test Shortcut Integration | Done |
+| 82 | OCAE-204 | [Feature] OCAE-204: Implement company managemen... | Backlog |
+| 89 | OCAE-305 | [Feature] OCAE-305: Implement API rate limiting | Backlog |
+| 90 | OCAE-304 | [Feature] OCAE-304: Set up secure header config... | Backlog |
+| 91 | OCAE-302 | [Feature] OCAE-302: Implement role-based access... | Backlog |
+| 95 | OCAE-402 | [Feature] OCAE-402: Create financial metrics ca... | Backlog |
+| 97 | OCAE-401 | [Feature] OCAE-401: Implement financial report ... | Backlog |
+| 96 | OCDI-201 | [Feature] OCDI-201: Implement financial data im... | Backlog |
+| 98 | OCDI-202 | [Feature] OCDI-202: Create financial reporting ... | Backlog |
+| 93 | OCAE-306 | [Chore] OCAE-306: Implement security audit logging | Backlog |
+| 99 | OCAE-501 | [Chore] OCAE-501: Set up Jest testing framework | Backlog |
+| 100 | OCAE-502 | [Chore] OCAE-502: Implement ESLint configuration | Backlog |
+| 101 | OCAE-504 | [Chore] OCAE-504: Create end-to-end test suite | Backlog |
+| 102 | OCAE-503 | [Chore] OCAE-503: Create CI/CD pipeline configu... | Backlog |
+| 107 | N/A | [Chore] OCAE-TEST: Test Shortcut Integration | Backlog |

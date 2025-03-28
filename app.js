@@ -187,4 +187,13 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
+// Set up server and start listening
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
+  });
+}
+
 module.exports = app;
