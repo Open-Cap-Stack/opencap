@@ -8,6 +8,7 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const helmetMiddleware = require('./middleware/security/helmet');
 const corsMiddleware = require('./middleware/security/cors');
+const secureHeadersMiddleware = require('./middleware/secureHeadersMiddleware'); // OCAE-304: Import secure headers
 const { rateLimiter, authRateLimiter } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
 const testEndpoints = require('./middleware/testEndpoints');
@@ -22,6 +23,7 @@ const app = express();
 // Apply security middleware first
 app.use(helmetMiddleware);
 app.use(corsMiddleware);
+app.use(secureHeadersMiddleware()); // OCAE-304: Apply secure headers middleware
 
 // Apply compression middleware early in the pipeline
 app.use(compression());
