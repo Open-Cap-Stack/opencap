@@ -10,7 +10,7 @@ const express = require('express');
 const request = require('supertest');
 const { expect } = require('chai');
 
-// Import rate limiting module (we'll enhance this)
+// Import rate limiting module
 const rateLimitModule = require('../../middleware/security/rateLimit');
 
 describe('Enhanced API Rate Limiting', () => {
@@ -22,39 +22,136 @@ describe('Enhanced API Rate Limiting', () => {
   
   describe('Route-Specific Rate Limiting', () => {
     it('should apply different limits to different API routes', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.createRouteRateLimit).to.throw();
+      // Create a route-specific rate limiter
+      const apiLimiter = rateLimitModule.createRouteRateLimit('api', 20, 5 * 60 * 1000);
+      
+      // Verify it's a function (middleware)
+      expect(typeof apiLimiter).to.equal('function');
+      
+      // Apply the middleware to a test route
+      app.use('/api', apiLimiter);
+      app.get('/api/test', (req, res) => {
+        res.status(200).json({ message: 'Success' });
+      });
+      
+      // Test route
+      const response = await request(app).get('/api/test');
+      expect(response.status).to.equal(200);
+      expect(response.headers).to.have.property('x-ratelimit-limit');
+      expect(response.headers).to.have.property('x-ratelimit-remaining');
     });
     
     it('should track limits per route', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.getRouteLimits).to.throw();
+      // Create multiple route limiters
+      rateLimitModule.createRouteRateLimit('api', 20, 5 * 60 * 1000);
+      rateLimitModule.createRouteRateLimit('admin', 10, 10 * 60 * 1000);
+      
+      // Get the limits and verify they're tracked correctly
+      const limits = rateLimitModule.getRouteLimits();
+      
+      expect(limits).to.have.property('api');
+      expect(limits).to.have.property('admin');
+      expect(limits.api.max).to.equal(20);
+      expect(limits.admin.max).to.equal(10);
+      expect(limits.api.windowMs).to.equal(5 * 60 * 1000);
+      expect(limits.admin.windowMs).to.equal(10 * 60 * 1000);
     });
   });
   
   describe('API Key Based Rate Limiting', () => {
     it('should identify requests by API key instead of IP when provided', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.createApiKeyRateLimit).to.throw();
+      // Create an API key rate limiter
+      const apiKeyLimiter = rateLimitModule.createApiKeyRateLimit(50, 10 * 60 * 1000);
+      
+      // Apply the middleware to a test route
+      app.use('/api', apiKeyLimiter);
+      app.get('/api/test', (req, res) => {
+        res.status(200).json({ message: 'Success' });
+      });
+      
+      // Test with API key
+      const response = await request(app)
+        .get('/api/test')
+        .set('x-api-key', 'test-key-1234');
+        
+      expect(response.status).to.equal(200);
+      expect(response.headers).to.have.property('x-ratelimit-limit');
+      expect(response.headers).to.have.property('x-ratelimit-remaining');
     });
     
     it('should apply different limits to different API keys based on subscription tier', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.createTieredRateLimit).to.throw();
+      // Create a tiered rate limiter for premium tier
+      const premiumLimiter = rateLimitModule.createTieredRateLimit('premium');
+      
+      // Apply the middleware to a test route
+      app.use('/api', premiumLimiter);
+      app.get('/api/test', (req, res) => {
+        res.status(200).json({ message: 'Success' });
+      });
+      
+      // Test with API key
+      const response = await request(app)
+        .get('/api/test')
+        .set('x-api-key', 'premium-key-1234');
+        
+      expect(response.status).to.equal(200);
+      expect(response.headers).to.have.property('x-ratelimit-limit');
+      expect(parseFloat(response.headers['x-ratelimit-limit'])).to.be.at.least(1000); // Premium tier has higher limit
     });
   });
   
   describe('Burst Prevention', () => {
     it('should implement token bucket algorithm for better burst handling', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.createTokenBucketRateLimit).to.throw();
+      // Create a token bucket rate limiter
+      const tokenBucketLimiter = rateLimitModule.createTokenBucketRateLimit(20, 1);
+      
+      // Apply the middleware to a test route
+      app.use('/api', tokenBucketLimiter);
+      app.get('/api/test', (req, res) => {
+        res.status(200).json({ message: 'Success' });
+      });
+      
+      // Test route
+      const response = await request(app).get('/api/test');
+      expect(response.status).to.equal(200);
+      expect(response.headers).to.have.property('x-ratelimit-limit');
+      expect(response.headers).to.have.property('x-ratelimit-remaining');
+      expect(response.headers).to.have.property('x-ratelimit-reset');
+      
+      // Tokens should be reduced after request
+      expect(parseFloat(response.headers['x-ratelimit-remaining'])).to.be.lessThan(20);
     });
   });
   
   describe('Advanced Response Headers', () => {
     it('should include advanced rate limit information in response headers', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.includeAdvancedHeaders).to.throw();
+      // Create rate limiter with advanced headers
+      const advancedHeadersMiddleware = rateLimitModule.includeAdvancedHeaders();
+      
+      // Setup a test app that will set a rate limit header
+      app.use((req, res, next) => {
+        // Simulate rateLimit middleware by setting headers
+        res.setHeader('x-ratelimit-remaining', '99');
+        // Create reset time
+        req.rateLimit = {
+          resetTime: Date.now() + 900000
+        };
+        next();
+      });
+      
+      // Then apply the advanced headers middleware
+      app.use(advancedHeadersMiddleware);
+      
+      app.get('/test', (req, res) => {
+        res.status(200).json({ message: 'Success' });
+      });
+      
+      // Test route
+      const response = await request(app).get('/test');
+      expect(response.status).to.equal(200);
+      
+      // The policy header should be added
+      expect(response.headers).to.have.property('x-ratelimit-policy');
     });
     
     it('should include retry-after header when rate limit is exceeded', async () => {
@@ -76,16 +173,27 @@ describe('Enhanced API Rate Limiting', () => {
       // This should exceed the limit
       const response = await request(app).get('/test');
       
-      // Test not implemented yet (RED)
-      // Actual test will check for retry-after header
       expect(response.status).to.equal(429);
+      expect(response.headers).to.have.property('retry-after');
     });
   });
   
   describe('Configuration Management', () => {
     it('should support dynamic configuration updates', async () => {
-      // Test not implemented yet (RED)
-      expect(() => rateLimitModule.updateRateLimitConfig).to.throw();
+      // Create an initial route limiter
+      rateLimitModule.createRouteRateLimit('api', 20, 5 * 60 * 1000);
+      
+      // Get initial configuration
+      const initialLimits = rateLimitModule.getRouteLimits();
+      expect(initialLimits.api.max).to.equal(20);
+      
+      // Update the configuration
+      const result = rateLimitModule.updateRateLimitConfig('api', { max: 200 });
+      expect(result).to.be.true;
+      
+      // Get updated configuration
+      const updatedLimits = rateLimitModule.getRouteLimits();
+      expect(updatedLimits.api.max).to.equal(200);
     });
   });
 });
