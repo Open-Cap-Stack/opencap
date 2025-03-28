@@ -1,0 +1,202 @@
+# Investor Management API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/investors:
+  get:
+    tags:
+      - Investor Management
+    summary: Get all investors
+    description: Returns a paginated list of all investors
+    operationId: getAllInvestors
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of investors
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Investor'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Investor Management
+    summary: Create a new investor
+    description: Registers a new investor in the system
+    operationId: createInvestor
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Full name of the investor
+              email:
+                type: string
+                format: email
+                description: Email address
+              type:
+                type: string
+                enum: [individual, institutional]
+                description: Type of investor
+              companyId:
+                type: string
+                description: ID of the associated company
+    responses:
+      '201':
+        description: Investor created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Investor'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investors/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Investor ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Investor Management
+    summary: Get investor by ID
+    description: Returns a single investor by ID
+    operationId: getInvestorById
+    responses:
+      '200':
+        description: Investor found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Investor'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Investor Management
+    summary: Update investor
+    description: Updates an existing investor
+    operationId: updateInvestor
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Full name of the investor
+              email:
+                type: string
+                format: email
+                description: Email address
+              type:
+                type: string
+                enum: [individual, institutional]
+                description: Type of investor
+              status:
+                type: string
+                enum: [active, inactive]
+                description: Investor status
+    responses:
+      '200':
+        description: Investor updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Investor'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Investor Management
+    summary: Delete investor
+    description: Deletes an investor by ID
+    operationId: deleteInvestor
+    responses:
+      '204':
+        description: Investor deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/investors/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Investor Management
+    summary: Get investors by company
+    description: Returns all investors associated with a specific company
+    operationId: getInvestorsByCompany
+    responses:
+      '200':
+        description: Investors found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Investor'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

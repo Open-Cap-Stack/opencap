@@ -1,0 +1,490 @@
+openapi: 3.0.0
+info:
+  title: OpenCap Document API
+  description: Document Management and Access Control Endpoints
+  version: 1.0.0
+
+paths:
+  /api/documents:
+    get:
+      tags:
+        - Document Management
+      summary: Get all documents
+      description: Retrieve a list of all documents the user has access to
+      operationId: getDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of records to return
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [contract, report, legal, tax, other]
+          description: Filter by document type
+      responses:
+        '200':
+          description: List of documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Document Management
+      summary: Upload a new document
+      description: Upload a new document with metadata
+      operationId: uploadDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - name
+                - type
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to upload
+                name:
+                  type: string
+                  description: Document name
+                type:
+                  type: string
+                  enum: [contract, report, legal, tax, other]
+                  description: Document type
+                description:
+                  type: string
+                  description: Document description
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Tags to categorize the document
+                entityId:
+                  type: string
+                  description: ID of the related entity (e.g., company, SPV, investor)
+                entityType:
+                  type: string
+                  enum: [company, spv, investor, employee, other]
+                  description: Type of the related entity
+      responses:
+        '201':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{id}:
+    get:
+      tags:
+        - Document Management
+      summary: Get document by ID
+      description: Retrieve details of a specific document
+      operationId: getDocumentById
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      responses:
+        '200':
+          description: Document details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - Document Management
+      summary: Update document metadata
+      description: Update metadata of a specific document
+      operationId: updateDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Document name
+                type:
+                  type: string
+                  enum: [contract, report, legal, tax, other]
+                  description: Document type
+                description:
+                  type: string
+                  description: Document description
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Tags to categorize the document
+                entityId:
+                  type: string
+                  description: ID of the related entity
+                entityType:
+                  type: string
+                  enum: [company, spv, investor, employee, other]
+                  description: Type of the related entity
+      responses:
+        '200':
+          description: Document updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Document Management
+      summary: Delete document
+      description: Delete a specific document
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      responses:
+        '200':
+          description: Document deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  id:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{id}/download:
+    get:
+      tags:
+        - Document Management
+      summary: Download document
+      description: Download the document file
+      operationId: downloadDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      responses:
+        '200':
+          description: Document file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/document-embeddings:
+    post:
+      tags:
+        - Document Management
+      summary: Generate document embeddings
+      description: Generate vector embeddings for a document to enable semantic search
+      operationId: generateDocumentEmbeddings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - documentId
+              properties:
+                documentId:
+                  type: string
+                  description: ID of the document to generate embeddings for
+                forceRegenerate:
+                  type: boolean
+                  default: false
+                  description: Force regeneration of existing embeddings
+      responses:
+        '200':
+          description: Embeddings generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                  embeddingCount:
+                    type: integer
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/document-embeddings/search:
+    post:
+      tags:
+        - Document Management
+      summary: Semantic search across documents
+      description: Search for documents using semantic similarity
+      operationId: searchDocuments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Search query
+                limit:
+                  type: integer
+                  default: 10
+                  description: Maximum number of results to return
+                filters:
+                  type: object
+                  properties:
+                    documentTypes:
+                      type: array
+                      items:
+                        type: string
+                        enum: [contract, report, legal, tax, other]
+                      description: Filter by document types
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by tags
+                    entityTypes:
+                      type: array
+                      items:
+                        type: string
+                        enum: [company, spv, investor, employee, other]
+                      description: Filter by entity types
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        document:
+                          $ref: '#/components/schemas/Document'
+                        score:
+                          type: number
+                          format: float
+                          description: Similarity score
+                        relevantText:
+                          type: string
+                          description: Relevant text excerpt
+                  total:
+                    type: integer
+                    description: Total number of results
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Document:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Document unique identifier
+        name:
+          type: string
+          description: Document name
+        type:
+          type: string
+          enum: [contract, report, legal, tax, other]
+          description: Document type
+        description:
+          type: string
+          description: Document description
+        fileUrl:
+          type: string
+          format: uri
+          description: URL to access the document file
+        fileSize:
+          type: integer
+          description: File size in bytes
+        fileType:
+          type: string
+          description: MIME type of the file
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags categorizing the document
+        entityId:
+          type: string
+          description: ID of the related entity
+        entityType:
+          type: string
+          enum: [company, spv, investor, employee, other]
+          description: Type of the related entity
+        uploadedBy:
+          type: string
+          description: ID of the user who uploaded the document
+        hasEmbeddings:
+          type: boolean
+          description: Whether vector embeddings have been generated
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of records
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Number of records per page
+        pages:
+          type: integer
+          description: Total number of pages

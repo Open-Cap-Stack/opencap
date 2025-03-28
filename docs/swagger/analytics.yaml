@@ -1,0 +1,814 @@
+# Analytics API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/analytics/dashboard:
+  get:
+    tags:
+      - Analytics
+    summary: Get dashboard analytics
+    description: Returns summarized analytics data for dashboard views
+    operationId: getDashboardAnalytics
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: period
+        in: query
+        description: Time period for analytics
+        schema:
+          type: string
+          enum: [day, week, month, quarter, year, custom]
+          default: month
+      - name: startDate
+        in: query
+        description: Start date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Dashboard analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                investments:
+                  type: object
+                  description: Investment analytics
+                  properties:
+                    total:
+                      type: number
+                      description: Total investment amount
+                    count:
+                      type: integer
+                      description: Number of investments
+                    byType:
+                      type: object
+                      description: Breakdown by investment type
+                      additionalProperties:
+                        type: number
+                    trend:
+                      type: array
+                      description: Time-series data for investment trends
+                      items:
+                        type: object
+                        properties:
+                          date:
+                            type: string
+                            format: date
+                          amount:
+                            type: number
+                shareholderActivity:
+                  type: object
+                  description: Shareholder activity metrics
+                  properties:
+                    totalShareholders:
+                      type: integer
+                      description: Total number of shareholders
+                    newShareholders:
+                      type: integer
+                      description: New shareholders in the period
+                    activePercentage:
+                      type: number
+                      description: Percentage of active shareholders
+                    distribution:
+                      type: object
+                      description: Distribution by investor type
+                      additionalProperties:
+                        type: integer
+                equityMetrics:
+                  type: object
+                  description: Equity-related metrics
+                  properties:
+                    outstandingShares:
+                      type: number
+                      description: Total outstanding shares
+                    fullyDilutedShares:
+                      type: number
+                      description: Fully diluted shares
+                    byShareClass:
+                      type: array
+                      description: Breakdown by share class
+                      items:
+                        type: object
+                        properties:
+                          shareClass:
+                            type: string
+                          shares:
+                            type: number
+                          percentage:
+                            type: number
+                documentActivity:
+                  type: object
+                  description: Document activity metrics
+                  properties:
+                    totalDocuments:
+                      type: integer
+                      description: Total number of documents
+                    newDocuments:
+                      type: integer
+                      description: New documents in the period
+                    byType:
+                      type: object
+                      description: Breakdown by document type
+                      additionalProperties:
+                        type: integer
+                complianceStatus:
+                  type: object
+                  description: Compliance status metrics
+                  properties:
+                    compliantPercentage:
+                      type: number
+                      description: Percentage of compliant entities
+                    pendingReview:
+                      type: integer
+                      description: Number of entities pending review
+                    byCheckType:
+                      type: object
+                      description: Compliance by check type
+                      additionalProperties:
+                        type: object
+                        properties:
+                          passed:
+                            type: integer
+                          failed:
+                            type: integer
+                          pending:
+                            type: integer
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/analytics/investments:
+  get:
+    tags:
+      - Analytics
+    summary: Get investment analytics
+    description: Returns detailed analytics for investments
+    operationId: getInvestmentAnalytics
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: period
+        in: query
+        description: Time period for analytics
+        schema:
+          type: string
+          enum: [day, week, month, quarter, year, custom]
+          default: month
+      - name: startDate
+        in: query
+        description: Start date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: groupBy
+        in: query
+        description: Group results by dimension
+        schema:
+          type: string
+          enum: [type, status, investor, date]
+          default: date
+    responses:
+      '200':
+        description: Investment analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: object
+                  description: Summary metrics
+                  properties:
+                    totalAmount:
+                      type: number
+                      description: Total investment amount
+                    totalCount:
+                      type: integer
+                      description: Total number of investments
+                    averageAmount:
+                      type: number
+                      description: Average investment amount
+                    medianAmount:
+                      type: number
+                      description: Median investment amount
+                byType:
+                  type: array
+                  description: Breakdown by investment type
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        description: Investment type
+                      amount:
+                        type: number
+                        description: Total amount
+                      count:
+                        type: integer
+                        description: Number of investments
+                      percentage:
+                        type: number
+                        description: Percentage of total
+                byStatus:
+                  type: array
+                  description: Breakdown by investment status
+                  items:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        description: Investment status
+                      amount:
+                        type: number
+                        description: Total amount
+                      count:
+                        type: integer
+                        description: Number of investments
+                      percentage:
+                        type: number
+                        description: Percentage of total
+                timeSeries:
+                  type: array
+                  description: Time-series data
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      amount:
+                        type: number
+                      count:
+                        type: integer
+                topInvestors:
+                  type: array
+                  description: Top investors by amount
+                  items:
+                    type: object
+                    properties:
+                      investorId:
+                        type: string
+                      investorName:
+                        type: string
+                      amount:
+                        type: number
+                      count:
+                        type: integer
+                      percentage:
+                        type: number
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/analytics/equity:
+  get:
+    tags:
+      - Analytics
+    summary: Get equity analytics
+    description: Returns detailed analytics for equity ownership and plans
+    operationId: getEquityAnalytics
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: includeHistorical
+        in: query
+        description: Include historical equity data
+        schema:
+          type: boolean
+          default: false
+      - name: asOfDate
+        in: query
+        description: Calculate equity as of this date (ISO format)
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Equity analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: object
+                  description: Summary metrics
+                  properties:
+                    authorizedShares:
+                      type: number
+                      description: Total authorized shares
+                    issuedShares:
+                      type: number
+                      description: Total issued shares
+                    reservedShares:
+                      type: number
+                      description: Total reserved shares
+                    availableShares:
+                      type: number
+                      description: Available shares
+                    fullyDilutedShares:
+                      type: number
+                      description: Fully diluted shares
+                capitalizationTable:
+                  type: object
+                  description: Capitalization table data
+                  properties:
+                    shareClasses:
+                      type: array
+                      description: Share classes
+                      items:
+                        type: object
+                        properties:
+                          shareClassId:
+                            type: string
+                          name:
+                            type: string
+                          issuedShares:
+                            type: number
+                          percentageOwnership:
+                            type: number
+                    shareholders:
+                      type: array
+                      description: Shareholders
+                      items:
+                        type: object
+                        properties:
+                          shareholderId:
+                            type: string
+                          name:
+                            type: string
+                          shareholderType:
+                            type: string
+                          shares:
+                            type: number
+                          percentageOwnership:
+                            type: number
+                          shareClasses:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                shareClassId:
+                                  type: string
+                                name:
+                                  type: string
+                                shares:
+                                  type: number
+                equityPlans:
+                  type: array
+                  description: Equity plans analytics
+                  items:
+                    type: object
+                    properties:
+                      planId:
+                        type: string
+                      name:
+                        type: string
+                      totalShares:
+                        type: number
+                      allocatedShares:
+                        type: number
+                      availableShares:
+                        type: number
+                      percentageAllocated:
+                        type: number
+                dilutionAnalysis:
+                  type: object
+                  description: Dilution analysis
+                  properties:
+                    currentDilution:
+                      type: object
+                      additionalProperties:
+                        type: number
+                    projectedDilution:
+                      type: object
+                      additionalProperties:
+                        type: number
+                valuation:
+                  type: object
+                  description: Valuation metrics
+                  properties:
+                    currentValuation:
+                      type: number
+                      description: Current company valuation
+                    sharePrice:
+                      type: number
+                      description: Current share price
+                    historicalValuations:
+                      type: array
+                      description: Historical valuations
+                      items:
+                        type: object
+                        properties:
+                          date:
+                            type: string
+                            format: date
+                          valuation:
+                            type: number
+                          sharePrice:
+                            type: number
+                          event:
+                            type: string
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/analytics/compliance:
+  get:
+    tags:
+      - Analytics
+    summary: Get compliance analytics
+    description: Returns analytics for compliance activities and status
+    operationId: getComplianceAnalytics
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: period
+        in: query
+        description: Time period for analytics
+        schema:
+          type: string
+          enum: [day, week, month, quarter, year, custom]
+          default: month
+      - name: startDate
+        in: query
+        description: Start date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Compliance analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: object
+                  description: Summary metrics
+                  properties:
+                    totalChecks:
+                      type: integer
+                      description: Total compliance checks
+                    passedChecks:
+                      type: integer
+                      description: Number of passed checks
+                    failedChecks:
+                      type: integer
+                      description: Number of failed checks
+                    pendingChecks:
+                      type: integer
+                      description: Number of pending checks
+                    complianceRate:
+                      type: number
+                      description: Overall compliance rate
+                byCheckType:
+                  type: array
+                  description: Breakdown by check type
+                  items:
+                    type: object
+                    properties:
+                      checkType:
+                        type: string
+                        description: Type of compliance check
+                      total:
+                        type: integer
+                        description: Total checks
+                      passed:
+                        type: integer
+                        description: Passed checks
+                      failed:
+                        type: integer
+                        description: Failed checks
+                      pending:
+                        type: integer
+                        description: Pending checks
+                      complianceRate:
+                        type: number
+                        description: Compliance rate for this type
+                byEntityType:
+                  type: array
+                  description: Breakdown by entity type
+                  items:
+                    type: object
+                    properties:
+                      entityType:
+                        type: string
+                        description: Type of entity
+                      total:
+                        type: integer
+                        description: Total entities
+                      compliant:
+                        type: integer
+                        description: Compliant entities
+                      nonCompliant:
+                        type: integer
+                        description: Non-compliant entities
+                      pending:
+                        type: integer
+                        description: Entities with pending compliance
+                      complianceRate:
+                        type: number
+                        description: Compliance rate for this entity type
+                timeSeries:
+                  type: array
+                  description: Time-series compliance data
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      complianceRate:
+                        type: number
+                      checkCount:
+                        type: integer
+                riskAnalysis:
+                  type: object
+                  description: Risk analysis
+                  properties:
+                    highRiskEntities:
+                      type: integer
+                      description: Number of high-risk entities
+                    mediumRiskEntities:
+                      type: integer
+                      description: Number of medium-risk entities
+                    lowRiskEntities:
+                      type: integer
+                      description: Number of low-risk entities
+                    riskDistribution:
+                      type: object
+                      additionalProperties:
+                        type: integer
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/analytics/activity:
+  get:
+    tags:
+      - Analytics
+    summary: Get user activity analytics
+    description: Returns analytics for user activity in the system
+    operationId: getActivityAnalytics
+    parameters:
+      - name: companyId
+        in: query
+        description: Filter by company ID
+        schema:
+          type: string
+      - name: period
+        in: query
+        description: Time period for analytics
+        schema:
+          type: string
+          enum: [day, week, month, quarter, year, custom]
+          default: month
+      - name: startDate
+        in: query
+        description: Start date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for custom period (ISO format)
+        schema:
+          type: string
+          format: date
+      - name: groupBy
+        in: query
+        description: Group results by dimension
+        schema:
+          type: string
+          enum: [user, action, resource, date]
+          default: date
+    responses:
+      '200':
+        description: Activity analytics data
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: object
+                  description: Summary metrics
+                  properties:
+                    totalActivity:
+                      type: integer
+                      description: Total activity count
+                    uniqueUsers:
+                      type: integer
+                      description: Number of unique active users
+                    averageActivitiesPerUser:
+                      type: number
+                      description: Average activities per user
+                    mostActiveDay:
+                      type: string
+                      format: date
+                      description: Most active day
+                byActionType:
+                  type: array
+                  description: Breakdown by action type
+                  items:
+                    type: object
+                    properties:
+                      action:
+                        type: string
+                        description: Action type
+                      count:
+                        type: integer
+                        description: Number of actions
+                      percentage:
+                        type: number
+                        description: Percentage of total
+                byResource:
+                  type: array
+                  description: Breakdown by resource
+                  items:
+                    type: object
+                    properties:
+                      resource:
+                        type: string
+                        description: Resource type
+                      count:
+                        type: integer
+                        description: Number of activities
+                      percentage:
+                        type: number
+                        description: Percentage of total
+                topUsers:
+                  type: array
+                  description: Most active users
+                  items:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                      userName:
+                        type: string
+                      activityCount:
+                        type: integer
+                      lastActive:
+                        type: string
+                        format: date-time
+                timeSeries:
+                  type: array
+                  description: Time-series activity data
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      count:
+                        type: integer
+                      uniqueUsers:
+                        type: integer
+                userEngagement:
+                  type: object
+                  description: User engagement metrics
+                  properties:
+                    dailyActiveUsers:
+                      type: integer
+                    weeklyActiveUsers:
+                      type: integer
+                    monthlyActiveUsers:
+                      type: integer
+                    retentionRate:
+                      type: number
+                      description: User retention rate
+                    averageSessionDuration:
+                      type: number
+                      description: Average session duration in minutes
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/analytics/export:
+  post:
+    tags:
+      - Analytics
+    summary: Export analytics data
+    description: Exports analytics data in various formats
+    operationId: exportAnalyticsData
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - dataType
+              - format
+            properties:
+              dataType:
+                type: string
+                enum: [investments, equity, compliance, activity, dashboard]
+                description: Type of data to export
+              format:
+                type: string
+                enum: [csv, excel, pdf, json]
+                description: Export format
+              parameters:
+                type: object
+                description: Parameters for the data query
+                properties:
+                  companyId:
+                    type: string
+                  period:
+                    type: string
+                  startDate:
+                    type: string
+                    format: date
+                  endDate:
+                    type: string
+                    format: date
+                  includeHistorical:
+                    type: boolean
+                  groupBy:
+                    type: string
+                additionalProperties: true
+    responses:
+      '200':
+        description: Analytics data exported successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                downloadUrl:
+                  type: string
+                  description: URL to download the exported data
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Expiration time for the download URL
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

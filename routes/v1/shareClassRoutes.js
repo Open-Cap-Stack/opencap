@@ -8,10 +8,10 @@
 const express = require('express');
 const router = express.Router();
 const shareClassController = require('../../controllers/v1/shareClassController');
-const auth = require('../../middleware/authMiddleware');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
-router.use(auth);
+router.use(authenticateToken);
 
 // GET routes
 router.get('/', shareClassController.getAllShareClasses);

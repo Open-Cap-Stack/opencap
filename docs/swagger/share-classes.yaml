@@ -1,0 +1,171 @@
+# Share Classes API specification
+# [Feature] OCAE-210: Implement comprehensive Swagger documentation
+/api/share-classes:
+  get:
+    tags:
+      - Share Classes
+    summary: Get all share classes
+    description: Returns a paginated list of all share classes
+    operationId: getAllShareClasses
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of share classes
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ShareClass'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Share Classes
+    summary: Create a new share class
+    description: Creates a new share class in the system
+    operationId: createShareClass
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ShareClassInput'
+    responses:
+      '201':
+        description: Share class created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareClass'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/share-classes/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Share class ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Share Classes
+    summary: Get share class by ID
+    description: Returns a single share class by its ID
+    operationId: getShareClassById
+    responses:
+      '200':
+        description: Share class found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareClass'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Share Classes
+    summary: Update share class
+    description: Updates an existing share class
+    operationId: updateShareClass
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ShareClassInput'
+    responses:
+      '200':
+        description: Share class updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareClass'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Share Classes
+    summary: Delete share class
+    description: Deletes a share class by ID
+    operationId: deleteShareClass
+    responses:
+      '204':
+        description: Share class deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/share-classes/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Share Classes
+    summary: Get share classes by company
+    description: Returns all share classes for a specific company
+    operationId: getShareClassesByCompany
+    responses:
+      '200':
+        description: Share classes found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ShareClass'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

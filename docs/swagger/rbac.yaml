@@ -1,0 +1,283 @@
+openapi: 3.0.0
+info:
+  title: OpenCap RBAC API
+  description: |
+    # Role-Based Access Control (RBAC)
+    
+    This API provides RBAC functionality for the OpenCap platform. It enables secure access control based on 
+    user roles and granular permissions.
+    
+    ## Key RBAC Components
+    
+    - **User Roles**: admin, manager, user, client
+    - **Permissions**: Fine-grained access controls (e.g., read:users, write:companies)
+    - **Middleware**: hasRole and hasPermission for protecting endpoints
+    
+    ## How to Use RBAC
+    
+    To secure an API endpoint with RBAC, use the provided middleware:
+    
+    ```javascript
+    // Require specific role
+    router.get('/endpoint', authenticateToken, hasRole(['admin']), controller.method);
+    
+    // Require specific permission
+    router.post('/endpoint', authenticateToken, hasPermission('write:resource'), controller.method);
+    ```
+    
+  version: '1.0'
+  
+paths:
+  /api/auth/permissions:
+    get:
+      summary: Get current user's permissions
+      description: Returns the list of permissions for the authenticated user
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User permissions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                      example: 'read:users'
+                  role:
+                    type: string
+                    example: 'admin'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /api/rbac/roles:
+    get:
+      summary: Get all available roles
+      description: Returns the list of all roles in the system
+      tags:
+        - RBAC
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Roles retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/rbac/permissions:
+    get:
+      summary: Get all available permissions
+      description: Returns the list of all permissions in the system
+      tags:
+        - RBAC
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Permissions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Permission'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/{userId}/permissions:
+    put:
+      summary: Update user permissions
+      description: Updates the permissions for a specific user
+      tags:
+        - Users
+        - RBAC
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    example: 'read:users'
+              required:
+                - permissions
+      responses:
+        '200':
+          description: User permissions updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  schemas:
+    Role:
+      type: object
+      properties:
+        name:
+          type: string
+          example: 'admin'
+        description:
+          type: string
+          example: 'Administrator with full system access'
+        defaultPermissions:
+          type: array
+          items:
+            type: string
+            example: 'admin:all'
+    
+    Permission:
+      type: object
+      properties:
+        name:
+          type: string
+          example: 'read:users'
+        description:
+          type: string
+          example: 'Allows reading user data'
+        resource:
+          type: string
+          example: 'users'
+        action:
+          type: string
+          example: 'read'
+    
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: 'usr_12345'
+        firstName:
+          type: string
+          example: 'John'
+        lastName:
+          type: string
+          example: 'Doe'
+        email:
+          type: string
+          format: email
+          example: 'john.doe@example.com'
+        role:
+          type: string
+          example: 'admin'
+        permissions:
+          type: array
+          items:
+            type: string
+            example: 'read:users'
+        status:
+          type: string
+          enum: ['active', 'pending', 'inactive', 'suspended']
+          example: 'active'
+  
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: 'Authentication required'
+    
+    ForbiddenError:
+      description: The server understood the request but refuses to authorize it
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: 'Access denied: Insufficient permissions'
+    
+    NotFoundError:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: 'Resource not found'
+    
+    BadRequestError:
+      description: The server could not understand the request due to invalid syntax
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: 'Invalid request'
+    
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: 'Internal server error'

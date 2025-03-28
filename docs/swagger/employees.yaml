@@ -1,0 +1,484 @@
+# Employees API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/employees:
+  get:
+    tags:
+      - Employee Management
+    summary: Get all employees
+    description: Returns a paginated list of all employees
+    operationId: getAllEmployees
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of employees
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Employee unique identifier
+                      userId:
+                        type: string
+                        description: Associated user ID
+                      companyId:
+                        type: string
+                        description: Associated company ID
+                      firstName:
+                        type: string
+                        description: Employee first name
+                      lastName:
+                        type: string
+                        description: Employee last name
+                      email:
+                        type: string
+                        format: email
+                        description: Employee email address
+                      title:
+                        type: string
+                        description: Job title
+                      department:
+                        type: string
+                        description: Department
+                      hireDate:
+                        type: string
+                        format: date
+                        description: Date of hire
+                      status:
+                        type: string
+                        enum: [active, terminated, on_leave]
+                        description: Current employment status
+                      terminationDate:
+                        type: string
+                        format: date
+                        description: Date of termination (if applicable)
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Employee Management
+    summary: Create a new employee
+    description: Creates a new employee record in the system
+    operationId: createEmployee
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - companyId
+              - firstName
+              - lastName
+              - email
+            properties:
+              companyId:
+                type: string
+                description: Associated company ID
+              userId:
+                type: string
+                description: Associated user ID (if exists)
+              firstName:
+                type: string
+                description: Employee first name
+              lastName:
+                type: string
+                description: Employee last name
+              email:
+                type: string
+                format: email
+                description: Employee email address
+              title:
+                type: string
+                description: Job title
+              department:
+                type: string
+                description: Department
+              hireDate:
+                type: string
+                format: date
+                description: Date of hire
+              status:
+                type: string
+                enum: [active, terminated, on_leave]
+                description: Current employment status
+                default: active
+    responses:
+      '201':
+        description: Employee created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Employee unique identifier
+                userId:
+                  type: string
+                  description: Associated user ID
+                companyId:
+                  type: string
+                  description: Associated company ID
+                firstName:
+                  type: string
+                  description: Employee first name
+                lastName:
+                  type: string
+                  description: Employee last name
+                email:
+                  type: string
+                  format: email
+                  description: Employee email address
+                title:
+                  type: string
+                  description: Job title
+                department:
+                  type: string
+                  description: Department
+                hireDate:
+                  type: string
+                  format: date
+                  description: Date of hire
+                status:
+                  type: string
+                  enum: [active, terminated, on_leave]
+                  description: Current employment status
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/employees/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Employee ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Employee Management
+    summary: Get employee by ID
+    description: Returns a single employee by their ID
+    operationId: getEmployeeById
+    responses:
+      '200':
+        description: Employee found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Employee unique identifier
+                userId:
+                  type: string
+                  description: Associated user ID
+                companyId:
+                  type: string
+                  description: Associated company ID
+                firstName:
+                  type: string
+                  description: Employee first name
+                lastName:
+                  type: string
+                  description: Employee last name
+                email:
+                  type: string
+                  format: email
+                  description: Employee email address
+                title:
+                  type: string
+                  description: Job title
+                department:
+                  type: string
+                  description: Department
+                hireDate:
+                  type: string
+                  format: date
+                  description: Date of hire
+                status:
+                  type: string
+                  enum: [active, terminated, on_leave]
+                  description: Current employment status
+                terminationDate:
+                  type: string
+                  format: date
+                  description: Date of termination (if applicable)
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Employee Management
+    summary: Update employee
+    description: Updates an existing employee record
+    operationId: updateEmployee
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              firstName:
+                type: string
+                description: Employee first name
+              lastName:
+                type: string
+                description: Employee last name
+              email:
+                type: string
+                format: email
+                description: Employee email address
+              title:
+                type: string
+                description: Job title
+              department:
+                type: string
+                description: Department
+              hireDate:
+                type: string
+                format: date
+                description: Date of hire
+              status:
+                type: string
+                enum: [active, terminated, on_leave]
+                description: Current employment status
+              terminationDate:
+                type: string
+                format: date
+                description: Date of termination (if applicable)
+    responses:
+      '200':
+        description: Employee updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Employee unique identifier
+                userId:
+                  type: string
+                  description: Associated user ID
+                companyId:
+                  type: string
+                  description: Associated company ID
+                firstName:
+                  type: string
+                  description: Employee first name
+                lastName:
+                  type: string
+                  description: Employee last name
+                email:
+                  type: string
+                  format: email
+                  description: Employee email address
+                title:
+                  type: string
+                  description: Job title
+                department:
+                  type: string
+                  description: Department
+                hireDate:
+                  type: string
+                  format: date
+                  description: Date of hire
+                status:
+                  type: string
+                  enum: [active, terminated, on_leave]
+                  description: Current employment status
+                terminationDate:
+                  type: string
+                  format: date
+                  description: Date of termination (if applicable)
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Employee Management
+    summary: Delete employee
+    description: Deletes an employee record by ID
+    operationId: deleteEmployee
+    responses:
+      '204':
+        description: Employee deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/employees/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Employee Management
+    summary: Get employees by company
+    description: Returns all employees for a specific company
+    operationId: getEmployeesByCompany
+    responses:
+      '200':
+        description: Employees found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Employee unique identifier
+                      firstName:
+                        type: string
+                        description: Employee first name
+                      lastName:
+                        type: string
+                        description: Employee last name
+                      email:
+                        type: string
+                        format: email
+                        description: Employee email address
+                      title:
+                        type: string
+                        description: Job title
+                      department:
+                        type: string
+                        description: Department
+                      status:
+                        type: string
+                        enum: [active, terminated, on_leave]
+                        description: Current employment status
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/employees/{id}/equity:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Employee ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Employee Management
+    summary: Get employee equity grants
+    description: Returns all equity grants for a specific employee
+    operationId: getEmployeeEquityGrants
+    responses:
+      '200':
+        description: Employee equity grants found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Grant ID
+                      planId:
+                        type: string
+                        description: Equity plan ID
+                      planName:
+                        type: string
+                        description: Equity plan name
+                      grantDate:
+                        type: string
+                        format: date
+                        description: Date the grant was issued
+                      sharesGranted:
+                        type: number
+                        description: Number of shares granted
+                      vestingSchedule:
+                        type: object
+                        description: Vesting schedule details
+                      status:
+                        type: string
+                        enum: [active, cancelled, exercised]
+                        description: Grant status
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

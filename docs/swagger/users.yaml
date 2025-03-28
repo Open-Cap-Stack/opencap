@@ -1,0 +1,819 @@
+# Users API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/users:
+  get:
+    tags:
+      - User Management
+    summary: Get all users
+    description: Returns a paginated list of all users (admin access required)
+    operationId: getAllUsers
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+      - name: role
+        in: query
+        description: Filter users by role
+        schema:
+          type: string
+          enum: [admin, manager, employee, investor]
+      - name: status
+        in: query
+        description: Filter users by status
+        schema:
+          type: string
+          enum: [active, inactive, pending]
+    responses:
+      '200':
+        description: A list of users
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: User unique identifier
+                      firstName:
+                        type: string
+                        description: User's first name
+                      lastName:
+                        type: string
+                        description: User's last name
+                      email:
+                        type: string
+                        description: User's email address
+                      role:
+                        type: string
+                        enum: [admin, manager, employee, investor]
+                        description: User's role in the system
+                      status:
+                        type: string
+                        enum: [active, inactive, pending]
+                        description: User's status
+                      lastLogin:
+                        type: string
+                        format: date-time
+                        description: Time of last login
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - User Management
+    summary: Create a new user
+    description: Creates a new user in the system
+    operationId: createUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - firstName
+              - lastName
+              - email
+              - password
+              - role
+            properties:
+              firstName:
+                type: string
+                description: User's first name
+              lastName:
+                type: string
+                description: User's last name
+              email:
+                type: string
+                format: email
+                description: User's email address
+              password:
+                type: string
+                format: password
+                description: User's password
+              role:
+                type: string
+                enum: [admin, manager, employee, investor]
+                description: User's role in the system
+              phone:
+                type: string
+                description: User's phone number
+              companyId:
+                type: string
+                description: ID of the company the user belongs to
+              photo:
+                type: string
+                description: URL to user's profile photo
+              preferences:
+                type: object
+                description: User preferences
+                additionalProperties: true
+    responses:
+      '201':
+        description: User created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User unique identifier
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                email:
+                  type: string
+                  description: User's email address
+                role:
+                  type: string
+                  enum: [admin, manager, employee, investor]
+                  description: User's role in the system
+                status:
+                  type: string
+                  enum: [active, inactive, pending]
+                  description: User's status
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        description: Email already in use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/users/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: User ID
+      schema:
+        type: string
+  get:
+    tags:
+      - User Management
+    summary: Get user by ID
+    description: Returns a single user by ID
+    operationId: getUserById
+    responses:
+      '200':
+        description: User found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User unique identifier
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                email:
+                  type: string
+                  description: User's email address
+                role:
+                  type: string
+                  enum: [admin, manager, employee, investor]
+                  description: User's role in the system
+                status:
+                  type: string
+                  enum: [active, inactive, pending]
+                  description: User's status
+                phone:
+                  type: string
+                  description: User's phone number
+                companyId:
+                  type: string
+                  description: ID of the company the user belongs to
+                photo:
+                  type: string
+                  description: URL to user's profile photo
+                lastLogin:
+                  type: string
+                  format: date-time
+                  description: Time of last login
+                preferences:
+                  type: object
+                  description: User preferences
+                  additionalProperties: true
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - User Management
+    summary: Update user
+    description: Updates an existing user
+    operationId: updateUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              firstName:
+                type: string
+                description: User's first name
+              lastName:
+                type: string
+                description: User's last name
+              email:
+                type: string
+                format: email
+                description: User's email address
+              role:
+                type: string
+                enum: [admin, manager, employee, investor]
+                description: User's role in the system
+              status:
+                type: string
+                enum: [active, inactive, pending]
+                description: User's status
+              phone:
+                type: string
+                description: User's phone number
+              companyId:
+                type: string
+                description: ID of the company the user belongs to
+              photo:
+                type: string
+                description: URL to user's profile photo
+              preferences:
+                type: object
+                description: User preferences
+                additionalProperties: true
+    responses:
+      '200':
+        description: User updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User unique identifier
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Email already in use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - User Management
+    summary: Delete user
+    description: Deletes a user (soft delete - sets status to inactive)
+    operationId: deleteUser
+    responses:
+      '204':
+        description: User deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/users/me:
+  get:
+    tags:
+      - User Management
+    summary: Get current user
+    description: Returns the currently authenticated user's profile
+    operationId: getCurrentUser
+    responses:
+      '200':
+        description: Current user profile
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User unique identifier
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                email:
+                  type: string
+                  description: User's email address
+                role:
+                  type: string
+                  enum: [admin, manager, employee, investor]
+                  description: User's role in the system
+                status:
+                  type: string
+                  enum: [active, inactive, pending]
+                  description: User's status
+                phone:
+                  type: string
+                  description: User's phone number
+                companyId:
+                  type: string
+                  description: ID of the company the user belongs to
+                photo:
+                  type: string
+                  description: URL to user's profile photo
+                preferences:
+                  type: object
+                  description: User preferences
+                  additionalProperties: true
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - User Management
+    summary: Update current user
+    description: Updates the currently authenticated user's profile
+    operationId: updateCurrentUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              firstName:
+                type: string
+                description: User's first name
+              lastName:
+                type: string
+                description: User's last name
+              email:
+                type: string
+                format: email
+                description: User's email address
+              phone:
+                type: string
+                description: User's phone number
+              photo:
+                type: string
+                description: URL to user's profile photo
+              preferences:
+                type: object
+                description: User preferences
+                additionalProperties: true
+    responses:
+      '200':
+        description: User updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User unique identifier
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '409':
+        description: Email already in use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/users/company/{companyId}:
+  parameters:
+    - name: companyId
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - User Management
+    summary: Get users by company
+    description: Returns all users associated with a specific company
+    operationId: getUsersByCompany
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+      - name: role
+        in: query
+        description: Filter users by role
+        schema:
+          type: string
+          enum: [admin, manager, employee, investor]
+    responses:
+      '200':
+        description: Users found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: User unique identifier
+                      firstName:
+                        type: string
+                        description: User's first name
+                      lastName:
+                        type: string
+                        description: User's last name
+                      email:
+                        type: string
+                        description: User's email address
+                      role:
+                        type: string
+                        enum: [admin, manager, employee, investor]
+                        description: User's role in the system
+                      status:
+                        type: string
+                        enum: [active, inactive, pending]
+                        description: User's status
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/auth/login:
+  post:
+    tags:
+      - Authentication
+    summary: User login
+    description: Authenticates a user and returns a JWT token
+    operationId: loginUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                description: User's email address
+              password:
+                type: string
+                format: password
+                description: User's password
+    responses:
+      '200':
+        description: Login successful
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: JWT authentication token
+                user:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                      description: User unique identifier
+                    firstName:
+                      type: string
+                      description: User's first name
+                    lastName:
+                      type: string
+                      description: User's last name
+                    email:
+                      type: string
+                      description: User's email address
+                    role:
+                      type: string
+                      description: User's role
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        description: Invalid credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+
+/api/auth/register:
+  post:
+    tags:
+      - Authentication
+    summary: User registration
+    description: Registers a new user
+    operationId: registerUser
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - firstName
+              - lastName
+              - email
+              - password
+            properties:
+              firstName:
+                type: string
+                description: User's first name
+              lastName:
+                type: string
+                description: User's last name
+              email:
+                type: string
+                format: email
+                description: User's email address
+              password:
+                type: string
+                format: password
+                description: User's password
+              phone:
+                type: string
+                description: User's phone number
+              companyId:
+                type: string
+                description: ID of the company the user belongs to
+              inviteCode:
+                type: string
+                description: Invitation code if registering via invite
+    responses:
+      '201':
+        description: Registration successful
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                      description: User unique identifier
+                    firstName:
+                      type: string
+                      description: User's first name
+                    lastName:
+                      type: string
+                      description: User's last name
+                    email:
+                      type: string
+                      description: User's email address
+                    status:
+                      type: string
+                      description: User's status
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '409':
+        description: Email already in use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+
+/api/auth/forgot-password:
+  post:
+    tags:
+      - Authentication
+    summary: Forgot password
+    description: Initiates the password reset process
+    operationId: forgotPassword
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                type: string
+                format: email
+                description: User's email address
+    responses:
+      '200':
+        description: Password reset email sent
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '404':
+        description: Email not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+
+/api/auth/reset-password:
+  post:
+    tags:
+      - Authentication
+    summary: Reset password
+    description: Resets the user's password using a reset token
+    operationId: resetPassword
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - token
+              - password
+            properties:
+              token:
+                type: string
+                description: Password reset token
+              password:
+                type: string
+                format: password
+                description: New password
+    responses:
+      '200':
+        description: Password reset successful
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        description: Invalid or expired token
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+
+/api/auth/change-password:
+  post:
+    tags:
+      - Authentication
+    summary: Change password
+    description: Changes the password for the currently authenticated user
+    operationId: changePassword
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - currentPassword
+              - newPassword
+            properties:
+              currentPassword:
+                type: string
+                format: password
+                description: Current password
+              newPassword:
+                type: string
+                format: password
+                description: New password
+    responses:
+      '200':
+        description: Password changed successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Success message
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        description: Current password is incorrect
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []

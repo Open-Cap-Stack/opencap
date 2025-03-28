@@ -1,0 +1,844 @@
+# SPVs (Special Purpose Vehicles) API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/spvs:
+  get:
+    tags:
+      - SPV Management
+    summary: Get all SPVs
+    description: Returns a paginated list of all Special Purpose Vehicles
+    operationId: getAllSPVs
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of SPVs
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: SPV unique identifier
+                      name:
+                        type: string
+                        description: Name of the SPV
+                      description:
+                        type: string
+                        description: Description of the SPV
+                      legalEntityType:
+                        type: string
+                        enum: [llc, lp, corporation, trust]
+                        description: Legal entity type
+                      managerId:
+                        type: string
+                        description: ID of the managing user or company
+                      adminIds:
+                        type: array
+                        description: IDs of administrators
+                        items:
+                          type: string
+                      targetCompanyId:
+                        type: string
+                        description: ID of the company this SPV invests in
+                      status:
+                        type: string
+                        enum: [draft, active, closed, liquidated]
+                        description: Current status of the SPV
+                      investmentTarget:
+                        type: number
+                        description: Target investment amount
+                      investmentMinimum:
+                        type: number
+                        description: Minimum investment amount
+                      investmentMaximum:
+                        type: number
+                        description: Maximum investment amount
+                      currency:
+                        type: string
+                        description: Currency code (e.g., USD)
+                      legalFormationDate:
+                        type: string
+                        format: date
+                        description: Date of legal formation
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - SPV Management
+    summary: Create a new SPV
+    description: Creates a new Special Purpose Vehicle
+    operationId: createSPV
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - legalEntityType
+              - managerId
+            properties:
+              name:
+                type: string
+                description: Name of the SPV
+              description:
+                type: string
+                description: Description of the SPV
+              legalEntityType:
+                type: string
+                enum: [llc, lp, corporation, trust]
+                description: Legal entity type
+              managerId:
+                type: string
+                description: ID of the managing user or company
+              adminIds:
+                type: array
+                description: IDs of administrators
+                items:
+                  type: string
+              targetCompanyId:
+                type: string
+                description: ID of the company this SPV invests in
+              status:
+                type: string
+                enum: [draft, active, closed, liquidated]
+                description: Current status of the SPV
+                default: draft
+              investmentTarget:
+                type: number
+                description: Target investment amount
+              investmentMinimum:
+                type: number
+                description: Minimum investment amount
+              investmentMaximum:
+                type: number
+                description: Maximum investment amount
+              currency:
+                type: string
+                description: Currency code (e.g., USD)
+                default: USD
+              legalFormationDate:
+                type: string
+                format: date
+                description: Date of legal formation
+              fees:
+                type: object
+                description: Fee structure
+                properties:
+                  managementFee:
+                    type: number
+                    description: Management fee percentage
+                  carriedInterest:
+                    type: number
+                    description: Carried interest percentage
+                  establishmentFee:
+                    type: number
+                    description: One-time establishment fee
+              legalDocuments:
+                type: array
+                description: Associated legal documents
+                items:
+                  type: object
+                  properties:
+                    documentType:
+                      type: string
+                      enum: [operating_agreement, subscription_agreement, ppm, term_sheet]
+                      description: Type of document
+                    documentId:
+                      type: string
+                      description: Document ID in storage
+    responses:
+      '201':
+        description: SPV created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: SPV unique identifier
+                name:
+                  type: string
+                  description: Name of the SPV
+                legalEntityType:
+                  type: string
+                  enum: [llc, lp, corporation, trust]
+                  description: Legal entity type
+                managerId:
+                  type: string
+                  description: ID of the managing user or company
+                status:
+                  type: string
+                  enum: [draft, active, closed, liquidated]
+                  description: Current status of the SPV
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: SPV ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPV by ID
+    description: Returns a single SPV by its ID
+    operationId: getSPVById
+    responses:
+      '200':
+        description: SPV found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: SPV unique identifier
+                name:
+                  type: string
+                  description: Name of the SPV
+                description:
+                  type: string
+                  description: Description of the SPV
+                legalEntityType:
+                  type: string
+                  enum: [llc, lp, corporation, trust]
+                  description: Legal entity type
+                managerId:
+                  type: string
+                  description: ID of the managing user or company
+                adminIds:
+                  type: array
+                  description: IDs of administrators
+                  items:
+                    type: string
+                targetCompanyId:
+                  type: string
+                  description: ID of the company this SPV invests in
+                status:
+                  type: string
+                  enum: [draft, active, closed, liquidated]
+                  description: Current status of the SPV
+                investmentTarget:
+                  type: number
+                  description: Target investment amount
+                investmentMinimum:
+                  type: number
+                  description: Minimum investment amount
+                investmentMaximum:
+                  type: number
+                  description: Maximum investment amount
+                currency:
+                  type: string
+                  description: Currency code (e.g., USD)
+                legalFormationDate:
+                  type: string
+                  format: date
+                  description: Date of legal formation
+                fees:
+                  type: object
+                  description: Fee structure
+                  properties:
+                    managementFee:
+                      type: number
+                      description: Management fee percentage
+                    carriedInterest:
+                      type: number
+                      description: Carried interest percentage
+                    establishmentFee:
+                      type: number
+                      description: One-time establishment fee
+                legalDocuments:
+                  type: array
+                  description: Associated legal documents
+                  items:
+                    type: object
+                    properties:
+                      documentType:
+                        type: string
+                        enum: [operating_agreement, subscription_agreement, ppm, term_sheet]
+                        description: Type of document
+                      documentId:
+                        type: string
+                        description: Document ID in storage
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - SPV Management
+    summary: Update SPV
+    description: Updates an existing SPV
+    operationId: updateSPV
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Name of the SPV
+              description:
+                type: string
+                description: Description of the SPV
+              adminIds:
+                type: array
+                description: IDs of administrators
+                items:
+                  type: string
+              targetCompanyId:
+                type: string
+                description: ID of the company this SPV invests in
+              status:
+                type: string
+                enum: [draft, active, closed, liquidated]
+                description: Current status of the SPV
+              investmentTarget:
+                type: number
+                description: Target investment amount
+              investmentMinimum:
+                type: number
+                description: Minimum investment amount
+              investmentMaximum:
+                type: number
+                description: Maximum investment amount
+              legalFormationDate:
+                type: string
+                format: date
+                description: Date of legal formation
+              fees:
+                type: object
+                description: Fee structure
+                properties:
+                  managementFee:
+                    type: number
+                    description: Management fee percentage
+                  carriedInterest:
+                    type: number
+                    description: Carried interest percentage
+                  establishmentFee:
+                    type: number
+                    description: One-time establishment fee
+              legalDocuments:
+                type: array
+                description: Associated legal documents
+                items:
+                  type: object
+                  properties:
+                    documentType:
+                      type: string
+                      enum: [operating_agreement, subscription_agreement, ppm, term_sheet]
+                      description: Type of document
+                    documentId:
+                      type: string
+                      description: Document ID in storage
+    responses:
+      '200':
+        description: SPV updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: SPV unique identifier
+                name:
+                  type: string
+                  description: Name of the SPV
+                status:
+                  type: string
+                  enum: [draft, active, closed, liquidated]
+                  description: Current status of the SPV
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - SPV Management
+    summary: Delete SPV
+    description: Deletes an SPV by ID
+    operationId: deleteSPV
+    responses:
+      '204':
+        description: SPV deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/{id}/investors:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: SPV ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPV investors
+    description: Returns all investors in a specific SPV
+    operationId: getSPVInvestors
+    responses:
+      '200':
+        description: SPV investors found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Investor ID
+                      investorName:
+                        type: string
+                        description: Name of the investor
+                      investmentAmount:
+                        type: number
+                        description: Amount invested
+                      investmentDate:
+                        type: string
+                        format: date
+                        description: Date of investment
+                      status:
+                        type: string
+                        enum: [pending, active, exited]
+                        description: Investor status in the SPV
+                      ownershipPercentage:
+                        type: number
+                        description: Percentage ownership in the SPV
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/{id}/investments:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: SPV ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPV investments
+    description: Returns all investments made by a specific SPV
+    operationId: getSPVInvestments
+    responses:
+      '200':
+        description: SPV investments found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Investment ID
+                      targetCompanyId:
+                        type: string
+                        description: ID of the target company
+                      targetCompanyName:
+                        type: string
+                        description: Name of the target company
+                      amount:
+                        type: number
+                        description: Investment amount
+                      currency:
+                        type: string
+                        description: Currency code
+                      investmentType:
+                        type: string
+                        enum: [equity, convertible_note, safe, debt]
+                        description: Type of investment
+                      investmentDate:
+                        type: string
+                        format: date
+                        description: Date of investment
+                      status:
+                        type: string
+                        enum: [pending, completed, exited]
+                        description: Status of the investment
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/{id}/documents:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: SPV ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPV documents
+    description: Returns all documents associated with a specific SPV
+    operationId: getSPVDocuments
+    responses:
+      '200':
+        description: SPV documents found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Document ID
+                      documentName:
+                        type: string
+                        description: Name of the document
+                      documentType:
+                        type: string
+                        enum: [operating_agreement, subscription_agreement, ppm, term_sheet, tax_document, financial_statement, other]
+                        description: Type of document
+                      uploadDate:
+                        type: string
+                        format: date-time
+                        description: Date the document was uploaded
+                      uploadedBy:
+                        type: string
+                        description: ID of the user who uploaded the document
+                      fileSize:
+                        type: number
+                        description: Size of the document in bytes
+                      fileType:
+                        type: string
+                        description: MIME type of the document
+                      downloadUrl:
+                        type: string
+                        description: URL to download the document
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/{id}/capital-calls:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: SPV ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPV capital calls
+    description: Returns all capital calls for a specific SPV
+    operationId: getSPVCapitalCalls
+    responses:
+      '200':
+        description: SPV capital calls found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Capital call ID
+                      callNumber:
+                        type: number
+                        description: Sequential number of the capital call
+                      callDate:
+                        type: string
+                        format: date
+                        description: Date of the capital call
+                      dueDate:
+                        type: string
+                        format: date
+                        description: Due date for contributions
+                      totalAmount:
+                        type: number
+                        description: Total amount of the capital call
+                      status:
+                        type: string
+                        enum: [draft, issued, partially_funded, fully_funded, closed]
+                        description: Status of the capital call
+                      purpose:
+                        type: string
+                        description: Purpose of the capital call
+                      contributionDetails:
+                        type: array
+                        description: Details of investor contributions
+                        items:
+                          type: object
+                          properties:
+                            investorId:
+                              type: string
+                              description: Investor ID
+                            amount:
+                              type: number
+                              description: Amount due from this investor
+                            status:
+                              type: string
+                              enum: [pending, received, late]
+                              description: Status of this contribution
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - SPV Management
+    summary: Create SPV capital call
+    description: Creates a new capital call for a specific SPV
+    operationId: createSPVCapitalCall
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - callDate
+              - dueDate
+              - totalAmount
+              - purpose
+            properties:
+              callDate:
+                type: string
+                format: date
+                description: Date of the capital call
+              dueDate:
+                type: string
+                format: date
+                description: Due date for contributions
+              totalAmount:
+                type: number
+                description: Total amount of the capital call
+              status:
+                type: string
+                enum: [draft, issued, partially_funded, fully_funded, closed]
+                description: Status of the capital call
+                default: draft
+              purpose:
+                type: string
+                description: Purpose of the capital call
+              notes:
+                type: string
+                description: Additional notes about the capital call
+              documentIds:
+                type: array
+                description: IDs of documents related to this capital call
+                items:
+                  type: string
+    responses:
+      '201':
+        description: SPV capital call created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Capital call ID
+                callNumber:
+                  type: number
+                  description: Sequential number of the capital call
+                callDate:
+                  type: string
+                  format: date
+                  description: Date of the capital call
+                dueDate:
+                  type: string
+                  format: date
+                  description: Due date for contributions
+                totalAmount:
+                  type: number
+                  description: Total amount of the capital call
+                status:
+                  type: string
+                  enum: [draft, issued, partially_funded, fully_funded, closed]
+                  description: Status of the capital call
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/spvs/manager/{managerId}:
+  parameters:
+    - name: managerId
+      in: path
+      required: true
+      description: Manager ID
+      schema:
+        type: string
+  get:
+    tags:
+      - SPV Management
+    summary: Get SPVs by manager
+    description: Returns all SPVs managed by a specific user or company
+    operationId: getSPVsByManager
+    responses:
+      '200':
+        description: SPVs found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: SPV unique identifier
+                      name:
+                        type: string
+                        description: Name of the SPV
+                      status:
+                        type: string
+                        enum: [draft, active, closed, liquidated]
+                        description: Current status of the SPV
+                      investmentTarget:
+                        type: number
+                        description: Target investment amount
+                      currency:
+                        type: string
+                        description: Currency code
+                      legalFormationDate:
+                        type: string
+                        format: date
+                        description: Date of legal formation
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
