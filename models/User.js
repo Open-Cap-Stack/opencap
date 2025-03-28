@@ -1,6 +1,7 @@
 /**
  * User Model
  * Feature: OCDI-102: Create User data model
+ * Updated: OCAE-302: Implement role-based access control
  */
 
 const mongoose = require('mongoose');
@@ -34,6 +35,49 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true, 
     enum: ['admin', 'manager', 'user', 'client'] 
+  },
+  // Add permissions array for RBAC
+  permissions: {
+    type: [String],
+    default: function() {
+      // Default permissions based on role
+      const rolePermissions = {
+        admin: [
+          'read:users', 'write:users', 'delete:users',
+          'read:companies', 'write:companies', 'delete:companies',
+          'read:reports', 'write:reports', 'delete:reports',
+          'read:spv', 'write:spv', 'delete:spv',
+          'read:assets', 'write:assets', 'delete:assets',
+          'read:compliance', 'write:compliance', 'delete:compliance',
+          'admin:all'
+        ],
+        manager: [
+          'read:users', 'write:users',
+          'read:companies', 'write:companies',
+          'read:reports', 'write:reports',
+          'read:spv', 'write:spv',
+          'read:assets', 'write:assets',
+          'read:compliance', 'write:compliance'
+        ],
+        user: [
+          'read:users',
+          'read:companies',
+          'read:reports',
+          'read:spv',
+          'read:assets',
+          'read:compliance',
+          'write:compliance'
+        ],
+        client: [
+          'read:users',
+          'read:reports',
+          'read:spv',
+          'read:assets'
+        ]
+      };
+      
+      return rolePermissions[this.role] || [];
+    }
   },
   status: { 
     type: String, 

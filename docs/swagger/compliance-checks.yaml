@@ -1,0 +1,502 @@
+# Compliance Checks API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/compliance-checks:
+  get:
+    tags:
+      - Compliance
+    summary: Get all compliance checks
+    description: Returns a paginated list of compliance checks
+    operationId: getAllComplianceChecks
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of compliance checks
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Compliance check unique identifier
+                      companyId:
+                        type: string
+                        description: Associated company ID
+                      checkType:
+                        type: string
+                        enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+                        description: Type of compliance check
+                      entityId:
+                        type: string
+                        description: ID of the entity being checked (user, investor, etc)
+                      entityType:
+                        type: string
+                        enum: [user, investor, company, spv]
+                        description: Type of entity being checked
+                      status:
+                        type: string
+                        enum: [pending, passed, failed, requires_review]
+                        description: Status of the compliance check
+                      results:
+                        type: object
+                        description: Detailed results of the compliance check
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Compliance
+    summary: Create a new compliance check
+    description: Initiates a new compliance check for an entity
+    operationId: createComplianceCheck
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - checkType
+              - entityId
+              - entityType
+            properties:
+              companyId:
+                type: string
+                description: Associated company ID
+              checkType:
+                type: string
+                enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+                description: Type of compliance check
+              entityId:
+                type: string
+                description: ID of the entity to check
+              entityType:
+                type: string
+                enum: [user, investor, company, spv]
+                description: Type of entity to check
+              additionalData:
+                type: object
+                description: Additional data required for the check
+                additionalProperties: true
+    responses:
+      '201':
+        description: Compliance check initiated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Compliance check unique identifier
+                companyId:
+                  type: string
+                  description: Associated company ID
+                checkType:
+                  type: string
+                  enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+                  description: Type of compliance check
+                entityId:
+                  type: string
+                  description: ID of the entity being checked
+                entityType:
+                  type: string
+                  enum: [user, investor, company, spv]
+                  description: Type of entity being checked
+                status:
+                  type: string
+                  enum: [pending, passed, failed, requires_review]
+                  description: Status of the compliance check
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/compliance-checks/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Compliance check ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Compliance
+    summary: Get compliance check by ID
+    description: Returns a single compliance check by its ID
+    operationId: getComplianceCheckById
+    responses:
+      '200':
+        description: Compliance check found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Compliance check unique identifier
+                companyId:
+                  type: string
+                  description: Associated company ID
+                checkType:
+                  type: string
+                  enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+                  description: Type of compliance check
+                entityId:
+                  type: string
+                  description: ID of the entity being checked
+                entityType:
+                  type: string
+                  enum: [user, investor, company, spv]
+                  description: Type of entity being checked
+                status:
+                  type: string
+                  enum: [pending, passed, failed, requires_review]
+                  description: Status of the compliance check
+                results:
+                  type: object
+                  description: Detailed results of the compliance check
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Compliance
+    summary: Update compliance check
+    description: Updates an existing compliance check (e.g., to review or manually approve)
+    operationId: updateComplianceCheck
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [pending, passed, failed, requires_review]
+                description: Status of the compliance check
+              reviewNotes:
+                type: string
+                description: Notes from compliance review
+              reviewedBy:
+                type: string
+                description: ID of the user who reviewed this check
+              additionalData:
+                type: object
+                description: Additional data to add to the check
+                additionalProperties: true
+    responses:
+      '200':
+        description: Compliance check updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: Compliance check unique identifier
+                status:
+                  type: string
+                  enum: [pending, passed, failed, requires_review]
+                  description: Status of the compliance check
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Last update timestamp
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Compliance
+    summary: Delete compliance check
+    description: Deletes a compliance check by ID
+    operationId: deleteComplianceCheck
+    responses:
+      '204':
+        description: Compliance check deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/compliance-checks/entity/{entityType}/{entityId}:
+  parameters:
+    - name: entityType
+      in: path
+      required: true
+      description: Type of entity (user, investor, company, spv)
+      schema:
+        type: string
+        enum: [user, investor, company, spv]
+    - name: entityId
+      in: path
+      required: true
+      description: Entity ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Compliance
+    summary: Get compliance checks by entity
+    description: Returns all compliance checks for a specific entity
+    operationId: getComplianceChecksByEntity
+    responses:
+      '200':
+        description: Compliance checks found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                        description: Compliance check unique identifier
+                      checkType:
+                        type: string
+                        enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+                        description: Type of compliance check
+                      status:
+                        type: string
+                        enum: [pending, passed, failed, requires_review]
+                        description: Status of the compliance check
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Last update timestamp
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/compliance-checks/bulk-verify:
+  post:
+    tags:
+      - Compliance
+    summary: Bulk verify compliance
+    description: Performs bulk compliance verification for multiple entities
+    operationId: bulkVerifyCompliance
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - entities
+              - checkTypes
+            properties:
+              entities:
+                type: array
+                description: Entities to check
+                items:
+                  type: object
+                  required:
+                    - entityId
+                    - entityType
+                  properties:
+                    entityId:
+                      type: string
+                      description: ID of the entity to check
+                    entityType:
+                      type: string
+                      enum: [user, investor, company, spv]
+                      description: Type of entity to check
+              checkTypes:
+                type: array
+                description: Types of compliance checks to perform
+                items:
+                  type: string
+                  enum: [kyc, aml, accredited_investor, reg_cf, reg_d, tax_compliance]
+              companyId:
+                type: string
+                description: Associated company ID
+    responses:
+      '200':
+        description: Bulk compliance checks initiated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batchId:
+                  type: string
+                  description: Batch ID for the bulk operation
+                totalChecks:
+                  type: integer
+                  description: Total number of checks initiated
+                entities:
+                  type: array
+                  description: List of entities with check IDs
+                  items:
+                    type: object
+                    properties:
+                      entityId:
+                        type: string
+                        description: Entity ID
+                      entityType:
+                        type: string
+                        description: Entity type
+                      checkIds:
+                        type: array
+                        description: IDs of initiated checks
+                        items:
+                          type: string
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/compliance-checks/batch/{batchId}:
+  parameters:
+    - name: batchId
+      in: path
+      required: true
+      description: Batch ID for bulk compliance checks
+      schema:
+        type: string
+  get:
+    tags:
+      - Compliance
+    summary: Get compliance check batch status
+    description: Returns the status of a batch of compliance checks
+    operationId: getComplianceCheckBatchStatus
+    responses:
+      '200':
+        description: Batch status found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batchId:
+                  type: string
+                  description: Batch ID for the bulk operation
+                status:
+                  type: string
+                  enum: [in_progress, completed, failed]
+                  description: Overall batch status
+                totalChecks:
+                  type: integer
+                  description: Total number of checks in the batch
+                completed:
+                  type: integer
+                  description: Number of completed checks
+                passed:
+                  type: integer
+                  description: Number of passed checks
+                failed:
+                  type: integer
+                  description: Number of failed checks
+                requiresReview:
+                  type: integer
+                  description: Number of checks requiring review
+                results:
+                  type: array
+                  description: Detailed results for each entity
+                  items:
+                    type: object
+                    properties:
+                      entityId:
+                        type: string
+                        description: Entity ID
+                      entityType:
+                        type: string
+                        description: Entity type
+                      checks:
+                        type: array
+                        description: Check results
+                        items:
+                          type: object
+                          properties:
+                            checkId:
+                              type: string
+                              description: Check ID
+                            checkType:
+                              type: string
+                              description: Type of check
+                            status:
+                              type: string
+                              description: Status of check
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
