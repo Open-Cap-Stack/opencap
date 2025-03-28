@@ -2,34 +2,37 @@ const mongoose = require('mongoose');
 const sinon = require('sinon');
 const { expect } = require('@jest/globals');
 const SPVAsset = require('../models/SPVAsset');
-const spvAssetController = require('../controllers/SPVAsset'); // Make sure to create this controller file
+const spvAssetController = require('../controllers/SPVAsset');
+const { 
+  setupSPVAssetTests, 
+  cleanupSPVAssets, 
+  getSampleAssetData 
+} = require('./utils/spvAssetTestUtils');
 
 describe('SPVAsset Controller', function () {
   beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/test');
-    await mongoose.connection.dropDatabase();
+    // Use the new setup utility with improved connection handling
+    await setupSPVAssetTests({ dropCollection: true });
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
+    // Don't disconnect here - managed by jest.setup.js
   });
 
   beforeEach(async () => {
-    await SPVAsset.deleteMany({});
+    // Use the new cleanup utility with retry logic
+    await cleanupSPVAssets();
   });
 
   it('should create a new SPVAsset', async function () {
+    const sampleAsset = getSampleAssetData();
     const req = {
-      body: {
-        AssetID: 'unique-asset-id',
-        SPVID: 'spv123',
-        Type: 'Real Estate',
-        Value: 1000000,
-        Description: 'Office building in downtown',
-        AcquisitionDate: new Date().toISOString(),
-      },
+      body: sampleAsset
     };
+    
+    // Create a more complete res mock with res.locals
     const res = {
+      locals: {},
       status: sinon.stub().returnsThis(),
       json: sinon.stub(),
     };
@@ -37,22 +40,24 @@ describe('SPVAsset Controller', function () {
     await spvAssetController.createSPVAsset(req, res);
 
     expect(res.status.calledWith(201)).toBe(true);
-    expect(res.json.calledWith(sinon.match.has('AssetID', 'unique-asset-id'))).toBe(true);
+    expect(res.json.calledOnce).toBe(true);
+    
+    // Check that the response data includes the asset ID
+    const responseArg = res.json.firstCall.args[0];
+    expect(responseArg).toBeDefined();
+    expect(responseArg.AssetID).toBe(sampleAsset.AssetID);
   });
 
   it('should get all SPVAssets', async function () {
-    const assetData = {
-      AssetID: 'unique-asset-id',
-      SPVID: 'spv123',
-      Type: 'Real Estate',
-      Value: 1000000,
-      Description: 'Office building in downtown',
-      AcquisitionDate: new Date().toISOString(),
-    };
-    await new SPVAsset(assetData).save();
+    // Create a test asset using the utility with retry logic
+    const sampleAsset = getSampleAssetData();
+    await new SPVAsset(sampleAsset).save();
 
     const req = {};
+    
+    // Create a more complete res mock with res.locals
     const res = {
+      locals: {},
       status: sinon.stub().returnsThis(),
       json: sinon.stub(),
     };
@@ -60,19 +65,17 @@ describe('SPVAsset Controller', function () {
     await spvAssetController.getSPVAssets(req, res);
 
     expect(res.status.calledWith(200)).toBe(true);
-    expect(res.json.args[0][0].spvassets).toBeInstanceOf(Array);
-    expect(res.json.args[0][0].spvassets[0].AssetID).toBe(assetData.AssetID);
+    
+    // Verify the response structure
+    const responseArg = res.json.firstCall.args[0];
+    expect(responseArg).toBeDefined();
+    expect(responseArg.spvassets).toBeInstanceOf(Array);
+    expect(responseArg.spvassets[0].AssetID).toBe(sampleAsset.AssetID);
   });
 
   it('should delete an SPVAsset by ID', async function () {
-    const asset = new SPVAsset({
-      AssetID: 'unique-asset-id',
-      SPVID: 'spv123',
-      Type: 'Real Estate',
-      Value: 1000000,
-      Description: 'Office building in downtown',
-      AcquisitionDate: new Date().toISOString(),
-    });
+    // Create a test asset using the utility with retry logic
+    const asset = new SPVAsset(getSampleAssetData());
     await asset.save();
 
     const req = {
@@ -80,7 +83,10 @@ describe('SPVAsset Controller', function () {
         id: asset._id.toString(),
       },
     };
+    
+    // Create a more complete res mock with res.locals
     const res = {
+      locals: {},
       status: sinon.stub().returnsThis(),
       json: sinon.stub(),
     };
@@ -88,6 +94,14 @@ describe('SPVAsset Controller', function () {
     await spvAssetController.deleteSPVAsset(req, res);
 
     expect(res.status.calledWith(200)).toBe(true);
-    expect(res.json.calledWith(sinon.match.has('message', 'SPVAsset deleted'))).toBe(true);
+    
+    // Check for the success message
+    const responseArg = res.json.firstCall.args[0];
+    expect(responseArg).toBeDefined();
+    expect(responseArg.message).toBe('SPVAsset deleted');
+    
+    // Verify the asset was actually deleted from the database
+    const deletedAsset = await SPVAsset.findById(asset._id);
+    expect(deletedAsset).toBeNull();
   });
 });

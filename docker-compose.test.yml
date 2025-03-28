@@ -1,5 +1,6 @@
 # Docker Compose Test Environment for OpenCap
 # Following Semantic Seed BDD/TDD Coding Standards V2.0
+# Updated for: [Bug] OCDI-301: Fix MongoDB Connection Timeout Issues
 
 version: '3'
 services:
@@ -8,7 +9,7 @@ services:
     container_name: opencap_mongodb_test
     restart: always
     ports:
-      - "27018:27017"
+      - "27017:27017"  # Updated to standard port for consistency
     environment:
       - MONGO_INITDB_ROOT_USERNAME=opencap
       - MONGO_INITDB_ROOT_PASSWORD=password123
@@ -16,13 +17,27 @@ services:
     volumes:
       - ./test-init-scripts/mongo:/docker-entrypoint-initdb.d
       - mongodb_test_data:/data/db
-    command: mongod
+    command: >
+      mongod
+      --setParameter maxConnectionsPerHost=200
+      --setParameter maxIncomingConnections=200
+      --wiredTigerCacheSizeGB=1
+    # Added resources to prevent container resource constraints
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    # Improved healthcheck with more retries and longer timeouts
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://opencap:password123@localhost:27017/admin?authSource=admin --quiet
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
   postgres-test:
     image: postgres:15-alpine
