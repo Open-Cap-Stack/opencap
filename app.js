@@ -8,6 +8,7 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const helmetMiddleware = require('./middleware/security/helmet');
 const corsMiddleware = require('./middleware/security/cors');
+const secureHeadersMiddleware = require('./middleware/secureHeadersMiddleware'); // OCAE-304: Import secure headers
 const { 
   rateLimiter, 
   authRateLimiter,
@@ -17,6 +18,7 @@ const {
 } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
 const testEndpoints = require('./middleware/testEndpoints');
+const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 
 // Initialize dotenv to load environment variables
 dotenv.config();
@@ -27,6 +29,7 @@ const app = express();
 // Apply security middleware first
 app.use(helmetMiddleware);
 app.use(corsMiddleware);
+app.use(secureHeadersMiddleware()); // OCAE-304: Apply secure headers middleware
 
 // Apply compression middleware early in the pipeline
 app.use(compression());
@@ -78,6 +81,9 @@ app.use('/api/premium', (req, res, next) => {
 // Apply API versioning middleware
 app.use(addVersionHeaders);
 app.use(validateApiVersion);
+
+// OCAE-210: Setup Swagger documentation middleware
+setupSwagger(app);
 
 // Mount test endpoints for middleware testing
 app.use('/api', testEndpoints);
@@ -212,5 +218,14 @@ app.use((err, req, res, next) => {
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
+
+// Set up server and start listening
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
+  });
+}
 
 module.exports = app;

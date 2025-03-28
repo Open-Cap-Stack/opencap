@@ -1,0 +1,305 @@
+# Companies API specification
+# [Feature] OCAE-210: Create comprehensive Swagger documentation
+/api/companies:
+  get:
+    tags:
+      - Company Management
+    summary: Get all companies
+    description: Returns a paginated list of all companies
+    operationId: getAllCompanies
+    parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/SortParam'
+    responses:
+      '200':
+        description: A list of companies
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Company'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  post:
+    tags:
+      - Company Management
+    summary: Create a new company
+    description: Creates a new company in the system
+    operationId: createCompany
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - legalName
+              - incorporationState
+            properties:
+              name:
+                type: string
+                description: Common name of the company
+              legalName:
+                type: string
+                description: Legal registered name of the company
+              incorporationState:
+                type: string
+                description: State where the company is incorporated
+              incorporationDate:
+                type: string
+                format: date
+                description: Date of incorporation
+              companyType:
+                type: string
+                enum: [C-Corp, S-Corp, LLC, Partnership]
+                description: Legal structure of the company
+              ein:
+                type: string
+                description: Employer Identification Number
+              status:
+                type: string
+                enum: [active, inactive, pending]
+                description: Current company status
+              address:
+                type: object
+                properties:
+                  street:
+                    type: string
+                  city:
+                    type: string
+                  state:
+                    type: string
+                  zipCode:
+                    type: string
+                  country:
+                    type: string
+    responses:
+      '201':
+        description: Company created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/companies/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Company Management
+    summary: Get company by ID
+    description: Returns a single company by its ID
+    operationId: getCompanyById
+    responses:
+      '200':
+        description: Company found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  put:
+    tags:
+      - Company Management
+    summary: Update company
+    description: Updates an existing company
+    operationId: updateCompany
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Common name of the company
+              legalName:
+                type: string
+                description: Legal registered name of the company
+              incorporationState:
+                type: string
+                description: State where the company is incorporated
+              incorporationDate:
+                type: string
+                format: date
+                description: Date of incorporation
+              companyType:
+                type: string
+                enum: [C-Corp, S-Corp, LLC, Partnership]
+                description: Legal structure of the company
+              ein:
+                type: string
+                description: Employer Identification Number
+              status:
+                type: string
+                enum: [active, inactive, pending]
+                description: Current company status
+              address:
+                type: object
+                properties:
+                  street:
+                    type: string
+                  city:
+                    type: string
+                  state:
+                    type: string
+                  zipCode:
+                    type: string
+                  country:
+                    type: string
+    responses:
+      '200':
+        description: Company updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+  delete:
+    tags:
+      - Company Management
+    summary: Delete company
+    description: Deletes a company by ID
+    operationId: deleteCompany
+    responses:
+      '204':
+        description: Company deleted successfully
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/companies/{id}/users:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Company Management
+    summary: Get company users
+    description: Returns all users associated with a specific company
+    operationId: getCompanyUsers
+    responses:
+      '200':
+        description: Company users found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/User'
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
+
+/api/companies/{id}/metrics:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: string
+  get:
+    tags:
+      - Company Management
+    summary: Get company metrics
+    description: Returns key performance metrics and analytics for a company
+    operationId: getCompanyMetrics
+    parameters:
+      - name: startDate
+        in: query
+        description: Start date for metrics calculation
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        description: End date for metrics calculation
+        schema:
+          type: string
+          format: date
+      - name: type
+        in: query
+        description: Type of metrics to retrieve
+        schema:
+          type: string
+          enum: [financial, operational, compliance, all]
+    responses:
+      '200':
+        description: Company metrics found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  additionalProperties: true
+                  description: Company metrics data
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '500':
+        $ref: '#/components/responses/InternalServerError'
+    security:
+      - bearerAuth: []
