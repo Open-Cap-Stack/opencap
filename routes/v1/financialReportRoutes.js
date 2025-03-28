@@ -8,10 +8,10 @@
 const express = require('express');
 const router = express.Router();
 const financialReportController = require('../../controllers/v1/financialReportController');
-const authMiddleware = require('../../middleware/authMiddleware');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 // Basic collection routes
 router.post('/', financialReportController.createFinancialReport);

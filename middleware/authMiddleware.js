@@ -2,16 +2,18 @@
  * Authentication Middleware
  * 
  * [Feature] OCAE-208: Implement share class management endpoints
+ * [Feature] OCAE-302: Implement role-based access control
  * JWT-based authentication middleware for API routes
  */
 
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 /**
  * Verifies the JWT token in the Authorization header
  * Usage: Add this middleware to routes that require authentication
  */
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
@@ -30,8 +32,26 @@ const authenticateToken = (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'testsecret');
     
+    // Get full user data from database to include permissions
+    const user = await User.findOne({ userId: decoded.userId });
+    
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+    
+    // Check if user is active
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active' });
+    }
+    
     // Add user data to request
-    req.user = decoded;
+    req.user = {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions || [],
+      companyId: user.companyId
+    };
     
     // Continue with the request
     next();
