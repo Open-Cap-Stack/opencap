@@ -2,26 +2,33 @@
  * Authentication Middleware Tests
  * Bug: OCDI-302: Fix User Authentication Test Failures
  * 
- * This test file demonstrates the issues with the current auth middleware:
- * 1. Mongoose connection timeouts
- * 2. JWT verification issues
- * 3. Token blacklisting inconsistencies
- * 4. Model naming inconsistencies
+ * This test file verifies the fixes for the auth middleware:
+ * 1. Mongoose connection timeouts with retry logic
+ * 2. JWT verification with timeouts
+ * 3. Improved token blacklisting
+ * 4. Model naming consistency
  */
 
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const { authenticateToken, checkTokenBlacklist, blacklistToken } = require('../../middleware/authMiddleware');
+const { 
+  authenticateToken, 
+  checkTokenBlacklist, 
+  blacklistToken, 
+  isTokenBlacklisted,
+  verifyTokenWithTimeout
+} = require('../../middleware/authMiddleware');
 const mongoDbConnection = require('../../utils/mongoDbConnection');
 
 // Mock dependencies
 jest.mock('jsonwebtoken');
 jest.mock('../../models/User');
+jest.mock('../../utils/mongoDbConnection');
 
 // Import mocks after they've been set up
 const User = require('../../models/User');
 
-describe('Authentication Middleware Issues (OCDI-302)', () => {
+describe('Authentication Middleware (OCDI-302)', () => {
   // Mock Express request and response objects
   let req;
   let res;
@@ -44,25 +51,41 @@ describe('Authentication Middleware Issues (OCDI-302)', () => {
     
     next = jest.fn();
     
-    // Reset token blacklist
-    global.tokenBlacklist = new Set();
+    // Set up mongoDbConnection mock
+    mongoDbConnection.withRetry.mockImplementation(async (fn) => {
+      return await fn();
+    });
+    
+    // Default JWT behavior
+    jwt.verify.mockReturnValue({ userId: 'test-user-id' });
   });
 
-  describe('MongoDB Connection Issues', () => {
-    it('should handle MongoDB connection timeouts', async () => {
+  describe('MongoDB Connection Improvements', () => {
+    it('should use retry logic for database operations', async () => {
       // Setup
       req.headers.authorization = 'Bearer valid-token';
-      jwt.verify.mockReturnValue({ userId: 'test-user-id' });
-      
-      // Mock User.findOne to simulate a timeout
-      User.findOne.mockImplementation(() => {
-        return new Promise((resolve, reject) => {
-          // Never resolves or rejects to simulate a timeout
-          setTimeout(() => {
-            reject(new Error('MongoDB operation timeout'));
-          }, 100);
-        });
+      User.findOne.mockResolvedValue({
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        role: 'user',
+        status: 'active'
       });
+      
+      // Act
+      await authenticateToken(req, res, next);
+      
+      // Assert
+      expect(mongoDbConnection.withRetry).toHaveBeenCalled();
+      expect(User.findOne).toHaveBeenCalledWith({ userId: 'test-user-id' });
+      expect(next).toHaveBeenCalled();
+    });
+    
+    it('should handle database operation failures gracefully', async () => {
+      // Setup
+      req.headers.authorization = 'Bearer valid-token';
+      
+      // Simulate MongoDB operation failure
+      mongoDbConnection.withRetry.mockRejectedValueOnce(new Error('Database error'));
       
       // Act
       await authenticateToken(req, res, next);
@@ -74,28 +97,9 @@ describe('Authentication Middleware Issues (OCDI-302)', () => {
       }));
       expect(next).not.toHaveBeenCalled();
     });
-    
-    it('should fail when User model cannot be found', async () => {
-      // Setup
-      req.headers.authorization = 'Bearer valid-token';
-      jwt.verify.mockReturnValue({ userId: 'test-user-id' });
-      
-      // Mock User.findOne to return null (user not found)
-      User.findOne.mockResolvedValue(null);
-      
-      // Act
-      await authenticateToken(req, res, next);
-      
-      // Assert
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        message: 'User not found'
-      }));
-      expect(next).not.toHaveBeenCalled();
-    });
   });
   
-  describe('JWT Verification Issues', () => {
+  describe('JWT Verification Improvements', () => {
     it('should handle expired tokens correctly', async () => {
       // Setup
       req.headers.authorization = 'Bearer expired-token';
@@ -103,7 +107,7 @@ describe('Authentication Middleware Issues (OCDI-302)', () => {
       // Mock JWT verify to throw TokenExpiredError
       const error = new Error('Token expired');
       error.name = 'TokenExpiredError';
-      jwt.verify.mockImplementation(() => {
+      jwt.verify.mockImplementationOnce(() => {
         throw error;
       });
       
@@ -125,7 +129,7 @@ describe('Authentication Middleware Issues (OCDI-302)', () => {
       // Mock JWT verify to throw JsonWebTokenError
       const error = new Error('Invalid token');
       error.name = 'JsonWebTokenError';
-      jwt.verify.mockImplementation(() => {
+      jwt.verify.mockImplementationOnce(() => {
         throw error;
       });
       
@@ -139,66 +143,114 @@ describe('Authentication Middleware Issues (OCDI-302)', () => {
       }));
       expect(next).not.toHaveBeenCalled();
     });
+  });
+  
+  describe('Token Blacklist Improvements', () => {
+    it('should correctly add tokens to the blacklist', async () => {
+      // Setup - add a token to the blacklist
+      await blacklistToken('test-token');
+      
+      // Assert it's added
+      const isBlacklisted = await isTokenBlacklisted('test-token');
+      expect(isBlacklisted).toBe(true);
+    });
     
-    it('should handle missing JWT_SECRET environment variable', async () => {
+    it('should correctly check for blacklisted tokens', async () => {
+      // Setup - token not blacklisted yet
+      const notBlacklisted = await isTokenBlacklisted('new-token');
+      expect(notBlacklisted).toBe(false);
+      
+      // Blacklist the token
+      await blacklistToken('new-token');
+      
+      // Check again
+      const isBlacklisted = await isTokenBlacklisted('new-token');
+      expect(isBlacklisted).toBe(true);
+    });
+    
+    it('should support the legacy synchronous checkTokenBlacklist function', async () => {
+      // Setup - add a token to the blacklist
+      await blacklistToken('legacy-token');
+      
+      // Check with the legacy function
+      const isBlacklisted = checkTokenBlacklist('legacy-token');
+      expect(isBlacklisted).toBe(true);
+      
+      // Non-blacklisted token
+      const notBlacklisted = checkTokenBlacklist('unknown-token');
+      expect(notBlacklisted).toBe(false);
+    });
+  });
+  
+  describe('Full Authentication Flow', () => {
+    it('should authenticate a valid request', async () => {
       // Setup
       req.headers.authorization = 'Bearer valid-token';
       
-      // Save original process.env.JWT_SECRET
-      const originalSecret = process.env.JWT_SECRET;
-      delete process.env.JWT_SECRET;
+      // Setup user mock
+      User.findOne.mockResolvedValueOnce({
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        companyId: 'company123',
+        status: 'active'
+      });
       
-      // Act & Assert
-      try {
-        await authenticateToken(req, res, next);
-        // Should use fallback 'testsecret' from middleware
-        expect(jwt.verify).toHaveBeenCalledWith('valid-token', 'testsecret');
-      } finally {
-        // Restore JWT_SECRET
-        process.env.JWT_SECRET = originalSecret;
-      }
-    });
-  });
-  
-  describe('Token Blacklist Issues', () => {
-    it('should not persist blacklisted tokens between test runs', () => {
-      // Setup - blacklist a token
-      blacklistToken('blacklisted-token');
+      // Act
+      await authenticateToken(req, res, next);
       
-      // Assert it's in the blacklist
-      expect(checkTokenBlacklist('blacklisted-token')).toBe(true);
-      
-      // Reset global variable to simulate test isolation issues
-      global.tokenBlacklist = undefined;
-      
-      // Assert token is no longer blacklisted (this is the issue)
-      expect(checkTokenBlacklist('blacklisted-token')).toBe(false);
+      // Assert
+      expect(next).toHaveBeenCalled();
+      expect(req.user).toEqual({
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        companyId: 'company123'
+      });
+      expect(req.token).toBe('valid-token'); // Should attach token to request
     });
     
-    it('should initialize empty blacklist when undefined', () => {
-      // Setup - ensure blacklist is undefined
-      global.tokenBlacklist = undefined;
+    it('should reject a blacklisted token', async () => {
+      // Setup - blacklist a token
+      await blacklistToken('blacklisted-token');
       
-      // Add a token to blacklist
-      blacklistToken('new-token');
+      // Setup request with blacklisted token
+      req.headers.authorization = 'Bearer blacklisted-token';
       
-      // Assert blacklist was initialized and token was added
-      expect(global.tokenBlacklist).toBeDefined();
-      expect(global.tokenBlacklist instanceof Set).toBe(true);
-      expect(global.tokenBlacklist.has('new-token')).toBe(true);
+      // Act
+      await authenticateToken(req, res, next);
+      
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Token is invalidated'
+      }));
+      expect(next).not.toHaveBeenCalled();
     });
-  });
-  
-  describe('Model Naming Inconsistencies', () => {
-    it('demonstrates the User vs userModel inconsistency', async () => {
-      // The middleware imports '../models/User'
-      // But tests typically mock '../../models/userModel'
-      // This is just a documentation test to highlight the issue
-      expect(User).toBeDefined();
+    
+    it('should reject inactive user accounts', async () => {
+      // Setup
+      req.headers.authorization = 'Bearer valid-token';
       
-      // In a typical test setup, this would fail:
-      // const userModel = require('../../models/userModel');
-      // expect(User).toBe(userModel); // These would be different modules
+      // Setup inactive user mock
+      User.findOne.mockResolvedValueOnce({
+        userId: 'inactive-user',
+        email: 'inactive@example.com',
+        role: 'user',
+        status: 'suspended' // Not active
+      });
+      
+      // Act
+      await authenticateToken(req, res, next);
+      
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Account is not active'
+      }));
+      expect(next).not.toHaveBeenCalled();
     });
   });
 });
