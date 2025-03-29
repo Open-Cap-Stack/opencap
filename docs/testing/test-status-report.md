@@ -205,6 +205,19 @@ Following the prioritized sequence outlined in this document will systematically
 
 This document will be updated weekly as fixes are implemented and new issues are discovered.
 
+## 10. Recent Security Fixes
+
+### OCDI-304: Removal of Exposed API Tokens (COMPLETED)
+- **Issue**: API tokens were exposed in the Git repository history
+- **Fix**: Implemented a comprehensive security solution:
+  - Removed sensitive tokens from the Git history using `git filter-repo`
+  - Added `.gitattributes` to prevent display of sensitive files in diffs
+  - Created security documentation in `docs/security/credential-handling-guide.md`
+  - Replaced all tokens with proper placeholders
+- **Next Steps**: 
+  - A GitHub Support request is needed to fully purge cached historical commits
+  - The exposed tokens must be immediately revoked
+
 ---
 
 *Prepared according to Semantic Seed Venture Studio Coding Standards V2.0*
