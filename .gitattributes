@@ -1,0 +1,8 @@
+# OCDI-304: Security enhancement for OpenCap credential handling
+# Following Semantic Seed Venture Studio Coding Standards V2.0
+
+# Treat .env files as binary to prevent display in GitHub's diff/blame
+.env* binary
+
+# Ensure line endings are consistent
+* text=auto
