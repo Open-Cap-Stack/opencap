@@ -8,7 +8,12 @@
  * 1. Tests are repeatable and isolated from production/development
  * 2. External dependencies are configured identically for all developers
  * 3. Tests can be run in CI/CD pipeline without local setup
+ * 
+ * Updated for: [Bug] OCDI-301: Fix MongoDB Connection Timeout Issues
  */
+
+// Import the MongoDB connection utility
+const mongoDbConnection = require('../../utils/mongoDbConnection');
 
 // Set environment variables for Docker test containers
 function setupDockerTestEnv() {
@@ -39,22 +44,16 @@ function setupDockerTestEnv() {
 // Check if Docker containers are running
 // This function pings the containers to verify they're up
 async function checkDockerContainersRunning() {
-  const { MongoClient } = require('mongodb');
   const { Client } = require('pg');
   const Minio = require('minio');
   
   const checks = [];
   
-  // Check MongoDB
+  // Check MongoDB - use the improved connection utility with retry logic
   checks.push(new Promise(async (resolve, reject) => {
     try {
-      const mongoClient = new MongoClient(process.env.MONGO_URI, { 
-        connectTimeoutMS: 5000,
-        serverSelectionTimeoutMS: 5000
-      });
-      await mongoClient.connect();
-      await mongoClient.db('admin').command({ ping: 1 });
-      await mongoClient.close();
+      // Use the new MongoDB connection utility with retry logic
+      await mongoDbConnection.runCommand('ping', {}, 'admin');
       console.log('✅ MongoDB test container is running');
       resolve(true);
     } catch (err) {

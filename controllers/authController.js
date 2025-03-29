@@ -1,3 +1,13 @@
+/**
+ * Authentication Controller
+ * 
+ * [Feature] OCAE-202: Implement user registration endpoint
+ * [Feature] OCAE-303: Implement password reset functionality
+ * [Bug] OCDI-302: Fix User Authentication Test Failures
+ * 
+ * Contains methods for user registration, authentication, and profile management.
+ */
+
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -5,6 +15,7 @@ const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
 const { blacklistToken } = require('../middleware/authMiddleware');
+const mongoDbConnection = require('../utils/mongoDbConnection');
 
 // Initialize Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -317,23 +328,29 @@ const refreshToken = async (req, res) => {
 
 /**
  * Logout a user by blacklisting their token
+ * Updated for: [Bug] OCDI-302: Fix User Authentication Test Failures
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const logout = async (req, res) => {
   try {
-    const { token } = req.body;
-
+    // Get the token from the request (added by the authenticateToken middleware)
+    const token = req.token;
+    
     if (!token) {
-      return res.status(400).json({ message: 'Token is required' });
+      return res.status(400).json({ message: 'No token provided' });
     }
-
-    // Blacklist token
-    await blacklistToken(token);
-
+    
+    // Blacklist the token to prevent reuse using the improved function
+    const success = await blacklistToken(token);
+    
+    if (!success) {
+      return res.status(500).json({ message: 'Failed to invalidate token' });
+    }
+    
     return res.status(200).json({ message: 'Logout successful' });
   } catch (error) {
-    console.error('Logout error:', error.message);
+    console.error('Logout error:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
