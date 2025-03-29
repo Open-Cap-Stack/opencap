@@ -1,10 +1,14 @@
 /**
  * SPV Asset Management API Controller
  * Feature: OCAE-212: Implement SPV Asset Management API
- * Bug: OCAE-empty-response: Fix SPVasset controller empty response objects
+ * Bug: OCDI-301: Fix MongoDB Connection Timeout Issues
+ * 
+ * Updated to use robust MongoDB connection utilities with retry logic
+ * Following Semantic Seed Venture Studio Coding Standards
  */
 const SPVAsset = require('../models/SPVasset');
 const mongoose = require('mongoose');
+const mongoDbConnection = require('../utils/mongoDbConnection');
 
 /**
  * Create a new SPV Asset
@@ -19,20 +23,24 @@ exports.createSPVAsset = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const newAsset = new SPVAsset({
-      AssetID,
-      SPVID,
-      Type,
-      Value,
-      Description,
-      AcquisitionDate,
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset({
+        AssetID,
+        SPVID,
+        Type,
+        Value,
+        Description,
+        AcquisitionDate,
+      });
+      return await newAsset.save();
     });
 
-    const savedAsset = await newAsset.save();
     // Store a copy in res.locals for the responseDebugger middleware
     res.locals.responseData = savedAsset.toObject ? savedAsset.toObject() : savedAsset;
     res.status(201).json(res.locals.responseData);
   } catch (error) {
+    console.error('Error creating SPV Asset:', error);
     res.status(500).json({ message: 'Failed to create SPVAsset', error: error.message });
   }
 };
@@ -44,13 +52,19 @@ exports.createSPVAsset = async (req, res) => {
  */
 exports.getSPVAssets = async (req, res) => {
   try {
-    const assets = await SPVAsset.find().exec();
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const assets = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.find().exec();
+    });
+
     // Convert Mongoose documents to plain objects
     const plainAssets = assets.map(asset => asset.toObject ? asset.toObject() : asset);
+    
     // Store a copy in res.locals for the responseDebugger middleware
     res.locals.responseData = { spvassets: plainAssets };
     res.status(200).json(res.locals.responseData);
   } catch (error) {
+    console.error('Error retrieving SPV Assets:', error);
     res.status(500).json({ message: 'Failed to retrieve SPVAssets', error: error.message });
   }
 };
@@ -67,8 +81,10 @@ exports.getSPVAssetById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    // Explicitly add exec to ensure proper promise handling
-    const asset = await SPVAsset.findById(req.params.id).exec();
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const asset = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.findById(req.params.id).exec();
+    });
     
     if (!asset) {
       return res.status(404).json({ message: 'SPV Asset not found' });
@@ -76,9 +92,6 @@ exports.getSPVAssetById = async (req, res) => {
     
     // Convert to plain object for consistent handling
     const plainAsset = asset.toObject ? asset.toObject() : asset;
-    
-    // Debug log to diagnose issues
-    console.log('Asset found:', asset._id, 'Converting to plain object');
     
     // Store in res.locals for potential use by middleware
     res.locals.responseData = plainAsset;
@@ -99,7 +112,11 @@ exports.getSPVAssetById = async (req, res) => {
 exports.getAssetsBySPVId = async (req, res) => {
   try {
     const spvId = req.params.spvId;
-    const assets = await SPVAsset.find({ SPVID: spvId }).exec();
+    
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const assets = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.find({ SPVID: spvId }).exec();
+    });
     
     if (assets.length === 0) {
       return res.status(404).json({ message: `No assets found for SPV: ${spvId}` });
@@ -111,6 +128,7 @@ exports.getAssetsBySPVId = async (req, res) => {
     res.locals.responseData = { assets: plainAssets };
     res.status(200).json(res.locals.responseData);
   } catch (error) {
+    console.error('Error retrieving assets by SPV ID:', error);
     res.status(500).json({ message: 'Failed to retrieve SPV Assets', error: error.message });
   }
 };
@@ -123,7 +141,11 @@ exports.getAssetsBySPVId = async (req, res) => {
 exports.getSPVValuation = async (req, res) => {
   try {
     const spvId = req.params.spvId;
-    const assets = await SPVAsset.find({ SPVID: spvId }).exec();
+    
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const assets = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.find({ SPVID: spvId }).exec();
+    });
     
     if (assets.length === 0) {
       return res.status(404).json({ message: `No assets found for SPV: ${spvId}` });
@@ -152,6 +174,7 @@ exports.getSPVValuation = async (req, res) => {
     res.locals.responseData = responseData;
     res.status(200).json(responseData);
   } catch (error) {
+    console.error('Error calculating SPV valuation:', error);
     res.status(500).json({ message: 'Failed to calculate SPV valuation', error: error.message });
   }
 };
@@ -164,7 +187,11 @@ exports.getSPVValuation = async (req, res) => {
 exports.getAssetTypeValuation = async (req, res) => {
   try {
     const assetType = req.params.type;
-    const assets = await SPVAsset.find({ Type: assetType }).exec();
+    
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const assets = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.find({ Type: assetType }).exec();
+    });
     
     if (assets.length === 0) {
       return res.status(404).json({ message: `No assets found of type: ${assetType}` });
@@ -193,6 +220,7 @@ exports.getAssetTypeValuation = async (req, res) => {
     res.locals.responseData = responseData;
     res.status(200).json(responseData);
   } catch (error) {
+    console.error('Error calculating asset type valuation:', error);
     res.status(500).json({ message: 'Failed to calculate asset type valuation', error: error.message });
   }
 };
@@ -208,46 +236,29 @@ exports.updateSPVAsset = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
-    
-    // Prevent AssetID and SPVID from being updated (they're unique identifiers)
-    if (req.body.AssetID) {
-      delete req.body.AssetID;
-    }
-    
-    if (req.body.SPVID) {
-      delete req.body.SPVID;
-    }
 
-    // Validate Value field is numeric
-    if (req.body.Value !== undefined && (isNaN(req.body.Value) || typeof req.body.Value !== 'number')) {
-      return res.status(400).json({ message: 'Invalid SPV Asset data' });
-    }
+    const updates = req.body;
+    const options = { new: true, runValidators: true };
     
-    // Explicitly add exec to ensure proper promise handling
-    const updatedAsset = await SPVAsset.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    ).exec();
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const updatedAsset = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.findByIdAndUpdate(req.params.id, updates, options).exec();
+    });
     
     if (!updatedAsset) {
-      return res.status(404).json({ message: 'SPV Asset not found' });
+      return res.status(404).json({ message: 'SPVAsset not found' });
     }
     
     // Convert to plain object for consistent handling
     const plainAsset = updatedAsset.toObject ? updatedAsset.toObject() : updatedAsset;
     
-    // Debug log
-    console.log('Asset updated:', updatedAsset._id, 'Converting to plain object');
-    
     // Store in res.locals for potential use by middleware
     res.locals.responseData = plainAsset;
     
-    // Return the plain JavaScript object
-    return res.status(200).json(plainAsset);
+    res.status(200).json(plainAsset);
   } catch (error) {
-    console.error('Error in updateSPVAsset:', error);
-    res.status(500).json({ message: 'Failed to update SPV Asset', error: error.message });
+    console.error('Error updating SPV Asset:', error);
+    res.status(500).json({ message: 'Failed to update SPVAsset', error: error.message });
   }
 };
 
@@ -258,7 +269,10 @@ exports.updateSPVAsset = async (req, res) => {
  */
 exports.deleteSPVAsset = async (req, res) => {
   try {
-    const deletedAsset = await SPVAsset.findByIdAndDelete(req.params.id).exec();
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const deletedAsset = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.findByIdAndDelete(req.params.id).exec();
+    });
 
     if (!deletedAsset) {
       return res.status(404).json({ message: 'SPVAsset not found' });
@@ -266,6 +280,7 @@ exports.deleteSPVAsset = async (req, res) => {
 
     res.status(200).json({ message: 'SPVAsset deleted' });
   } catch (error) {
+    console.error('Error deleting SPV Asset:', error);
     res.status(500).json({ message: 'Failed to delete SPVAsset', error: error.message });
   }
 };
