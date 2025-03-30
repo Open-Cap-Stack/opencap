@@ -17,11 +17,8 @@ services:
     volumes:
       - ./test-init-scripts/mongo:/docker-entrypoint-initdb.d
       - mongodb_test_data:/data/db
-    command: >
-      mongod
-      --setParameter maxConnectionsPerHost=200
-      --setParameter maxIncomingConnections=200
-      --wiredTigerCacheSizeGB=1
+    # Removed invalid setParameter options
+    command: mongod --wiredTigerCacheSizeGB=1
     # Added resources to prevent container resource constraints
     deploy:
       resources:
