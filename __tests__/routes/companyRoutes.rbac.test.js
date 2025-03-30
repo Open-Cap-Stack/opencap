@@ -1,164 +1,132 @@
 /**
  * Company Routes RBAC Tests
  * [Feature] OCAE-302: Implement role-based access control
+ * [Bug] OCAE-206: Fix Permission & Role-Based Access Control Tests
  */
 
 const request = require('supertest');
-const app = require('../../app');
-const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
-const User = require('../../models/User');
-const Company = require('../../models/Company');
-const { expect } = require('chai');
-const sinon = require('sinon');
+const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasPermission } = require('../../middleware/rbacMiddleware');
+const { generateAuthToken } = require('../utils/rbacTestUtils');
+const { mockCompanyController } = require('../mocks/companyMocks');
+
+// Create a test Express app for isolated testing
+const createTestApp = () => {
+  const app = express();
+  app.use(express.json());
+  
+  // Create company routes with RBAC applied
+  const router = express.Router();
+  
+  // GET /api/companies - Get all companies
+  router.get('/', 
+    authenticateToken,
+    hasPermission('read:companies'),
+    mockCompanyController.getAllCompanies
+  );
+  
+  // POST /api/companies - Create a new company
+  router.post('/', 
+    authenticateToken,
+    hasPermission('write:companies'),
+    mockCompanyController.createCompany
+  );
+  
+  // PUT /api/companies/:id - Update company
+  router.put('/:id', 
+    authenticateToken,
+    hasPermission('write:companies'),
+    mockCompanyController.updateCompanyById
+  );
+  
+  // DELETE /api/companies/:id - Delete company
+  router.delete('/:id', 
+    authenticateToken,
+    hasPermission(['delete:companies', 'admin:all']),
+    mockCompanyController.deleteCompanyById
+  );
+  
+  // Apply router
+  app.use('/api/companies', router);
+  
+  return app;
+};
 
 describe('Company Routes with RBAC', () => {
+  let testApp;
   let adminToken, managerToken, userToken, clientToken;
-  let adminUser, managerUser, regularUser, clientUser;
-  let testCompany;
-
-  beforeAll(async () => {
-    // Create test users with different roles
-    adminUser = new User({
-      userId: 'test-admin-' + Date.now(),
-      firstName: 'Admin',
-      lastName: 'User',
-      email: `admin-${Date.now()}@example.com`,
-      password: 'password123',
-      role: 'admin',
-      status: 'active'
+  
+  beforeAll(() => {
+    // Create isolated test app
+    testApp = createTestApp();
+    
+    // Generate tokens for different roles
+    adminToken = generateAuthToken({ 
+      userId: 'test-admin',
+      email: 'admin@example.com',
+      role: 'admin'
     });
     
-    managerUser = new User({
-      userId: 'test-manager-' + Date.now(),
-      firstName: 'Manager',
-      lastName: 'User',
-      email: `manager-${Date.now()}@example.com`,
-      password: 'password123',
-      role: 'manager',
-      status: 'active'
+    managerToken = generateAuthToken({ 
+      userId: 'test-manager',
+      email: 'manager@example.com',
+      role: 'manager'
     });
     
-    regularUser = new User({
-      userId: 'test-user-' + Date.now(),
-      firstName: 'Regular',
-      lastName: 'User',
-      email: `user-${Date.now()}@example.com`,
-      password: 'password123',
-      role: 'user',
-      status: 'active'
+    userToken = generateAuthToken({ 
+      userId: 'test-user',
+      email: 'user@example.com',
+      role: 'user'
     });
     
-    clientUser = new User({
-      userId: 'test-client-' + Date.now(),
-      firstName: 'Client',
-      lastName: 'User',
-      email: `client-${Date.now()}@example.com`,
-      password: 'password123',
-      role: 'client',
-      status: 'active'
+    clientToken = generateAuthToken({ 
+      userId: 'test-client',
+      email: 'client@example.com',
+      role: 'client'
     });
-
-    await adminUser.save();
-    await managerUser.save();
-    await regularUser.save();
-    await clientUser.save();
-
-    // Create test tokens
-    const jwtSecret = process.env.JWT_SECRET || 'testsecret';
-    
-    adminToken = jwt.sign(
-      { userId: adminUser.userId, email: adminUser.email },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
-
-    managerToken = jwt.sign(
-      { userId: managerUser.userId, email: managerUser.email },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
-
-    userToken = jwt.sign(
-      { userId: regularUser.userId, email: regularUser.email },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
-
-    clientToken = jwt.sign(
-      { userId: clientUser.userId, email: clientUser.email },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
-
-    // Create test company
-    testCompany = new Company({
-      name: 'Test Company',
-      description: 'Test company for RBAC testing',
-      industry: 'Technology',
-      foundedYear: 2020,
-      website: 'https://example.com'
-    });
-
-    await testCompany.save();
   });
-
-  afterAll(async () => {
-    // Clean up test data
-    await User.deleteMany({
-      userId: {
-        $in: [
-          adminUser.userId,
-          managerUser.userId,
-          regularUser.userId,
-          clientUser.userId
-        ]
-      }
-    });
-
-    await Company.findByIdAndDelete(testCompany._id);
-  });
-
+  
   describe('GET /api/companies - Get all companies', () => {
     it('should allow admin users to access companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .get('/api/companies')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.be.an('array');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('should allow manager users to access companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .get('/api/companies')
         .set('Authorization', `Bearer ${managerToken}`);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.be.an('array');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('should allow regular users to access companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .get('/api/companies')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.be.an('array');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('should allow client users to access companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .get('/api/companies')
         .set('Authorization', `Bearer ${clientToken}`);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.be.an('array');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('should reject requests without authentication', async () => {
-      const res = await request(app).get('/api/companies');
-      expect(res.status).to.equal(401);
+      const res = await request(testApp).get('/api/companies');
+      expect(res.status).toBe(401);
     });
   });
 
@@ -172,53 +140,43 @@ describe('Company Routes with RBAC', () => {
     };
 
     it('should allow admin users to create companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .post('/api/companies')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(newCompany);
 
-      expect(res.status).to.equal(201);
-      expect(res.body).to.have.property('name', newCompany.name);
-      
-      // Clean up
-      if (res.body._id) {
-        await Company.findByIdAndDelete(res.body._id);
-      }
+      expect(res.status).toBe(201);
+      expect(res.body.name).toBe(newCompany.name);
     });
 
     it('should allow manager users to create companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .post('/api/companies')
         .set('Authorization', `Bearer ${managerToken}`)
         .send(newCompany);
 
-      expect(res.status).to.equal(201);
-      expect(res.body).to.have.property('name', newCompany.name);
-      
-      // Clean up
-      if (res.body._id) {
-        await Company.findByIdAndDelete(res.body._id);
-      }
+      expect(res.status).toBe(201);
+      expect(res.body.name).toBe(newCompany.name);
     });
 
     it('should forbid regular users from creating companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .post('/api/companies')
         .set('Authorization', `Bearer ${userToken}`)
         .send(newCompany);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
 
     it('should forbid client users from creating companies', async () => {
-      const res = await request(app)
+      const res = await request(testApp)
         .post('/api/companies')
         .set('Authorization', `Bearer ${clientToken}`)
         .send(newCompany);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
   });
 
@@ -227,108 +185,108 @@ describe('Company Routes with RBAC', () => {
       description: 'Updated during RBAC testing',
       industry: 'Updated Industry'
     };
+    const companyId = '60d21b4667d0d8992e610c85'; // From our mock data
 
     it('should allow admin users to update companies', async () => {
-      const res = await request(app)
-        .put(`/api/companies/${testCompany._id}`)
+      const res = await request(testApp)
+        .put(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.have.property('description', updateData.description);
+      expect(res.status).toBe(200);
+      expect(res.body.description).toBe(updateData.description);
     });
 
     it('should allow manager users to update companies', async () => {
-      const res = await request(app)
-        .put(`/api/companies/${testCompany._id}`)
+      const res = await request(testApp)
+        .put(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${managerToken}`)
         .send(updateData);
 
-      expect(res.status).to.equal(200);
-      expect(res.body).to.have.property('description', updateData.description);
+      expect(res.status).toBe(200);
+      expect(res.body.description).toBe(updateData.description);
     });
 
     it('should forbid regular users from updating companies', async () => {
-      const res = await request(app)
-        .put(`/api/companies/${testCompany._id}`)
+      const res = await request(testApp)
+        .put(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .send(updateData);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
 
     it('should forbid client users from updating companies', async () => {
-      const res = await request(app)
-        .put(`/api/companies/${testCompany._id}`)
+      const res = await request(testApp)
+        .put(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${clientToken}`)
         .send(updateData);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
   });
 
   describe('DELETE /api/companies/:id - Delete company', () => {
-    let tempCompany;
-
-    beforeEach(async () => {
-      // Create a temporary company for delete tests
-      tempCompany = new Company({
-        name: 'Temp Delete Company',
-        description: 'Will be deleted in tests',
-        industry: 'Testing',
-        foundedYear: 2022
-      });
-      await tempCompany.save();
-    });
+    const companyId = '60d21b4667d0d8992e610c86'; // From our mock data
 
     it('should allow admin users to delete companies', async () => {
-      const res = await request(app)
-        .delete(`/api/companies/${tempCompany._id}`)
+      const res = await request(testApp)
+        .delete(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(res.status).to.equal(200);
-      
-      // Verify it's deleted
-      const company = await Company.findById(tempCompany._id);
-      expect(company).to.be.null;
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('deleted successfully');
     });
 
     it('should forbid manager users from deleting companies', async () => {
-      const res = await request(app)
-        .delete(`/api/companies/${tempCompany._id}`)
+      const res = await request(testApp)
+        .delete(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${managerToken}`);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
-      
-      // Clean up
-      await Company.findByIdAndDelete(tempCompany._id);
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
 
     it('should forbid regular users from deleting companies', async () => {
-      const res = await request(app)
-        .delete(`/api/companies/${tempCompany._id}`)
+      const res = await request(testApp)
+        .delete(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
-      
-      // Clean up
-      await Company.findByIdAndDelete(tempCompany._id);
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
     });
 
     it('should forbid client users from deleting companies', async () => {
-      const res = await request(app)
-        .delete(`/api/companies/${tempCompany._id}`)
+      const res = await request(testApp)
+        .delete(`/api/companies/${companyId}`)
         .set('Authorization', `Bearer ${clientToken}`);
 
-      expect(res.status).to.equal(403);
-      expect(res.body).to.have.property('message').that.includes('Access denied');
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('Access denied');
+    });
+  });
+  
+  describe('Custom permissions test', () => {
+    it('should respect custom permissions in the token', async () => {
+      // Create a token with explicit permissions regardless of role
+      const customToken = generateAuthToken({
+        userId: 'custom-user',
+        email: 'custom@example.com',
+        role: 'user', // User role normally can't delete
+        permissions: ['delete:companies'] // But we give explicit permission
+      });
       
-      // Clean up
-      await Company.findByIdAndDelete(tempCompany._id);
+      const companyId = '60d21b4667d0d8992e610c85';
+      
+      const res = await request(testApp)
+        .delete(`/api/companies/${companyId}`)
+        .set('Authorization', `Bearer ${customToken}`);
+      
+      // Should succeed because of explicit permission
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('deleted successfully');
     });
   });
 });

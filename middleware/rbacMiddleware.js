@@ -7,24 +7,73 @@
  */
 
 /**
+ * Role-to-permissions mapping
+ * This defines what permissions each role has access to
+ */
+const rolePermissions = {
+  'admin': [
+    'read:users', 'write:users', 'delete:users',
+    'read:companies', 'write:companies', 'delete:companies',
+    'admin:all'
+  ],
+  'manager': [
+    'read:users', 'write:users',
+    'read:companies', 'write:companies'
+  ],
+  'user': [
+    'read:companies'
+  ],
+  'client': [
+    'read:companies'
+  ]
+};
+
+/**
+ * Get permissions for a user based on their role and explicit permissions
+ * @param {Object} user - User object from request
+ * @returns {Array} - Array of permissions the user has
+ */
+const getUserPermissions = (user) => {
+  if (!user) return [];
+  
+  // Start with explicitly assigned permissions
+  let permissions = Array.isArray(user.permissions) ? [...user.permissions] : [];
+  
+  // Add role-based permissions if role exists
+  if (user.role && rolePermissions[user.role]) {
+    // Add permissions from role if not already included
+    rolePermissions[user.role].forEach(perm => {
+      if (!permissions.includes(perm)) {
+        permissions.push(perm);
+      }
+    });
+  }
+  
+  return permissions;
+};
+
+/**
  * Check if user has a specific permission
  * @param {Object} user - User object from request
  * @param {String|Array} requiredPermission - Permission or array of permissions to check
  * @returns {Boolean} - Whether user has the required permission
  */
 const checkPermission = (user, requiredPermission) => {
-  if (!user || !user.permissions) {
+  if (!user) {
     return false;
   }
 
+  // Get all user permissions (explicit + role-based)
+  const permissions = getUserPermissions(user);
+  
   if (Array.isArray(requiredPermission)) {
     // If any permission matches (OR logic)
     return requiredPermission.some(permission => 
-      user.permissions.includes(permission)
+      permissions.includes(permission)
     );
   }
 
-  return user.permissions.includes(requiredPermission);
+  return permissions.includes(requiredPermission);
 };
 
 /**
@@ -70,5 +119,7 @@ const hasPermission = (requiredPermission) => {
 module.exports = {
   checkPermission,
   hasRole,
-  hasPermission
+  hasPermission,
+  getUserPermissions, // Export for testing
+  rolePermissions // Export for reference
 };
