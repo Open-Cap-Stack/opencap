@@ -20,7 +20,7 @@ function setupDockerTestEnv() {
   // The container names and ports should match docker-compose.test.yml
   
   // MongoDB settings - use credentials from docker-compose.test.yml
-  process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27017/opencap_test?authSource=admin';
+  process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27018/opencap_test?authSource=admin';
   
   // PostgreSQL settings
   process.env.DATABASE_URL = 'postgres://postgres:password@127.0.0.1:5433/opencap_test';
@@ -52,8 +52,18 @@ async function checkDockerContainersRunning() {
   // Check MongoDB - use the improved connection utility with retry logic
   checks.push(new Promise(async (resolve, reject) => {
     try {
-      // Use the new MongoDB connection utility with retry logic
-      await mongoDbConnection.runCommand('ping', {}, 'admin');
+      // Connect to MongoDB on port 27018 (updated port)
+      const uri = 'mongodb://opencap:password123@127.0.0.1:27018/opencap_test?authSource=admin';
+      const options = {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      };
+      
+      // Test connection with improved retry logic
+      await mongoDbConnection.connectWithRetry(uri, options, 3, 500);
       console.log('✅ MongoDB test container is running');
       resolve(true);
     } catch (err) {

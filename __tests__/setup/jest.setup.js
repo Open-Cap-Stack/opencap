@@ -19,7 +19,7 @@ console.warn = function(msg) {
 const { setupDockerTestEnv, checkDockerContainersRunning } = require('./docker-test-env');
 
 // Configure higher timeout for tests that might need to wait for Docker services
-jest.setTimeout(45000); // Increased from 30000ms to align with MongoDB socket timeout
+jest.setTimeout(120000); // Increased from 45000ms to 120000ms (2 minutes) for MongoDB connection retries
 
 // Global setup and cleanup for MongoDB connections
 let mongoConnection = null;
@@ -32,8 +32,16 @@ beforeAll(async () => {
   try {
     await checkDockerContainersRunning();
     
-    // Establish MongoDB connection for the test suite
-    mongoConnection = await mongoDbConnection.connectWithRetry();
+    // Establish MongoDB connection for the test suite with extended timeout
+    const mongoOptions = {
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 75000,
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    };
+    
+    mongoConnection = await mongoDbConnection.connectWithRetry(null, mongoOptions, 5, 1000);
     
     // Ensure collections are properly indexed
     await mongoose.connection.db.listCollections().toArray();
