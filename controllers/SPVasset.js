@@ -8,7 +8,7 @@
  */
 const mongoose = require('mongoose');
 const SPV = require('../models/SPV');
-const SPVAsset = require('../models/SPVAsset');
+const SPVAsset = require('../models/SPVasset');
 const mongoDbConnection = require('../utils/mongoDbConnection');
 
 /**
@@ -119,8 +119,26 @@ exports.getAssetsBySPVId = async (req, res) => {
     if (assets.length === 0) {
       return res.status(404).json({ message: 'No assets found for this SPV' });
     }
-
-    res.status(200).json({ spvId: spvId, assets: assets });
+    
+    // Check if the referenced SPV still exists
+    const spvExists = await mongoDbConnection.withRetry(async () => {
+      return await SPV.exists({ SPVID: spvId });
+    });
+    
+    // Convert Mongoose documents to plain objects
+    let plainAssets = assets.map(asset => asset.toObject ? asset.toObject() : asset);
+    
+    // If SPV doesn't exist, mark assets as orphaned
+    if (!spvExists) {
+      plainAssets = plainAssets.map(asset => ({
+        ...asset,
+        SPVStatus: 'Orphaned'  // Add SPVStatus field to indicate the SPV was deleted
+      }));
+    }
+    
+    // Store in res.locals for potential use by middleware
+    res.locals.responseData = { assets: plainAssets };
+    res.status(200).json(res.locals.responseData);
   } catch (error) {
     console.error('Error retrieving assets by SPV ID:', error);
     res.status(500).json({ message: 'Failed to retrieve assets', error: error.message });
@@ -191,11 +209,22 @@ exports.getAssetTypeValuation = async (req, res) => {
     // Calculate total valuation
     const totalValuation = assets.reduce((sum, asset) => sum + asset.Value, 0);
     
-    res.status(200).json({
-      assetType: type,
+    // Create response data
+    const responseData = {
+      assetType: type, 
       totalValuation,
-      assetCount: assets.length
-    });
+      assetCount: assets.length,
+      assetBreakdown: assets.map(asset => ({ 
+        assetId: asset.AssetID,
+        type: asset.Type,
+        value: asset.Value,
+        description: asset.Description
+      }))
+    };
+    
+    // Store in res.locals for potential use by middleware
+    res.locals.responseData = responseData;
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Error calculating asset type valuation:', error);
     res.status(500).json({ message: 'Failed to calculate asset type valuation', error: error.message });
@@ -215,13 +244,38 @@ exports.updateSPVAsset = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    // Check if the asset exists
-    const asset = await SPVAsset.findById(assetId);
+    // Create a copy of the request body and remove immutable fields
+    const updates = { ...req.body };
     
-    if (!asset) {
-      return res.status(404).json({ message: 'SPVAsset not found' });
+    // Prevent updates to immutable fields
+    delete updates.AssetID;
+    delete updates.SPVID;
+    
+    // Validate data types
+    if (updates.Value && isNaN(Number(updates.Value))) {
+      return res.status(400).json({ message: 'Invalid SPV Asset data: Value must be a number' });
     }
-
+    
+    const options = { new: true, runValidators: true };
+    
+    // Use withRetry for the MongoDB operation to handle potential connection issues
+    let updatedAsset;
+    try {
+      updatedAsset = await mongoDbConnection.withRetry(async () => {
+        return await SPVAsset.findByIdAndUpdate(req.params.id, updates, options).exec();
+      });
+    } catch (error) {
+      // Handle validation errors from Mongoose
+      if (error.name === 'ValidationError' || error.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid SPV Asset data', error: error.message });
+      }
+      throw error; // Re-throw other errors to be caught by the outer catch
+    }
+    
+    if (!updatedAsset) {
+      return res.status(404).json({ message: 'SPV Asset not found' });
+    }
+    
     // Check for immutable fields in the update data
     const immutableFields = ['AssetID', 'SPVID'];
     for (const field of immutableFields) {
@@ -234,17 +288,17 @@ exports.updateSPVAsset = async (req, res) => {
     const allowedFields = ['Type', 'Value', 'Description', 'AcquisitionDate'];
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
-        asset[field] = req.body[field];
+        updatedAsset[field] = req.body[field];
       }
     });
 
     // Save the updated asset
-    await asset.save();
+    await updatedAsset.save();
 
-    res.status(200).json(asset);
+    res.status(200).json(updatedAsset);
   } catch (error) {
     console.error('Error updating SPV Asset:', error);
-    res.status(500).json({ message: 'Failed to update SPVAsset', error: error.message });
+    res.status(500).json({ message: 'Failed to update SPV Asset', error: error.message });
   }
 };
 

@@ -9,7 +9,7 @@ services:
     container_name: opencap_mongodb_test
     restart: always
     ports:
-      - "27017:27017"  # Updated to standard port for consistency
+      - "27018:27017"  # Changed from 27017:27017 to avoid port conflicts
     environment:
       - MONGO_INITDB_ROOT_USERNAME=opencap
       - MONGO_INITDB_ROOT_PASSWORD=password123
@@ -17,11 +17,8 @@ services:
     volumes:
       - ./test-init-scripts/mongo:/docker-entrypoint-initdb.d
       - mongodb_test_data:/data/db
-    command: >
-      mongod
-      --setParameter maxConnectionsPerHost=200
-      --setParameter maxIncomingConnections=200
-      --wiredTigerCacheSizeGB=1
+    # Removed invalid setParameter options
+    command: mongod --wiredTigerCacheSizeGB=1
     # Added resources to prevent container resource constraints
     deploy:
       resources:

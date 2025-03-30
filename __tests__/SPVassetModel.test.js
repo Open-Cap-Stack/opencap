@@ -1,11 +1,18 @@
+/**
+ * SPV Asset Model Tests
+ * Bug Fix: OCDI-301: Fix MongoDB Connection Timeout Issues
+ * 
+ * Updated to use robust MongoDB connection utilities with retry logic
+ * Following Semantic Seed Venture Studio Coding Standards
+ */
 const mongoose = require('mongoose');
 const { expect } = require('@jest/globals');
-const SPVAsset = require('../models/SPVAsset');
+const SPVAsset = require('../models/SPVasset');
 const mongoDbConnection = require('../utils/mongoDbConnection');
 
 describe('SPVAsset Model', () => {
   beforeAll(async () => {
-    // Use our connection utility instead of direct mongoose.connect
+    // Use the improved MongoDB connection utility with retry logic
     await mongoDbConnection.connectWithRetry();
     await mongoose.connection.db.dropDatabase();
   });
@@ -15,7 +22,10 @@ describe('SPVAsset Model', () => {
   });
 
   beforeEach(async () => {
-    await SPVAsset.deleteMany({});
+    // Use MongoDB connection utility with retry logic
+    await mongoDbConnection.withRetry(async () => {
+      await SPVAsset.deleteMany({});
+    });
   });
 
   // Direct validator function tests to improve branch coverage
@@ -110,8 +120,11 @@ describe('SPVAsset Model', () => {
       AcquisitionDate: new Date(),
     };
 
-    const asset = new SPVAsset(assetData);
-    const savedAsset = await asset.save();
+    // Use MongoDB connection utility with retry logic
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const asset = new SPVAsset(assetData);
+      return await asset.save();
+    });
 
     expect(savedAsset.AssetID).toBe(assetData.AssetID);
     expect(savedAsset.SPVID).toBe(assetData.SPVID);
@@ -131,35 +144,69 @@ describe('SPVAsset Model', () => {
       Value: 1000000,
     };
 
+    let error;
     try {
-      const asset = new SPVAsset(assetData);
-      await asset.save();
-      fail('Should throw validation error');
-    } catch (error) {
-      expect(error.errors.AssetID).toBeTruthy();
-      expect(error.errors.Type).toBeTruthy();
-      expect(error.errors.Description).toBeTruthy();
-      expect(error.errors.AcquisitionDate).toBeTruthy();
+      await mongoDbConnection.withRetry(async () => {
+        const asset = new SPVAsset(assetData);
+        return await asset.save();
+      });
+    } catch (err) {
+      error = err;
     }
+    
+    expect(error).toBeDefined();
+    expect(error.errors.AssetID).toBeTruthy();
+    expect(error.errors.Type).toBeTruthy();
+    expect(error.errors.Description).toBeTruthy();
+    expect(error.errors.AcquisitionDate).toBeTruthy();
   });
 
-  it('should not create an SPVAsset with invalid enum values', async () => {
+  it('should enforce Type enum validation', async () => {
     const assetData = {
-      AssetID: 'ASSET-001',
-      SPVID: 'SPV-001',
-      Type: 'InvalidType', // Invalid enum value
+      AssetID: 'unique-asset-id',
+      SPVID: 'spv123',
+      Type: 'Invalid Type', // Not in enum
       Value: 1000000,
       Description: 'Office building in downtown',
       AcquisitionDate: new Date(),
     };
 
+    let error;
     try {
-      const asset = new SPVAsset(assetData);
-      await asset.save();
-      fail('Should throw validation error');
-    } catch (error) {
-      expect(error.errors.Type).toBeTruthy();
+      await mongoDbConnection.withRetry(async () => {
+        const asset = new SPVAsset(assetData);
+        return await asset.save();
+      });
+    } catch (err) {
+      error = err;
     }
+    
+    expect(error).toBeDefined();
+    expect(error.errors.Type).toBeTruthy();
+  });
+
+  it('should enforce Value as a number', async () => {
+    const assetData = {
+      AssetID: 'unique-asset-id',
+      SPVID: 'spv123',
+      Type: 'Real Estate',
+      Value: 'not-a-number', // Should be a number
+      Description: 'Office building in downtown',
+      AcquisitionDate: new Date(),
+    };
+
+    let error;
+    try {
+      await mongoDbConnection.withRetry(async () => {
+        const asset = new SPVAsset(assetData);
+        return await asset.save();
+      });
+    } catch (err) {
+      error = err;
+    }
+    
+    expect(error).toBeDefined();
+    expect(error.errors.Value).toBeTruthy();
   });
 
   it('should not create an SPVAsset with negative Value', async () => {
