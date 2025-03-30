@@ -130,3 +130,8 @@ dist
 .pnp.*
 .DS_Store
 .DS_Store
+
+# OpenCap specific ignores
+__tests__/controllers/temp/
+*.test.js.bak
+*.bak
