@@ -7,6 +7,7 @@
  * Following Semantic Seed Venture Studio Coding Standards
  */
 const SPVAsset = require('../models/SPVasset');
+const SPV = require('../models/SPV');
 const mongoose = require('mongoose');
 const mongoDbConnection = require('../utils/mongoDbConnection');
 
@@ -122,8 +123,22 @@ exports.getAssetsBySPVId = async (req, res) => {
       return res.status(404).json({ message: `No assets found for SPV: ${spvId}` });
     }
     
+    // Check if the referenced SPV still exists
+    const spvExists = await mongoDbConnection.withRetry(async () => {
+      return await SPV.exists({ SPVID: spvId });
+    });
+    
     // Convert Mongoose documents to plain objects
-    const plainAssets = assets.map(asset => asset.toObject ? asset.toObject() : asset);
+    let plainAssets = assets.map(asset => asset.toObject ? asset.toObject() : asset);
+    
+    // If SPV doesn't exist, mark assets as orphaned
+    if (!spvExists) {
+      plainAssets = plainAssets.map(asset => ({
+        ...asset,
+        SPVStatus: 'Orphaned'  // Add SPVStatus field to indicate the SPV was deleted
+      }));
+    }
+    
     // Store in res.locals for potential use by middleware
     res.locals.responseData = { assets: plainAssets };
     res.status(200).json(res.locals.responseData);
