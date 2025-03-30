@@ -237,16 +237,36 @@ exports.updateSPVAsset = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    const updates = req.body;
+    // Create a copy of the request body and remove immutable fields
+    const updates = { ...req.body };
+    
+    // Prevent updates to immutable fields
+    delete updates.AssetID;
+    delete updates.SPVID;
+    
+    // Validate data types
+    if (updates.Value && isNaN(Number(updates.Value))) {
+      return res.status(400).json({ message: 'Invalid SPV Asset data: Value must be a number' });
+    }
+    
     const options = { new: true, runValidators: true };
     
     // Use withRetry for the MongoDB operation to handle potential connection issues
-    const updatedAsset = await mongoDbConnection.withRetry(async () => {
-      return await SPVAsset.findByIdAndUpdate(req.params.id, updates, options).exec();
-    });
+    let updatedAsset;
+    try {
+      updatedAsset = await mongoDbConnection.withRetry(async () => {
+        return await SPVAsset.findByIdAndUpdate(req.params.id, updates, options).exec();
+      });
+    } catch (error) {
+      // Handle validation errors from Mongoose
+      if (error.name === 'ValidationError' || error.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid SPV Asset data', error: error.message });
+      }
+      throw error; // Re-throw other errors to be caught by the outer catch
+    }
     
     if (!updatedAsset) {
-      return res.status(404).json({ message: 'SPVAsset not found' });
+      return res.status(404).json({ message: 'SPV Asset not found' });
     }
     
     // Convert to plain object for consistent handling
@@ -258,7 +278,7 @@ exports.updateSPVAsset = async (req, res) => {
     res.status(200).json(plainAsset);
   } catch (error) {
     console.error('Error updating SPV Asset:', error);
-    res.status(500).json({ message: 'Failed to update SPVAsset', error: error.message });
+    res.status(500).json({ message: 'Failed to update SPV Asset', error: error.message });
   }
 };
 
