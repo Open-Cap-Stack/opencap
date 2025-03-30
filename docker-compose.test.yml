@@ -9,7 +9,7 @@ services:
     container_name: opencap_mongodb_test
     restart: always
     ports:
-      - "27017:27017"  # Updated to standard port for consistency
+      - "27018:27017"  # Changed from 27017:27017 to avoid port conflicts
     environment:
       - MONGO_INITDB_ROOT_USERNAME=opencap
       - MONGO_INITDB_ROOT_PASSWORD=password123
