@@ -208,3 +208,59 @@ This document will be updated weekly as fixes are implemented and new issues are
 ---
 
 *Prepared according to Semantic Seed Venture Studio Coding Standards V2.0*
+
+### OCDI-301: Fix MongoDB Connection Timeout Issues (COMPLETED)
+- **Issue**: SPV Asset tests were failing with MongoDB connection timeouts and authentication errors
+- **Fix Implemented**:
+  - Created robust MongoDB connection utility with retry logic and exponential backoff
+  - Implemented authentication test utilities for consistent JWT mocking across all tests
+  - Fixed all SPVAsset test files:
+    - SPVAsset_GetById.test.js
+    - SPVAsset_UpdateById.test.js
+    - SPVAsset_Valuation.test.js
+    - SPV_SPVAsset_Integration.test.js
+  - Resolved Docker container configuration issues:
+    - Removed invalid MongoDB parameters causing container restarts
+    - Fixed port conflicts with existing MongoDB instances
+    - Configured test environment to use dedicated test ports
+  - Enhanced data validation and error handling in controllers:
+    - Added protection for immutable fields in update operations
+    - Improved validation error handling
+    - Implemented orphaned asset detection
+  - Achieved excellent test coverage for SPVAsset components:
+    - Controllers: Statements 92.68%, Branches 83.33%, Lines 92.24%, Functions 100%
+    - Models: 100% coverage across all metrics
+    - Routes: 100% coverage across all metrics
+- **Outcome**: 
+  - All SPVAsset tests are now passing consistently
+  - MongoDB operations are robust against temporary connection issues
+  - The code follows the Semantic Seed Venture Studio Coding Standards
+
+### OCDI-304: Fix SPV Asset Model Validation Issues (IN PROGRESS)
+- **Issue**: SPVAsset model lacks proper validation for data types, format checking, and has performance issues with queries
+- **Progress**:
+  - Enhanced SPVAsset model with improved validation logic:
+    - Added dedicated validation functions for asset IDs, numbers, dates, and types
+    - Implemented proper format checking for IDs (alphanumeric with hyphens only)
+    - Added minimum value validation for numeric fields
+    - Added maximum length validation for descriptions
+  - Added utility methods to improve code reusability:
+    - Static methods for common queries (findByType, findBySPVID, getTotalValueBySPVID)
+    - Added filtering capabilities with robust validation
+    - Instance methods for API response formatting and value calculation
+  - Improved query performance with proper indexing:
+    - Added indexes for frequently queried fields
+    - Created compound indexes for complex queries
+    - Implemented case insensitivity for IDs with proper normalization
+  - Achieved excellent test coverage metrics:
+    - Statements: 100% (exceeds 90% requirement)
+    - Branches: 91.89% (exceeds 80% requirement)
+    - Lines: 100% (exceeds 90% requirement)
+    - Functions: 100% (exceeds 90% requirement)
+- **Next Steps**:
+  - Test changes in integration with SPV controller and other components
+  - Update any dependent code that might be affected by the enhanced validation
+  - Update API documentation to reflect new validation requirements
+  - Complete remaining test files for full end-to-end coverage
+
+---
