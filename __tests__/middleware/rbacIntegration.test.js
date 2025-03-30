@@ -1,10 +1,11 @@
 /**
  * RBAC Integration Tests
  * [Feature] OCAE-302: Implement role-based access control
+ * [Bug] OCAE-206: Fix Permission & Role-Based Access Control Tests
  */
 
 const express = require('express');
-const { hasRole, hasPermission } = require('../../middleware/rbacMiddleware');
+const { hasRole, hasPermission, rolePermissions } = require('../../middleware/rbacMiddleware');
 
 describe('RBAC Integration', () => {
   let mockReq, mockRes, mockNext;
@@ -79,7 +80,7 @@ describe('RBAC Integration', () => {
   });
 
   describe('hasPermission middleware integration', () => {
-    it('should integrate properly with Express routes', () => {
+    it('should integrate properly with Express routes using explicit permissions', () => {
       // Create a mock express router
       const router = express.Router();
       const mockEndpoint = jest.fn((req, res) => res.json({ success: true }));
@@ -97,6 +98,32 @@ describe('RBAC Integration', () => {
       middlewareChain[0].handle(mockReq, mockRes, mockNext);
       
       // It should call next()
+      expect(mockNext).toHaveBeenCalled();
+    });
+    
+    it('should integrate properly with Express routes using role-based permissions', () => {
+      // Create a mock express router with user that has admin role but no explicit permissions
+      const adminRoleReq = {
+        user: {
+          userId: 'test789',
+          role: 'admin',
+          permissions: [] // No explicit permissions
+        }
+      };
+      
+      const router = express.Router();
+      const mockEndpoint = jest.fn((req, res) => res.json({ success: true }));
+      
+      // Apply RBAC middleware that requires a permission that admin role has
+      router.get('/delete-companies', hasPermission('delete:companies'), mockEndpoint);
+      
+      // Get the middleware chain
+      const middlewareChain = router.stack[0].route.stack;
+      
+      // Execute the middleware
+      middlewareChain[0].handle(adminRoleReq, mockRes, mockNext);
+      
+      // It should call next() because admin role has delete:companies permission
       expect(mockNext).toHaveBeenCalled();
     });
 
