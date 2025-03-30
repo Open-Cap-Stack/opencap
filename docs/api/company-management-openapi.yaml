@@ -1,0 +1,845 @@
+openapi: 3.0.3
+info:
+  title: OpenCap Company Management API
+  description: |
+    API for managing company information in the OpenCap platform.
+    
+    Feature: OCAE-204 - Implement company management endpoints
+    Status: Completed ✅
+    Test Status: All tests passing (33/33)
+  version: 1.0.0
+  contact:
+    name: OpenCap API Team
+    url: https://opencap.example.com
+    email: api@opencap.example.com
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
+
+servers:
+  - url: https://api.opencap.example.com/api
+    description: Production API server
+  - url: https://staging-api.opencap.example.com/api
+    description: Staging API server
+  - url: http://localhost:5000/api
+    description: Local development server
+
+tags:
+  - name: Companies
+    description: Core company management operations
+  - name: Enhanced
+    description: Enhanced company features
+  - name: Bulk
+    description: Bulk operations for companies
+  - name: Statistics
+    description: Company statistics and analytics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from authentication endpoint
+  
+  schemas:
+    Company:
+      type: object
+      required:
+        - companyId
+        - CompanyName
+        - CompanyType
+        - RegisteredAddress
+        - TaxID
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier for the company
+          example: "comp-123"
+        CompanyName:
+          type: string
+          description: Name of the company
+          example: "Acme Corporation"
+        CompanyType:
+          type: string
+          enum: [startup, corporation, non-profit, government]
+          description: Type of company
+          example: "corporation"
+        RegisteredAddress:
+          type: string
+          description: Legal registered address of the company
+          example: "123 Main St, San Francisco, CA 94105"
+        TaxID:
+          type: string
+          description: Tax identification number
+          example: "12-3456789"
+        corporationDate:
+          type: string
+          format: date-time
+          description: Date when the company was incorporated
+          example: "2020-01-01T00:00:00.000Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: Date when the company record was created
+          example: "2022-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Date when the company record was last updated
+          example: "2022-01-01T00:00:00.000Z"
+    
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: Unique identifier for the user
+          example: "user-123"
+        name:
+          type: string
+          description: Full name of the user
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: Email address of the user
+          example: "john.doe@example.com"
+        role:
+          type: string
+          description: Role of the user in the system
+          example: "admin"
+    
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Company with ID comp-999 not found"
+    
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of items
+          example: 42
+        page:
+          type: integer
+          description: Current page number
+          example: 2
+        limit:
+          type: integer
+          description: Number of items per page
+          example: 10
+        pages:
+          type: integer
+          description: Total number of pages
+          example: 5
+    
+    CompanyList:
+      type: object
+      properties:
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Company'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    
+    UserList:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Company ID the users belong to
+          example: "comp-123"
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Whether the data is valid
+          example: true
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field with validation error
+                example: "CompanyName"
+              message:
+                type: string
+                description: Error message
+                example: "Company name is required"
+    
+    CompanyTypeStats:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Company type
+          example: "corporation"
+        count:
+          type: integer
+          description: Number of companies of this type
+          example: 15
+    
+    CompanyUserStats:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Company ID
+          example: "comp-123"
+        userCount:
+          type: integer
+          description: Number of users in the company
+          example: 42
+    
+    CompanyStatistics:
+      type: object
+      properties:
+        totalCompanies:
+          type: integer
+          description: Total number of companies
+          example: 100
+        companyTypeStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyTypeStats'
+        newCompanies:
+          type: integer
+          description: Number of companies created in the last 30 days
+          example: 5
+        topCompaniesByUsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyUserStats'
+    
+    BulkCompanyRequest:
+      type: object
+      required:
+        - companies
+      properties:
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Company'
+          description: Array of companies to create or update
+    
+    BulkCompanyResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          description: Number of companies created
+          example: 5
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Company'
+          description: Array of created companies
+
+paths:
+  /companies:
+    get:
+      tags:
+        - Companies
+      summary: Get all companies
+      description: Retrieves a paginated list of all companies
+      operationId: getAllCompanies
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyList'
+        '400':
+          description: Invalid pagination parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Companies
+      summary: Create a new company
+      description: Creates a new company in the system
+      operationId: createCompany
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Company data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      responses:
+        '201':
+          description: Company created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          description: Invalid company data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Company with this ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/{id}:
+    get:
+      tags:
+        - Companies
+      summary: Get company by ID
+      description: Retrieves a specific company by ID
+      operationId: getCompanyById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Company ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Companies
+      summary: Update company by ID
+      description: Updates a specific company by ID
+      operationId: updateCompanyById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Company ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Company data to update
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                CompanyName:
+                  type: string
+                  example: "Updated Company Name"
+                CompanyType:
+                  type: string
+                  enum: [startup, corporation, non-profit, government]
+                  example: "non-profit"
+                RegisteredAddress:
+                  type: string
+                  example: "456 New St, San Francisco, CA 94105"
+                TaxID:
+                  type: string
+                  example: "98-7654321"
+      responses:
+        '200':
+          description: Company updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          description: Invalid company data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Companies
+      summary: Delete company by ID
+      description: Deletes a specific company by ID
+      operationId: deleteCompanyById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Company ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Company deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Company comp-123 deleted"
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/type/{companyType}:
+    get:
+      tags:
+        - Enhanced
+      summary: Get companies by type
+      description: Retrieves companies filtered by type
+      operationId: getCompaniesByType
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: companyType
+          in: path
+          description: Company type to filter by
+          required: true
+          schema:
+            type: string
+            enum: [startup, corporation, non-profit, government]
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyList'
+        '400':
+          description: Invalid company type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/search:
+    get:
+      tags:
+        - Enhanced
+      summary: Search companies
+      description: Searches companies based on criteria
+      operationId: searchCompanies
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          description: Company name (partial match)
+          required: false
+          schema:
+            type: string
+        - name: taxId
+          in: query
+          description: Tax ID (exact match)
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Company type (exact match)
+          required: false
+          schema:
+            type: string
+            enum: [startup, corporation, non-profit, government]
+        - name: sort
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            default: CompanyName
+        - name: order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyList'
+        '400':
+          description: No search parameters provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/{id}/validate:
+    post:
+      tags:
+        - Enhanced
+      summary: Validate company data
+      description: Validates company data against business rules
+      operationId: validateCompanyData
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Company ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Data to validate
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  description: Company data to validate
+                  example:
+                    CompanyName: "Test Corp"
+                    TaxID: "12-3456789"
+      responses:
+        '200':
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          description: Missing validation data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/bulk:
+    post:
+      tags:
+        - Bulk
+      summary: Bulk create companies
+      description: Creates multiple companies in a single request
+      operationId: bulkCreateCompanies
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Companies to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCompanyRequest'
+      responses:
+        '201':
+          description: Companies created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCompanyResponse'
+        '400':
+          description: Invalid request format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: One or more companies already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Bulk
+      summary: Bulk update companies
+      description: Updates multiple companies in a single request
+      operationId: bulkUpdateCompanies
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Companies to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCompanyRequest'
+      responses:
+        '200':
+          description: Companies updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                    description: Number of companies updated
+                    example: 5
+                  companies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Company'
+                    description: Array of updated companies
+        '400':
+          description: Invalid request format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: One or more companies not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/{id}/users:
+    get:
+      tags:
+        - Enhanced
+      summary: Get company users
+      description: Retrieves users associated with a company
+      operationId: getCompanyUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Company ID
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /companies/statistics:
+    get:
+      tags:
+        - Statistics
+      summary: Get company statistics
+      description: Retrieves statistical information about companies
+      operationId: getCompanyStatistics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyStatistics'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+security:
+  - bearerAuth: []
