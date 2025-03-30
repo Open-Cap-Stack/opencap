@@ -98,7 +98,7 @@ Based on the dependencies between components and the severity of issues, the fol
    - Increase connection timeout in test environment
    - Ensure MongoDB container is properly initialized before tests run
    - Add retry logic for connection attempts
-   - **Status: FIXED**
+   - **Status: IN PROGRESS**
 
 2. **Optimize Docker Test Environment**
    - Increase resource allocation for test containers
@@ -204,6 +204,35 @@ The OpenCap test suite requires significant attention to reach the required cove
 Following the prioritized sequence outlined in this document will systematically address the failures and bring the test suite to the required quality standards as specified in the Semantic Seed Venture Studio Coding Standards.
 
 This document will be updated weekly as fixes are implemented and new issues are discovered.
+
+## 10. Recent Security Fixes
+
+### OCDI-304: Removal of Exposed API Tokens (COMPLETED)
+- **Issue**: API tokens were exposed in the Git repository history
+- **Fix**: Implemented a comprehensive security solution:
+  - Removed sensitive tokens from the Git history using `git filter-repo`
+  - Added `.gitattributes` to prevent display of sensitive files in diffs
+  - Created security documentation in `docs/security/credential-handling-guide.md`
+  - Replaced all tokens with proper placeholders
+- **Next Steps**: 
+  - A GitHub Support request is needed to fully purge cached historical commits
+  - The exposed tokens must be immediately revoked
+
+### OCDI-301: Fix MongoDB Connection Timeout Issues (IN PROGRESS)
+- **Issue**: SPV Asset tests were failing with MongoDB connection timeouts and authentication errors
+- **Progress**:
+  - Implemented robust MongoDB connection utility with retry logic and exponential backoff
+  - Created authentication test utilities for consistent JWT mocking
+  - Updated SPVAsset tests to use improved connection handling
+  - Fixed casing inconsistencies across model imports
+- **Approach**:
+  - Following TDD workflow with comprehensive test coverage
+  - Ensuring Controllers meet 85% minimum test coverage
+  - Ensuring Models meet 90% minimum test coverage
+- **Remaining Work**:
+  - Complete updating all SPVAsset test files
+  - Verify test coverage meets minimum thresholds
+  - Update documentation for MongoDB connection best practices
 
 ---
 

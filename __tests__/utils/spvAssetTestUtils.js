@@ -10,7 +10,7 @@
 
 const mongoose = require('mongoose');
 const mongoDbConnection = require('../../utils/mongoDbConnection');
-const SPVAsset = require('../../models/SPVAsset');
+const SPVAsset = require('../../models/SPVasset');
 
 /**
  * Setup the SPV Asset test environment with proper connection handling

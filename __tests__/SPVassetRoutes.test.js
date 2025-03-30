@@ -1,12 +1,34 @@
 /**
  * SPV Asset Management API Tests
  * Feature: OCAE-212: Implement SPV Asset Management API
+ * Bug Fix: OCDI-301: Fix MongoDB Connection Timeout Issues
+ * 
+ * Updated to mock JWT authentication middleware and improve MongoDB reliability
+ * Following Semantic Seed Venture Studio Coding Standards
  */
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const SPVAsset = require('../models/SPVasset');
 const spvAssetRoutes = require('../routes/SPVasset');
+const mongoDbConnection = require('../utils/mongoDbConnection');
+
+// Mock JWT authentication middleware
+jest.mock('../middleware/jwtAuth', () => ({
+  authenticate: jest.fn((req, res, next) => {
+    // Set mock user with admin role
+    req.user = {
+      id: 'test-user-id',
+      email: 'admin@test.com',
+      roles: ['Admin']
+    };
+    next();
+  }),
+  authenticateRole: jest.fn(() => (req, res, next) => {
+    next();
+  })
+}));
 
 const app = express();
 app.use(express.json());
@@ -22,9 +44,28 @@ const testAsset = {
   AcquisitionDate: new Date(),
 };
 
+// Helper function to create and save multiple test assets with retry logic
+async function createTestAssets(assets) {
+  return Promise.all(
+    assets.map(async (asset) => {
+      return mongoDbConnection.withRetry(async () => {
+        const newAsset = new SPVAsset(asset);
+        return await newAsset.save();
+      });
+    })
+  );
+}
+
 // Setup and teardown
 beforeEach(async () => {
-  await SPVAsset.deleteMany({});
+  // Use MongoDB connection utility with retry logic
+  await mongoDbConnection.withRetry(async () => {
+    await SPVAsset.deleteMany({});
+  });
+});
+
+afterAll(async () => {
+  await mongoose.connection.close();
 });
 
 // POST /api/spvassets - Create a new SPV Asset
@@ -56,12 +97,14 @@ describe('POST /api/spvassets', () => {
 describe('GET /api/spvassets', () => {
   it('should get all SPV Assets', async () => {
     // Create test assets
-    await new SPVAsset(testAsset).save();
-    await new SPVAsset({
-      ...testAsset,
-      AssetID: 'asset-002',
-      Description: 'Second asset'
-    }).save();
+    await createTestAssets([
+      testAsset,
+      {
+        ...testAsset,
+        AssetID: 'asset-002',
+        Description: 'Second asset'
+      }
+    ]);
 
     const res = await request(app).get('/api/spvassets');
 
@@ -90,7 +133,10 @@ describe('GET /api/spvassets', () => {
       AcquisitionDate: new Date(),
     };
 
-    const savedAsset = await new SPVAsset(assetData).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(assetData);
+      return await newAsset.save();
+    });
 
     const res = await request(app).get(`/api/spvassets/${savedAsset._id}`);
 
@@ -133,7 +179,7 @@ describe('GET /api/spvassets', () => {
       }
     ];
 
-    await SPVAsset.insertMany(assets);
+    await createTestAssets(assets);
 
     const res = await request(app).get('/api/spvassets/spv/test-spv');
     
@@ -171,7 +217,7 @@ describe('GET /api/spvassets', () => {
       }
     ];
 
-    await SPVAsset.insertMany(assets);
+    await createTestAssets(assets);
 
     const res = await request(app).get('/api/spvassets/valuation/spv/test-spv');
     
@@ -211,7 +257,7 @@ describe('GET /api/spvassets', () => {
       }
     ];
 
-    await SPVAsset.insertMany(assets);
+    await createTestAssets(assets);
 
     const res = await request(app).get('/api/spvassets/valuation/type/Real Estate');
     
@@ -233,7 +279,10 @@ describe('GET /api/spvassets', () => {
       AcquisitionDate: new Date(),
     };
 
-    const savedAsset = await new SPVAsset(assetData).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(assetData);
+      return await newAsset.save();
+    });
     
     const updateData = {
       Value: 1200000,
@@ -261,7 +310,10 @@ describe('GET /api/spvassets', () => {
       AcquisitionDate: new Date(),
     };
 
-    const savedAsset = await new SPVAsset(assetData).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(assetData);
+      return await newAsset.save();
+    });
     
     const updateData = {
       AssetID: 'try-to-change',
@@ -280,15 +332,17 @@ describe('GET /api/spvassets', () => {
   });
 
   it('should delete an SPVAsset by ID', async () => {
-    const asset = new SPVAsset({
-      AssetID: 'unique-asset-id',
-      SPVID: 'spv123',
-      Type: 'Real Estate',
-      Value: 1000000,
-      Description: 'Office building in downtown',
-      AcquisitionDate: new Date(),
+    const asset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset({
+        AssetID: 'unique-asset-id',
+        SPVID: 'spv123',
+        Type: 'Real Estate',
+        Value: 1000000,
+        Description: 'Office building in downtown',
+        AcquisitionDate: new Date(),
+      });
+      return await newAsset.save();
     });
-    await asset.save();
 
     const res = await request(app).delete(`/api/spvassets/${asset._id}`);
 
@@ -313,7 +367,10 @@ describe('GET /api/spvassets', () => {
       AcquisitionDate: new Date(),
     };
 
-    const savedAsset = await new SPVAsset(assetData).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(assetData);
+      return await newAsset.save();
+    });
     
     const updateData = {
       Value: "not-a-number"
@@ -369,7 +426,10 @@ describe('GET /api/spvassets', () => {
 // GET /api/spvassets/:id - Get asset by ID
 describe('GET /api/spvassets/:id', () => {
   it('should get an asset by valid ID', async () => {
-    const asset = await new SPVAsset(testAsset).save();
+    const asset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(testAsset);
+      return await newAsset.save();
+    });
     const res = await request(app).get(`/api/spvassets/${asset.AssetID}`);
 
     expect(res.statusCode).toBe(200);
@@ -395,12 +455,14 @@ describe('GET /api/spvassets/:id', () => {
 // GET /api/spvassets/spv/:spvId - Get assets for a specific SPV
 describe('GET /api/spvassets/spv/:spvId', () => {
   it('should get assets for a specific SPV', async () => {
-    await new SPVAsset(testAsset).save(); // SPVID: spv-001
-    await new SPVAsset({
-      ...testAsset,
-      AssetID: 'asset-002',
-      SPVID: 'spv-002'
-    }).save();
+    await createTestAssets([
+      testAsset,
+      {
+        ...testAsset,
+        AssetID: 'asset-002',
+        SPVID: 'spv-002'
+      }
+    ]);
 
     const res = await request(app).get('/api/spvassets/spv/spv-001');
 
@@ -422,12 +484,14 @@ describe('GET /api/spvassets/spv/:spvId', () => {
 describe('GET /api/spvassets/valuation/spv/:spvId', () => {
   it('should calculate total valuation for a specific SPV', async () => {
     // Create assets for the same SPV with different values
-    await new SPVAsset(testAsset).save(); // SPVID: spv-001, Value: 1000000
-    await new SPVAsset({
-      ...testAsset,
-      AssetID: 'asset-002',
-      Value: 500000
-    }).save();
+    await createTestAssets([
+      testAsset,
+      {
+        ...testAsset,
+        AssetID: 'asset-002',
+        Value: 500000
+      }
+    ]);
 
     const res = await request(app).get('/api/spvassets/valuation/spv/spv-001');
 
@@ -451,19 +515,21 @@ describe('GET /api/spvassets/valuation/spv/:spvId', () => {
 describe('GET /api/spvassets/valuation/type/:type', () => {
   it('should calculate total valuation for a specific asset type', async () => {
     // Create assets of different types
-    await new SPVAsset(testAsset).save(); // Type: Real Estate, Value: 1000000
-    await new SPVAsset({
-      ...testAsset,
-      AssetID: 'asset-002',
-      Type: 'Financial Instrument',
-      Value: 500000
-    }).save();
-    await new SPVAsset({
-      ...testAsset,
-      AssetID: 'asset-003',
-      Type: 'Real Estate',
-      Value: 750000
-    }).save();
+    await createTestAssets([
+      testAsset,
+      {
+        ...testAsset,
+        AssetID: 'asset-002',
+        Type: 'Financial Instrument',
+        Value: 500000
+      },
+      {
+        ...testAsset,
+        AssetID: 'asset-003',
+        Type: 'Real Estate',
+        Value: 750000
+      }
+    ]);
 
     const res = await request(app).get('/api/spvassets/valuation/type/Real Estate');
 
@@ -486,7 +552,10 @@ describe('GET /api/spvassets/valuation/type/:type', () => {
 // PUT /api/spvassets/:id - Update Asset
 describe('PUT /api/spvassets/:id', () => {
   it('should update an asset by ID', async () => {
-    const savedAsset = await new SPVAsset(testAsset).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(testAsset);
+      return await newAsset.save();
+    });
     const updateData = {
       Type: 'Financial Instrument',
       Value: 1250000,
@@ -494,7 +563,7 @@ describe('PUT /api/spvassets/:id', () => {
     };
 
     const res = await request(app)
-      .put(`/api/spvassets/${savedAsset.AssetID}`)
+      .put(`/api/spvassets/${savedAsset._id}`)
       .send(updateData);
 
     expect(res.statusCode).toBe(200);
@@ -505,7 +574,10 @@ describe('PUT /api/spvassets/:id', () => {
   });
 
   it('should prevent AssetID and SPVID from being updated', async () => {
-    const savedAsset = await new SPVAsset(testAsset).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(testAsset);
+      return await newAsset.save();
+    });
     const updateData = {
       AssetID: 'new-asset-id',
       SPVID: 'new-spv-id',
@@ -513,7 +585,7 @@ describe('PUT /api/spvassets/:id', () => {
     };
 
     const res = await request(app)
-      .put(`/api/spvassets/${savedAsset.AssetID}`)
+      .put(`/api/spvassets/${savedAsset._id}`)
       .send(updateData);
 
     expect(res.statusCode).toBe(200);
@@ -523,13 +595,16 @@ describe('PUT /api/spvassets/:id', () => {
   });
 
   it('should return 400 if Value is not numeric', async () => {
-    const savedAsset = await new SPVAsset(testAsset).save();
+    const savedAsset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(testAsset);
+      return await newAsset.save();
+    });
     const updateData = {
       Value: 'not-a-number'
     };
 
     const res = await request(app)
-      .put(`/api/spvassets/${savedAsset.AssetID}`)
+      .put(`/api/spvassets/${savedAsset._id}`)
       .send(updateData);
 
     expect(res.statusCode).toBe(400);
@@ -549,14 +624,17 @@ describe('PUT /api/spvassets/:id', () => {
 // DELETE /api/spvassets/:id - Delete Asset
 describe('DELETE /api/spvassets/:id', () => {
   it('should delete an asset by ID', async () => {
-    const asset = await new SPVAsset(testAsset).save();
-    const res = await request(app).delete(`/api/spvassets/${asset.AssetID}`);
+    const asset = await mongoDbConnection.withRetry(async () => {
+      const newAsset = new SPVAsset(testAsset);
+      return await newAsset.save();
+    });
+    const res = await request(app).delete(`/api/spvassets/${asset._id}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('message');
 
     // Verify asset is deleted
-    const findRes = await request(app).get(`/api/spvassets/${asset.AssetID}`);
+    const findRes = await request(app).get(`/api/spvassets/${asset._id}`);
     expect(findRes.statusCode).toBe(404);
   });
 
