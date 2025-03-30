@@ -205,12 +205,12 @@ exports.getAssetTypeValuation = async (req, res) => {
     
     // Create response data
     const responseData = {
-      type: assetType,
+      assetType: assetType, 
       totalValuation,
       assetCount: plainAssets.length,
-      assets: plainAssets.map(asset => ({
+      assetBreakdown: plainAssets.map(asset => ({ 
         assetId: asset.AssetID,
-        spvId: asset.SPVID,
+        type: asset.Type,
         value: asset.Value,
         description: asset.Description
       }))
