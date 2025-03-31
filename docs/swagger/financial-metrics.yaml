@@ -1,0 +1,692 @@
+openapi: 3.0.0
+info:
+  title: Financial Metrics API
+  description: |
+    Financial metrics calculation endpoints for OpenCap companies
+    [Feature] OCAE-402: Create financial metrics calculation endpoints
+  version: 1.0.0
+  
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error details if available
+          
+    ProfitabilityMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        grossProfitMargin:
+          type: number
+          format: float
+          description: Gross profit divided by revenue
+        operatingProfitMargin:
+          type: number
+          format: float
+          description: Operating profit divided by revenue
+        netProfitMargin:
+          type: number
+          format: float
+          description: Net profit divided by revenue
+        revenue:
+          type: number
+          description: Revenue for the period
+        grossProfit:
+          type: number
+          description: Gross profit for the period
+        operatingProfit:
+          type: number
+          description: Operating profit for the period
+        netProfit:
+          type: number
+          description: Net profit for the period
+    
+    LiquidityMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        currentRatio:
+          type: number
+          format: float
+          description: Current assets divided by current liabilities
+        quickRatio:
+          type: number
+          format: float
+          description: (Current assets - inventory) divided by current liabilities
+        cashRatio:
+          type: number
+          format: float
+          description: Cash and cash equivalents divided by current liabilities
+        currentAssets:
+          type: number
+          description: Current assets for the period
+        inventory:
+          type: number
+          description: Inventory for the period
+        cashAndCashEquivalents:
+          type: number
+          description: Cash and cash equivalents for the period
+        currentLiabilities:
+          type: number
+          description: Current liabilities for the period
+          
+    SolvencyMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        debtToEquityRatio:
+          type: number
+          format: float
+          description: Total liabilities divided by equity
+        debtToAssetRatio:
+          type: number
+          format: float
+          description: Total liabilities divided by total assets
+        longTermDebtToEquityRatio:
+          type: number
+          format: float
+          description: Long-term debt divided by equity
+        interestCoverageRatio:
+          type: number
+          format: float
+          description: Operating income divided by interest expense
+        totalLiabilities:
+          type: number
+          description: Total liabilities for the period
+        longTermDebt:
+          type: number
+          description: Long-term debt for the period
+        equity:
+          type: number
+          description: Equity for the period
+        totalAssets:
+          type: number
+          description: Total assets for the period
+          
+    EfficiencyMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        assetTurnoverRatio:
+          type: number
+          format: float
+          description: Revenue divided by average total assets
+        inventoryTurnoverRatio:
+          type: number
+          format: float
+          description: Cost of goods sold divided by average inventory
+        receivablesTurnoverRatio:
+          type: number
+          format: float
+          description: Revenue divided by average accounts receivable
+        daysInventoryOutstanding:
+          type: number
+          format: float
+          description: 365 divided by inventory turnover ratio
+        daysReceivablesOutstanding:
+          type: number
+          format: float
+          description: 365 divided by receivables turnover ratio
+          
+    GrowthMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        currentPeriod:
+          type: string
+          description: Current reporting period
+        comparisonPeriod:
+          type: string
+          description: Period being compared to
+        revenueGrowth:
+          type: number
+          format: float
+          description: Percentage growth in revenue
+        netIncomeGrowth:
+          type: number
+          format: float
+          description: Percentage growth in net income
+        ebitdaGrowth:
+          type: number
+          format: float
+          description: Percentage growth in EBITDA
+        totalAssetsGrowth:
+          type: number
+          format: float
+          description: Percentage growth in total assets
+        equityGrowth:
+          type: number
+          format: float
+          description: Percentage growth in equity
+          
+    ValuationMetrics:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        earningsPerShare:
+          type: number
+          format: float
+          description: Net income divided by shares outstanding
+        priceToEarningsRatio:
+          type: number
+          format: float
+          description: Stock price divided by earnings per share
+        enterpriseValue:
+          type: number
+          description: Market cap plus debt minus cash
+        evToEbitda:
+          type: number
+          format: float
+          description: Enterprise value divided by EBITDA
+        evToRevenue:
+          type: number
+          format: float
+          description: Enterprise value divided by revenue
+        priceToBookRatio:
+          type: number
+          format: float
+          description: Market cap divided by equity
+        bookValuePerShare:
+          type: number
+          format: float
+          description: Equity divided by shares outstanding
+          
+    MetricsDashboard:
+      type: object
+      properties:
+        companyId:
+          type: string
+          description: Unique identifier of the company
+        period:
+          type: string
+          description: Reporting period in format YYYY-QX or YYYY-full
+        generatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the dashboard was generated
+        profitability:
+          $ref: '#/components/schemas/ProfitabilityMetrics'
+        liquidity:
+          $ref: '#/components/schemas/LiquidityMetrics'
+        solvency:
+          $ref: '#/components/schemas/SolvencyMetrics'
+        efficiency:
+          $ref: '#/components/schemas/EfficiencyMetrics'
+        growth:
+          $ref: '#/components/schemas/GrowthMetrics'
+        valuation:
+          $ref: '#/components/schemas/ValuationMetrics'
+          
+paths:
+  /api/v1/companies/{companyId}/metrics/profitability:
+    get:
+      summary: Calculate profitability metrics
+      description: |
+        Calculates profitability metrics such as gross profit margin, 
+        operating profit margin, and net profit margin for a specific company.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Profitability metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitabilityMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/liquidity:
+    get:
+      summary: Calculate liquidity metrics
+      description: |
+        Calculates liquidity metrics such as current ratio, quick ratio, 
+        and cash ratio for a specific company.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Liquidity metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiquidityMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/solvency:
+    get:
+      summary: Calculate solvency metrics
+      description: |
+        Calculates solvency metrics such as debt-to-equity ratio and 
+        interest coverage ratio for a specific company.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Solvency metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolvencyMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/efficiency:
+    get:
+      summary: Calculate efficiency metrics
+      description: |
+        Calculates efficiency metrics such as asset turnover, inventory turnover,
+        and receivables turnover for a specific company.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Efficiency metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EfficiencyMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/growth:
+    get:
+      summary: Calculate growth metrics
+      description: |
+        Calculates growth metrics such as revenue growth, EBITDA growth,
+        and net income growth compared to a previous period.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+        - in: query
+          name: compareWith
+          required: false
+          schema:
+            type: string
+            enum: [previous-year, previous-quarter]
+          description: Basis for comparison (defaults to previous-year)
+      responses:
+        '200':
+          description: Growth metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrowthMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/valuation:
+    get:
+      summary: Calculate valuation metrics
+      description: |
+        Calculates valuation metrics such as P/E ratio, EV/EBITDA, P/B ratio,
+        and other metrics for public companies.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Valuation metrics calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValuationMetrics'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/companies/{companyId}/metrics/dashboard:
+    get:
+      summary: Calculate comprehensive financial metrics dashboard
+      description: |
+        Combines all financial metrics into a comprehensive dashboard view
+        for a specific company and reporting period.
+      tags:
+        - Financial Metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the company
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+          description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
+      responses:
+        '200':
+          description: Comprehensive metrics dashboard calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsDashboard'
+        '400':
+          description: Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No financial data found for the specified period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error while calculating metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

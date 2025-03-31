@@ -144,7 +144,8 @@ const routes = {
 // Import custom v1 routes
 const v1Routes = {
   shareClassRoutes: require('./routes/v1/shareClassRoutes'),
-  financialReportRoutes: require('./routes/v1/financialReportRoutes')
+  financialReportRoutes: require('./routes/v1/financialReportRoutes'),
+  financialMetricsRoutes: require('./routes/v1/financialMetricsRoutes')
 };
 
 // Route mapping with paths
@@ -204,6 +205,10 @@ if (routes.v1ShareClassRoutes) {
 // OCAE-206: Financial report routes
 app.use('/api/v1/financial-reports', v1Routes.financialReportRoutes);
 console.log('Registered custom v1 route: /api/v1/financial-reports -> financialReportRoutes');
+
+// OCAE-402: Financial metrics routes
+app.use('/api/v1', v1Routes.financialMetricsRoutes);
+console.log('Registered custom v1 route: /api/v1 -> financialMetricsRoutes');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
