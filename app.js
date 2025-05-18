@@ -128,15 +128,15 @@ const routes = {
   authRoutes: require("./routes/authRoutes"),
 
   // Optional routes that might not exist in all environments
-  communicationRoutes: safeRequire("./routes/Communication"),
-  notificationRoutes: safeRequire("./routes/notificationRoutes"),
-  inviteManagementRoutes: safeRequire("./routes/inviteManagementRoutes"),
+  communicationRoutes: require("./routes/Communication"),
+  notificationRoutes: require("./routes/Notification"),
+  inviteManagementRoutes: require("./routes/inviteManagementRoute"),
   // Using direct require for SPV and compliance routes to ensure they're properly loaded
   spvRoutes: require("./routes/SPV"),
   spvAssetRoutes: require("./routes/SPVasset"),
   complianceCheckRoutes: require("./routes/complianceCheckRoutes"),
-  integrationModuleRoutes: safeRequire("./routes/integrationModuleRoutes"),
-  taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes"),
+  integrationModuleRoutes: require("./routes/integration"),
+  taxCalculatorRoutes: require("./routes/TaxCalculator"),
   
   // OCAE-208: Enhanced V1 Routes 
   v1ShareClassRoutes: safeRequire("./routes/v1/shareClassRoutes")
@@ -196,10 +196,14 @@ const filteredMappings = Object.fromEntries(
 createVersionedRoutes(app, routes, filteredMappings);
 
 // Mount custom v1 routes directly
-// OCAE-208: Share class routes
+// OCAE-208: Register custom v1 shareClasses routes if they exist
 if (routes.v1ShareClassRoutes) {
   app.use('/api/v1/shareClasses', routes.v1ShareClassRoutes);
   console.log('Registered custom v1 route: /api/v1/shareClasses -> v1ShareClassRoutes');
+} else {
+  // Use the imported v1Routes directly if v1ShareClassRoutes is not available
+  app.use('/api/v1/shareClasses', v1Routes.shareClassRoutes);
+  console.log('Registered custom v1 route: /api/v1/shareClasses -> v1Routes.shareClassRoutes');
 }
 
 // OCAE-206: Financial report routes

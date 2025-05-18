@@ -3,18 +3,18 @@ const router = express.Router();
 const inviteManagementController = require("../controllers/inviteManagementController");
 
 // Route for creating an invite
-router.post("/invites", inviteManagementController.createInvite);
+router.post("/", inviteManagementController.createInvite);
 
 // Route for getting all invites
-router.get("/invites", inviteManagementController.getAllInvites);
+router.get("/", inviteManagementController.getAllInvites);
 
 // Route for getting an invite by ID
-router.get("/invites/:id", inviteManagementController.getInviteById);
+router.get("/:id", inviteManagementController.getInviteById);
 
 // Route for updating an invite
-router.put("/invites/:id", inviteManagementController.updateInvite);
+router.put("/:id", inviteManagementController.updateInvite);
 
 // Route for deleting an invite
-router.delete("/invites/:id", inviteManagementController.deleteInvite);
+router.delete("/:id", inviteManagementController.deleteInvite);
 
 module.exports = router;
