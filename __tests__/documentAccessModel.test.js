@@ -1,13 +1,16 @@
+/**
+ * Document Access Model Tests
+ * Following OpenCap TDD principles and Semantic Seed standards
+ */
 const mongoose = require('mongoose');
 const DocumentAccessModel = require('../models/DocumentAccessModel');
+// Use the shared test database setup instead of creating a new connection
+const { clearDB } = require('./setup/testDB');
 
-beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/opencap');
-});
-
-afterAll(async () => {
-    await mongoose.connection.db.dropDatabase();
-    await mongoose.connection.close();
+// We don't need to explicitly connect or disconnect because it's handled by jest.setup.js
+beforeEach(async () => {
+    // Clear test data before each test
+    await clearDB();
 });
 
 describe('DocumentAccess Model', () => {

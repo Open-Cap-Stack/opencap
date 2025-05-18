@@ -17,7 +17,10 @@ const mongoDbConnection = require('../../utils/mongoDbConnection');
 
 // Set environment variables for Docker test containers
 function setupDockerTestEnv() {
-  // The container names and ports should match docker-compose.test.yml
+  // The container names and ports should match docker-compose.yml
+  
+  // Ensure NODE_ENV is set to test for all tests
+  process.env.NODE_ENV = 'test';
   
   // MongoDB settings - use credentials from docker-compose.yml
   process.env.MONGO_URI = 'mongodb://opencap:password123@mongodb:27017/opencap?authSource=admin';

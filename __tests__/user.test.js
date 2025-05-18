@@ -1,14 +1,16 @@
+/**
+ * User Model Tests
+ * Following OpenCap TDD principles and Semantic Seed standards
+ */
 const mongoose = require('mongoose');
-const { connectDB } = require('../db');
 const User = require('../models/User');
+// Use the shared test database setup instead of creating a new connection
+const { clearDB } = require('./setup/testDB');
 
-beforeAll(async () => {
-  await connectDB();
-});
-
-afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.connection.close();
+// We don't need to explicitly connect or disconnect because it's handled by jest.setup.js
+beforeEach(async () => {
+  // Clear test data before each test
+  await clearDB();
 });
 
 describe('User Model Test', () => {
