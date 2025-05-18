@@ -7,9 +7,15 @@
  * Following Semantic Seed Venture Studio Coding Standards
  */
 const mongoose = require('mongoose');
-const SPV = require('../models/SPV');
-const SPVAsset = require('../models/SPVasset');
 const mongoDbConnection = require('../utils/mongoDbConnection');
+
+// Import the SPVAsset model
+const SPVAsset = require('../models/SPVAssetModel');
+
+// Helper function to get the SPVAsset model
+const getSPVAssetModel = () => {
+  return SPVAsset;
+};
 
 /**
  * Create a new SPV Asset
@@ -24,6 +30,8 @@ exports.createSPVAsset = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
+    const SPVAsset = getSPVAssetModel();
+    
     // Use withRetry for the MongoDB operation to handle potential connection issues
     const savedAsset = await mongoDbConnection.withRetry(async () => {
       const newAsset = new SPVAsset({
@@ -37,9 +45,12 @@ exports.createSPVAsset = async (req, res) => {
       return await newAsset.save();
     });
 
+    // Convert to plain object if possible
+    const responseData = savedAsset.toObject ? savedAsset.toObject() : savedAsset;
+    
     // Store a copy in res.locals for the responseDebugger middleware
-    res.locals.responseData = savedAsset.toObject ? savedAsset.toObject() : savedAsset;
-    res.status(201).json(res.locals.responseData);
+    res.locals.responseData = responseData;
+    res.status(201).json(responseData);
   } catch (error) {
     console.error('Error creating SPV Asset:', error);
     res.status(500).json({ message: 'Failed to create SPVAsset', error: error.message });
@@ -53,11 +64,17 @@ exports.createSPVAsset = async (req, res) => {
  */
 exports.getSPVAssets = async (req, res) => {
   try {
-    // Get all SPV assets directly without using the withRetry method
-    const spvAssets = await SPVAsset.find({});
+    const SPVAsset = getSPVAssetModel();
+    const assets = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.find().exec();
+    });
+
+    // Convert Mongoose documents to plain objects
+    const spvAssets = assets.map(asset => asset.toObject ? asset.toObject() : asset);
     
-    // Convert to API response format if needed
+    // Store response data for debugging
     const responseData = { spvassets: spvAssets };
+    res.locals.responseData = responseData;
     
     res.status(200).json(responseData);
   } catch (error) {
@@ -79,8 +96,10 @@ exports.getSPVAssetById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    // Get SPV asset by ID directly without using withRetry
-    const asset = await SPVAsset.findById(assetId);
+    const SPVAsset = getSPVAssetModel();
+    const asset = await mongoDbConnection.withRetry(async () => {
+      return await SPVAsset.findById(assetId).exec();
+    });
     
     if (!asset) {
       return res.status(404).json({ message: 'SPVAsset not found' });
