@@ -54,21 +54,35 @@ Following OpenCap's TDD workflow:
   - `complete-controller.test.js` - Direct controller methods
 - Fixed API endpoint routing issues to enable proper testing
 
+### Current Progress: WIP
+1. ✅ Fixed database connection standardization across test files
+2. ✅ Ensured NODE_ENV is properly set to 'test' in test environment
+3. ✅ Updated MongoDB connection parameters to use Docker container service names
+4. ✅ Created test scripts for running targeted test subsets
+
 ### Remaining Work for READY: Refactor Complete
-1. Fix database connection issues between test files
-2. Update mock implementations to be consistent
-3. Create specific tests for high-priority coverage gaps:
+1. 🔄 Fix case sensitivity issues in model imports (SPVasset vs. SPVAsset)
+2. 🔄 Update mock implementations to be consistent
+3. 🔄 Create specific tests for high-priority coverage gaps:
    - `authController.verifyEmail`
    - `authController.resetPassword`
    - `User` model validation methods
 
 ## Recommended Actions
 
-1. Update the test environment configuration
-2. Create a dedicated test for model methods only
-3. Use a phased test approach:
-   - Run individual tests first
-   - Then run combined tests with detailed coverage reports
+1. ✅ Update the test environment configuration
+   - Configured MongoDB to properly connect in Docker container
+   - Standardized database connections across test files
+   - Set proper environment variables (NODE_ENV=test)
+
+2. 🔄 Create targeted test scripts to focus on specific components
+   - Created `run-api-tests.sh` for testing API endpoints
+   - Created `run-spv-tests.sh` for testing SPV-related functionality
+
+3. 🔄 Use a phased test approach:
+   - Run individual component tests first
+   - Fix case sensitivity issues in model imports
+   - Gradually expand test coverage to include more components
 
 ## Semantic Seed Guidelines Application
 
