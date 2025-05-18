@@ -8,13 +8,13 @@
  */
 
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+// Using real MongoDB container instead of mongodb-memory-server for compatibility
 
-let mongoServer;
 let isConnected = false;
 
 /**
- * Connect to in-memory MongoDB for testing with singleton pattern
+ * Connect to MongoDB for testing with singleton pattern
+ * Uses the actual MongoDB container from Docker environment
  */
 const connectDB = async () => {
   // If already connected, return existing connection
@@ -24,36 +24,14 @@ const connectDB = async () => {
   }
 
   try {
-    // Create new in-memory server if not exists
-    if (!mongoServer) {
-      // Get MongoDB version from environment variable or default to 7.0.3 for Debian 12 compatibility
-      const mongoVersion = process.env.MONGODB_VERSION || '7.0.3';
-      console.log(`📊 Using MongoDB version: ${mongoVersion}`);
-      
-      mongoServer = await MongoMemoryServer.create({
-        binary: {
-          version: mongoVersion,
-          checkMD5: false,
-          downloadDir: '/tmp/.mongodb-binaries'
-        },
-        instance: {
-          // Use a fixed port for stability
-          port: 27018,
-          // Disable IPv6 to prevent issues on some systems
-          ip: '127.0.0.1',
-          // Increase timeouts
-          storageEngine: 'wiredTiger',
-          args: ['--setParameter', 'maxTransactionLockRequestTimeoutMillis=5000']
-        }
-      });
-    }
-    
-    const uri = mongoServer.getUri();
+    // Use MongoDB URI from environment variable or fallback to default test container URI
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://opencap:password123@mongodb:27017/opencap_test?authSource=admin';
+    console.log(`📊 Connecting to MongoDB at: ${mongoUri.split('@')[1]}`);
     
     const mongooseOpts = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      // Increase timeouts
+      // Increase timeouts for stability in Docker environment
       connectTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       serverSelectionTimeoutMS: 30000,
@@ -71,11 +49,11 @@ const connectDB = async () => {
     
     // Connect if not already connected
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(uri, mongooseOpts);
+      await mongoose.connect(mongoUri, mongooseOpts);
     }
     
     isConnected = true;
-    console.log('✅ Connected to in-memory MongoDB server for testing');
+    console.log('✅ Connected to MongoDB container for testing');
     return mongoose.connection;
   } catch (error) {
     console.error('❌ Error connecting to test database:', error);
@@ -84,16 +62,18 @@ const connectDB = async () => {
 };
 
 /**
- * Drop database, close the connection and stop mongod.
+ * Clear the database but don't drop it - we're using a real container.
  */
 const closeDatabase = async () => {
   // Don't close the connection between tests, just clear the data
   if (mongoose.connection.readyState !== 0) {
     try {
-      await mongoose.connection.dropDatabase();
-      console.log('✅ Dropped test database');
+      // Instead of dropping the database, just clear all collections
+      // This is safer for a shared container environment
+      await clearDatabase();
+      console.log('✅ Cleared test database');
     } catch (error) {
-      console.error('❌ Error dropping test database:', error);
+      console.error('❌ Error clearing test database:', error);
       throw error; // Rethrow to fail the test
     }
   }
@@ -137,13 +117,6 @@ const disconnectDB = async () => {
       isConnected = false;
       console.log('✅ Closed MongoDB connection');
     }
-    
-    // Only stop the server when explicitly asked to disconnect
-    if (mongoServer) {
-      await mongoServer.stop();
-      mongoServer = null;
-      console.log('✅ Stopped MongoDB memory server');
-    }
   } catch (error) {
     console.error('❌ Error disconnecting from test database:', error);
     throw error;
@@ -166,6 +139,6 @@ module.exports = {
   clearDB,
   // Export mongoose for direct access if needed
   mongoose,
-  // Export the server for advanced scenarios
-  getMongoServer: () => mongoServer,
+  // No server to export since we're using a real MongoDB container
+  getTestDbUri: () => process.env.MONGODB_URI || 'mongodb://opencap:password123@mongodb:27017/opencap_test?authSource=admin',
 };
