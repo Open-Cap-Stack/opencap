@@ -1,10 +1,10 @@
 /**
- * SPV Asset Management API Model
- * Feature: OCAE-212: Implement SPV Asset Management API
- * Previously tracked as OCAE-003
+ * SPV Asset Management API Model (New)
+ * Created to resolve model compilation issues
  */
 const mongoose = require('mongoose');
 
+// Define the schema
 const SPVAssetSchema = new mongoose.Schema({
   AssetID: {
     type: String,
@@ -17,7 +17,7 @@ const SPVAssetSchema = new mongoose.Schema({
   },
   Type: {
     type: String,
-    enum: ['Real Estate', 'Financial Instrument'], // Add other types as needed
+    enum: ['Real Estate', 'Financial Instrument'],
     required: true,
   },
   Value: {
@@ -32,6 +32,13 @@ const SPVAssetSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
 });
 
-module.exports = mongoose.model('SPVAsset', SPVAssetSchema);
+// Create the model
+const SPVAsset = mongoose.model('SPVAsset', SPVAssetSchema);
+
+module.exports = SPVAsset;

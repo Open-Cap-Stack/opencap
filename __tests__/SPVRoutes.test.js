@@ -20,8 +20,23 @@ const testSPV = {
   CreationDate: new Date(),
   Status: 'Active',
   ComplianceStatus: 'Compliant',
-  TotalFunding: 1000000,
   ParentCompanyID: 'parent-001'
+};
+
+// Sample test data for status testing
+const pendingSPV = {
+  ...testSPV,
+  SPVID: 'spv-002',
+  Status: 'Pending',
+  ComplianceStatus: 'PendingReview'
+};
+
+// Sample test data for compliance testing
+const nonCompliantSPV = {
+  ...testSPV,
+  SPVID: 'spv-003',
+  Status: 'Active',
+  ComplianceStatus: 'NonCompliant'
 };
 
 // Setup and teardown
@@ -95,17 +110,26 @@ describe('GET /api/spvs/:id', () => {
   });
 
   it('should return 404 for non-existent SPV ID', async () => {
-    const res = await request(app).get('/api/spvs/non-existent-id');
+    const res = await request(app).get('/api/spvs/507f1f77bcf86cd799439011');
 
     expect(res.statusCode).toBe(404);
     expect(res.body).toHaveProperty('message');
   });
 
-  it('should return 400 for invalid SPV ID format', async () => {
-    const res = await request(app).get('/api/spvs/123'); // Assuming ID validation in place
+  it('should try to find by SPVID first', async () => {
+    const spv = await new SPV(testSPV).save();
+    const res = await request(app).get(`/api/spvs/${spv.SPVID}`);
 
-    expect(res.statusCode).toBe(400);
-    expect(res.body).toHaveProperty('message');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.SPVID).toBe(testSPV.SPVID);
+  });
+
+  it('should find by MongoDB ID if not found by SPVID', async () => {
+    const spv = await new SPV(testSPV).save();
+    const res = await request(app).get(`/api/spvs/${spv._id}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body._id).toBe(spv._id.toString());
   });
 });
 
@@ -142,25 +166,31 @@ describe('GET /api/spvs/:id/investors', () => {
 describe('GET /api/spvs/status/:status', () => {
   it('should get SPVs by status', async () => {
     await new SPV(testSPV).save(); // Status: Active
-    await new SPV({
-      ...testSPV,
-      SPVID: 'spv-002',
-      Status: 'Inactive'
-    }).save();
+    await new SPV(pendingSPV).save(); // Status: Pending
 
     const res = await request(app).get('/api/spvs/status/Active');
 
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBeTruthy();
-    expect(res.body.length).toBe(1);
-    expect(res.body[0].Status).toBe('Active');
+    expect(res.body).toHaveProperty('spvs');
+    expect(Array.isArray(res.body.spvs)).toBeTruthy();
+    expect(res.body.spvs.length).toBe(1);
+    expect(res.body.spvs[0].Status).toBe('Active');
   });
 
-  it('should return 404 for status with no matching SPVs', async () => {
+  it('should return 400 for invalid status', async () => {
+    const res = await request(app).get('/api/spvs/status/InvalidStatus');
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('message', 'Invalid status parameter. Must be Active, Pending, or Closed');
+  });
+
+  it('should return empty array for valid status with no matching SPVs', async () => {
     const res = await request(app).get('/api/spvs/status/Closed');
 
-    expect(res.statusCode).toBe(404);
-    expect(res.body).toHaveProperty('message');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('spvs');
+    expect(Array.isArray(res.body.spvs)).toBeTruthy();
+    expect(res.body.spvs.length).toBe(0);
   });
 });
 
@@ -168,11 +198,7 @@ describe('GET /api/spvs/status/:status', () => {
 describe('GET /api/spvs/compliance/:status', () => {
   it('should get SPVs by compliance status', async () => {
     await new SPV(testSPV).save(); // ComplianceStatus: Compliant
-    await new SPV({
-      ...testSPV,
-      SPVID: 'spv-002',
-      ComplianceStatus: 'Non-Compliant'
-    }).save();
+    await new SPV(nonCompliantSPV).save(); // ComplianceStatus: NonCompliant
 
     const res = await request(app).get('/api/spvs/compliance/Compliant');
 
@@ -182,11 +208,19 @@ describe('GET /api/spvs/compliance/:status', () => {
     expect(res.body[0].ComplianceStatus).toBe('Compliant');
   });
 
-  it('should return 404 for compliance status with no matching SPVs', async () => {
+  it('should return 400 for invalid compliance status', async () => {
     const res = await request(app).get('/api/spvs/compliance/Unknown');
 
-    expect(res.statusCode).toBe(404);
-    expect(res.body).toHaveProperty('message');
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('message', 'Invalid compliance status. Status must be one of: Compliant, NonCompliant, PendingReview');
+  });
+
+  it('should return empty array for valid compliance status with no matching SPVs', async () => {
+    const res = await request(app).get('/api/spvs/compliance/NonCompliant');
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBeTruthy();
+    expect(res.body.length).toBe(0);
   });
 });
 
@@ -203,16 +237,19 @@ describe('GET /api/spvs/parent/:id', () => {
     const res = await request(app).get('/api/spvs/parent/parent-001');
 
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBeTruthy();
-    expect(res.body.length).toBe(1);
-    expect(res.body[0].ParentCompanyID).toBe('parent-001');
+    expect(res.body).toHaveProperty('spvs');
+    expect(Array.isArray(res.body.spvs)).toBeTruthy();
+    expect(res.body.spvs.length).toBe(1);
+    expect(res.body.spvs[0].ParentCompanyID).toBe('parent-001');
   });
 
-  it('should return 404 for parent company with no associated SPVs', async () => {
+  it('should return empty array for parent company with no associated SPVs', async () => {
     const res = await request(app).get('/api/spvs/parent/non-existent-parent');
 
-    expect(res.statusCode).toBe(404);
-    expect(res.body).toHaveProperty('message');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('spvs');
+    expect(Array.isArray(res.body.spvs)).toBeTruthy();
+    expect(res.body.spvs.length).toBe(0);
   });
 });
 
@@ -222,7 +259,7 @@ describe('PUT /api/spvs/:id', () => {
     const spv = await new SPV(testSPV).save();
     const updateData = {
       Name: 'Updated SPV Name',
-      ComplianceStatus: 'Non-Compliant'
+      ComplianceStatus: 'NonCompliant'
     };
 
     const res = await request(app)
@@ -246,9 +283,8 @@ describe('PUT /api/spvs/:id', () => {
       .put(`/api/spvs/${spv.SPVID}`)
       .send(updateData);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.SPVID).toBe(spv.SPVID); // Original ID should be preserved
-    expect(res.body.Name).toBe(updateData.Name);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('message', 'SPVID cannot be modified');
   });
 
   it('should return 404 for non-existent SPV ID', async () => {

@@ -10,7 +10,9 @@
 
 const mongoose = require('mongoose');
 const mongoDbConnection = require('../../utils/mongoDbConnection');
-const SPVAsset = require('../../models/SPVAsset');
+
+// Import the model
+let SPVAsset;
 
 /**
  * Setup the SPV Asset test environment with proper connection handling
@@ -25,6 +27,11 @@ async function setupSPVAssetTests(options = { dropCollection: false }) {
     await mongoDbConnection.connectWithRetry();
   }
   
+  // Import the model after connection is established
+  if (!SPVAsset) {
+    SPVAsset = require('../../models/SPVAssetModel');
+  }
+  
   // If requested, drop the collection for a clean slate
   if (options.dropCollection) {
     await mongoDbConnection.withRetry(async () => {
@@ -36,6 +43,8 @@ async function setupSPVAssetTests(options = { dropCollection: false }) {
       });
     });
   }
+  
+  return SPVAsset;
 }
 
 /**
@@ -44,6 +53,7 @@ async function setupSPVAssetTests(options = { dropCollection: false }) {
  * @returns {Promise<void>}
  */
 async function cleanupSPVAssets() {
+  const SPVAsset = getSPVAssetModel();
   await mongoDbConnection.withRetry(async () => {
     const result = await SPVAsset.deleteMany({});
     return result;
@@ -57,9 +67,11 @@ async function cleanupSPVAssets() {
  * @returns {Promise<Object>} - Created asset
  */
 async function createTestSPVAsset(assetData) {
+  const SPVAsset = getSPVAssetModel();
   return mongoDbConnection.withRetry(async () => {
     const asset = new SPVAsset(assetData);
-    return await asset.save();
+    await asset.save();
+    return asset;
   });
 }
 
@@ -70,8 +82,9 @@ async function createTestSPVAsset(assetData) {
  * @returns {Promise<Array>} - Found assets
  */
 async function findSPVAssets(filter = {}) {
+  const SPVAsset = getSPVAssetModel();
   return mongoDbConnection.withRetry(async () => {
-    return await SPVAsset.find(filter);
+    return SPVAsset.find(filter);
   });
 }
 
@@ -82,8 +95,9 @@ async function findSPVAssets(filter = {}) {
  * @returns {Promise<Object>} - Found asset
  */
 async function findSPVAssetById(id) {
+  const SPVAsset = getSPVAssetModel();
   return mongoDbConnection.withRetry(async () => {
-    return await SPVAsset.findById(id);
+    return SPVAsset.findById(id);
   });
 }
 
@@ -94,8 +108,9 @@ async function findSPVAssetById(id) {
  * @returns {Promise<Object>} - Deletion result
  */
 async function deleteSPVAssetById(id) {
+  const SPVAsset = getSPVAssetModel();
   return mongoDbConnection.withRetry(async () => {
-    return await SPVAsset.findByIdAndDelete(id);
+    return SPVAsset.findByIdAndDelete(id);
   });
 }
 

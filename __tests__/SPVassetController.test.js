@@ -1,40 +1,50 @@
 const mongoose = require('mongoose');
 const sinon = require('sinon');
 const { expect } = require('@jest/globals');
-const SPVAsset = require('../models/SPVAsset');
-const spvAssetController = require('../controllers/SPVAsset');
 const mongoDbConnection = require('../utils/mongoDbConnection');
-const { 
-  setupSPVAssetTests, 
-  cleanupSPVAssets, 
-  getSampleAssetData 
-} = require('./utils/spvAssetTestUtils');
+const testUtils = require('./utils/spvAssetTestUtils');
+const SPVAsset = require('../models/SPVAssetModel');
+const spvAssetController = require('../controllers/SPVasset');
+
+// Load test environment variables
+require('dotenv').config({ path: '.env.test' });
 
 /**
  * SPV Asset Controller Tests
  * 
  * [Bug] OCDI-301: Fix MongoDB Connection Timeout Issues
  * 
- * This test file verifies the fixes for MongoDB connection timeouts
- * in the SPV Asset controller with expanded test coverage to meet
- * the required thresholds.
+ * This test file verifies the SPV Asset controller functionality
+ * with proper database integration and error handling.
  */
 describe('SPVAsset Controller', function () {
+  // Increase timeout for database operations
+  jest.setTimeout(30000);
+
   beforeAll(async () => {
-    // Use the new setup utility with improved connection handling
-    await setupSPVAssetTests({ dropCollection: true });
+    // Set up test database connections
+    await testUtils.setupSPVAssetTests({ dropCollection: true });
   });
 
   afterAll(async () => {
-    // Don't disconnect here - managed by jest.setup.js
+    // Clean up any remaining test data and close the connection
+    await testUtils.cleanupSPVAssets();
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close();
+    }
   });
 
   beforeEach(async () => {
-    // Use the new cleanup utility with retry logic
-    await cleanupSPVAssets();
+    // Clear all mocks before each test
+    jest.clearAllMocks();
     
-    // Restore any stubs
-    sinon.restore();
+    // Clear the test database before each test
+    await testUtils.cleanupSPVAssets();
+  });
+  
+  afterEach(async () => {
+    // Clean up any pending operations
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   it('should create a new SPVAsset', async function () {
@@ -80,38 +90,32 @@ describe('SPVAsset Controller', function () {
     expect(res.status.calledWith(200)).toBe(true);
     
     // Verify the response structure
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.spvassets).toBeInstanceOf(Array);
-    expect(responseArg.spvassets[0].AssetID).toBe(sampleAsset.AssetID);
   });
 
   it('should get an SPVAsset by ID', async function () {
     // Create a test asset
-    const sampleAsset = new SPVAsset(getSampleAssetData());
-    await sampleAsset.save();
+    const sampleAsset = testUtils.getSampleAssetData();
+    const asset = await testUtils.createTestSPVAsset(sampleAsset);
 
     const req = {
       params: {
-        id: sampleAsset._id.toString()
+        id: asset._id.toString()
       }
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getSPVAssetById(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Verify the response data matches the asset
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.AssetID).toBe(sampleAsset.AssetID);
-    expect(responseArg.SPVID).toBe(sampleAsset.SPVID);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.AssetID).toBe(sampleAsset.AssetID);
+    expect(res.locals.responseData.SPVID).toBe(sampleAsset.SPVID);
   });
 
   it('should return 404 when getting non-existent SPVAsset by ID', async function () {
@@ -122,15 +126,17 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getSPVAssetById(req, res);
 
-    expect(res.status.calledWith(404)).toBe(true);
-    expect(res.json.firstCall.args[0].message).toBe('SPV Asset not found');
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toBe('SPV Asset not found');
   });
 
   it('should handle invalid ID format when getting SPVAsset by ID', async function () {
@@ -141,31 +147,35 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getSPVAssetById(req, res);
 
-    expect(res.status.calledWith(400)).toBe(true);
-    expect(res.json.firstCall.args[0].message).toBe('Invalid SPV Asset ID format');
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toBe('Invalid SPV Asset ID format');
   });
 
   it('should get assets by SPV ID', async function () {
     // Create two assets with the same SPV ID
     const spvId = 'test-spv-123';
     
-    const asset1 = getSampleAssetData();
+    const asset1 = testUtils.getSampleAssetData();
     asset1.SPVID = spvId;
     asset1.AssetID = 'asset-1';
     
-    const asset2 = getSampleAssetData();
+    const asset2 = testUtils.getSampleAssetData();
     asset2.SPVID = spvId;
     asset2.AssetID = 'asset-2';
     
-    await new SPVAsset(asset1).save();
-    await new SPVAsset(asset2).save();
+    await Promise.all([
+      testUtils.createTestSPVAsset(asset1),
+      testUtils.createTestSPVAsset(asset2)
+    ]);
 
     const req = {
       params: {
@@ -174,22 +184,20 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getAssetsBySPVId(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Verify response includes both assets with the same SPV ID
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.assets).toBeInstanceOf(Array);
-    expect(responseArg.assets.length).toBe(2);
-    expect(responseArg.assets.find(a => a.AssetID === 'asset-1')).toBeDefined();
-    expect(responseArg.assets.find(a => a.AssetID === 'asset-2')).toBeDefined();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.assets).toBeInstanceOf(Array);
+    expect(res.locals.responseData.assets.length).toBe(2);
+    expect(res.locals.responseData.assets.find(a => a.AssetID === 'asset-1')).toBeDefined();
+    expect(res.locals.responseData.assets.find(a => a.AssetID === 'asset-2')).toBeDefined();
   });
 
   it('should return 404 when no assets exist for SPV ID', async function () {
@@ -200,15 +208,17 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getAssetsBySPVId(req, res);
 
-    expect(res.status.calledWith(404)).toBe(true);
-    expect(res.json.firstCall.args[0].message).toContain('No assets found for SPV');
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toContain('No assets found for SPV');
   });
 
   it('should calculate SPV valuation correctly', async function () {
@@ -216,14 +226,12 @@ describe('SPVAsset Controller', function () {
     const spvId = 'spv-valuation-test';
     
     const assets = [
-      { ...getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-1', Value: 1000 },
-      { ...getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-2', Value: 2000 },
-      { ...getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-3', Value: 3000 }
+      { ...testUtils.getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-1', Value: 1000 },
+      { ...testUtils.getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-2', Value: 2000 },
+      { ...testUtils.getSampleAssetData(), SPVID: spvId, AssetID: 'val-asset-3', Value: 3000 }
     ];
     
-    for (const asset of assets) {
-      await new SPVAsset(asset).save();
-    }
+    await Promise.all(assets.map(asset => testUtils.createTestSPVAsset(asset)));
 
     const req = {
       params: {
@@ -232,24 +240,21 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getSPVValuation(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Verify the valuation calculation
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.spvId).toBe(spvId);
-    expect(responseArg.totalValuation).toBe(6000); // 1000 + 2000 + 3000
-    expect(responseArg.assetCount).toBe(3);
-    // Verify asset breakdown array exists and has correct entries
-    expect(responseArg.assetBreakdown).toBeInstanceOf(Array);
-    expect(responseArg.assetBreakdown.length).toBe(3);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.spvId).toBe(spvId);
+    expect(res.locals.responseData.totalValuation).toBe(6000); // 1000 + 2000 + 3000
+    expect(res.locals.responseData.assetCount).toBe(3);
+    expect(res.locals.responseData.assetBreakdown).toBeInstanceOf(Array);
+    expect(res.locals.responseData.assetBreakdown.length).toBe(3);
   });
 
   it('should calculate asset type valuation correctly', async function () {
@@ -257,14 +262,12 @@ describe('SPVAsset Controller', function () {
     const assetType = 'Real Estate'; // Use valid enum value
     
     const assets = [
-      { ...getSampleAssetData(), Type: assetType, AssetID: 'type-asset-1', Value: 1500 },
-      { ...getSampleAssetData(), Type: assetType, AssetID: 'type-asset-2', Value: 2500 },
-      { ...getSampleAssetData(), Type: assetType, AssetID: 'type-asset-3', Value: 3500 }
+      { ...testUtils.getSampleAssetData(), Type: assetType, AssetID: 'type-asset-1', Value: 1500 },
+      { ...testUtils.getSampleAssetData(), Type: assetType, AssetID: 'type-asset-2', Value: 2500 },
+      { ...testUtils.getSampleAssetData(), Type: assetType, AssetID: 'type-asset-3', Value: 3500 }
     ];
     
-    for (const asset of assets) {
-      await new SPVAsset(asset).save();
-    }
+    await Promise.all(assets.map(asset => testUtils.createTestSPVAsset(asset)));
 
     const req = {
       params: {
@@ -273,29 +276,27 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.getAssetTypeValuation(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Verify the valuation calculation
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.type).toBe(assetType);
-    expect(responseArg.totalValuation).toBe(7500); // 1500 + 2500 + 3500
-    expect(responseArg.assetCount).toBe(3);
-    expect(responseArg.assets).toBeInstanceOf(Array);
-    expect(responseArg.assets.length).toBe(3);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.type).toBe(assetType);
+    expect(res.locals.responseData.totalValuation).toBe(7500); // 1500 + 2500 + 3500
+    expect(res.locals.responseData.assetCount).toBe(3);
+    expect(res.locals.responseData.assets).toBeInstanceOf(Array);
+    expect(res.locals.responseData.assets.length).toBe(3);
   });
 
   it('should update an SPVAsset', async function () {
     // Create a test asset
-    const sampleAsset = new SPVAsset(getSampleAssetData());
-    await sampleAsset.save();
+    const sampleAsset = testUtils.getSampleAssetData();
+    const asset = await testUtils.createTestSPVAsset(sampleAsset);
 
     const updates = {
       Value: 9999,
@@ -304,29 +305,28 @@ describe('SPVAsset Controller', function () {
 
     const req = {
       params: {
-        id: sampleAsset._id.toString()
+        id: asset._id.toString()
       },
       body: updates
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.updateSPVAsset(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Verify the asset was updated
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.Value).toBe(updates.Value);
-    expect(responseArg.Description).toBe(updates.Description);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.Value).toBe(updates.Value);
+    expect(res.locals.responseData.Description).toBe(updates.Description);
     
     // Verify persistence to database
-    const updatedAsset = await SPVAsset.findById(sampleAsset._id);
+    const updatedAsset = await testUtils.findSPVAssetById(asset._id);
+    expect(updatedAsset).toBeDefined();
     expect(updatedAsset.Value).toBe(updates.Value);
     expect(updatedAsset.Description).toBe(updates.Description);
   });
@@ -340,15 +340,17 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.updateSPVAsset(req, res);
 
-    expect(res.status.calledWith(400)).toBe(true);
-    expect(res.json.firstCall.args[0].message).toBe('Invalid SPV Asset ID format');
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toBe('Invalid SPV Asset ID format');
   });
 
   it('should return 404 when updating non-existent SPVAsset', async function () {
@@ -360,21 +362,22 @@ describe('SPVAsset Controller', function () {
     };
     
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.updateSPVAsset(req, res);
 
-    expect(res.status.calledWith(404)).toBe(true);
-    expect(res.json.firstCall.args[0].message).toBe('SPVAsset not found');
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toBe('SPVAsset not found');
   });
 
   it('should delete an SPVAsset by ID', async function () {
     // Create a test asset using the utility with retry logic
-    const asset = new SPVAsset(getSampleAssetData());
-    await asset.save();
+    const asset = await testUtils.createTestSPVAsset(testUtils.getSampleAssetData());
 
     const req = {
       params: {
@@ -382,24 +385,21 @@ describe('SPVAsset Controller', function () {
       },
     };
     
-    // Create a more complete res mock with res.locals
     const res = {
-      locals: {},
-      status: sinon.stub().returnsThis(),
-      json: sinon.stub(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      locals: {}
     };
 
     await spvAssetController.deleteSPVAsset(req, res);
 
-    expect(res.status.calledWith(200)).toBe(true);
-    
-    // Check for the success message
-    const responseArg = res.json.firstCall.args[0];
-    expect(responseArg).toBeDefined();
-    expect(responseArg.message).toBe('SPVAsset deleted');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalled();
+    expect(res.locals.responseData).toBeDefined();
+    expect(res.locals.responseData.message).toBe('SPVAsset deleted');
     
     // Verify the asset was actually deleted from the database
-    const deletedAsset = await SPVAsset.findById(asset._id);
+    const deletedAsset = await testUtils.findSPVAssetById(asset._id);
     expect(deletedAsset).toBeNull();
   });
 

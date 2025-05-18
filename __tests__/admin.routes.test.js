@@ -9,17 +9,42 @@ const app = express();
 app.use(express.json());
 app.use("/api/admins", require("../routes/adminRoutes"));
 
+let dbConnection;
+
 beforeAll(async () => {
-  await connectDB();
-});
+  try {
+    dbConnection = await connectDB();
+    // Ensure we have a valid connection
+    if (!dbConnection || dbConnection.readyState !== 1) {
+      throw new Error('Failed to establish database connection');
+    }
+  } catch (error) {
+    console.error('Database connection error:', error);
+    throw error;
+  }
+}, 30000); // Increase timeout to 30 seconds
 
 afterAll(async () => {
-  await mongoose.connection.db.dropDatabase();
-  await mongoose.connection.close();
-});
+  try {
+    // Only attempt to drop database if we have a valid connection
+    if (dbConnection && dbConnection.readyState === 1) {
+      await dbConnection.db.dropDatabase();
+    }
+  } catch (error) {
+    console.error('Error dropping test database:', error);
+  } finally {
+    // Always attempt to close the connection
+    await disconnectDB();
+  }
+}, 30000);
 
 beforeEach(async () => {
-  await Admin.deleteMany({});
+  try {
+    await Admin.deleteMany({});
+  } catch (error) {
+    console.error('Error cleaning up test data:', error);
+    throw error;
+  }
 });
 
 describe("Admin API Tests", () => {

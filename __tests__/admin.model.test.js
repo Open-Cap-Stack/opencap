@@ -4,13 +4,42 @@ const expect = chai.expect;
 const Admin = require('../models/admin');
 const { connectDB, disconnectDB } = require('../db');
 
+let dbConnection;
+
 beforeAll(async function () {
-  await connectDB();
-});
+  try {
+    dbConnection = await connectDB();
+    // Ensure we have a valid connection
+    if (!dbConnection || dbConnection.readyState !== 1) {
+      throw new Error('Failed to establish database connection');
+    }
+  } catch (error) {
+    console.error('Database connection error:', error);
+    throw error;
+  }
+}, 30000);
 
 afterAll(async function () {
-  await mongoose.connection.db.dropDatabase();
-  await mongoose.connection.close();
+  try {
+    // Only attempt to drop database if we have a valid connection
+    if (dbConnection && dbConnection.readyState === 1) {
+      await dbConnection.db.dropDatabase();
+    }
+  } catch (error) {
+    console.error('Error dropping test database:', error);
+  } finally {
+    // Always attempt to close the connection
+    await disconnectDB();
+  }
+}, 30000);
+
+beforeEach(async function () {
+  try {
+    await Admin.deleteMany({});
+  } catch (error) {
+    console.error('Error cleaning up test data:', error);
+    throw error;
+  }
 });
 
 describe('Admin Model', function () {

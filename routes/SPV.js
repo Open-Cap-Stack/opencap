@@ -67,6 +67,19 @@ router.get('/:id', (req, res, next) => {
 }, SPVController.getSPVById);
 
 /**
+ * @route GET /api/spvs/:id/investors
+ * @desc Get investors for a specific SPV
+ * @access Private
+ */
+router.get('/:id/investors', (req, res, next) => {
+  // Check for empty ID parameter and handle it directly
+  if (!req.params.id || req.params.id.trim() === '') {
+    return res.status(404).json({ message: 'SPV ID is required' });
+  }
+  next();
+}, SPVController.getSPVInvestors);
+
+/**
  * @route PUT /api/spvs/:id
  * @desc Update an SPV by ID
  * @access Private

@@ -9,7 +9,7 @@ services:
     container_name: opencap_mongodb_test
     restart: always
     ports:
-      - "27017:27017"  # Updated to standard port for consistency
+      - "27018:27017"  # Changed to avoid conflict with main MongoDB
     environment:
       - MONGO_INITDB_ROOT_USERNAME=opencap
       - MONGO_INITDB_ROOT_PASSWORD=password123
@@ -17,20 +17,8 @@ services:
     volumes:
       - ./test-init-scripts/mongo:/docker-entrypoint-initdb.d
       - mongodb_test_data:/data/db
-    command: >
-      mongod
-      --setParameter maxConnectionsPerHost=200
-      --setParameter maxIncomingConnections=200
-      --wiredTigerCacheSizeGB=1
-    # Added resources to prevent container resource constraints
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 1G
+    # Using default MongoDB configuration
+    # Resource constraints are handled by Docker Compose
     # Improved healthcheck with more retries and longer timeouts
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh mongodb://opencap:password123@localhost:27017/admin?authSource=admin --quiet

@@ -25,13 +25,13 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
  * @returns {Object} Nodemailer transporter object
  */
 const createEmailTransporter = () => {
+  // For MailHog, we don't need authentication
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.example.com',
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER || 'test@example.com',
-      pass: process.env.EMAIL_PASSWORD || 'password'
+    host: process.env.EMAIL_HOST || 'mailhog',
+    port: parseInt(process.env.EMAIL_PORT || '1025'),
+    secure: false, // MailHog doesn't use TLS by default
+    tls: {
+      rejectUnauthorized: false // For self-signed certificates in development
     }
   });
 };

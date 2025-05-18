@@ -4,7 +4,7 @@
  * Previously tracked as OCAE-003
  */
 const express = require('express');
-const SPVAsset = require('../models/SPVasset');
+const SPVAsset = require('../models/SPVAssetModel');
 const router = express.Router();
 const mongoose = require('mongoose');
 const SPVAssetController = require('../controllers/SPVasset');

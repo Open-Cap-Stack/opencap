@@ -5,23 +5,32 @@ services:
     build:
       context: .
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - .:/app
       - /app/node_modules
     working_dir: /app
-    command: nodemon app.js
+    command: node app.js
     depends_on:
       - postgres
       - minio
       - spark
       - airflow-webserver
+      - mongodb
     environment:
+      - PORT=3001
       - DATABASE_URL=postgres://postgres:password@postgres:5432/opencap
+      - MONGODB_URI=mongodb://opencap:password123@opencap_mongodb:27017/opencap?authSource=admin
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minio
       - MINIO_SECRET_KEY=minio123
       - NODE_ENV=development
+      - JWT_SECRET=test_secret
+      - JWT_EXPIRATION=24h
+      - EMAIL_HOST=mailhog
+      - EMAIL_PORT=1025
+      - EMAIL_FROM=noreply@opencap.local
+      - VERIFY_EMAIL=true
 
   postgres:
     image: postgres:15-alpine
@@ -150,6 +159,14 @@ services:
       - _AIRFLOW_WWW_USER_EMAIL=admin@opencap.org
     entrypoint: /bin/bash
     command: -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@opencap.org && exit 0"
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: opencap_mailhog
+    ports:
+      - "1025:1025" # SMTP server
+      - "8025:8025" # Web UI
+    restart: always
 
   airflow-scheduler:
     image: apache/airflow:2.7.2

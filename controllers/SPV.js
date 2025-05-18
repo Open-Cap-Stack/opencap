@@ -79,9 +79,9 @@ exports.getSPVs = async (req, res) => {
   try {
     const spvs = await SPV.find();
     if (spvs.length === 0) {
-      return res.status(200).json({ message: 'No SPVs found', spvs: [] });
+      return res.status(200).json([]);
     }
-    res.status(200).json({ spvs });
+    res.status(200).json(spvs);
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve SPVs', error: error.message });
   }
@@ -112,22 +112,22 @@ exports.getSPVById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV ID format' });
     }
     
-    // Regular ID validation flow
-    let spv;
-    
+    // First try to find by SPVID
+    const spvBySPVID = await SPV.findOne({ SPVID: id });
+    if (spvBySPVID) {
+      return res.status(200).json(spvBySPVID);
+    }
+
+    // If not found by SPVID and ID is a valid MongoDB ObjectId, try finding by ID
     if (isValidMongoId(id)) {
-      // Try to find by MongoDB ID
-      spv = await SPV.findById(id);
-    } else {
-      // Try to find by SPVID
-      spv = await SPV.findOne({ SPVID: id });
+      const spv = await SPV.findById(id);
+      if (spv) {
+        return res.status(200).json(spv);
+      }
     }
     
-    if (!spv) {
-      return res.status(404).json({ message: 'SPV not found' });
-    }
-    
-    res.status(200).json(spv);
+    // If we get here, the SPV was not found
+    return res.status(404).json({ message: 'SPV not found' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve SPV', error: error.message });
   }
@@ -217,7 +217,8 @@ exports.getSPVsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
     
-    if (!status || !['Active', 'Pending', 'Closed'].includes(status)) {
+    // Validate status parameter
+    if (!['Active', 'Pending', 'Closed'].includes(status)) {
       return res.status(400).json({ 
         message: 'Invalid status parameter. Must be Active, Pending, or Closed' 
       });
@@ -225,13 +226,13 @@ exports.getSPVsByStatus = async (req, res) => {
     
     const spvs = await SPV.find({ Status: status });
     
-    if (spvs.length === 0) {
-      return res.status(404).json({ message: `No SPVs found with status: ${status}` });
-    }
-    
+    // Always return an object with a spvs array, even if empty
     res.status(200).json({ spvs });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to retrieve SPVs by status', error: error.message });
+    res.status(500).json({ 
+      message: 'Failed to retrieve SPVs by status', 
+      error: error.message 
+    });
   }
 };
 
@@ -245,24 +246,24 @@ exports.getSPVsByComplianceStatus = async (req, res) => {
   try {
     const { status } = req.params;
     
-    if (!status || !['Compliant', 'NonCompliant', 'PendingReview'].includes(status)) {
+    // Validate status parameter
+    const validStatuses = ['Compliant', 'NonCompliant', 'PendingReview'];
+    if (!validStatuses.includes(status)) {
       return res.status(400).json({ 
-        message: 'Invalid compliance status parameter. Must be Compliant, NonCompliant, or PendingReview' 
+        message: 'Invalid compliance status. Status must be one of: ' + validStatuses.join(', ')
       });
     }
     
     const spvs = await SPV.find({ ComplianceStatus: status });
     
+    // Return empty array instead of 404 when no SPVs found
     if (spvs.length === 0) {
-      return res.status(404).json({ message: `No SPVs found with compliance status: ${status}` });
+      return res.status(200).json([]);
     }
     
-    res.status(200).json({ spvs });
+    res.status(200).json(spvs);
   } catch (error) {
-    res.status(500).json({ 
-      message: 'Failed to retrieve SPVs by compliance status', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Failed to retrieve SPVs by compliance status', error: error.message });
   }
 };
 
@@ -274,18 +275,15 @@ exports.getSPVsByComplianceStatus = async (req, res) => {
  */
 exports.getSPVsByParentCompany = async (req, res) => {
   try {
-    const parentId = req.params.id;
+    const { id } = req.params;
     
-    if (!parentId || parentId.trim() === '') {
-      return res.status(400).json({ message: 'Missing parent company ID' });
+    if (!id) {
+      return res.status(400).json({ message: 'Parent company ID is required' });
     }
     
-    const spvs = await SPV.find({ ParentCompanyID: parentId });
+    const spvs = await SPV.find({ ParentCompanyID: id });
     
-    if (spvs.length === 0) {
-      return res.status(404).json({ message: `No SPVs found for parent company: ${parentId}` });
-    }
-    
+    // Always return an object with a spvs array, even if empty
     res.status(200).json({ spvs });
   } catch (error) {
     res.status(500).json({ 
@@ -327,5 +325,49 @@ exports.deleteSPV = async (req, res) => {
     res.status(200).json({ message: 'SPV deleted successfully', deletedSPV });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete SPV', error: error.message });
+  }
+};
+
+/**
+ * Get investors for a specific SPV
+ * @route GET /api/spvs/:id/investors
+ * @param {string} req.params.id - SPV ID or SPVID
+ * @param {boolean} [req.query.requireInvestors] - If true, returns 404 when no investors found
+ * @returns {Object} JSON response with array of investors or error message
+ */
+exports.getSPVInvestors = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { requireInvestors } = req.query;
+    
+    // Find SPV by ID or SPVID
+    let spv;
+    if (isValidMongoId(id)) {
+      spv = await SPV.findById(id);
+    }
+    
+    if (!spv) {
+      // Try finding by SPVID if not found by ID
+      spv = await SPV.findOne({ SPVID: id });
+    }
+    
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+    
+    // In a real implementation, this would fetch investors from the database
+    // For now, we'll return an empty array or 404 based on requireInvestors flag
+    const investors = [];
+    
+    if (requireInvestors === 'true' && investors.length === 0) {
+      return res.status(404).json({ message: 'No investors found for this SPV' });
+    }
+    
+    res.status(200).json(investors);
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Failed to retrieve SPV investors', 
+      error: error.message 
+    });
   }
 };
