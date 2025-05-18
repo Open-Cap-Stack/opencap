@@ -26,11 +26,15 @@ const connectDB = async () => {
   try {
     // Create new in-memory server if not exists
     if (!mongoServer) {
+      // Get MongoDB version from environment variable or default to 7.0.3 for Debian 12 compatibility
+      const mongoVersion = process.env.MONGODB_VERSION || '7.0.3';
+      console.log(`📊 Using MongoDB version: ${mongoVersion}`);
+      
       mongoServer = await MongoMemoryServer.create({
-        // Let MongoDB Memory Server auto-detect the correct binary version
         binary: {
-          // Skip version check
-          checkMD5: false
+          version: mongoVersion,
+          checkMD5: false,
+          downloadDir: '/tmp/.mongodb-binaries'
         },
         instance: {
           // Use a fixed port for stability
