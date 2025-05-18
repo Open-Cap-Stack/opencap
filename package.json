@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "jest --config=jest.config.js --detectOpenHandles --runInBand --forceExit --testTimeout=30000",
+    "test": "MONGODB_VERSION=7.0.3 jest --config=jest.config.js --detectOpenHandles --runInBand --forceExit --testTimeout=30000",
     "test:watch": "jest --config=jest.config.js --watch --runInBand",
     "test:coverage": "jest --config=jest.config.js --coverage --detectOpenHandles --forceExit --testTimeout=30000",
     "test:integration": "jest --config=jest.config.js --detectOpenHandles --runInBand --forceExit --testTimeout=30000 '__tests__/**/*.integration.test.js'",
