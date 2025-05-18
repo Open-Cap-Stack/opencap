@@ -19,22 +19,22 @@ const mongoDbConnection = require('../../utils/mongoDbConnection');
 function setupDockerTestEnv() {
   // The container names and ports should match docker-compose.test.yml
   
-  // MongoDB settings - use credentials from docker-compose.test.yml
-  process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27018/opencap_test?authSource=admin';
+  // MongoDB settings - use credentials from docker-compose.yml
+  process.env.MONGO_URI = 'mongodb://opencap:password123@mongodb:27017/opencap?authSource=admin';
   
-  // PostgreSQL settings
-  process.env.DATABASE_URL = 'postgres://postgres:password@127.0.0.1:5433/opencap_test';
-  process.env.PG_HOST = '127.0.0.1';
-  process.env.PG_PORT = '5433';
+  // PostgreSQL settings - use container service name instead of localhost
+  process.env.DATABASE_URL = 'postgres://postgres:password@postgres:5432/opencap';
+  process.env.PG_HOST = 'postgres';
+  process.env.PG_PORT = '5432';
   process.env.PG_USER = 'postgres';
   process.env.PG_PASSWORD = 'password';
-  process.env.PG_DATABASE = 'opencap_test';
+  process.env.PG_DATABASE = 'opencap';
   
-  // MinIO settings
-  process.env.MINIO_ENDPOINT = '127.0.0.1';
-  process.env.MINIO_PORT = '9090';
-  process.env.MINIO_ACCESS_KEY = 'minioadmin';
-  process.env.MINIO_SECRET_KEY = 'minioadmin';
+  // MinIO settings - use container service name instead of localhost
+  process.env.MINIO_ENDPOINT = 'minio';
+  process.env.MINIO_PORT = '9000';
+  process.env.MINIO_ACCESS_KEY = 'minio';
+  process.env.MINIO_SECRET_KEY = 'minio123';
   process.env.MINIO_BUCKET = 'test-bucket';
   process.env.MINIO_USE_SSL = 'false';
   
