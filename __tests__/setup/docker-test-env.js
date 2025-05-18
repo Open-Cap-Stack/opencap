@@ -20,7 +20,7 @@ function setupDockerTestEnv() {
   // The container names and ports should match docker-compose.test.yml
   
   // MongoDB settings - use credentials from docker-compose.test.yml
-  process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27017/opencap_test?authSource=admin';
+  process.env.MONGO_URI = 'mongodb://opencap:password123@127.0.0.1:27018/opencap_test?authSource=admin';
   
   // PostgreSQL settings
   process.env.DATABASE_URL = 'postgres://postgres:password@127.0.0.1:5433/opencap_test';
@@ -106,11 +106,29 @@ async function checkDockerContainersRunning() {
   }));
   
   try {
-    await Promise.all(checks);
-    return true;
+    // Try to run all checks, but continue if some fail
+    const results = await Promise.allSettled(checks);
+    
+    // Count successful tests
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    
+    if (failed > 0) {
+      console.warn(`⚠️ Warning: ${failed} of ${checks.length} container checks failed. Some tests may be skipped.`);
+    }
+    
+    // As long as MongoDB is running, we can continue with tests
+    // We're checking MongoDB specifically in the first check
+    if (results[0]?.status === 'fulfilled') {
+      console.log('✅ MongoDB is available, proceeding with tests');
+      return true;
+    } else {
+      console.error('❌ MongoDB container is required but not available');
+      console.error('docker-compose -f docker-compose.test.yml up -d');
+      return false;
+    }
   } catch (err) {
-    console.error('❌ Not all containers are running. Please start them with:');
-    console.error('docker-compose -f docker-compose.test.yml up -d');
+    console.error('❌ Error checking containers:', err.message);
     return false;
   }
 }

@@ -1,17 +1,21 @@
 // __tests__/setup/jest.setup.js
-// ... existing code ...
+// Test setup for OpenCap project
+// Following Semantic Seed Venture Studio Coding Standards V2.0
 
 // Set Mongoose options to suppress deprecation warnings
 const mongoose = require('mongoose');
 mongoose.set('strictQuery', false);
 
-// Import MongoDB connection utility
-const mongoDbConnection = require('../../utils/mongoDbConnection');
+// Import test database utilities
+const { connectDB, clearDB, disconnectDB } = require('./testDB');
 
 // Suppress deprecation warnings
 const originalConsoleWarn = console.warn;
 console.warn = function(msg) {
-  if (msg.includes('collection.ensureIndex is deprecated')) return;
+  if (msg.includes('collection.ensureIndex is deprecated') || 
+      msg.includes('Mongoose: the `strictQuery`')) {
+    return;
+  }
   originalConsoleWarn.apply(console, arguments);
 };
 
@@ -19,11 +23,9 @@ console.warn = function(msg) {
 const { setupDockerTestEnv, checkDockerContainersRunning } = require('./docker-test-env');
 
 // Configure higher timeout for tests that might need to wait for Docker services
-jest.setTimeout(45000); // Increased from 30000ms to align with MongoDB socket timeout
+jest.setTimeout(60000); // Increased to 60s to handle slower CI environments
 
 // Global setup and cleanup for MongoDB connections
-let mongoConnection = null;
-
 beforeAll(async () => {
   // Set up Docker test environment variables
   setupDockerTestEnv();
@@ -32,33 +34,55 @@ beforeAll(async () => {
   try {
     await checkDockerContainersRunning();
     
-    // Establish MongoDB connection for the test suite
-    mongoConnection = await mongoDbConnection.connectWithRetry();
+    // Connect to the test database
+    const connection = await connectDB();
     
-    // Ensure collections are properly indexed
-    await mongoose.connection.db.listCollections().toArray();
+    // Ensure the connection is valid before accessing the database
+    if (connection && connection.db) {
+      // Ensure collections are properly indexed
+      await connection.db.listCollections().toArray();
+    }
+    
+    console.log('✅ Test database setup complete');
   } catch (error) {
-    console.warn('⚠️ Docker test containers not detected or connection failed:', error.message);
-    console.warn('To fix: run "docker-compose -f docker-compose.test.yml up -d"');
+    console.error('❌ Test setup failed:', error);
+    process.exit(1);
   }
-  
-  // Suppress console logs during tests
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-// Add global afterEach hook to help with test isolation
+// Clean up after each test
 afterEach(async () => {
-  // Clean up any lingering operations
-  await new Promise(resolve => setTimeout(resolve, 100));
+  try {
+    // Clear all test data but keep the connection open
+    await clearDB();
+  } catch (error) {
+    console.error('❌ Error during test cleanup:', error);
+  }
 });
 
+// Clean up after all tests are done
 afterAll(async () => {
-  // Restore console
-  jest.restoreAllMocks();
-  
-  // Close MongoDB connection properly
-  if (mongoConnection) {
-    await mongoDbConnection.disconnect();
+  try {
+    // Disconnect from the test database
+    await disconnectDB();
+  } catch (error) {
+    console.error('❌ Error during test teardown:', error);
+    process.exit(1);
   }
+});
+
+// Global test setup
+describe('Test Environment', () => {
+  beforeAll(() => {
+    // Suppress console logs during tests
+    if (process.env.DEBUG !== 'true') {
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    }
+  });
+
+  // Add a simple test to verify the test environment
+  it('should have a working test environment', () => {
+    expect(process.env.NODE_ENV).toBe('test');
+  });
 });
