@@ -131,8 +131,9 @@ const routes = {
   communicationRoutes: safeRequire("./routes/Communication"),
   notificationRoutes: safeRequire("./routes/notificationRoutes"),
   inviteManagementRoutes: safeRequire("./routes/inviteManagementRoutes"),
-  spvRoutes: safeRequire("./routes/SPV"),
-  spvAssetRoutes: safeRequire("./routes/SPVasset"),
+  // Using direct require for SPV routes to ensure they're properly loaded
+  spvRoutes: require("./routes/SPV"),
+  spvAssetRoutes: require("./routes/SPVasset"),
   complianceCheckRoutes: safeRequire("./routes/complianceCheckRoutes"),
   integrationModuleRoutes: safeRequire("./routes/integrationModuleRoutes"),
   taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes"),
