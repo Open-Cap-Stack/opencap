@@ -6,9 +6,16 @@
  * Updated to use robust MongoDB connection utilities with retry logic
  * Following Semantic Seed Venture Studio Coding Standards
  */
-const SPVAsset = require('../models/SPVasset');
 const mongoose = require('mongoose');
 const mongoDbConnection = require('../utils/mongoDbConnection');
+
+// Import the model
+const SPVAsset = require('../models/SPVAssetModel');
+
+// Helper function to get the SPVAsset model
+const getSPVAssetModel = () => {
+  return SPVAsset;
+};
 
 /**
  * Create a new SPV Asset
@@ -52,7 +59,7 @@ exports.createSPVAsset = async (req, res) => {
  */
 exports.getSPVAssets = async (req, res) => {
   try {
-    // Use withRetry for the MongoDB operation to handle potential connection issues
+    const SPVAsset = getSPVAssetModel();
     const assets = await mongoDbConnection.withRetry(async () => {
       return await SPVAsset.find().exec();
     });
@@ -76,20 +83,21 @@ exports.getSPVAssets = async (req, res) => {
  */
 exports.getSPVAssetById = async (req, res) => {
   try {
-    // Validate ID format
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
+    const SPVAsset = getSPVAssetModel();
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    // Use withRetry for the MongoDB operation to handle potential connection issues
     const asset = await mongoDbConnection.withRetry(async () => {
-      return await SPVAsset.findById(req.params.id).exec();
+      return await SPVAsset.findById(id);
     });
-    
+
     if (!asset) {
       return res.status(404).json({ message: 'SPV Asset not found' });
     }
-    
+
     // Convert to plain object for consistent handling
     const plainAsset = asset.toObject ? asset.toObject() : asset;
     
@@ -111,6 +119,7 @@ exports.getSPVAssetById = async (req, res) => {
  */
 exports.getAssetsBySPVId = async (req, res) => {
   try {
+    const SPVAsset = getSPVAssetModel();
     const spvId = req.params.spvId;
     
     // Use withRetry for the MongoDB operation to handle potential connection issues
@@ -140,6 +149,7 @@ exports.getAssetsBySPVId = async (req, res) => {
  */
 exports.getSPVValuation = async (req, res) => {
   try {
+    const SPVAsset = getSPVAssetModel();
     const spvId = req.params.spvId;
     
     // Use withRetry for the MongoDB operation to handle potential connection issues
@@ -186,6 +196,7 @@ exports.getSPVValuation = async (req, res) => {
  */
 exports.getAssetTypeValuation = async (req, res) => {
   try {
+    const SPVAsset = getSPVAssetModel();
     const assetType = req.params.type;
     
     // Use withRetry for the MongoDB operation to handle potential connection issues
@@ -232,6 +243,7 @@ exports.getAssetTypeValuation = async (req, res) => {
  */
 exports.updateSPVAsset = async (req, res) => {
   try {
+    const SPVAsset = getSPVAssetModel();
     // Validate ID format
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
@@ -269,6 +281,7 @@ exports.updateSPVAsset = async (req, res) => {
  */
 exports.deleteSPVAsset = async (req, res) => {
   try {
+    const SPVAsset = getSPVAssetModel();
     // Use withRetry for the MongoDB operation to handle potential connection issues
     const deletedAsset = await mongoDbConnection.withRetry(async () => {
       return await SPVAsset.findByIdAndDelete(req.params.id).exec();
