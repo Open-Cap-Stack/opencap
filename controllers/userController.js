@@ -47,6 +47,31 @@ const getUserById = async (req, res) => {
   }
 };
 
+const getProfile = async (req, res) => {
+  try {
+    // The user ID is attached to the request by the auth middleware
+    let user;
+    
+    // Try to find by userId first (new format)
+    if (req.user.userId) {
+      user = await User.findOne({ userId: req.user.userId }).select('-password');
+    } 
+    // Fall back to _id if userId not found
+    if (!user && req.user.id) {
+      user = await User.findById(req.user.id).select('-password');
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Error fetching user profile' });
+  }
+};
+
 const updateUserById = async (req, res) => {
   try {
     const updatedUser = await User.findByIdAndUpdate(
@@ -82,5 +107,6 @@ module.exports = {
   getAllUsers,
   getUserById,
   updateUserById,
-  deleteUserById
+  deleteUserById,
+  getProfile
 };

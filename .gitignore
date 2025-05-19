@@ -48,6 +48,29 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# Test files
+*.test.js
+*.spec.js
+**/__tests__/**
+**/test/**
+coverage/
+.nyc_output/
+
+# Development environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
 # Optional npm cache directory
 .npm
 

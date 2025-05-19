@@ -26,6 +26,9 @@ dotenv.config();
 // Initialize the Express app
 const app = express();
 
+// Trust first proxy (for rate limiting behind reverse proxy)
+app.set('trust proxy', 1);
+
 // Apply security middleware first
 app.use(helmetMiddleware);
 app.use(corsMiddleware);
@@ -100,126 +103,145 @@ if (!isTestEnv) {
 // Function to safely require routes
 const safeRequire = (path) => {
   try {
-    return fs.existsSync(path) ? require(path) : null;
+    // Ensure the path has a .js extension
+    const fullPath = path.endsWith('.js') ? path : `${path}.js`;
+    
+    console.log(`Checking if file exists: ${fullPath}`);
+    if (!fs.existsSync(fullPath)) {
+      console.warn(`Warning: Route file does not exist: ${fullPath}`);
+      return null;
+    }
+    
+    console.log(`Attempting to require: ${fullPath}`);
+    const module = require(fullPath);
+    console.log(`Successfully loaded route module: ${fullPath}`);
+    console.log(`Module exports:`, Object.keys(module || {}));
+    return module;
   } catch (err) {
-    console.warn(`Warning: Could not load route file: ${path}`);
+    console.error(`Error loading route file ${path}:`, err.message);
+    console.error('Error details:', {
+      code: err.code,
+      path: err.path || path,
+      requireStack: err.requireStack || []
+    });
+    console.error('Error stack:', err.stack);
     return null;
   }
 };
 
-// Import route modules
+// Import route modules using absolute paths
+const path = require('path');
 const routes = {
   // Core routes that should always exist
-  financialReportRoutes: require("./routes/financialReportingRoutes"),
-  userRoutes: require("./routes/userRoutes"),
-  shareClassRoutes: require("./routes/shareClassRoutes"),
-  stakeholderRoutes: require("./routes/stakeholderRoutes"),
-  documentRoutes: require("./routes/documentRoutes"),
-  fundraisingRoundRoutes: require("./routes/fundraisingRoundRoutes"),
-  equityPlanRoutes: require("./routes/equityPlanRoutes"),
-  documentEmbeddingRoutes: require("./routes/documentEmbeddingRoutes"),
-  employeeRoutes: require("./routes/employeeRoutes"),
-  activityRoutes: require("./routes/activityRoutes"),
-  investmentRoutes: require("./routes/investmentTrackerRoutes"),
-  adminRoutes: require("./routes/adminRoutes"),
-  documentAccessRoutes: require("./routes/documentAccessRoutes"),
-  investorRoutes: require("./routes/investorRoutes"),
-  companyRoutes: require("./routes/companyRoutes"),
-  authRoutes: require("./routes/authRoutes"),
-
-  // Optional routes that might not exist in all environments
-  communicationRoutes: safeRequire("./routes/Communication"),
-  notificationRoutes: safeRequire("./routes/notificationRoutes"),
-  inviteManagementRoutes: safeRequire("./routes/inviteManagementRoutes"),
-  spvRoutes: safeRequire("./routes/SPV"),
-  spvAssetRoutes: safeRequire("./routes/SPVasset"),
-  complianceCheckRoutes: safeRequire("./routes/complianceCheckRoutes"),
-  integrationModuleRoutes: safeRequire("./routes/integrationModuleRoutes"),
-  taxCalculatorRoutes: safeRequire("./routes/taxCalculatorRoutes"),
-  
-  // OCAE-208: Enhanced V1 Routes 
-  v1ShareClassRoutes: safeRequire("./routes/v1/shareClassRoutes")
+  financialReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialReportingRoutes')),
+  userRoutes: safeRequire(path.join(__dirname, 'routes/v1/userRoutes')),
+  shareClassRoutes: safeRequire(path.join(__dirname, 'routes/v1/shareClassRoutes')),
+  stakeholderRoutes: safeRequire(path.join(__dirname, 'routes/v1/stakeholderRoutes')),
+  documentRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentRoutes')),
+  fundraisingRoundRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraisingRoundRoutes')),
+  equityPlanRoutes: safeRequire(path.join(__dirname, 'routes/v1/equityPlanRoutes')),
+  documentEmbeddingRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentEmbeddingRoutes')),
+  employeeRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeRoutes')),
+  activityRoutes: safeRequire(path.join(__dirname, 'routes/v1/activityRoutes')),
+  investmentTrackerRoutes: safeRequire(path.join(__dirname, 'routes/v1/investmentTrackerRoutes')),
+  adminRoutes: safeRequire(path.join(__dirname, 'routes/v1/adminRoutes')),
+  documentAccessRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentAccessRoutes')),
+  investorRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorRoutes')),
+  companyRoutes: safeRequire(path.join(__dirname, 'routes/v1/companyRoutes')),
+  authRoutes: safeRequire(path.join(__dirname, 'routes/v1/authRoutes')),
+  communicationRoutes: safeRequire(path.join(__dirname, 'routes/v1/communicationRoutes')),
+  notificationRoutes: safeRequire(path.join(__dirname, 'routes/v1/notificationRoutes')),
+  inviteManagementRoutes: safeRequire(path.join(__dirname, 'routes/v1/inviteManagementRoutes')),
+  spvRoutes: safeRequire(path.join(__dirname, 'routes/v1/spvRoutes')),
+  spvAssetRoutes: safeRequire(path.join(__dirname, 'routes/v1/spvAssetRoutes')),
+  complianceCheckRoutes: safeRequire(path.join(__dirname, 'routes/v1/complianceCheckRoutes')),
+  integrationModuleRoutes: safeRequire(path.join(__dirname, 'routes/v1/integrationModuleRoutes')),
+  taxCalculatorRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxCalculatorRoutes')),
+  // Optional routes that may not exist in all environments
+  financialMetricsRoutes: (() => {
+    const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
+    console.log(`Attempting to load financial metrics routes from: ${fullPath}`);
+    console.log(`File exists: ${fs.existsSync(fullPath) ? 'yes' : 'no'}`);
+    const result = safeRequire(fullPath);
+    console.log(`Financial metrics routes loaded: ${result ? 'success' : 'failed'}`);
+    return result;
+  })(),
 };
 
-// Import custom v1 routes
-const v1Routes = {
-  shareClassRoutes: require('./routes/v1/shareClassRoutes'),
-  financialReportRoutes: require('./routes/v1/financialReportRoutes'),
-  financialMetricsRoutes: require('./routes/v1/financialMetricsRoutes')
-};
-
-// Route mapping with paths
-const routeMappings = {
-  '/api/financial-reports': 'financialReportRoutes',
-  '/api/users': 'userRoutes',
-  '/api/shareClasses': 'shareClassRoutes',
-  '/api/stakeholders': 'stakeholderRoutes',
-  '/api/documents': 'documentRoutes',
-  '/api/fundraisingRounds': 'fundraisingRoundRoutes',
-  '/api/equityPlans': 'equityPlanRoutes',
-  '/api/documentEmbeddings': 'documentEmbeddingRoutes',
-  '/api/employees': 'employeeRoutes',
-  '/api/activities': 'activityRoutes',
-  '/api/investments': 'investmentRoutes',
-  '/api/admins': 'adminRoutes',
-  '/api/documentAccesses': 'documentAccessRoutes',
-  '/api/investors': 'investorRoutes',
-  '/api/companies': 'companyRoutes',
-  '/auth': 'authRoutes',
-  '/api/communications': 'communicationRoutes',
-  '/api/notifications': 'notificationRoutes',
-  '/api/invites': 'inviteManagementRoutes',
-  '/api/spvs': 'spvRoutes',
-  '/api/spvassets': 'spvAssetRoutes',
-  '/api/compliance-checks': 'complianceCheckRoutes',
-  '/api/integration-modules': 'integrationModuleRoutes',
-  '/api/taxCalculations': 'taxCalculatorRoutes'
-};
-
-// Keep track of routes that have custom v1 implementations
-const hasCustomV1Implementation = ['shareClassRoutes', 'financialReportRoutes']; // Routes with custom v1 implementations
-
-// Mount legacy routes only if they exist and don't have a custom v1 implementation
-Object.entries(routeMappings).forEach(([path, routeName]) => {
-  if (routes[routeName] && !hasCustomV1Implementation.includes(routeName)) {
-    app.use(path, routes[routeName]);
+// Mount routes with correct paths
+Object.entries(routes).forEach(([key, route]) => {
+  // Skip if route is null or undefined
+  if (!route) {
+    console.log(`Skipping null/undefined route: ${key}`);
+    if (key === 'financialMetricsRoutes') {
+      console.log('Financial metrics routes failed to load. Check previous logs for details.');
+    }
+    return;
+  }
+  if (route) {
+    let path;
+    // Special case for auth routes
+    if (key === 'authRoutes') {
+      path = '/api/v1/auth';
+    } else if (key === 'investmentTrackerRoutes') {
+      path = '/api/v1/investments';
+    } else if (key === 'financialReportRoutes') {
+      path = '/api/v1/financial-reports';
+    } else if (key === 'documentEmbeddingRoutes') {
+      path = '/api/v1/document-embeddings';
+    } else if (key === 'documentAccessRoutes') {
+      path = '/api/v1/document-accesses';
+    } else if (key === 'fundraisingRoundRoutes') {
+      path = '/api/v1/fundraising-rounds';
+    } else if (key === 'equityPlanRoutes') {
+      path = '/api/v1/equity-plans';
+    } else if (key === 'shareClassRoutes') {
+      path = '/api/v1/share-classes';
+    } else if (key === 'spvAssetRoutes') {
+      path = '/api/v1/spv-assets';
+    } else if (key === 'complianceCheckRoutes') {
+      path = '/api/v1/compliance-checks';
+    } else if (key === 'integrationModuleRoutes') {
+      path = '/api/v1/integration-modules';
+    } else if (key === 'financialMetricsRoutes') {
+      path = '/api/v1/metrics';
+    } else if (key === 'taxCalculatorRoutes') {
+      path = '/api/v1/tax-calculations';
+    } else if (key === 'inviteManagementRoutes') {
+      path = '/api/v1/invites';
+    } else {
+      path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
+    }
+    
+    // Ensure the route is a function before mounting
+    if (typeof route === 'function') {
+      app.use(path, route);
+      console.log(`Registered custom v1 route: ${path} -> ${key}`);
+    } else {
+      console.error(`Error: Route ${key} is not a valid middleware function`);
+    }
+  } else if (route) {
+    console.log(`Route not mounted (not a function): ${key} (type: ${typeof route})`);
+  } else {
+    console.log(`Route not found: ${key}`);
   }
 });
 
-// Create versioned routes for legacy endpoints (except those with custom v1 implementations)
-const filteredMappings = Object.fromEntries(
-  Object.entries(routeMappings)
-    .filter(([path, routeName]) => !hasCustomV1Implementation.includes(routeName))
-);
-
-// Apply versioning to legacy routes (not including those with custom v1 implementations) 
-createVersionedRoutes(app, routes, filteredMappings);
-
-// Mount custom v1 routes directly
-// OCAE-208: Share class routes
-if (routes.v1ShareClassRoutes) {
-  app.use('/api/v1/shareClasses', routes.v1ShareClassRoutes);
-  console.log('Registered custom v1 route: /api/v1/shareClasses -> v1ShareClassRoutes');
-}
-
-// OCAE-206: Financial report routes
-app.use('/api/v1/financial-reports', v1Routes.financialReportRoutes);
-console.log('Registered custom v1 route: /api/v1/financial-reports -> financialReportRoutes');
-
-// OCAE-402: Financial metrics routes
-app.use('/api/v1', v1Routes.financialMetricsRoutes);
-console.log('Registered custom v1 route: /api/v1 -> financialMetricsRoutes');
+// Health check endpoint - must be before error handlers
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(err.statusCode || 500).json({
-    error: err.message || "Internal Server Error",
+    error: err.message || 'Internal Server Error',
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 
-// 404 handler
+// 404 handler - must be last
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -228,8 +250,8 @@ app.use('*', (req, res) => {
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
   });
 }
 

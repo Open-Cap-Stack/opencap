@@ -101,33 +101,68 @@ const registerUser = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user object with a unique userId
-    const userId = new mongoose.Types.ObjectId().toString();
-    const newUser = new User({
+    // Check if we're in development mode
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    // Generate a userId if not provided (using email prefix + timestamp for uniqueness)
+    const userId = req.body.userId || 
+                 `${email.split('@')[0]}_${Date.now().toString(36).slice(-6)}`;
+    
+    // Create user object
+    const userData = {
       userId,
       firstName,
       lastName,
       email,
       password: hashedPassword,
       role,
-      status: 'pending',
-      companyId: companyId || null,
-      emailVerified: false
-    });
+      companyId,
+      status: isDevelopment ? 'active' : 'pending' // Auto-activate in development
+    };
+    
+    // Only add verification token if not in development
+    if (!isDevelopment) {
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      userData.verificationToken = verificationToken;
+      userData.verificationTokenExpires = verificationTokenExpires;
+    }
 
-    const savedUser = await newUser.save();
+    // Create user
+    const user = new User(userData);
 
-    // Generate verification token and send email
-    await sendVerificationEmailToUser(savedUser);
+    // Save user to database
+    await user.save();
 
-    // Remove password from response
-    const userResponse = savedUser.toObject();
-    delete userResponse.password;
+    // Send verification email in background if not in development
+    if (!isDevelopment) {
+      await sendVerificationEmailToUser(user);
+    }
 
-    return res.status(201).json({
-      message: 'User registered successfully',
-      user: userResponse
-    });
+    // Generate auth token for immediate login in development
+    let token;
+    if (isDevelopment) {
+      token = jwt.sign(
+        { userId: user._id, role: user.role },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '24h' }
+      );
+    }
+
+    // Return success response
+    const response = {
+      success: true,
+      message: isDevelopment 
+        ? 'Registration successful. You are now logged in.'
+        : 'Registration successful. Please check your email to verify your account.',
+      userId: user._id
+    };
+    
+    if (isDevelopment) {
+      response.token = token;
+    }
+    
+    return res.status(201).json(response);
   } catch (error) {
     console.error('Registration error:', error.message);
     return res.status(500).json({ 
