@@ -13,7 +13,7 @@ const { hasPermission } = require('../../middleware/rbacMiddleware');
 
 /**
  * @swagger
- * /api/v1/companies/{companyId}/metrics/profitability:
+ * /api/v1/metrics/companies/{companyId}/metrics/profitability:
  *   get:
  *     tags:
  *       - Financial Metrics
@@ -57,7 +57,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/companies/{companyId}/metrics/liquidity:
+ * /api/v1/metrics/companies/{companyId}/metrics/liquidity:
  *   get:
  *     tags:
  *       - Financial Metrics
@@ -101,7 +101,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/companies/{companyId}/metrics/solvency:
+ * /api/v1/metrics/companies/{companyId}/metrics/solvency:
  *   get:
  *     tags:
  *       - Financial Metrics
@@ -145,7 +145,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/companies/{companyId}/metrics/efficiency:
+ * /api/v1/metrics/companies/{companyId}/metrics/efficiency:
  *   get:
  *     tags:
  *       - Financial Metrics
@@ -189,12 +189,12 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/companies/{companyId}/metrics/growth:
+ * /api/v1/metrics/companies/{companyId}/metrics/dashboard:
  *   get:
  *     tags:
  *       - Financial Metrics
- *     summary: Calculate growth metrics for a company
- *     description: Calculates year-over-year or quarter-over-quarter growth rates for key financials
+ *     summary: Get financial metrics dashboard
+ *     description: Returns a comprehensive dashboard of all financial metrics
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -204,126 +204,21 @@ router.get(
  *           type: string
  *         required: true
  *         description: Unique ID of the company
- *       - in: query
- *         name: period
- *         schema:
- *           type: string
- *         required: true
- *         description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
- *       - in: query
- *         name: compareWith
- *         schema:
- *           type: string
- *           enum: [previous-year, previous-quarter]
- *         required: false
- *         description: Basis for comparison (defaults to previous-year)
  *     responses:
  *       200:
- *         description: Growth metrics calculated successfully
- *       400:
- *         description: Invalid input parameters
+ *         description: Financial metrics dashboard retrieved successfully
  *       401:
  *         description: Unauthorized - Missing or invalid authentication
  *       403:
  *         description: Forbidden - Insufficient permissions
- *       404:
- *         description: No financial data found for the specified period
  *       500:
- *         description: Server error while calculating metrics
- */
-router.get(
-  '/companies/:companyId/metrics/growth',
-  authenticateToken,
-  hasPermission('financialReports.view'),
-  financialMetricsController.calculateGrowthMetrics
-);
-
-/**
- * @swagger
- * /api/v1/companies/{companyId}/metrics/valuation:
- *   get:
- *     tags:
- *       - Financial Metrics
- *     summary: Calculate valuation metrics for a company
- *     description: Calculates P/E ratio, EV/EBITDA, P/B ratio, and other valuation metrics
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         schema:
- *           type: string
- *         required: true
- *         description: Unique ID of the company
- *       - in: query
- *         name: period
- *         schema:
- *           type: string
- *         required: true
- *         description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
- *     responses:
- *       200:
- *         description: Valuation metrics calculated successfully
- *       400:
- *         description: Invalid input parameters
- *       401:
- *         description: Unauthorized - Missing or invalid authentication
- *       403:
- *         description: Forbidden - Insufficient permissions
- *       404:
- *         description: No financial data found for the specified period
- *       500:
- *         description: Server error while calculating metrics
- */
-router.get(
-  '/companies/:companyId/metrics/valuation',
-  authenticateToken,
-  hasPermission('financialReports.view'),
-  financialMetricsController.calculateValuationMetrics
-);
-
-/**
- * @swagger
- * /api/v1/companies/{companyId}/metrics/dashboard:
- *   get:
- *     tags:
- *       - Financial Metrics
- *     summary: Calculate comprehensive financial metrics dashboard
- *     description: Combines all financial metrics into a single dashboard view
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         schema:
- *           type: string
- *         required: true
- *         description: Unique ID of the company
- *       - in: query
- *         name: period
- *         schema:
- *           type: string
- *         required: true
- *         description: Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)
- *     responses:
- *       200:
- *         description: Comprehensive metrics calculated successfully
- *       400:
- *         description: Invalid input parameters
- *       401:
- *         description: Unauthorized - Missing or invalid authentication
- *       403:
- *         description: Forbidden - Insufficient permissions
- *       404:
- *         description: No financial data found for the specified period
- *       500:
- *         description: Server error while calculating metrics
+ *         description: Server error while retrieving dashboard
  */
 router.get(
   '/companies/:companyId/metrics/dashboard',
   authenticateToken,
   hasPermission('financialReports.view'),
-  financialMetricsController.calculateComprehensiveMetrics
+  financialMetricsController.getFinancialDashboard
 );
 
 module.exports = router;

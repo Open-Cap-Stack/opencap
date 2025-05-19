@@ -1,0 +1,25 @@
+{
+  "restartable": "rs",
+  "ignore": [
+    ".git",
+    "node_modules/**/node_modules",
+    "tests/"
+  ],
+  "watch": [
+    "app.js",
+    "controllers/",
+    "models/",
+    "routes/"
+  ],
+  "execMap": {
+    "js": "node --inspect"
+  },
+  "ext": "js,json",
+  "verbose": true,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "events": {
+    "restart": "echo 'App restarted'"
+  }
+}

@@ -1765,13 +1765,13 @@
         }
       }
     },
-    "/api/v1/companies/{companyId}/metrics/profitability": {
+    "/api/v1/metrics/companies/{companyId}/metrics/profitability": {
       "get": {
         "tags": [
           "Financial Metrics"
         ],
-        "summary": "Calculate profitability metrics",
-        "description": "Calculates profitability metrics such as gross profit margin, \noperating profit margin, and net profit margin for a specific company.\n",
+        "summary": "Calculate profitability metrics for a company",
+        "description": "Calculates gross profit margin, operating profit margin, and net profit margin",
         "security": [
           {
             "bearerAuth": []
@@ -1785,7 +1785,7 @@
               "type": "string"
             },
             "required": true,
-            "description": "Unique identifier of the company"
+            "description": "Unique ID of the company"
           },
           {
             "in": "query",
@@ -1799,75 +1799,33 @@
         ],
         "responses": {
           "200": {
-            "description": "Profitability metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfitabilityMetrics"
-                }
-              }
-            }
+            "description": "Profitability metrics calculated successfully"
           },
           "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Invalid input parameters"
           },
           "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Unauthorized - Missing or invalid authentication"
           },
           "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Forbidden - Insufficient permissions"
           },
           "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "No financial data found for the specified period"
           },
           "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Server error while calculating metrics"
           }
         }
       }
     },
-    "/api/v1/companies/{companyId}/metrics/liquidity": {
+    "/api/v1/metrics/companies/{companyId}/metrics/liquidity": {
       "get": {
         "tags": [
           "Financial Metrics"
         ],
-        "summary": "Calculate liquidity metrics",
-        "description": "Calculates liquidity metrics such as current ratio, quick ratio, \nand cash ratio for a specific company.\n",
+        "summary": "Calculate liquidity metrics for a company",
+        "description": "Calculates current ratio, quick ratio, and cash ratio",
         "security": [
           {
             "bearerAuth": []
@@ -1881,7 +1839,7 @@
               "type": "string"
             },
             "required": true,
-            "description": "Unique identifier of the company"
+            "description": "Unique ID of the company"
           },
           {
             "in": "query",
@@ -1895,75 +1853,33 @@
         ],
         "responses": {
           "200": {
-            "description": "Liquidity metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiquidityMetrics"
-                }
-              }
-            }
+            "description": "Liquidity metrics calculated successfully"
           },
           "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Invalid input parameters"
           },
           "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Unauthorized - Missing or invalid authentication"
           },
           "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Forbidden - Insufficient permissions"
           },
           "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "No financial data found for the specified period"
           },
           "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Server error while calculating metrics"
           }
         }
       }
     },
-    "/api/v1/companies/{companyId}/metrics/solvency": {
+    "/api/v1/metrics/companies/{companyId}/metrics/solvency": {
       "get": {
         "tags": [
           "Financial Metrics"
         ],
-        "summary": "Calculate solvency metrics",
-        "description": "Calculates solvency metrics such as debt-to-equity ratio and \ninterest coverage ratio for a specific company.\n",
+        "summary": "Calculate solvency metrics for a company",
+        "description": "Calculates debt-to-equity ratio, debt-to-asset ratio, and interest coverage ratio",
         "security": [
           {
             "bearerAuth": []
@@ -1977,7 +1893,7 @@
               "type": "string"
             },
             "required": true,
-            "description": "Unique identifier of the company"
+            "description": "Unique ID of the company"
           },
           {
             "in": "query",
@@ -1991,75 +1907,33 @@
         ],
         "responses": {
           "200": {
-            "description": "Solvency metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SolvencyMetrics"
-                }
-              }
-            }
+            "description": "Solvency metrics calculated successfully"
           },
           "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Invalid input parameters"
           },
           "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Unauthorized - Missing or invalid authentication"
           },
           "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Forbidden - Insufficient permissions"
           },
           "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "No financial data found for the specified period"
           },
           "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Server error while calculating metrics"
           }
         }
       }
     },
-    "/api/v1/companies/{companyId}/metrics/efficiency": {
+    "/api/v1/metrics/companies/{companyId}/metrics/efficiency": {
       "get": {
         "tags": [
           "Financial Metrics"
         ],
-        "summary": "Calculate efficiency metrics",
-        "description": "Calculates efficiency metrics such as asset turnover, inventory turnover,\nand receivables turnover for a specific company.\n",
+        "summary": "Calculate efficiency metrics for a company",
+        "description": "Calculates asset turnover, inventory turnover, and receivables turnover ratios",
         "security": [
           {
             "bearerAuth": []
@@ -2073,7 +1947,7 @@
               "type": "string"
             },
             "required": true,
-            "description": "Unique identifier of the company"
+            "description": "Unique ID of the company"
           },
           {
             "in": "query",
@@ -2087,75 +1961,33 @@
         ],
         "responses": {
           "200": {
-            "description": "Efficiency metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EfficiencyMetrics"
-                }
-              }
-            }
+            "description": "Efficiency metrics calculated successfully"
           },
           "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Invalid input parameters"
           },
           "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Unauthorized - Missing or invalid authentication"
           },
           "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Forbidden - Insufficient permissions"
           },
           "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "No financial data found for the specified period"
           },
           "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Server error while calculating metrics"
           }
         }
       }
     },
-    "/api/v1/companies/{companyId}/metrics/growth": {
+    "/api/v1/metrics/companies/{companyId}/metrics/dashboard": {
       "get": {
         "tags": [
           "Financial Metrics"
         ],
-        "summary": "Calculate growth metrics",
-        "description": "Calculates growth metrics such as revenue growth, EBITDA growth,\nand net income growth compared to a previous period.\n",
+        "summary": "Get financial metrics dashboard",
+        "description": "Returns a comprehensive dashboard of all financial metrics",
         "security": [
           {
             "bearerAuth": []
@@ -2169,283 +2001,21 @@
               "type": "string"
             },
             "required": true,
-            "description": "Unique identifier of the company"
-          },
-          {
-            "in": "query",
-            "name": "period",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
-          },
-          {
-            "in": "query",
-            "name": "compareWith",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "previous-year",
-                "previous-quarter"
-              ]
-            },
-            "required": false,
-            "description": "Basis for comparison (defaults to previous-year)"
+            "description": "Unique ID of the company"
           }
         ],
         "responses": {
           "200": {
-            "description": "Growth metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrowthMetrics"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Financial metrics dashboard retrieved successfully"
           },
           "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Unauthorized - Missing or invalid authentication"
           },
           "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Forbidden - Insufficient permissions"
           },
           "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/companies/{companyId}/metrics/valuation": {
-      "get": {
-        "tags": [
-          "Financial Metrics"
-        ],
-        "summary": "Calculate valuation metrics",
-        "description": "Calculates valuation metrics such as P/E ratio, EV/EBITDA, P/B ratio,\nand other metrics for public companies.\n",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "companyId",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "Unique identifier of the company"
-          },
-          {
-            "in": "query",
-            "name": "period",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Valuation metrics calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValuationMetrics"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/companies/{companyId}/metrics/dashboard": {
-      "get": {
-        "tags": [
-          "Financial Metrics"
-        ],
-        "summary": "Calculate comprehensive financial metrics dashboard",
-        "description": "Combines all financial metrics into a comprehensive dashboard view\nfor a specific company and reporting period.\n",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "companyId",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "Unique identifier of the company"
-          },
-          {
-            "in": "query",
-            "name": "period",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Comprehensive metrics dashboard calculated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MetricsDashboard"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden - Insufficient permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No financial data found for the specified period",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error while calculating metrics",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "description": "Server error while retrieving dashboard"
           }
         }
       }
@@ -7407,6 +6977,691 @@
             "bearerAuth": []
           }
         ]
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/profitability": {
+      "get": {
+        "summary": "Calculate profitability metrics",
+        "description": "Calculates profitability metrics such as gross profit margin, \noperating profit margin, and net profit margin for a specific company.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profitability metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitabilityMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/liquidity": {
+      "get": {
+        "summary": "Calculate liquidity metrics",
+        "description": "Calculates liquidity metrics such as current ratio, quick ratio, \nand cash ratio for a specific company.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liquidity metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiquidityMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/solvency": {
+      "get": {
+        "summary": "Calculate solvency metrics",
+        "description": "Calculates solvency metrics such as debt-to-equity ratio and \ninterest coverage ratio for a specific company.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Solvency metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolvencyMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/efficiency": {
+      "get": {
+        "summary": "Calculate efficiency metrics",
+        "description": "Calculates efficiency metrics such as asset turnover, inventory turnover,\nand receivables turnover for a specific company.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Efficiency metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfficiencyMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/growth": {
+      "get": {
+        "summary": "Calculate growth metrics",
+        "description": "Calculates growth metrics such as revenue growth, EBITDA growth,\nand net income growth compared to a previous period.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          },
+          {
+            "in": "query",
+            "name": "compareWith",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "previous-year",
+                "previous-quarter"
+              ]
+            },
+            "description": "Basis for comparison (defaults to previous-year)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Growth metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrowthMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/valuation": {
+      "get": {
+        "summary": "Calculate valuation metrics",
+        "description": "Calculates valuation metrics such as P/E ratio, EV/EBITDA, P/B ratio,\nand other metrics for public companies.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation metrics calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValuationMetrics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/metrics/dashboard": {
+      "get": {
+        "summary": "Calculate comprehensive financial metrics dashboard",
+        "description": "Combines all financial metrics into a comprehensive dashboard view\nfor a specific company and reporting period.\n",
+        "tags": [
+          "Financial Metrics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the company"
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reporting period in format YYYY-QX or YYYY-full (e.g., 2024-Q1 or 2024-full)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comprehensive metrics dashboard calculated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsDashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No financial data found for the specified period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error while calculating metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/financial-reports": {

@@ -8,20 +8,24 @@ services:
       - "3000:3000"
     volumes:
       - .:/app
-      - /app/node_modules
+      - node_modules:/app/node_modules
     working_dir: /app
-    command: nodemon app.js
+    command: sh -c "npm install && node app.js"
     depends_on:
       - postgres
+      - mongodb
       - minio
       - spark
       - airflow-webserver
     environment:
       - DATABASE_URL=postgres://postgres:password@postgres:5432/opencap
+      - MONGODB_URI=mongodb://opencap:password123@mongodb:27017/opencap?authSource=admin
+      - MONGODB_URI_TEST=mongodb://opencap:password123@mongodb:27017/opencap_test?authSource=admin
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minio
       - MINIO_SECRET_KEY=minio123
       - NODE_ENV=development
+      - PORT=3000
 
   postgres:
     image: postgres:15-alpine
@@ -180,3 +184,4 @@ volumes:
   airflow_data:
   airflow_db_data:
   mongodb_data:
+  node_modules:
