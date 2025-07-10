@@ -10,14 +10,16 @@
     "test:watch": "cross-env NODE_ENV=test jest --watch --detectOpenHandles --forceExit",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage --detectOpenHandles --forceExit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "init:zerodb": "node scripts/initZeroDB.js",
+    "test:zerodb": "node scripts/testZeroDB.js"
   },
-
   "dependencies": {
     "@langchain/anthropic": "^0.3.8",
     "@langchain/core": "^0.3.18",
     "@langchain/langgraph": "^0.2.22",
     "argon2": "^0.40.3",
+    "axios": "^1.10.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
@@ -46,6 +48,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.53.2",
     "cross-env": "^7.0.3",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",

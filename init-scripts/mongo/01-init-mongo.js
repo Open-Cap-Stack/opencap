@@ -6,7 +6,7 @@ print('Starting MongoDB production database setup...');
 // Create application user
 db.getSiblingDB('opencap').createUser({
   user: 'opencapapp',
-  pwd: 'password123',
+  pwd: process.env.MONGODB_APP_PASSWORD || 'cfcb9ad70ddbadba456c906a16511ebe',
   roles: [
     { role: 'readWrite', db: 'opencap' },
     { role: 'dbAdmin', db: 'opencap' }
@@ -28,14 +28,10 @@ db.createCollection('communications');
 
 print('Collections created for production environment');
 
-// Create initial admin user
-db.users.insertOne({
-  username: "admin",
-  email: "admin@opencap.org",
-  password: "$2a$10$JGZhscRZIvRUnaLOeOXAQOBJGRb2BA6QrNQx1V7Zjd2lVlLS9Id4i", // Hashed 'password123'
-  role: "admin",
-  createdAt: new Date(),
-  updatedAt: new Date()
-});
+// Admin user creation should be done via API or environment variables
+// Removed hardcoded admin user for security
+// Use the API endpoint /api/v1/auth/register to create the first admin user
+
+print('Admin user creation skipped - create via API endpoint');
 
 print('MongoDB production database setup completed');

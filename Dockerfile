@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=development
-ENV PORT=3000
+ENV PORT=5000
 
 # Install system dependencies
 RUN apk add --no-cache python3 make g++
@@ -34,7 +34,7 @@ RUN chown -R appuser:appgroup /app/node_modules
 USER appuser
 
 # Expose the app's running port
-EXPOSE 3000
+EXPOSE 5000
 
 # Command to run the app
 CMD ["npm", "start"]

@@ -2,9 +2,10 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: [
     '**/tests/**/*.test.js',
+    '**/__tests__/**/*.test.js',
     '**/*.test.js'
   ],
-  testPathIgnorePatterns: ['/node_modules/'],
+  testPathIgnorePatterns: ['/node_modules/', '/startup-love/', '/frontend/'],
   collectCoverage: true,
   collectCoverageFrom: [
     'controllers/**/*.js',
@@ -13,6 +14,5 @@ module.exports = {
     'services/**/*.js'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
-  setupFilesAfterEnv: ['./tests/setup.js']
+  coverageReporters: ['text', 'lcov']
 };

@@ -83,9 +83,13 @@ const authenticateToken = async (req, res, next) => {
     }
     
     // Verify token with timeout
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
     const decoded = await verifyTokenWithTimeout(
       token, 
-      process.env.JWT_SECRET || 'testsecret',
+      process.env.JWT_SECRET,
       JWT_VERIFICATION_TIMEOUT_MS
     );
     
