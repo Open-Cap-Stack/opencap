@@ -1,6 +1,7 @@
 # OpenCap Test Endpoints Guide
 
-This document provides detailed instructions for testing the various test endpoints in the OpenCap application. These endpoints are designed to help verify that middleware components are functioning correctly.
+This document provides detailed instructions for testing the various test endpoints in the OpenCap application. Th
+ese endpoints are designed to help verify that middleware components are functioning correctly.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -26,17 +27,27 @@ Before you begin, ensure you have:
 
 ## Base URL
 
-All endpoints are relative to the base URL of your API. For local development, this is typically:
+All endpoints are relative to the base URL of your API. The base URL differs between environments:
 
+### Local Development
 ```
 http://localhost:3000/api/v1/test
 ```
+
+### Production (Railway)
+```
+https://opencap-production.up.railway.app/api
+```
+
+**Note:** The URL structure differs between environments. In local development, test endpoints are under `/api/v1/test/`, while in production they are directly under `/api/`.
 
 ## Authentication
 
 ### JWT Authentication Overview
 
 OpenCap uses JSON Web Tokens (JWT) for authentication. Most API endpoints require a valid JWT token in the `Authorization` header.
+
+> **Important**: When testing protected endpoints on the Railway deployment, you must first obtain a valid authentication token.
 
 ### Obtaining a JWT Token
 
@@ -123,6 +134,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/v1/users/me
 
 Here's a complete example of testing an authenticated endpoint:
 
+#### Local Development
+
 ```bash
 # 1. Login and store the token
 RESPONSE=$(curl -s -X POST http://localhost:3000/api/v1/auth/login \
@@ -136,6 +149,149 @@ TOKEN=$(echo $RESPONSE | jq -r '.token')
 curl -X GET http://localhost:3000/api/v1/users/me \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
+
+#### Production (Railway)
+
+```bash
+# 1. Login and store the token
+RESPONSE=$(curl -s -X POST https://opencap-production.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"your-password"}')
+
+# 2. Extract the token
+TOKEN=$(echo $RESPONSE | jq -r '.token')
+
+# 3. Use the token in subsequent requests
+curl -X GET https://opencap-production.up.railway.app/api/v1/users/me \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### Railway-Specific Authentication Notes
+
+1. **Database Seeding**: The production environment may have different user credentials than your local development environment. Ensure you're using credentials that exist in the Railway deployment.
+
+2. **Error Troubleshooting**: If you encounter 500 Internal Server Error when authenticating on Railway, check:
+   - Whether the auth service is properly configured in the deployment
+   - If environment variables for JWT secrets are properly set
+   - If the MongoDB connection is properly established
+
+3. **First-Time Setup**: For a fresh Railway deployment, you may need to create an initial admin user through a secure channel before being able to authenticate.
+
+4. **Railway Environment Variables**: Make sure all necessary environment variables are set correctly in the Railway dashboard, especially:
+   ```
+   JWT_SECRET=your_jwt_secret_here
+   JWT_EXPIRATION=24h
+   MONGODB_URI=your_mongodb_connection_string
+   ```
+
+5. **Deployment Log Access**: Check the Railway logs for specific error messages:
+   ```bash
+   railway logs
+   ```
+   If you don't have the Railway CLI installed:
+   ```bash
+   npm i -g @railway/cli
+   railway login
+   ```
+
+### Railway Deployment Verification and Authentication Process
+
+#### Step 1: Verify Basic Health and Connectivity
+
+```bash
+# Check if the application is running
+curl https://opencap-production.up.railway.app/health
+
+# Expected response:
+# {"status":"ok","message":"Server is running"}
+```
+
+#### Step 2: Test Middleware Components 
+
+Ensure middleware is functioning correctly before testing authentication:
+
+```bash
+# Test body parser middleware
+curl -X POST https://opencap-production.up.railway.app/api/test-body-parser \
+  -H "Content-Type: application/json" \
+  -d '{"testField":"testValue"}'
+```
+
+#### Step 3: Authenticate to Get JWT Token
+
+Attempt to authenticate with the pre-configured admin account:
+
+```bash
+# Try to get an authentication token
+RESPONSE=$(curl -s -X POST https://opencap-production.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@opencap.com","password":"admin123"}')
+
+echo $RESPONSE
+```
+
+**Note for Dev Team**: If you receive an "Internal server error" response:
+
+```json
+{"message":"Internal server error"}
+```
+
+This indicates one of the following issues:
+
+1. The MongoDB connection string (`MONGODB_URI`) is not properly configured in Railway
+2. JWT secrets (`JWT_SECRET`) are not properly set in the Railway environment
+3. The database doesn't contain the user account you're trying to authenticate with
+
+#### Step 4: First-Time Setup for Railway Environment
+
+For a new Railway deployment, complete these steps in order:
+
+1. Set required environment variables in Railway dashboard:
+   - `MONGODB_URI` - MongoDB connection string
+   - `JWT_SECRET` - Secret key for JWT token signing
+   - `JWT_EXPIRATION` - Token expiration time (e.g., "24h")
+   - `PORT` - Set to match Railway's expected port
+   - `NODE_ENV` - Set to "production"
+
+2. Provision and initialize the MongoDB database:
+   - Connect to MongoDB instance using connection string
+   - Run the database seed script to create initial admin user:
+   ```bash
+   # From local environment with Railway CLI installed
+   railway run node scripts/init-admin-user.js
+   ```
+
+3. Retry authentication with the credentials created during initialization
+
+#### Step 5: Working with JWT Tokens
+
+Once authentication is working correctly, follow this workflow:
+
+```bash
+# 1. Login and store the token (replace with working credentials)
+RESPONSE=$(curl -s -X POST https://opencap-production.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@opencap.com","password":"admin123"}')
+
+# 2. Extract the token - will only work after environment setup
+TOKEN=$(echo $RESPONSE | jq -r '.token')
+
+# 3. Use the token for authenticated requests
+curl -X GET https://opencap-production.up.railway.app/api/v1/users \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### Step 6: Verify MongoDB Connectivity
+
+Most authentication errors relate to database connectivity issues. Verify MongoDB connection:
+
+```bash
+# Check MongoDB connectivity using a database utility endpoint (if available)
+curl https://opencap-production.up.railway.app/api/v1/admin/db-status \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Refer to [OpenCap_TestCoverage_DigitalOceanDeployment.md](./OpenCap_TestCoverage_DigitalOceanDeployment.md) for detailed deployment setup instructions.
 
 ### Security Notes
 
@@ -153,9 +309,14 @@ Verifies that the test router is properly mounted and basic requests work.
 
 **Endpoint:** `GET /`
 
-**cURL Command:**
+**cURL Command (Local):**
 ```bash
 curl -X GET http://localhost:3000/api/v1/test/
+```
+
+**cURL Command (Production):**
+```bash
+curl -X GET https://opencap-production.up.railway.app/api
 ```
 
 **Expected Response:**
@@ -177,10 +338,22 @@ Tests the Express JSON body parser middleware.
 
 **Endpoint:** `POST /test-body-parser`
 
-**cURL Command:**
+**cURL Command (Local):**
 ```bash
 curl -X POST \
   http://localhost:3000/api/v1/test/test-body-parser \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "testField": "testValue",
+    "numbers": [1, 2, 3],
+    "nested": {"key": "value"}
+  }'
+```
+
+**cURL Command (Production):**
+```bash
+curl -X POST \
+  https://opencap-production.up.railway.app/api/test-body-parser \
   -H 'Content-Type: application/json' \
   -d '{
     "testField": "testValue",
@@ -212,13 +385,23 @@ Tests cookie parsing and setting functionality.
 
 **Endpoint:** `GET /test-cookie-parser`
 
-**cURL Command:**
+**cURL Command (Local):**
 ```bash
 # First request - no cookies
 curl -v http://localhost:3000/api/v1/test/test-cookie-parser
 
 # Second request - with cookies from first response
 curl -v http://localhost:3000/api/v1/test/test-cookie-parser \
+  -H "Cookie: testResponseCookie=cookieValue"
+```
+
+**cURL Command (Production):**
+```bash
+# First request - no cookies
+curl -v https://opencap-production.up.railway.app/api/test-cookie-parser
+
+# Second request - with cookies from first response
+curl -v https://opencap-production.up.railway.app/api/test-cookie-parser \
   -H "Cookie: testResponseCookie=cookieValue"
 ```
 
@@ -243,7 +426,7 @@ Tests response compression (gzip/deflate).
 
 **Endpoint:** `GET /test-compression`
 
-**cURL Command:**
+**cURL Command (Local):**
 ```bash
 # Without compression (for comparison)
 curl -v http://localhost:3000/api/v1/test/test-compression \
@@ -251,6 +434,16 @@ curl -v http://localhost:3000/api/v1/test/test-compression \
 
 # With compression
 curl -v --compressed http://localhost:3000/api/v1/test/test-compression
+```
+
+**cURL Command (Production):**
+```bash
+# Without compression (for comparison)
+curl -v https://opencap-production.up.railway.app/api/test-compression \
+  -H "Accept-Encoding: "  # Explicitly disable compression
+
+# With compression
+curl -v --compressed https://opencap-production.up.railway.app/api/test-compression
 ```
 
 **Verification Points:**
@@ -264,12 +457,21 @@ Tests the rate limiting middleware.
 
 **Endpoint:** `GET /rate-limit-test`
 
-**cURL Command:**
+**cURL Command (Local):**
 ```bash
 # Make multiple requests to test rate limiting
 for i in {1..6}; do
   curl -s -o /dev/null -w "Request $i: %{http_code}\n" \
     http://localhost:3000/api/v1/test/rate-limit-test
+done
+```
+
+**cURL Command (Production):**
+```bash
+# Make multiple requests to test rate limiting
+for i in {1..6}; do
+  curl -s -o /dev/null -w "Request $i: %{http_code}\n" \
+    https://opencap-production.up.railway.app/api/rate-limit-test
 done
 ```
 

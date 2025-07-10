@@ -4,7 +4,7 @@ const activitySchema = new mongoose.Schema({
   activityId: { type: String, required: true, unique: true },
   activityType: {
     type: String,
-    enum: ['DocumentUpload', 'StakeholderUpdate'],
+    enum: ['DocumentUpload', 'StakeholderUpdate', 'FinancialReportCreated', 'UserLogin', 'SystemUpdate'],
     required: true,
   },
   timestamp: { type: Date, required: true },

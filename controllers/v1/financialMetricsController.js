@@ -9,18 +9,7 @@ const mongoose = require('mongoose');
 const FinancialReport = require('../../models/financialReport');
 const Company = require('../../models/Company');
 
-/**
- * Helper function to parse period string (e.g., '2024-Q1' or '2024-annual')
- */
-const _test_parsePeriod = (period) => {
-  const periodMatch = period.match(/^(\d{4})-(Q[1-4]|annual)$/);
-  if (!periodMatch) return null;
-  
-  const year = parseInt(periodMatch[1], 10);
-  const quarter = periodMatch[2] === 'annual' ? 'full' : periodMatch[2];
-  
-  return { year, quarter };
-};
+// Removed _test_parsePeriod function - NO MOCK DATA
 
 /**
  * Helper function to parse period string into year and quarter
@@ -963,7 +952,5 @@ module.exports = {
   calculateGrowthMetrics,
   calculateValuationMetrics,
   calculateComprehensiveMetrics,
-  getFinancialDashboard,
-  // Export parsePeriod for testing
-  _test_parsePeriod
+  getFinancialDashboard
 };

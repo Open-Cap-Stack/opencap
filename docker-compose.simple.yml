@@ -1,0 +1,93 @@
+version: "3.8"
+
+services:
+  # Backend API Service
+  app:
+    build:
+      context: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "npm install && node app.js"
+    depends_on:
+      - postgres
+      - mongodb
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres:5432/opencap
+      - MONGODB_URI=mongodb://opencap:password123@mongodb:27017/opencap?authSource=admin
+      - MONGODB_URI_TEST=mongodb://opencap:password123@mongodb:27017/opencap_test?authSource=admin
+      - NODE_ENV=development
+      - PORT=5000
+      - CORS_ORIGIN=http://localhost:5173
+
+  # Frontend React Service
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:5000/api/v1
+    depends_on:
+      - app
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: opencap_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: opencap
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:5.0
+    container_name: opencap_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: opencap
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: opencap
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/Cody/docker-data/postgres_data
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/Cody/docker-data/mongodb_data
+  backend_node_modules:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/Cody/docker-data/backend_node_modules
+  frontend_node_modules:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/Cody/docker-data/frontend_node_modules

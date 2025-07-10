@@ -25,13 +25,17 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
  * @returns {Object} Nodemailer transporter object
  */
 const createEmailTransporter = () => {
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    throw new Error('EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD environment variables are required');
+  }
+  
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.example.com',
+    host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || '587'),
     secure: process.env.EMAIL_SECURE === 'true',
     auth: {
-      user: process.env.EMAIL_USER || 'test@example.com',
-      pass: process.env.EMAIL_PASSWORD || 'password'
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
     }
   });
 };
@@ -142,9 +146,13 @@ const registerUser = async (req, res) => {
     // Generate auth token for immediate login in development
     let token;
     if (isDevelopment) {
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      
       token = jwt.sign(
         { userId: user._id, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
     }
@@ -204,13 +212,13 @@ const loginUser = async (req, res) => {
     // Generate tokens
     const accessToken = jwt.sign(
       { userId: user.userId || user._id, role: user.role },
-      process.env.JWT_SECRET || 'testsecret',
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
       { userId: user.userId || user._id },
-      process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -286,13 +294,13 @@ const oauthLogin = async (req, res) => {
     // Generate tokens
     const accessToken = jwt.sign(
       { userId: user.userId || user._id, role: user.role },
-      process.env.JWT_SECRET || 'testsecret',
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
       { userId: user.userId || user._id },
-      process.env.JWT_REFRESH_SECRET || 'refresh-testsecret',
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -327,7 +335,7 @@ const refreshToken = async (req, res) => {
 
     try {
       // Verify refresh token
-      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'refresh-testsecret');
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 
       // Find user
       const user = await User.findOne({
@@ -344,7 +352,7 @@ const refreshToken = async (req, res) => {
       // Generate new access token
       const accessToken = jwt.sign(
         { userId: user.userId || user._id, role: user.role },
-        process.env.JWT_SECRET || 'testsecret',
+        process.env.JWT_SECRET,
         { expiresIn: '1h' }
       );
 
@@ -412,7 +420,7 @@ const requestPasswordReset = async (req, res) => {
       // Generate reset token
       const resetToken = jwt.sign(
         { userId: user.userId || user._id },
-        process.env.JWT_RESET_SECRET || 'reset-testsecret',
+        process.env.JWT_RESET_SECRET,
         { expiresIn: '1h' }
       );
 
@@ -461,7 +469,7 @@ const verifyResetToken = async (req, res) => {
     
     try {
       // Verify token in a nested try-catch to ensure proper error handling
-      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
+      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
       
       try {
         // Check if user exists - wrap in another try-catch to separate database errors
@@ -532,7 +540,7 @@ const resetPassword = async (req, res) => {
     
     try {
       // Verify token - wrap this in another try-catch to return 400 instead of 500
-      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || 'reset-testsecret');
+      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
       
       try {
         // Database operations in separate try-catch for proper error handling
@@ -742,7 +750,7 @@ const verifyEmail = async (req, res) => {
 
     try {
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret');
+      const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET);
 
       // Find user
       const user = await User.findOne({
@@ -787,7 +795,7 @@ const sendVerificationEmailToUser = async (user) => {
   // Generate verification token
   const verificationToken = jwt.sign(
     { userId: user.userId || user._id }, 
-    process.env.JWT_VERIFICATION_SECRET || 'verification-testsecret', 
+    process.env.JWT_VERIFICATION_SECRET, 
     { expiresIn: '24h' }
   );
   

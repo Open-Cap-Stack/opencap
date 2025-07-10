@@ -35,8 +35,6 @@ const filesToRemove = [
 const testScriptsToKeep = [
   'scripts/test-shortcut-integration.js',
   'scripts/test-mongodb-connection.js',
-  'scripts/insertTestFinancialData.js',
-  'scripts/enhancedTestFinancialData.js',
   'scripts/cleanupTestFiles.js' // This script itself
 ];
 

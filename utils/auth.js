@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required');
+  process.exit(1);
+}
 
 const generateToken = (payload, options = { expiresIn: '1h' }) => {
   return jwt.sign(payload, JWT_SECRET, options);
@@ -14,8 +19,12 @@ const validateApiKey = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  if (apiKey && apiKey !== 'valid-key') {
-    return res.status(401).json({ error: 'Invalid API key' });
+  if (apiKey) {
+    // Validate API key against environment variable or database
+    const validApiKey = process.env.API_KEY;
+    if (!validApiKey || apiKey !== validApiKey) {
+      return res.status(401).json({ error: 'Invalid API key' });
+    }
   }
 
   if (authHeader) {

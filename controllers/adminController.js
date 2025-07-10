@@ -81,8 +81,33 @@ exports.deleteAdmin = async (req, res) => {
 };
 
 exports.loginAdmin = async (req, res) => {
-  // Implement login logic
-  res.status(200).json({ token: "fake-token" }); // Mock response
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    
+    // Find admin by email
+    const admin = await Admin.findOne({ Email: email });
+    if (!admin) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    
+    // In a real implementation, you would verify the password here
+    // For now, we'll require the JWT_SECRET environment variable
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
+    // Return success without a token (requires proper JWT implementation)
+    res.status(501).json({ 
+      message: "Login functionality requires proper JWT implementation",
+      error: "JWT authentication not yet implemented"
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 exports.logoutAdmin = async (req, res) => {

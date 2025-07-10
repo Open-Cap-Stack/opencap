@@ -17,7 +17,7 @@ const {
   includeAdvancedHeaders 
 } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
-const testEndpoints = require('./middleware/testEndpoints');
+// testEndpoints removed - no longer needed
 const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 
 // Initialize dotenv to load environment variables
@@ -88,8 +88,7 @@ app.use(validateApiVersion);
 // OCAE-210: Setup Swagger documentation middleware
 setupSwagger(app);
 
-// Mount test endpoints for middleware testing
-app.use('/api', testEndpoints);
+// Test endpoints removed - using real OpenCAP Stack API only
 
 // Determine if the environment is a test environment
 const isTestEnv = process.env.NODE_ENV === "test";

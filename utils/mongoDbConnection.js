@@ -37,7 +37,11 @@ const DEFAULT_MONGOOSE_OPTIONS = {
  */
 function getMongoURI(dbName = null) {
   // Default to environment variable
-  const uri = process.env.MONGO_URI || 'mongodb://opencap:password123@127.0.0.1:27017/opencap_test?authSource=admin';
+  const uri = process.env.MONGO_URI;
+  
+  if (!uri) {
+    throw new Error('MONGO_URI environment variable is required');
+  }
   
   // If dbName is specified, replace the database name in the URI
   if (dbName) {
