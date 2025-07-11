@@ -5,6 +5,7 @@
  */
 
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const userProfileSchema = new mongoose.Schema({
   bio: { type: String, default: '' },
@@ -105,6 +106,22 @@ userSchema.methods.toJSON = function() {
   delete user.passwordResetToken;
   delete user.passwordResetExpires;
   return user;
+};
+
+// Generate auth token method
+userSchema.methods.generateAuthToken = function() {
+  const secret = process.env.JWT_SECRET || 'test-secret-key';
+  return jwt.sign(
+    { 
+      id: this._id, 
+      userId: this.userId,
+      role: this.role,
+      email: this.email,
+      permissions: this.permissions
+    },
+    secret,
+    { expiresIn: '24h' }
+  );
 };
 
 // Create a unique compound index

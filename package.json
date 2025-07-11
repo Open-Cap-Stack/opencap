@@ -5,10 +5,13 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
+    "start:test": "cross-env NODE_ENV=test node app.js",
     "dev": "nodemon app.js",
     "test": "cross-env NODE_ENV=test jest --detectOpenHandles --forceExit",
     "test:watch": "cross-env NODE_ENV=test jest --watch --detectOpenHandles --forceExit",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage --detectOpenHandles --forceExit",
+    "test:e2e": "npx playwright test",
+    "test:all": "npm run test:coverage && cd frontend && npm run test:coverage && cd .. && npm run test:e2e",
     "lint": "eslint .",
     "format": "prettier --write .",
     "init:zerodb": "node scripts/initZeroDB.js",
