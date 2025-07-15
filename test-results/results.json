@@ -1,0 +1,177 @@
+{
+  "config": {
+    "configFile": "/Users/tobymorning/opencap-1/playwright.config.js",
+    "rootDir": "/Users/tobymorning/opencap-1/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "test-results/results.xml"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/tobymorning/opencap-1/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/tobymorning/opencap-1/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/tobymorning/opencap-1/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/tobymorning/opencap-1/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/tobymorning/opencap-1/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/tobymorning/opencap-1/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/tobymorning/opencap-1/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "/Users/tobymorning/opencap-1/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/tobymorning/opencap-1/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "/Users/tobymorning/opencap-1/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.53.2",
+    "workers": 8,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {",
+      "stack": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {\n    at Object.<anonymous> (/Users/tobymorning/opencap-1/e2e/api/core-api.spec.js:10:62)",
+      "location": {
+        "file": "/Users/tobymorning/opencap-1/e2e/api/core-api.spec.js",
+        "line": 10,
+        "column": 13
+      },
+      "snippet": "\u001b[90m   at \u001b[39mapi/core-api.spec.js:10\n\n   8 |  */\n   9 |\n> 10 | const { test, expect, testUsers, testCompanies, testSPVs } = require('../utils/testFixtures');\n     |             ^\n  11 |\n  12 | test.describe('Core API Integration', () => {\n  13 |   "
+    },
+    {
+      "message": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {",
+      "stack": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {\n    at Object.<anonymous> (/Users/tobymorning/opencap-1/e2e/auth/authentication.spec.js:10:37)",
+      "location": {
+        "file": "/Users/tobymorning/opencap-1/e2e/auth/authentication.spec.js",
+        "line": 10,
+        "column": 13
+      },
+      "snippet": "\u001b[90m   at \u001b[39mauth/authentication.spec.js:10\n\n   8 |  */\n   9 |\n> 10 | const { test, expect, testUsers } = require('../utils/testFixtures');\n     |             ^\n  11 |\n  12 | test.describe('Authentication Flow', () => {\n  13 |   "
+    },
+    {
+      "message": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {",
+      "stack": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {\n    at Object.<anonymous> (/Users/tobymorning/opencap-1/e2e/flows/business-flows.spec.js:10:62)",
+      "location": {
+        "file": "/Users/tobymorning/opencap-1/e2e/flows/business-flows.spec.js",
+        "line": 10,
+        "column": 13
+      },
+      "snippet": "\u001b[90m   at \u001b[39mflows/business-flows.spec.js:10\n\n   8 |  */\n   9 |\n> 10 | const { test, expect, testUsers, testCompanies, testSPVs } = require('../utils/testFixtures');\n     |             ^\n  11 |\n  12 | test.describe('Business Workflow Integration', () => {\n  13 |"
+    },
+    {
+      "message": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {",
+      "stack": "SyntaxError: /Users/tobymorning/opencap-1/e2e/utils/testFixtures.js: Unexpected token, expected \",\" (10:13)\n\n   8 |  */\n   9 |\n> 10 | const { test as base, expect } = require('@playwright/test');\n     |              ^\n  11 |\n  12 | // Test data fixtures\n  13 | const testUsers = {\n    at Object.<anonymous> (/Users/tobymorning/opencap-1/e2e/security/security.spec.js:10:37)",
+      "location": {
+        "file": "/Users/tobymorning/opencap-1/e2e/security/security.spec.js",
+        "line": 10,
+        "column": 13
+      },
+      "snippet": "\u001b[90m   at \u001b[39msecurity/security.spec.js:10\n\n   8 |  */\n   9 |\n> 10 | const { test, expect, testUsers } = require('../utils/testFixtures');\n     |             ^\n  11 |\n  12 | test.describe('Security Testing', () => {\n  13 |"
+    },
+    {
+      "message": "Error: No tests found",
+      "stack": "Error: No tests found"
+    }
+  ],
+  "stats": {
+    "startTime": "2025-07-12T21:50:57.055Z",
+    "duration": 3765.2930000000006,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

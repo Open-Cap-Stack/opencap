@@ -12,6 +12,7 @@ const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
 const { blacklistToken } = require('../middleware/authMiddleware');

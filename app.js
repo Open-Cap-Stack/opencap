@@ -17,6 +17,7 @@ const {
   includeAdvancedHeaders 
 } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
+const { securityLogger } = require('./middleware/securityAuditLogger'); // OCAE-306: Import security audit logging
 // testEndpoints removed - no longer needed
 const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 
@@ -84,6 +85,9 @@ app.use('/api/premium', (req, res, next) => {
 // Apply API versioning middleware
 app.use(addVersionHeaders);
 app.use(validateApiVersion);
+
+// OCAE-306: Apply security audit logging middleware
+app.use(securityLogger.errorHandler());
 
 // OCAE-210: Setup Swagger documentation middleware
 setupSwagger(app);
@@ -156,6 +160,8 @@ const routes = {
   complianceCheckRoutes: safeRequire(path.join(__dirname, 'routes/v1/complianceCheckRoutes')),
   integrationModuleRoutes: safeRequire(path.join(__dirname, 'routes/v1/integrationModuleRoutes')),
   taxCalculatorRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxCalculatorRoutes')),
+  securityAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityAuditRoutes')),
+  financialDataRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialDataRoutes')),
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -208,6 +214,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/tax-calculations';
     } else if (key === 'inviteManagementRoutes') {
       path = '/api/v1/invites';
+    } else if (key === 'securityAuditRoutes') {
+      path = '/api/v1/security-audits';
+    } else if (key === 'financialDataRoutes') {
+      path = '/api/v1/financial-data';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
