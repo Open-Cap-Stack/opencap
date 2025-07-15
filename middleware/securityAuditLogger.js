@@ -47,22 +47,38 @@ class SecurityAuditLogger {
   }
 
   setupLogDirectories() {
-    const baseDir = path.join(__dirname, '../logs');
+    // In production environments, use /tmp for logs or disable file logging
+    const isProduction = process.env.NODE_ENV === 'production';
+    const baseDir = isProduction ? '/tmp/opencap-logs' : path.join(__dirname, '../logs');
+    
     this.securityLogDir = path.join(baseDir, 'security');
     this.auditLogDir = path.join(baseDir, 'audit');
+    this.loggingEnabled = true;
     
-    // Create directories if they don't exist
-    [baseDir, this.securityLogDir, this.auditLogDir].forEach(dir => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    // Create directories if they don't exist and we have permissions
+    try {
+      [baseDir, this.securityLogDir, this.auditLogDir].forEach(dir => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+      });
+    } catch (error) {
+      console.warn('Unable to create log directories, disabling file logging:', error.message);
+      this.loggingEnabled = false;
+      
+      // In production, we'll log to console only
+      if (isProduction) {
+        console.log('Security audit logging will use console output only in production');
       }
-    });
+    }
   }
 
   initializeLogger() {
-    const date = new Date().toISOString().split('T')[0];
-    this.securityLogFile = path.join(this.securityLogDir, `security-${date}.log`);
-    this.auditLogFile = path.join(this.auditLogDir, `audit-${date}.log`);
+    if (this.loggingEnabled) {
+      const date = new Date().toISOString().split('T')[0];
+      this.securityLogFile = path.join(this.securityLogDir, `security-${date}.log`);
+      this.auditLogFile = path.join(this.auditLogDir, `audit-${date}.log`);
+    }
   }
 
   /**
@@ -115,21 +131,32 @@ class SecurityAuditLogger {
   }
 
   /**
-   * Write log entry to file
+   * Write log entry to file or console
    */
   writeLogEntry(logEntry, isAuditLog = false) {
-    const logFile = isAuditLog ? this.auditLogFile : this.securityLogFile;
     const logLine = JSON.stringify(logEntry) + '\n';
     
-    try {
-      fs.appendFileSync(logFile, logLine);
+    // Always log to console if file logging is disabled or in development
+    const shouldLogToConsole = !this.loggingEnabled || 
+                               process.env.NODE_ENV === 'development' || 
+                               process.env.NODE_ENV === 'production';
+    
+    if (shouldLogToConsole) {
+      const logType = isAuditLog ? 'AUDIT' : 'SECURITY';
+      console.log(`🔒 [${logType}] [${logEntry.level.toUpperCase()}] ${logEntry.eventType}:`, logEntry.details);
+    }
+    
+    // Try to write to file if logging is enabled
+    if (this.loggingEnabled && this.securityLogFile && this.auditLogFile) {
+      const logFile = isAuditLog ? this.auditLogFile : this.securityLogFile;
       
-      // Also log to console in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`🔒 [${logEntry.level.toUpperCase()}] ${logEntry.eventType}:`, logEntry.details);
+      try {
+        fs.appendFileSync(logFile, logLine);
+      } catch (error) {
+        console.warn('Failed to write security log to file, using console only:', error.message);
+        // Disable file logging on write errors
+        this.loggingEnabled = false;
       }
-    } catch (error) {
-      console.error('Security audit logger error:', error);
     }
   }
 
