@@ -21,6 +21,9 @@
  * @returns {Function} Express middleware function
  */
 function secureHeaders(options = {}) {
+  // Ensure options is an object (handle null/undefined)
+  const opts = options || {};
+  
   // Default configuration
   const config = {
     contentSecurityPolicy: {
@@ -36,14 +39,14 @@ function secureHeaders(options = {}) {
         'frame-src': ["'none'"],
         'base-uri': ["'self'"],
         'form-action': ["'self'"],
-        ...((options.contentSecurityPolicy && options.contentSecurityPolicy.directives) || {})
+        ...((opts.contentSecurityPolicy && opts.contentSecurityPolicy.directives) || {})
       }
     },
-    xContentTypeOptions: options.xContentTypeOptions || 'nosniff',
-    xFrameOptions: options.xFrameOptions || 'DENY',
-    xXssProtection: options.xXssProtection || '1; mode=block',
-    strictTransportSecurity: options.strictTransportSecurity || 'max-age=31536000; includeSubDomains',
-    referrerPolicy: options.referrerPolicy || 'strict-origin-when-cross-origin'
+    xContentTypeOptions: opts.xContentTypeOptions || 'nosniff',
+    xFrameOptions: opts.xFrameOptions || 'DENY',
+    xXssProtection: opts.xXssProtection || '1; mode=block',
+    strictTransportSecurity: opts.strictTransportSecurity || 'max-age=31536000; includeSubDomains',
+    referrerPolicy: opts.referrerPolicy || 'strict-origin-when-cross-origin'
   };
 
   /**

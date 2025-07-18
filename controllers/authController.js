@@ -602,13 +602,16 @@ const getUserProfile = async (req, res) => {
     // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
 
-    // Find user
-    const user = await User.findOne({
-      $or: [
-        { _id: userId },
-        { userId: userId }
-      ]
-    }).select('-password');
+    // Find user - first try by userId field, then by _id if it looks like an ObjectId
+    let user;
+    
+    // Try finding by userId field first (for string userIds like "admin-001")
+    user = await User.findOne({ userId: userId }).select('-password');
+    
+    // If not found and userId looks like an ObjectId, try _id field
+    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId).select('-password');
+    }
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -632,13 +635,13 @@ const updateUserProfile = async (req, res) => {
     const userId = req.user.userId;
     const { firstName, lastName, email, currentPassword, newPassword } = req.body;
 
-    // Find user
-    const user = await User.findOne({
-      $or: [
-        { _id: userId },
-        { userId: userId }
-      ]
-    });
+    // Find user - first try by userId field, then by _id if it looks like an ObjectId
+    let user = await User.findOne({ userId: userId });
+    
+    // If not found and userId looks like an ObjectId, try _id field
+    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -709,13 +712,13 @@ const sendVerificationEmail = async (req, res) => {
     // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
 
-    // Find user
-    const user = await User.findOne({
-      $or: [
-        { _id: userId },
-        { userId: userId }
-      ]
-    });
+    // Find user - first try by userId field, then by _id if it looks like an ObjectId
+    let user = await User.findOne({ userId: userId });
+    
+    // If not found and userId looks like an ObjectId, try _id field
+    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
