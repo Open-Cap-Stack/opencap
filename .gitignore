@@ -48,13 +48,13 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
-# Test files
-*.test.js
-*.spec.js
-**/__tests__/**
-**/test/**
+# Test output
 coverage/
 .nyc_output/
+
+# Allow test files in tests/ directory
+!tests/**/*.test.js
+!tests/**/*.spec.js
 
 # Development environment files
 .env
