@@ -1,200 +1,149 @@
-# 🚨 CRITICAL FILE PLACEMENT RULES 🚨
+# CRITICAL FILE PLACEMENT RULES
 
-## ⛔ ABSOLUTE PROHIBITIONS - ZERO TOLERANCE ⛔
+## ABSOLUTE PROHIBITIONS - ZERO TOLERANCE
 
 ### **YOU MUST READ THIS BEFORE CREATING ANY FILE**
 
----
-
-## 🔴 RULE #1: NEVER CREATE .MD FILES IN ROOT DIRECTORIES
-
-### ❌ **COMPLETELY FORBIDDEN LOCATIONS:**
-
-```
-/Users/aideveloper/core/*.md  (except README.md)
-/Users/aideveloper/core/src/backend/*.md
-/Users/aideveloper/core/AINative-website/*.md (except README.md, CODY.md)
-```
-
-### ✅ **REQUIRED LOCATIONS:**
-
-**ALL backend documentation MUST go in:**
-```
-/Users/aideveloper/core/docs/{category}/filename.md
-```
-
-**ALL frontend documentation MUST go in:**
-```
-/Users/aideveloper/core/AINative-website/docs/{category}/filename.md
-```
+**Project**: OpenCap Stack
+**Path**: `/Users/juweriya/Desktop/opencapstack`
 
 ---
 
-## 🔴 RULE #2: NEVER CREATE .SH SCRIPTS IN BACKEND
+## RULE #1: NEVER CREATE .MD FILES IN ROOT DIRECTORIES
 
-### ❌ **COMPLETELY FORBIDDEN:**
+### COMPLETELY FORBIDDEN LOCATIONS:
+
 ```
-/Users/aideveloper/core/src/backend/*.sh (except start.sh)
+/Users/juweriya/Desktop/opencapstack/*.md  (except README.md, CLAUDE.md)
+/Users/juweriya/Desktop/opencapstack/controllers/*.md
+/Users/juweriya/Desktop/opencapstack/models/*.md
+/Users/juweriya/Desktop/opencapstack/routes/*.md
+/Users/juweriya/Desktop/opencapstack/services/*.md
+/Users/juweriya/Desktop/opencapstack/middleware/*.md
 ```
 
-### ✅ **REQUIRED LOCATION:**
+### REQUIRED LOCATIONS:
+
+**ALL documentation MUST go in:**
 ```
-/Users/aideveloper/core/scripts/script_name.sh
+/Users/juweriya/Desktop/opencapstack/docs/{category}/filename.md
 ```
 
 ---
 
-## 🔴 RULE #3: ALWAYS USE CORRECT BASE URL FORMAT
+## RULE #2: NEVER CREATE .SH SCRIPTS IN ROOT OR CODE DIRECTORIES
 
-### ❌ **INCORRECT BASE URL PATTERNS:**
+### COMPLETELY FORBIDDEN:
+```
+/Users/juweriya/Desktop/opencapstack/*.sh
+/Users/juweriya/Desktop/opencapstack/controllers/*.sh
+/Users/juweriya/Desktop/opencapstack/models/*.sh
+/Users/juweriya/Desktop/opencapstack/routes/*.sh
+```
+
+### REQUIRED LOCATION:
+```
+/Users/juweriya/Desktop/opencapstack/scripts/script_name.sh
+```
+
+---
+
+## RULE #3: ALWAYS USE CORRECT API BASE URL FORMAT
+
+### INCORRECT BASE URL PATTERNS:
 
 ```bash
-# ❌ WRONG: Including /api/v1 in the base URL variable
-BASE_URL="https://api.ainative.studio/api/v1"
-ZERODB_API_URL="https://api.ainative.studio/api/v1"
-API_URL="https://api.ainative.studio/api/v1"
-base_url = "https://api.ainative.studio/api/v1"
-self.base_url = "https://api.ainative.studio/api/v1"
+# WRONG: Including /api/v1 in the base URL variable
+BASE_URL="http://localhost:5000/api/v1"
 
 # Then using it like:
-curl "$BASE_URL/projects/"  # Results in /api/v1/projects/ ✅ (works but inconsistent)
+curl "$BASE_URL/stakeholders"  # Results in /api/v1/stakeholders
 ```
 
-### ✅ **CORRECT BASE URL PATTERN:**
+### CORRECT BASE URL PATTERN:
 
 ```bash
-# ✅ CORRECT: Base URL is domain only
-BASE_URL="https://api.ainative.studio"
-ZERODB_API_URL="https://api.ainative.studio"
-API_URL="https://api.ainative.studio"
-base_url = "https://api.ainative.studio"
-self.base_url = "https://api.ainative.studio"
+# CORRECT: Base URL is domain only
+BASE_URL="http://localhost:5000"
 
 # Then use with FULL API paths:
-curl "$BASE_URL/api/v1/projects/"  # ✅ Explicit and clear
-curl "$BASE_URL/api/v1/videos/showcase"  # ✅ Always shows full path
-curl "$BASE_URL/health"  # ✅ Root-level endpoints also clear
+curl "$BASE_URL/api/v1/stakeholders"  # Explicit and clear
+curl "$BASE_URL/api/v1/share-classes"  # Always shows full path
+curl "$BASE_URL/health"  # Root-level endpoints also clear
 ```
 
-### 📋 **API ENDPOINT STRUCTURE:**
-
-Based on actual FastAPI codebase verification:
+### API ENDPOINT STRUCTURE:
 
 ```
-Production Base: https://api.ainative.studio
+Local Base: http://localhost:5000
+Production Base: https://api.opencapstack.com (if applicable)
 
 API v1 Endpoints:
-  ✅ /api/v1/projects/
-  ✅ /api/v1/videos/showcase
-  ✅ /api/v1/videos/{video_id}/annotations
-  ✅ /api/v1/auth/login
-  ✅ /api/v1/public/projects/
+  /api/v1/stakeholders
+  /api/v1/share-classes
+  /api/v1/documents
+  /api/v1/activities
+  /api/v1/notifications
 
 Root Endpoints:
-  ✅ /health
-  ✅ /docs
-  ✅ /redoc
-```
-
-### 🎯 **WHY THIS MATTERS:**
-
-1. **Clarity**: Full paths are immediately visible in code
-2. **Consistency**: Same pattern across all documentation
-3. **Maintainability**: Easy to update if API version changes
-4. **Developer Experience**: No confusion about URL construction
-5. **AI Agent Training**: Clear examples for LLM learning
-
-### 🔍 **VERIFICATION:**
-
-Codebase source of truth:
-- `src/backend/app/core/config.py:38`: `API_V1_STR = "/v1"`
-- `src/backend/app/main.py:337`: `app.include_router(main_api_router, prefix=settings.API_V1_STR)`
-- `src/backend/app/api/v1/endpoints/showcase_videos.py:30`: `router = APIRouter(prefix="/api/v1/videos")`
-
-**Full URL Path**: `https://api.ainative.studio` + `/api/v1/videos/{endpoint}`
-
-### 📝 **CORRECT EXAMPLES IN DOCUMENTATION:**
-
-```python
-# Python Example
-BASE_URL = "https://api.ainative.studio"
-response = requests.get(f"{BASE_URL}/api/v1/projects/")
-response = requests.post(f"{BASE_URL}/api/v1/videos/{video_id}/annotations")
-health = requests.get(f"{BASE_URL}/health")
-```
-
-```bash
-# Bash Example
-export BASE_URL="https://api.ainative.studio"
-curl "$BASE_URL/api/v1/projects/"
-curl "$BASE_URL/api/v1/videos/showcase"
-curl "$BASE_URL/health"
-```
-
-```javascript
-// JavaScript Example
-const BASE_URL = 'https://api.ainative.studio';
-const response = await fetch(`${BASE_URL}/api/v1/projects/`);
-const videos = await fetch(`${BASE_URL}/api/v1/videos/showcase`);
-const health = await fetch(`${BASE_URL}/health`);
+  /health
+  /api-docs
 ```
 
 ---
 
-## 📋 MANDATORY CATEGORIZATION GUIDE
+## MANDATORY CATEGORIZATION GUIDE
 
-### Backend Documentation Categories
+### Documentation Categories
 
 | Filename Pattern | Destination | Examples |
 |-----------------|-------------|----------|
 | `ISSUE_*.md`, `BUG_*.md` | `docs/issues/` | ISSUE_24_SUMMARY.md |
 | `*_TEST*.md`, `QA_*.md` | `docs/testing/` | QA_TEST_REPORT.md |
-| `AGENT_SWARM_*.md`, `WORKFLOW_*.md`, `STAGE_*.md`, `MAX_STAGE*.md` | `docs/agent-swarm/` | AGENT_SWARM_WORKFLOW.md |
-| `API_*.md`, `*_ENDPOINTS*.md`, `PAGINATION*.md` | `docs/api/` | API_DOCUMENTATION.md |
-| `*_IMPLEMENTATION*.md`, `*_SUMMARY.md`, `*_COMPLETE.md` | `docs/reports/` | FEATURE_IMPLEMENTATION_SUMMARY.md |
-| `DEPLOYMENT_*.md`, `RAILWAY_*.md` | `docs/deployment/` | DEPLOYMENT_CHECKLIST.md |
-| `*_QUICK_*.md`, `*_REFERENCE.md`, `STEPS_*.md` | `docs/quick-reference/` | QUICK_START_GUIDE.md |
-| `RLHF_*.md`, `MEMORY_*.md`, `SECURITY_*.md` | `docs/backend/` | RLHF_IMPLEMENTATION.md |
-| `CODING_*.md`, `*_GUIDE.md`, `*_INSTRUCTIONS.md` | `docs/development-guides/` | CODING_STANDARDS.md |
-| `PRD_*.md`, `BACKLOG*.md`, `*_PLAN.md` | `docs/planning/` | PRD_NEW_FEATURE.md |
+| `API_*.md`, `*_ENDPOINTS*.md` | `docs/api/` | API_DOCUMENTATION.md |
+| `*_IMPLEMENTATION*.md`, `*_SUMMARY.md` | `docs/reports/` | FEATURE_IMPLEMENTATION_SUMMARY.md |
+| `DEPLOYMENT_*.md`, `DOCKER_*.md` | `docs/deployment/` | DEPLOYMENT_CHECKLIST.md |
+| `*_GUIDE.md`, `*_INSTRUCTIONS.md` | `docs/development-guides/` | CODING_STANDARDS.md |
+| `PRD_*.md`, `BACKLOG*.md`, `SPRINT_*.md` | `docs/planning/` | PRD_NEW_FEATURE.md |
 | `ROOT_CAUSE_*.md`, `*_ANALYSIS.md` | `docs/issues/` | ROOT_CAUSE_ANALYSIS.md |
-| `*_FIXES_*.md`, `CRITICAL_*.md` | `docs/reports/` | CRITICAL_FIXES_SUMMARY.md |
+| `OCAE-*.md`, `OCDI-*.md`, `OCSIS-*.md` | `docs/issues/` or `docs/reports/` | OCAE-206-fix-summary.md |
+| `DataModels*.md` | `docs/` | DataModels.md |
 
-### Frontend Documentation Categories
+### Script Categories
 
-| Type | Destination |
-|------|-------------|
-| Features | `AINative-website/docs/features/` |
-| Testing | `AINative-website/docs/testing/` |
-| Implementation | `AINative-website/docs/implementation/` |
-| Issues | `AINative-website/docs/issues/` |
-| Deployment | `AINative-website/docs/deployment/` |
-| Reports | `AINative-website/docs/reports/` |
+| Script Type | Destination | Examples |
+|------------|-------------|----------|
+| Test scripts | `scripts/test_*.sh` | test_api.sh |
+| Setup scripts | `scripts/setup_*.sh` | setup_dev.sh |
+| Deploy scripts | `scripts/deploy_*.sh` | deploy_prod.sh |
+| Migration scripts | `scripts/migrate_*.sh` | migrate_db.sh |
+| Utility JS scripts | `scripts/*.js` | initZeroDB.js |
 
 ---
 
-## 🔒 ENFORCEMENT CHECKLIST
+## ENFORCEMENT CHECKLIST
 
 ### **BEFORE creating ANY .md or .sh file, you MUST:**
 
-1. ✅ **CHECK:** Am I creating this file in a root directory?
-2. ✅ **STOP:** If yes, determine the correct category
-3. ✅ **CREATE:** In the correct `docs/{category}/` or `scripts/` location
-4. ✅ **VERIFY:** File is NOT in any root directory
+1. **CHECK:** Am I creating this file in a root or code directory?
+2. **STOP:** If yes, determine the correct category
+3. **CREATE:** In the correct `docs/{category}/` or `scripts/` location
+4. **VERIFY:** File is NOT in any forbidden directory
 
 ### **Example - CORRECT Workflow:**
 
 ```bash
-# ❌ WRONG:
-echo "content" > /Users/aideveloper/core/ISSUE_24_SUMMARY.md
+# WRONG:
+echo "content" > /Users/juweriya/Desktop/opencapstack/ISSUE_24_SUMMARY.md
 
-# ✅ CORRECT:
-echo "content" > /Users/aideveloper/core/docs/issues/ISSUE_24_SUMMARY.md
+# CORRECT:
+mkdir -p /Users/juweriya/Desktop/opencapstack/docs/issues
+echo "content" > /Users/juweriya/Desktop/opencapstack/docs/issues/ISSUE_24_SUMMARY.md
 ```
 
 ---
 
-## ⚠️ CONSEQUENCES OF VIOLATIONS
+## CONSEQUENCES OF VIOLATIONS
 
 ### **What happens when you violate these rules:**
 
@@ -207,43 +156,63 @@ echo "content" > /Users/aideveloper/core/docs/issues/ISSUE_24_SUMMARY.md
 
 ### **Impact on Users:**
 
-- 😡 **Frustration:** Users get annoyed finding files in wrong locations
-- ⏱️ **Time waste:** 30+ minutes spent reorganizing files
-- 📉 **Productivity loss:** Can't find documentation quickly
-- 🔄 **Repetitive work:** Same cleanup needed over and over
+- **Frustration:** Users get annoyed finding files in wrong locations
+- **Time waste:** 30+ minutes spent reorganizing files
+- **Productivity loss:** Can't find documentation quickly
+- **Repetitive work:** Same cleanup needed over and over
 
 ---
 
-## 🎯 YOUR RESPONSIBILITY
+## YOUR RESPONSIBILITY
 
 As an AI assistant, you MUST:
 
-- ✅ **READ these rules** before creating ANY file
-- ✅ **FOLLOW the categorization guide** for every .md file
-- ✅ **CREATE files in correct locations** from the start
-- ✅ **NEVER create files in root** directories
-- ✅ **ASK if unsure** about categorization
+- **READ these rules** before creating ANY file
+- **FOLLOW the categorization guide** for every .md file
+- **CREATE files in correct locations** from the start
+- **NEVER create files in root** directories
+- **ASK if unsure** about categorization
 
 ---
 
-## 📝 VERIFICATION COMMANDS
+## VERIFICATION COMMANDS
 
 ### After creating documentation, verify:
 
 ```bash
-# Check core root (should only show README.md)
-ls /Users/aideveloper/core/*.md
+# Check project root (should only show README.md, CLAUDE.md)
+ls /Users/juweriya/Desktop/opencapstack/*.md
 
-# Check backend (should show NO .md files)
-ls /Users/aideveloper/core/src/backend/*.md
+# Check controllers (should show NO .md files)
+ls /Users/juweriya/Desktop/opencapstack/controllers/*.md
 
-# Check backend scripts (should only show start.sh)
-ls /Users/aideveloper/core/src/backend/*.sh
+# Check scripts folder (should have all scripts)
+ls /Users/juweriya/Desktop/opencapstack/scripts/
 ```
 
 ---
 
-## 🚨 THIS IS NOT A SUGGESTION - IT IS A REQUIREMENT
+## QUICK REFERENCE
+
+### Allowed Root Files:
+- `README.md` - Project overview
+- `CLAUDE.md` - Claude Code context
+- `LICENSE` - License file
+- `package.json` - Node.js manifest
+- `app.js` - Application entry
+- `db.js` - Database connection
+- Configuration files (`.eslintrc`, `.prettierrc`)
+- Docker files
+
+### Everything Else:
+- Documentation → `docs/{category}/`
+- Scripts → `scripts/`
+- Tests → `tests/`
+- E2E Tests → `e2e/`
+
+---
+
+## THIS IS NOT A SUGGESTION - IT IS A REQUIREMENT
 
 **These rules are MANDATORY and NON-NEGOTIABLE.**
 
@@ -253,6 +222,6 @@ ls /Users/aideveloper/core/src/backend/*.sh
 
 ---
 
-Last Updated: December 9, 2025
+Last Updated: 2026-02-02
 Status: **CRITICAL - ZERO TOLERANCE**
 Enforcement: **IMMEDIATE AND STRICT**

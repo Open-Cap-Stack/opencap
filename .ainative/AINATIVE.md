@@ -1,254 +1,178 @@
-# AINative Studio Project Context
+# OpenCap Stack - Project Context
 
-**Project**: AINative Studio Marketing Website (Next.js Migration)
-**Last Updated**: 2026-01-18
-**Compatible With**: Gemini CLI, Claude Code, and other AI coding assistants
+**Project**: OpenCap Stack - MERN Application for Equity Management
+**Last Updated**: 2026-02-02
+**Compatible With**: Gemini CLI, Claude Code, Cursor, Windsurf, and other AI coding assistants
 
 ---
 
 ## Project Overview
 
-This is the **Next.js 16** production version of the AINative Studio marketing website, migrated from a Vite-based SPA. The project serves as the public-facing website for AINative Studio's AI development platform.
+**OpenCap Stack** is a comprehensive MERN stack application designed to manage stakeholders, share classes, documents, activities, notifications, equity simulations, tax calculations, and financial reporting. The project follows Test-Driven Development (TDD) and is fully aligned with the Open Cap Table Alliance (OCTA) schema.
 
 ---
 
-## Repository Paths
+## Repository Path
 
-### Primary Repository (Next.js - Production)
-**Path**: `/Users/aideveloper/ainative-website-nextjs-staging`
-**Framework**: Next.js 16 (App Router)
-**Status**: ✅ Active Development (Go-live: 1-2 days)
-
-### Legacy Repository (Vite - Reference)
-**Path**: `/Users/aideveloper/core/AINative-website`
-**Framework**: Vite + React 18
-**Status**: 🔒 Read-only reference (live production)
+**Path**: `/Users/juweriya/Desktop/opencapstack`
+**Framework**: MERN (MongoDB, Express, React, Node.js)
+**Status**: Active Development
 
 ---
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router, TypeScript)
-- **Styling**: Tailwind CSS v4 + shadcn/ui components
-- **State Management**: React Query (TanStack Query)
-- **Analytics**: Google Analytics 4, Google Tag Manager
-- **Deployment**: Railway (production), Vercel (staging)
-- **Package Manager**: npm
+### Backend
+- **Runtime**: Node.js (v18+)
+- **Framework**: Express.js
+- **ODM**: Mongoose 6.x
+- **Authentication**: JWT (jsonwebtoken)
+- **Validation**: Express middleware
+
+### Databases
+- **Primary**: MongoDB (document store)
+- **Analytics**: PostgreSQL (relational)
+- **Graph**: Neo4j (relationships)
+- **Cache**: Redis (optional)
+
+### AI/ML Integration
+- **LangChain**: Anthropic + OpenAI providers
+- **LangGraph**: Workflow orchestration
+
+### Storage & Files
+- **Object Storage**: MinIO (S3-compatible)
+- **Document Processing**: PDF.js, Mammoth, Tesseract.js
+
+### Real-time
+- **WebSockets**: Socket.IO + ws
+
+### Testing
+- **Unit/Integration**: Jest
+- **E2E**: Playwright
+- **In-memory DB**: mongodb-memory-server
+
+### Frontend
+- **Framework**: React (submodule in `/frontend`)
+- **Build Tool**: Vite
 
 ---
 
 ## Architecture
 
-### Page Structure
+### Project Structure
 ```
-app/                    # Next.js App Router pages
-  layout.tsx           # Root layout with SEO metadata
-  page.tsx             # Homepage
-  [feature]/
-    page.tsx           # Server component (exports metadata)
-    [Feature]Client.tsx # Client component ('use client')
-```
-
-### Migration Pattern (from Vite)
-1. **Server Component** (`app/[page]/page.tsx`):
-   - Export `metadata` for SEO (replaces react-helmet-async)
-   - Import and render client component
-   - No 'use client' directive
-
-2. **Client Component** (`app/[page]/[Page]Client.tsx`):
-   - Add `'use client'` directive at top
-   - Convert `react-router-dom` Link to Next.js Link (`to=` → `href=`)
-   - Remove Helmet imports
-   - Keep framer-motion for animations
-
-### Component Library
-- **Branded Components**: `components/branding/` (InputBranded, BrandedEmpty, etc.)
-- **UI Components**: `components/ui/` (shadcn/ui)
-- **Layout**: `components/layout/` (Header, Footer)
-- **SEO**: `components/seo/StructuredData.tsx`
-
----
-
-## Design System
-
-### Color Palette
-```typescript
-primary: '#4B6FED',      // AI Native Blue
-secondary: '#8A63F4',    // Purple
-accent: '#D04BF4',       // Pink
-background: '#0D1117',   // Dark BG (Vite-aligned)
-surface: '#161B22',      // Dark surface
-border: '#2D333B',       // Dark border
+opencapstack/
+├── app.js                    # Express app entry point
+├── db.js                     # Database connections
+├── controllers/              # Route controllers (30+ files)
+│   ├── stakeholderController.js
+│   ├── shareClassController.js
+│   ├── documentController.js
+│   └── ...
+├── models/                   # Mongoose schemas
+├── routes/                   # Express routes
+├── services/                 # Business logic services
+├── middleware/               # Auth, validation, error handling
+├── config/                   # Jest, Playwright, app config
+├── tests/                    # Jest test files
+├── e2e/                      # Playwright E2E tests
+├── scripts/                  # Utility scripts
+├── docs/                     # Documentation (50+ files)
+├── frontend/                 # React frontend (git submodule)
+├── .claude/                  # Claude Code configuration
+└── .ainative/                # AI agent configuration
 ```
 
-### Typography
-- **Font**: Poppins (400, 500, 600, 700) via next/font/google
-- **Scale**: title-1 (28px), title-2 (24px), body (14px), button (12px)
-
-### Key CSS Classes
-- `.text-gradient` - Blue to teal text gradient
-- `.container-custom` - Max-width 1280px container
-- `.card-vite` - Branded card with hover effects
-
----
-
-## SEO Configuration
-
-### Root Layout Metadata
-- Title template: `%s | AI Native Studio`
-- Comprehensive Open Graph and Twitter Cards
-- JSON-LD structured data (Organization, SoftwareApplication, WebSite)
-
-### Per-Page Metadata
-Every page exports a `metadata` object with:
-- Unique title and description
-- Relevant keywords
-- Page-specific OG images
-- Canonical URLs
-
-### Structured Data Schemas (Available)
-- `ArticleSchema` - Blog posts
-- `FAQSchema` - FAQ pages
-- `VideoSchema` - Tutorials/webinars
-- `HowToSchema` - Tutorial pages
-- `BreadcrumbSchema` - Navigation
-- `ProductSchema` - Pricing
-
----
-
-## Services & APIs
-
-### Backend API
-**Base URL**: `https://api.ainative.studio/v1`
-**Auth**: JWT tokens via `AuthService`
-
-### Key Services (`services/`)
-- `pricingService.ts` - Stripe checkout integration
-- `apiKeyService.ts` - API key management
-- `authService.ts` - Authentication
-- `creditService.ts` - Credit system
-- `usageService.ts` - Usage tracking
+### API Structure
+- **Port**: 5000 (configurable)
+- **Docs**: `/api-docs` (Swagger UI)
+- **Health**: `/health`
+- **API Prefix**: `/api/v1`
 
 ---
 
 ## Development Workflow
 
-### Local Development
+### Semantic Seed Venture Studio Coding Standards (SSCS)
+
+This project follows SSCS which emphasizes:
+- **Structured Backlog Management** with story IDs (OCAE-XXX, OCDI-XXX)
+- **Test-Driven Development (TDD)** with Red-Green-Refactor
+- **Consistent Branch Naming** (`feature/OCAE-XXX`, `bug/OCAE-XXX`)
+- **Daily Commits** with proper prefixes (including "WIP:")
+- **Pull Request Process** with traceability to backlog items
+
+### Branch Naming
+- `feature/{story-id}-{slug}` - New features
+- `bug/{story-id}-{slug}` - Bug fixes
+- `chore/{story-id}-{slug}` - Maintenance tasks
+
+### Story ID Prefixes
+- **OCAE**: OpenCap API Enhancement
+- **OCDI**: OpenCap Data Infrastructure
+- **OCSIS**: OpenCap System Integration
+
+---
+
+## Testing Strategy
+
+### Test Commands
 ```bash
-# Start dev server (port 3000 - RESERVED)
-npm run dev
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
-
-# Build verification
-npm run build
-
-# Run tests
+# Unit/Integration tests
 npm test
+
+# With coverage (80%+ required)
+npm run test:coverage
+
+# Watch mode
+npm run test:watch
+
+# E2E tests
+npm run test:e2e
+
+# E2E with UI
+npm run test:e2e:ui
+
+# All tests
+npm run test:all
 ```
 
-### Pre-Commit Checklist
-1. `npm run lint` - must pass
-2. `npm run type-check` - must pass
-3. `npm run build` - must succeed
-4. `npm test` - all tests pass
+### TDD Workflow
+1. **Red**: Write failing tests first (commit: `WIP: red tests for {story}`)
+2. **Green**: Minimal code to pass (commit: `green: {behavior}`)
+3. **Refactor**: Improve design (commit: `refactor: {area}`)
 
-### Port Reservations
-- **Port 3000**: Reserved for AINative Studio Next.js dev server
-- **Port 3001**: Other local services
+### Coverage Requirements
+- Minimum 80% for new features
+- Include test output in PRs
+- Execute tests before ANY commit
 
 ---
 
 ## Git Workflow
 
-### Branch Strategy
-- `main` - production branch
-- Feature branches: `feature/[name]`
-- Bug fixes: `fix/[name]`
+### ZERO TOLERANCE: AI Attribution
+**NEVER include in commits, PRs, or issues:**
+- ❌ "Claude", "Anthropic", "claude.com"
+- ❌ "Generated with [AI Tool]"
+- ❌ "Co-Authored-By: [AI]"
+- ❌ Any AI tool attribution
 
-### Commit Rules (ZERO TOLERANCE)
-**NEVER include in commits, PRs, or GitHub activity:**
-- "Claude" / "Anthropic" / "claude.com"
-- "Generated with Claude" / "Claude Code"
-- "Co-Authored-By: Claude" or any Claude/Anthropic reference
-- AI tool attribution of any kind
+### Commit Style
+```
+feat: Add stakeholder CRUD endpoints
+fix: Resolve share class validation error
+docs: Update API documentation
+test: Add unit tests for equity simulation
+chore: Update dependencies
+refactor: Simplify authentication flow
+```
 
-See `.claude/rules/git-rules.md` for complete rules.
-
----
-
-## Gap Analysis Status
-
-### Functional Gaps
-- **Total**: 47 gaps identified
-- **Critical**: 6 items (27-42 hours)
-- **Tracking**: GitHub Issues #327-#369
-- **Document**: `gaps-backlog.md`
-
-### Design System Gaps
-- **Total**: 15 gaps identified
-- **Critical**: 3 items (11-16 hours)
-- **Tracking**: GitHub Issues #370-#384
-- **Document**: `design-gaps-backlog.md`
-
-### SEO Gaps
-- **Total**: 18 gaps identified
-- **Critical**: 5 items (15-21 hours)
-- **Tracking**: GitHub Issues #385-#389
-- **Document**: `seo-gaps-backlog.md`
-
----
-
-## AI Agent Configuration
-
-### Claude Code
-- Primary agent configuration: `.claude/CLAUDE.md`
-- Specialized agents: `.claude/agents/`
-- Custom rules: `.claude/rules/`
-
-### Gemini CLI (This File)
-- Project context: `.ainative/AINATIVE.md` (this file)
-- Settings: `.ainative/settings.json`
-- Custom rules: `.ainative/rules/`
-
----
-
-## MCP Servers (Model Context Protocol)
-
-### Configured MCP Servers
-1. **ZeroDB MCP Server** - Vector database, embeddings, agent memory
-2. **GitHub MCP Server** - GitHub API integration
-3. **AINative Design MCP Server** - Design system analysis
-
-See `.claude/CLAUDE.md` for complete MCP configuration.
-
----
-
-## Key Files Reference
-
-### Configuration
-- `next.config.ts` - Next.js configuration
-- `tailwind.config.ts` - Tailwind configuration
-- `tsconfig.json` - TypeScript configuration
-- `lib/config/app.ts` - App configuration
-
-### Documentation
-- `gaps-backlog.md` - Functional gaps (47 items)
-- `design-gaps-backlog.md` - Design gaps (15 items)
-- `seo-gaps-backlog.md` - SEO gaps (18 items)
-- `GAP_ANALYSIS_SUMMARY.md` - Functional summary
-- `DESIGN_GAP_ANALYSIS_SUMMARY.md` - Design summary
-- `SEO_GAP_ANALYSIS_SUMMARY.md` - SEO summary
-
-### SEO & Analytics
-- `app/layout.tsx` - Root metadata
-- `app/sitemap.ts` - Dynamic sitemap
-- `app/robots.ts` - Robots.txt
-- `components/seo/StructuredData.tsx` - JSON-LD schemas
+### Pre-Commit Checklist
+1. ✅ `npm run lint` - must pass
+2. ✅ `npm test` - must pass
+3. ✅ Coverage >= 80% for new code
+4. ✅ No AI attribution in message
 
 ---
 
@@ -256,55 +180,133 @@ See `.claude/CLAUDE.md` for complete MCP configuration.
 
 ### Required
 ```bash
-NEXT_PUBLIC_SITE_URL=https://www.ainative.studio
-NEXT_PUBLIC_API_URL=https://api.ainative.studio/v1
+MONGODB_URI=mongodb://localhost:27017/opencap
+PORT=5000
+JWT_SECRET=your-secret-key
+NODE_ENV=development
 ```
 
 ### Optional
 ```bash
-NEXT_PUBLIC_META_PIXEL_ID=your_pixel_id
-NEXT_PUBLIC_GA_ID=G-ML0XEBPZV2
-NEXT_PUBLIC_GTM_ID=GTM-MJKQDBGV
+# PostgreSQL (analytics)
+DATABASE_URL=postgresql://user:pass@localhost:5432/opencap
+
+# Neo4j (graph)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
+
+# MinIO (storage)
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+
+# AI Services
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+OPENAI_API_KEY=sk-xxxxx
 ```
 
 ---
 
-## Testing
+## Common Tasks
 
-### Test Structure
-```
-test/                  # Test scripts
-  issue-[N]-[page].test.sh  # Page-specific tests
+### Start Development
+```bash
+npm run dev              # Backend with nodemon
+npm run frontend:dev     # Frontend dev server
+npm run dev:full         # Both concurrently
 ```
 
-### Testing Philosophy
-- Test-driven development (TDD) preferred
-- BDD-style tests (Given/When/Then)
-- Minimum 80% coverage for new features
+### Run Tests
+```bash
+npm test                 # Unit tests
+npm run test:coverage    # With coverage
+npm run test:e2e         # E2E tests
+```
+
+### Code Quality
+```bash
+npm run lint             # ESLint
+npm run format           # Prettier
+```
+
+### Database
+```bash
+# MongoDB should be running
+mongod --dbpath /data/db
+
+# Or with Docker
+docker-compose up -d mongo
+```
 
 ---
 
-## Resources
+## AI Agent Configuration
+
+### Claude Code
+- Primary context: `CLAUDE.md` (root)
+- Skills: `.claude/skills/`
+- Commands: `.claude/commands/`
+
+### Gemini CLI (This Directory)
+- Project context: `.ainative/AINATIVE.md` (this file)
+- Settings: `.ainative/settings.json`
+- Rules: `.ainative/rules/`
+
+---
+
+## MCP Servers Available
+
+1. **ZeroDB** - Vector database, embeddings, agent memory
+2. **GitHub** - GitHub API integration, issues, PRs
+3. **Google Analytics** - Analytics data queries
+
+See `.claude/mcp.json.example` for MCP configuration.
+
+---
+
+## Key Documentation
+
+| Document | Location |
+|----------|----------|
+| API Documentation | `docs/API_Documentation_Sprint1.md` |
+| Data Models | `docs/DataModels.md` |
+| Backend Plan | `docs/Backend_Completion_Plan.md` |
+| Sprint Plans | `docs/OCSIS_Sprint_Plan.md` |
+| MCP Protocol | `docs/MCP_PROTOCOL.md` |
+| Workflow Guide | `docs/SSCS_Workflow_Guide.md` |
+
+---
+
+## Quick Reference
+
+| What | Where |
+|------|-------|
+| Project context | `.ainative/AINATIVE.md` |
+| Claude context | `CLAUDE.md` |
+| Settings | `.ainative/settings.json` |
+| Skills | `.claude/skills/` |
+| Commands | `.claude/commands/` |
+| Tests | `tests/` |
+| E2E Tests | `e2e/` |
+| Documentation | `docs/` |
+
+---
+
+## Support
 
 ### Documentation
-- Next.js 16 Docs: https://nextjs.org/docs
-- Tailwind CSS v4: https://tailwindcss.com/docs
-- shadcn/ui: https://ui.shadcn.com
+- Express.js: https://expressjs.com/
+- Mongoose: https://mongoosejs.com/
+- Jest: https://jestjs.io/
+- Playwright: https://playwright.dev/
 
-### Internal
-- Original Vite Site: `/Users/aideveloper/core/AINative-website`
-- Migration Guide: See gap analysis documents
-
----
-
-## Contact & Support
-
-- **Team**: AINative Studio
-- **Repository**: ainative-website-nextjs-staging
-- **Issues**: GitHub Issues (#327-#389 active)
-- **Deployment**: Railway (production), Vercel (staging)
+### Project Resources
+- GitHub: https://github.com/Open-Cap-Stack/opencap
+- Issues: GitHub Issues (OCAE-XXX format)
 
 ---
 
-**Last Updated**: 2026-01-18
-**Next Review**: Before go-live (1-2 days)
+**Last Updated**: 2026-02-02
+**Maintained By**: OpenCap Stack Team

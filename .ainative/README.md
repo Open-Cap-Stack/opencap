@@ -2,7 +2,7 @@
 
 **Purpose**: Project context and configuration for AI coding assistants
 **Compatible With**: Gemini CLI, Claude Code, Cursor, Windsurf, and other AI tools
-**Last Updated**: 2026-01-18
+**Last Updated**: 2026-02-02
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```bash
 # Navigate to project
-cd /Users/aideveloper/ainative-website-nextjs-staging
+cd /Users/juweriya/Desktop/opencapstack
 
 # Start Gemini CLI (automatically loads .ainative/settings.json)
 gemini
@@ -24,15 +24,15 @@ gemini
 ### For Claude Code Users
 
 ```bash
-# Open project (automatically reads .claude/ and .ainative/)
-claude /Users/aideveloper/ainative-website-nextjs-staging
+# Open project (automatically reads CLAUDE.md and .ainative/)
+claude /Users/juweriya/Desktop/opencapstack
 ```
 
 ### For Other AI Tools
 
 1. Read `AINATIVE.md` for complete project context
 2. Review `settings.json` for configuration details
-3. Follow rules in `rules/` directory
+3. Follow rules in `RULES.MD`
 
 ---
 
@@ -42,9 +42,13 @@ claude /Users/aideveloper/ainative-website-nextjs-staging
 .ainative/
 ├── README.md                        # This file (quick reference)
 ├── AINATIVE.md                      # Complete project context
+├── RULES.MD                         # Development rules and standards
 ├── settings.json                    # Gemini CLI-compatible settings
-└── rules/
-    └── gemini-cli-alignment.md      # Alignment with Gemini CLI conventions
+├── api-catalog/                     # API endpoint documentation
+├── commands/                        # AI command definitions
+├── hooks/                           # Git hooks
+├── rules/                           # Additional rule files
+└── skills -> ../.claude/skills      # Symlink to Claude skills
 ```
 
 ---
@@ -54,11 +58,11 @@ claude /Users/aideveloper/ainative-website-nextjs-staging
 ### AINATIVE.md
 **Primary project context file** containing:
 - Project overview and tech stack
-- Repository paths (Next.js + Vite reference)
-- Architecture and migration patterns
-- Development workflow
+- Repository paths
+- Architecture and structure
+- Development workflow (SSCS)
 - Git rules (ZERO TOLERANCE for AI attribution)
-- Gap analysis status
+- Testing strategy
 - Environment variables
 - Key file references
 
@@ -74,35 +78,43 @@ claude /Users/aideveloper/ainative-website-nextjs-staging
 - Security policies
 - MCP server integrations
 - Development settings
+- Testing configuration
 
 **When to read**: For tool configuration and security settings
 
-### rules/gemini-cli-alignment.md
-**Compatibility guide** for Gemini CLI and other AI tools:
-- Dual configuration approach (.ainative + .claude)
-- Configuration hierarchy
-- Tool integration patterns
-- Path references
-- AI coding rules (universal)
-- Usage guidelines for different tools
-- MCP server integration
-- Best practices
+### RULES.MD
+**Complete development rules** including:
+- Backlog rules (Shortcut-first)
+- Story types & estimation (Fibonacci)
+- Coding style guidelines
+- Testing strategy (TDD/BDD)
+- CI/CD rules
+- Git & PR etiquette
+- File placement rules
+- Database schema management
 
-**When to read**: When using Gemini CLI or ensuring cross-tool compatibility
+**When to read**: Before making any code changes
 
 ---
 
 ## Key Project Paths
 
-### Production Repository (Next.js)
+### Repository Root
 ```
-/Users/aideveloper/ainative-website-nextjs-staging
+/Users/juweriya/Desktop/opencapstack
 ```
 
-### Reference Repository (Vite - Read Only)
-```
-/Users/aideveloper/core/AINative-website
-```
+### Important Directories
+| Directory | Purpose |
+|-----------|---------|
+| `controllers/` | Express route controllers |
+| `models/` | Mongoose schemas |
+| `routes/` | API route definitions |
+| `services/` | Business logic |
+| `tests/` | Jest test files |
+| `e2e/` | Playwright E2E tests |
+| `docs/` | Documentation |
+| `scripts/` | Utility scripts |
 
 ---
 
@@ -110,31 +122,34 @@ claude /Users/aideveloper/ainative-website-nextjs-staging
 
 ### ZERO TOLERANCE: AI Attribution
 **NEVER include in commits, PRs, or issues:**
-- ❌ "Claude", "Anthropic", "Gemini", "Google"
+- ❌ "Claude", "Anthropic", "claude.com"
+- ❌ "Gemini", "Google AI"
 - ❌ "Generated with [AI Tool]"
 - ❌ "Co-Authored-By: [AI Tool]"
 - ❌ Any AI tool attribution
 
 ### Pre-Commit Checklist
 1. ✅ `npm run lint` - must pass
-2. ✅ `npm run type-check` - must pass
-3. ✅ `npm run build` - must succeed
-4. ✅ `npm test` - must pass
+2. ✅ `npm test` - must pass
+3. ✅ Coverage >= 80% for new features
+4. ✅ No AI attribution in commits
+
+### Branch Naming
+- `feature/OCAE-XXX-description`
+- `bug/OCAE-XXX-description`
+- `chore/OCAE-XXX-description`
 
 ---
 
 ## Context Loading Order
 
 1. **Primary**: `.ainative/AINATIVE.md` (project fundamentals)
-2. **Supplementary**: `.claude/CLAUDE.md` (Claude-specific instructions)
-3. **Gap Analysis**:
-   - `gaps-backlog.md` (47 functional gaps)
-   - `design-gaps-backlog.md` (15 design gaps)
-   - `seo-gaps-backlog.md` (18 SEO gaps)
-4. **Summaries**:
-   - `GAP_ANALYSIS_SUMMARY.md`
-   - `DESIGN_GAP_ANALYSIS_SUMMARY.md`
-   - `SEO_GAP_ANALYSIS_SUMMARY.md`
+2. **Claude-specific**: `CLAUDE.md` (root directory)
+3. **Rules**: `.ainative/RULES.MD` (development standards)
+4. **Documentation**:
+   - `docs/DataModels.md`
+   - `docs/API_Documentation_Sprint1.md`
+   - `docs/Backend_Completion_Plan.md`
 
 ---
 
@@ -142,28 +157,26 @@ claude /Users/aideveloper/ainative-website-nextjs-staging
 
 ### Start Development
 ```bash
-npm run dev          # Start dev server (port 3000)
+npm run dev              # Start backend with nodemon
+npm run frontend:dev     # Start frontend dev server
+npm run dev:full         # Run both concurrently
 ```
 
 ### Verify Code Quality
 ```bash
-npm run lint         # ESLint
-npm run type-check   # TypeScript
-npm run build        # Production build
-npm test             # Run tests
+npm run lint             # ESLint
+npm test                 # Run Jest tests
+npm run test:coverage    # With coverage report
+npm run test:e2e         # Playwright E2E tests
 ```
 
-### View Gap Analysis
+### Database Operations
 ```bash
-cat gaps-backlog.md           # Functional gaps
-cat design-gaps-backlog.md    # Design gaps
-cat seo-gaps-backlog.md       # SEO gaps
-```
+# Start MongoDB (Docker)
+docker-compose up -d mongo
 
-### Check Open Issues
-```bash
-gh issue list --label "critical"
-gh issue list --label "high-priority"
+# Or locally
+mongod --dbpath /data/db
 ```
 
 ---
@@ -172,9 +185,8 @@ gh issue list --label "high-priority"
 
 1. **ZeroDB** - Vector database, embeddings, agent memory
 2. **GitHub** - GitHub API integration, issues, PRs
-3. **AINative Design** - Design system analysis, token extraction
 
-See `settings.json` for MCP configuration.
+See `.claude/mcp.json.example` for MCP configuration.
 
 ---
 
@@ -182,15 +194,17 @@ See `settings.json` for MCP configuration.
 
 ### Required Variables
 ```bash
-NEXT_PUBLIC_SITE_URL=https://www.ainative.studio
-NEXT_PUBLIC_API_URL=https://api.ainative.studio/v1
+MONGODB_URI=mongodb://localhost:27017/opencap
+PORT=5000
+JWT_SECRET=your-secret-key
+NODE_ENV=development
 ```
 
 ### Optional Variables
 ```bash
-NEXT_PUBLIC_META_PIXEL_ID=your_pixel_id
-NEXT_PUBLIC_GA_ID=G-ML0XEBPZV2
-NEXT_PUBLIC_GTM_ID=GTM-MJKQDBGV
+DATABASE_URL=postgresql://...   # PostgreSQL
+NEO4J_URI=bolt://localhost:7687 # Neo4j
+ANTHROPIC_API_KEY=sk-ant-...    # AI services
 ```
 
 ---
@@ -200,30 +214,30 @@ NEXT_PUBLIC_GTM_ID=GTM-MJKQDBGV
 | What | Where |
 |------|-------|
 | Project context | `.ainative/AINATIVE.md` |
-| Gemini CLI settings | `.ainative/settings.json` |
-| Alignment rules | `.ainative/rules/gemini-cli-alignment.md` |
-| Claude Code context | `.claude/CLAUDE.md` |
-| Functional gaps | `gaps-backlog.md` |
-| Design gaps | `design-gaps-backlog.md` |
-| SEO gaps | `seo-gaps-backlog.md` |
-| Next.js path | `/Users/aideveloper/ainative-website-nextjs-staging` |
-| Vite path (reference) | `/Users/aideveloper/core/AINative-website` |
+| Claude context | `CLAUDE.md` |
+| Settings | `.ainative/settings.json` |
+| Rules | `.ainative/RULES.MD` |
+| Skills | `.claude/skills/` |
+| Commands | `.claude/commands/` |
+| Tests | `tests/` |
+| E2E Tests | `e2e/` |
+| Documentation | `docs/` |
 
 ---
 
 ## Support
 
 ### Documentation
-- Gemini CLI: https://google-gemini.github.io/gemini-cli/
-- Claude Code: https://docs.claude.com/en/docs/claude-code/
-- Next.js: https://nextjs.org/docs
+- Express.js: https://expressjs.com/
+- Mongoose: https://mongoosejs.com/
+- Jest: https://jestjs.io/
+- Playwright: https://playwright.dev/
 
-### Project Issues
-- GitHub Issues: #327-#389 (active)
-- Critical issues: Filter by `critical` label
-- High priority: Filter by `high-priority` label
+### Project Resources
+- GitHub: https://github.com/Open-Cap-Stack/opencap
+- Issues: Use OCAE-XXX format
 
 ---
 
-**Last Updated**: 2026-01-18
-**Maintained By**: AINative Studio Team
+**Last Updated**: 2026-02-02
+**Maintained By**: OpenCap Stack Team

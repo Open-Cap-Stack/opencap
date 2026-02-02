@@ -2,40 +2,42 @@
   "$schema": "https://google-gemini.github.io/gemini-cli/schemas/settings.schema.json",
   "version": "1.0.0",
   "project": {
-    "name": "AINative Studio Website (Next.js)",
+    "name": "OpenCap Stack",
     "type": "web-application",
-    "framework": "next.js",
-    "language": "typescript"
+    "framework": "express",
+    "language": "javascript",
+    "description": "MERN stack application for equity management aligned with OCTA schema"
   },
   "paths": {
-    "nextjs": "/Users/aideveloper/ainative-website-nextjs-staging",
-    "vite_reference": "/Users/aideveloper/core/AINative-website",
+    "root": "/Users/juweriya/Desktop/opencapstack",
     "include_directories": [
-      "app",
-      "components",
-      "lib",
+      "controllers",
+      "models",
+      "routes",
       "services",
-      "public"
+      "middleware",
+      "config",
+      "tests",
+      "e2e",
+      "scripts"
     ],
     "exclude_patterns": [
       "node_modules",
-      ".next",
       "dist",
       "build",
-      "*.test.ts",
-      "*.test.tsx"
+      "coverage",
+      ".git",
+      "frontend/node_modules",
+      "frontend/dist"
     ]
   },
   "context": {
     "primary_context_file": ".ainative/AINATIVE.md",
     "supplementary_files": [
-      ".claude/CLAUDE.md",
-      "gaps-backlog.md",
-      "design-gaps-backlog.md",
-      "seo-gaps-backlog.md",
-      "GAP_ANALYSIS_SUMMARY.md",
-      "DESIGN_GAP_ANALYSIS_SUMMARY.md",
-      "SEO_GAP_ANALYSIS_SUMMARY.md"
+      "CLAUDE.md",
+      "README.md",
+      "docs/DataModels.md",
+      "docs/API_Documentation_Sprint1.md"
     ],
     "max_context_files": 10
   },
@@ -61,15 +63,17 @@
         "npx",
         "curl",
         "grep",
-        "find"
+        "find",
+        "docker",
+        "docker-compose",
+        "mongosh"
       ],
-      "working_directory": "/Users/aideveloper/ainative-website-nextjs-staging"
+      "working_directory": "/Users/juweriya/Desktop/opencapstack"
     }
   },
   "security": {
     "trusted_folders": [
-      "/Users/aideveloper/ainative-website-nextjs-staging",
-      "/Users/aideveloper/core/AINative-website"
+      "/Users/juweriya/Desktop/opencapstack"
     ],
     "sandbox_profile": "default"
   },
@@ -90,10 +94,6 @@
       "github": {
         "enabled": true,
         "description": "GitHub API integration"
-      },
-      "ainative-design": {
-        "enabled": true,
-        "description": "Design system analysis and token extraction"
       }
     }
   },
@@ -109,37 +109,59 @@
         "Co-Authored-By: Claude",
         "Gemini",
         "AI-generated",
-        "🤖 Generated with"
+        "Generated with"
       ]
     },
     "commit_style": {
       "format": "conventional",
       "examples": [
-        "feat: Add user authentication",
-        "fix: Resolve navigation bug",
+        "feat: Add stakeholder CRUD endpoints",
+        "fix: Resolve share class validation error",
         "docs: Update API documentation",
-        "style: Format code with Prettier",
-        "refactor: Simplify pricing logic",
-        "test: Add unit tests for services",
-        "chore: Update dependencies"
+        "test: Add unit tests for equity simulation",
+        "chore: Update dependencies",
+        "refactor: Simplify authentication flow"
       ]
+    },
+    "branch_naming": {
+      "format": "{type}/{story-id}-{slug}",
+      "types": ["feature", "bug", "chore"],
+      "story_prefixes": ["OCAE", "OCDI", "OCSIS"]
     },
     "code_quality": {
       "linting": "required",
-      "type_checking": "required",
       "testing": "required_for_features",
       "min_coverage": 80
     }
   },
   "development": {
-    "port": 3000,
+    "port": 5000,
     "auto_restart": true,
     "hot_reload": true,
     "source_maps": true
   },
-  "deployment": {
-    "target": "railway",
-    "staging_url": "https://ainative-website-nextjs-staging.up.railway.app",
-    "production_url": "https://www.ainative.studio"
+  "testing": {
+    "framework": "jest",
+    "e2e_framework": "playwright",
+    "commands": {
+      "unit": "npm test",
+      "coverage": "npm run test:coverage",
+      "e2e": "npm run test:e2e",
+      "all": "npm run test:all"
+    }
+  },
+  "databases": {
+    "primary": {
+      "type": "mongodb",
+      "default_uri": "mongodb://localhost:27017/opencap"
+    },
+    "analytics": {
+      "type": "postgresql",
+      "description": "For analytics and reporting"
+    },
+    "graph": {
+      "type": "neo4j",
+      "description": "For relationship graphs"
+    }
   }
 }
