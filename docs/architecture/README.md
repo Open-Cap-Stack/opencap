@@ -1,11 +1,23 @@
 # OpenCap Stack Architecture Documentation
 
-This directory contains comprehensive architecture documentation for the OpenCap Stack platform's continuous bidirectional data synchronization system.
+This directory contains comprehensive architecture documentation for the OpenCap Stack platform.
+
+## Primary Database: ZeroDB
+
+OpenCap Stack uses **ZeroDB** (via AINative Studio) as its primary database. ZeroDB provides:
+
+- **NoSQL Table Storage**: All application data
+- **Vector Search**: Semantic document search
+- **Memory Management**: Agent context retention
+- **Event Streaming**: Real-time updates
+- **File Storage**: Document metadata
+
+For ZeroDB setup and API details, see [ZeroDB Documentation](../zerodb/README.md).
 
 ## Documents
 
 ### 1. [Continuous Sync Design](./continuous-sync-design.md)
-**Purpose:** Comprehensive architectural design for MongoDB ↔ ZeroDB synchronization
+**Purpose:** Architecture for optional MongoDB to ZeroDB synchronization (for migration scenarios)
 
 **Contents:**
 - Executive Summary & Key Decisions
@@ -21,8 +33,10 @@ This directory contains comprehensive architecture documentation for the OpenCap
 
 **Target Audience:** System Architects, Tech Leads, Senior Developers
 
+**Note:** This sync feature is optional and only needed when migrating existing MongoDB data to ZeroDB.
+
 ### 2. [Sync Implementation Guide](./sync-implementation-guide.md)
-**Purpose:** Practical implementation guide with code templates
+**Purpose:** Practical implementation guide with code templates for MongoDB migration
 
 **Contents:**
 - Quick Start Guide
@@ -35,12 +49,29 @@ This directory contains comprehensive architecture documentation for the OpenCap
 
 ## Quick Reference
 
-### Architecture Overview
+### Primary Architecture (ZeroDB-Only)
 
 ```
-MongoDB (Source 1) ←→ Change Stream Listener → Sync Queue → Worker Pool → ZeroDB (Source 2)
-                                                    ↑             ↓
-ZeroDB (Source 2)  ←→ ZeroDB Poller           ← Sync Queue ← Conflict Resolver
+Application → ZeroDB Service → ZeroDB API (AINative Studio)
+                    ↓
+            ┌───────────────────────────────────────────┐
+            │ ZeroDB Lakehouse                          │
+            │ ├── NoSQL Tables (all application data)  │
+            │ ├── Vector Store (semantic search)       │
+            │ ├── Memory Store (agent context)         │
+            │ ├── Event Stream (real-time updates)     │
+            │ └── File Storage (document metadata)     │
+            └───────────────────────────────────────────┘
+```
+
+### Optional: Migration Sync Architecture
+
+For migrating from MongoDB to ZeroDB:
+
+```
+MongoDB (Source) ←→ Change Stream Listener → Sync Queue → Worker Pool → ZeroDB (Target)
+                                                  ↑             ↓
+ZeroDB (Target)  ←→ ZeroDB Poller          ← Sync Queue ← Conflict Resolver
 ```
 
 ### Key Components
@@ -223,14 +254,15 @@ Clear separation of concerns with well-defined interfaces between components.
 ## References
 
 ### External Documentation
-- [MongoDB Change Streams](https://docs.mongodb.com/manual/changeStreams/)
-- [ZeroDB API Documentation](https://docs.zerodb.io/)
+- [ZeroDB API (AINative Studio)](https://api.ainative.studio/)
 - [Event-Driven Architecture Patterns](https://martinfowler.com/articles/201701-event-driven.html)
 
 ### Internal Documentation
+- [ZeroDB Documentation](../zerodb/README.md)
+- [ZeroDB API Reference](../zerodb/API_REFERENCE.md)
+- [ZeroDB Migration Guide](../zerodb/MIGRATION_GUIDE.md)
 - [Database Schema Documentation](../DataModels.md)
-- [Monitoring Guide](../monitoring/README.md)
-- [Deployment Runbook](../operations/deployment-runbook.md)
+- [Troubleshooting Guide](../troubleshooting.md)
 
 ## Contributing
 

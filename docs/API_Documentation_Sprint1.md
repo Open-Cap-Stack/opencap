@@ -1,17 +1,44 @@
-# OpenCap API Documentation - Sprint 1 ✅
+# OpenCap API Documentation - Sprint 1
 
 This document provides detailed information about the APIs enhanced during Sprint 1 of the OpenCap API Enhancement Plan. It follows the Semantic Seed Venture Studio Coding Standards V2.0 with a focus on proper documentation and testing.
 
+**Database**: ZeroDB (via AINative Studio)
+
 ## Table of Contents
 
-1. [Compliance Check API](#compliance-check-api) ✅
-2. [Tax Calculator API](#tax-calculator-api) ✅
-3. [Testing](#testing) ✅
-4. [Next Steps](#next-steps)
+1. [Database Configuration](#database-configuration)
+2. [Compliance Check API](#compliance-check-api)
+3. [Tax Calculator API](#tax-calculator-api)
+4. [Testing](#testing)
+5. [Next Steps](#next-steps)
 
 ---
 
-## Compliance Check API ✅
+## Database Configuration
+
+OpenCap Stack uses ZeroDB as its primary database. All API endpoints interact with ZeroDB tables through the ZeroDB service layer.
+
+### Environment Setup
+
+```bash
+# Required environment variables
+ZERODB_API_KEY=your_zerodb_api_key
+ZERODB_BASE_URL=https://api.ainative.studio/api/v1
+ZERODB_PROJECT_ID=your_project_id
+```
+
+### ZeroDB Tables Used
+
+| API | ZeroDB Table |
+|-----|--------------|
+| Compliance Check | `compliance_checks` |
+| Tax Calculator | `tax_calculations` |
+
+For complete database setup, see [ZeroDB Migration Guide](./zerodb/MIGRATION_GUIDE.md).
+
+---
+
+## Compliance Check API
 
 The Compliance Check API allows for management of regulatory compliance checks for Special Purpose Vehicles (SPVs). This API handles GDPR, HIPAA, SOX, and CCPA regulation types.
 
@@ -20,6 +47,8 @@ The Compliance Check API allows for management of regulatory compliance checks f
 ```
 /api/compliance-checks
 ```
+
+### ZeroDB Table: `compliance_checks`
 
 ### Endpoints
 
@@ -40,13 +69,13 @@ The Compliance Check API allows for management of regulatory compliance checks f
 - **Response**: 201 Created
   ```json
   {
-    "_id": "60a1e2c8c8e6b12d98765432",
+    "row_id": "uuid-generated-by-zerodb",
     "CheckID": "CHECK-001",
     "SPVID": "SPV-123",
     "RegulationType": "GDPR",
     "Status": "Compliant",
     "LastCheckedBy": "AdminUser",
-    "Timestamp": "2025-05-16T12:00:00.000Z",
+    "Timestamp": "2026-02-02T12:00:00.000Z",
     "Details": "Initial compliance check"
   }
   ```
@@ -60,13 +89,13 @@ The Compliance Check API allows for management of regulatory compliance checks f
     "success": true,
     "complianceChecks": [
       {
-        "_id": "60a1e2c8c8e6b12d98765432",
+        "row_id": "uuid-generated-by-zerodb",
         "CheckID": "CHECK-001",
         "SPVID": "SPV-123",
         "RegulationType": "GDPR",
         "Status": "Compliant",
         "LastCheckedBy": "AdminUser",
-        "Timestamp": "2025-05-16T12:00:00.000Z",
+        "Timestamp": "2026-02-02T12:00:00.000Z",
         "Details": "Initial compliance check"
       }
     ]
@@ -81,43 +110,43 @@ The Compliance Check API allows for management of regulatory compliance checks f
   {
     "complianceChecks": [
       {
-        "_id": "60a1e2c8c8e6b12d98765433",
+        "row_id": "uuid-generated-by-zerodb",
         "CheckID": "CHECK-002",
         "SPVID": "SPV-456",
         "RegulationType": "SOX",
         "Status": "Non-Compliant",
         "LastCheckedBy": "AdminUser",
-        "Timestamp": "2025-05-16T12:00:00.000Z",
+        "Timestamp": "2026-02-02T12:00:00.000Z",
         "Details": "Failed SOX compliance"
       }
     ]
   }
   ```
 
-#### Get Compliance Check by ID (New in Sprint 1)
+#### Get Compliance Check by ID
 - **Method**: GET
 - **Endpoint**: `/:id`
-- **Parameters**: 
-  - `id`: MongoDB ObjectId of the compliance check
+- **Parameters**:
+  - `id`: ZeroDB row_id of the compliance check
 - **Response**: 200 OK
   ```json
   {
-    "_id": "60a1e2c8c8e6b12d98765432",
+    "row_id": "uuid-generated-by-zerodb",
     "CheckID": "CHECK-001",
     "SPVID": "SPV-123",
     "RegulationType": "GDPR",
     "Status": "Compliant",
     "LastCheckedBy": "AdminUser",
-    "Timestamp": "2025-05-16T12:00:00.000Z",
+    "Timestamp": "2026-02-02T12:00:00.000Z",
     "Details": "Initial compliance check"
   }
   ```
 
-#### Update Compliance Check (New in Sprint 1)
+#### Update Compliance Check
 - **Method**: PUT
 - **Endpoint**: `/:id`
 - **Parameters**:
-  - `id`: MongoDB ObjectId of the compliance check
+  - `id`: ZeroDB row_id of the compliance check
 - **Request Body**:
   ```json
   {
@@ -129,13 +158,13 @@ The Compliance Check API allows for management of regulatory compliance checks f
 - **Response**: 200 OK
   ```json
   {
-    "_id": "60a1e2c8c8e6b12d98765432",
+    "row_id": "uuid-generated-by-zerodb",
     "CheckID": "CHECK-001",
     "SPVID": "SPV-123",
     "RegulationType": "GDPR",
     "Status": "Non-Compliant",
     "LastCheckedBy": "UpdatedUser",
-    "Timestamp": "2025-05-16T12:00:00.000Z",
+    "Timestamp": "2026-02-02T12:00:00.000Z",
     "Details": "Updated compliance status"
   }
   ```
@@ -144,19 +173,19 @@ The Compliance Check API allows for management of regulatory compliance checks f
 - **Method**: DELETE
 - **Endpoint**: `/:id`
 - **Parameters**:
-  - `id`: MongoDB ObjectId of the compliance check
+  - `id`: ZeroDB row_id of the compliance check
 - **Response**: 200 OK
   ```json
   {
     "message": "Compliance check deleted",
     "deletedCheck": {
-      "_id": "60a1e2c8c8e6b12d98765432",
+      "row_id": "uuid-generated-by-zerodb",
       "CheckID": "CHECK-001",
       "SPVID": "SPV-123",
       "RegulationType": "GDPR",
       "Status": "Compliant",
       "LastCheckedBy": "AdminUser",
-      "Timestamp": "2025-05-16T12:00:00.000Z",
+      "Timestamp": "2026-02-02T12:00:00.000Z",
       "Details": "Initial compliance check"
     }
   }
@@ -170,7 +199,7 @@ The Compliance Check API allows for management of regulatory compliance checks f
 
 ---
 
-## Tax Calculator API ✅
+## Tax Calculator API
 
 The Tax Calculator API manages tax calculations for different sale scenarios and share classes.
 
@@ -179,6 +208,8 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
 ```
 /api/tax-calculator
 ```
+
+### ZeroDB Table: `tax_calculations`
 
 ### Endpoints
 
@@ -194,13 +225,13 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
     "SaleAmount": 10000,
     "TaxRate": 0.20,
     "TaxImplication": { "implication": "Capital Gains" },
-    "TaxDueDate": "2025-04-15T00:00:00.000Z"
+    "TaxDueDate": "2026-04-15T00:00:00.000Z"
   }
   ```
 - **Response**: 201 Created
   ```json
   {
-    "_id": "60b2f3d9c9f7b23e87654321",
+    "row_id": "uuid-generated-by-zerodb",
     "calculationId": "CALC-001",
     "SaleScenario": { "scenario": "Stock Sale" },
     "ShareClassInvolved": "Common Stock",
@@ -208,7 +239,7 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
     "TaxRate": 0.20,
     "TaxImplication": { "implication": "Capital Gains" },
     "CalculatedTax": 2000,
-    "TaxDueDate": "2025-04-15T00:00:00.000Z"
+    "TaxDueDate": "2026-04-15T00:00:00.000Z"
   }
   ```
 
@@ -220,7 +251,7 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
   {
     "taxCalculations": [
       {
-        "_id": "60b2f3d9c9f7b23e87654321",
+        "row_id": "uuid-generated-by-zerodb",
         "calculationId": "CALC-001",
         "SaleScenario": { "scenario": "Stock Sale" },
         "ShareClassInvolved": "Common Stock",
@@ -228,7 +259,7 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
         "TaxRate": 0.20,
         "TaxImplication": { "implication": "Capital Gains" },
         "CalculatedTax": 2000,
-        "TaxDueDate": "2025-04-15T00:00:00.000Z"
+        "TaxDueDate": "2026-04-15T00:00:00.000Z"
       }
     ]
   }
@@ -238,11 +269,11 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
 - **Method**: GET
 - **Endpoint**: `/:id`
 - **Parameters**:
-  - `id`: MongoDB ObjectId of the tax calculation
+  - `id`: ZeroDB row_id of the tax calculation
 - **Response**: 200 OK
   ```json
   {
-    "_id": "60b2f3d9c9f7b23e87654321",
+    "row_id": "uuid-generated-by-zerodb",
     "calculationId": "CALC-001",
     "SaleScenario": { "scenario": "Stock Sale" },
     "ShareClassInvolved": "Common Stock",
@@ -250,28 +281,28 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
     "TaxRate": 0.20,
     "TaxImplication": { "implication": "Capital Gains" },
     "CalculatedTax": 2000,
-    "TaxDueDate": "2025-04-15T00:00:00.000Z"
+    "TaxDueDate": "2026-04-15T00:00:00.000Z"
   }
   ```
 
-#### Update Tax Calculation (New in Sprint 1)
+#### Update Tax Calculation
 - **Method**: PUT
 - **Endpoint**: `/:id`
 - **Parameters**:
-  - `id`: MongoDB ObjectId of the tax calculation
+  - `id`: ZeroDB row_id of the tax calculation
 - **Request Body**:
   ```json
   {
     "SaleAmount": 15000,
     "TaxRate": 0.22,
     "TaxImplication": { "implication": "Updated Capital Gains" },
-    "TaxDueDate": "2025-05-15T00:00:00.000Z"
+    "TaxDueDate": "2026-05-15T00:00:00.000Z"
   }
   ```
 - **Response**: 200 OK
   ```json
   {
-    "_id": "60b2f3d9c9f7b23e87654321",
+    "row_id": "uuid-generated-by-zerodb",
     "calculationId": "CALC-001",
     "SaleScenario": { "scenario": "Stock Sale" },
     "ShareClassInvolved": "Common Stock",
@@ -279,7 +310,7 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
     "TaxRate": 0.22,
     "TaxImplication": { "implication": "Updated Capital Gains" },
     "CalculatedTax": 3300,
-    "TaxDueDate": "2025-05-15T00:00:00.000Z"
+    "TaxDueDate": "2026-05-15T00:00:00.000Z"
   }
   ```
 
@@ -287,13 +318,13 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
 - **Method**: DELETE
 - **Endpoint**: `/:id`
 - **Parameters**:
-  - `id`: MongoDB ObjectId of the tax calculation
+  - `id`: ZeroDB row_id of the tax calculation
 - **Response**: 200 OK
   ```json
   {
     "message": "Tax calculation deleted",
     "taxCalculation": {
-      "_id": "60b2f3d9c9f7b23e87654321",
+      "row_id": "uuid-generated-by-zerodb",
       "calculationId": "CALC-001",
       "SaleScenario": { "scenario": "Stock Sale" },
       "ShareClassInvolved": "Common Stock",
@@ -301,7 +332,7 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
       "TaxRate": 0.20,
       "TaxImplication": { "implication": "Capital Gains" },
       "CalculatedTax": 2000,
-      "TaxDueDate": "2025-04-15T00:00:00.000Z"
+      "TaxDueDate": "2026-04-15T00:00:00.000Z"
     }
   }
   ```
@@ -314,9 +345,9 @@ The Tax Calculator API manages tax calculations for different sale scenarios and
 
 ---
 
-## Testing ✅
+## Testing
 
-All enhanced APIs have been thoroughly tested using Jest with the following test coverage:
+All enhanced APIs have been thoroughly tested using Jest with ZeroDB integration.
 
 ### 1. ComplianceCheck API Tests
 
@@ -324,7 +355,8 @@ All enhanced APIs have been thoroughly tested using Jest with the following test
   - Model validation
   - Controller functions
   - Route handlers
-  
+  - ZeroDB service integration
+
 - **BDD-Style Integration Tests**:
   - Successful operations
   - Error handling
@@ -336,15 +368,47 @@ All enhanced APIs have been thoroughly tested using Jest with the following test
   - Model validation
   - Controller functions
   - Tax calculation logic
-  
+  - ZeroDB service integration
+
 - **BDD-Style Integration Tests**:
   - Successful operations
   - Automatic tax recalculation
   - Error handling
   - Edge cases
 
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test file
+npm test -- __tests__/api/complianceCheck.test.js
+```
+
+---
+
 ## Next Steps
 
 1. **Sprint 2**: Focus on SPV and Communications APIs
 2. **Documentation Updates**: Add Swagger/OpenAPI specifications
 3. **Test Enhancements**: Continue expanding test coverage
+4. **ZeroDB Optimization**: Implement caching and query optimization
+
+---
+
+## Related Documentation
+
+- [ZeroDB API Reference](./zerodb/API_REFERENCE.md)
+- [ZeroDB Migration Guide](./zerodb/MIGRATION_GUIDE.md)
+- [Data Models](./DataModels.md)
+- [Troubleshooting Guide](./troubleshooting.md)
+
+---
+
+**Document Version**: 2.0
+**Last Updated**: 2026-02-02
+**Database**: ZeroDB (via AINative Studio)
