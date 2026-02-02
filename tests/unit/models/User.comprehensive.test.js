@@ -46,6 +46,24 @@ describe('User Model', () => {
             'read:compliance', 'write:compliance', 'delete:compliance',
             'admin:all'
           ],
+          founder: [
+            'read:users', 'write:users',
+            'read:companies', 'write:companies',
+            'read:reports', 'write:reports',
+            'read:spv', 'write:spv',
+            'read:assets', 'write:assets',
+            'read:compliance', 'write:compliance',
+            'read:equity', 'write:equity'
+          ],
+          investor: [
+            'read:users',
+            'read:companies',
+            'read:reports',
+            'read:spv',
+            'read:assets',
+            'read:compliance',
+            'read:equity'
+          ],
           manager: [
             'read:users', 'write:users',
             'read:companies', 'write:companies',
@@ -427,7 +445,7 @@ describe('User Model', () => {
 
   describe('Role Validation', () => {
     it('should handle all valid role values', () => {
-      const validRoles = ['admin', 'manager', 'user', 'client'];
+      const validRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
 
       validRoles.forEach(role => {
         const user = new User({
@@ -442,6 +460,40 @@ describe('User Model', () => {
         expect(user.role).toBe(role);
         expect(user.permissions.length).toBeGreaterThan(0);
       });
+    });
+
+    it('should set founder permissions for founder role', () => {
+      const user = new User({
+        userId: 'founder-123',
+        firstName: 'Founder',
+        lastName: 'User',
+        email: 'founder@example.com',
+        password: 'password123',
+        role: 'founder'
+      });
+
+      expect(user.permissions).toContain('read:users');
+      expect(user.permissions).toContain('write:users');
+      expect(user.permissions).toContain('read:equity');
+      expect(user.permissions).toContain('write:equity');
+      expect(user.permissions).not.toContain('admin:all');
+    });
+
+    it('should set investor permissions for investor role', () => {
+      const user = new User({
+        userId: 'investor-123',
+        firstName: 'Investor',
+        lastName: 'User',
+        email: 'investor@example.com',
+        password: 'password123',
+        role: 'investor'
+      });
+
+      expect(user.permissions).toContain('read:users');
+      expect(user.permissions).toContain('read:companies');
+      expect(user.permissions).toContain('read:equity');
+      expect(user.permissions).not.toContain('write:users');
+      expect(user.permissions).not.toContain('write:equity');
     });
   });
 
