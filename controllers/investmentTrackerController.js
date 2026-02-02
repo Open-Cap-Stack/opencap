@@ -1,4 +1,12 @@
-const investmentTrackerModel = require('../models/investmentTrackerModel');
+/**
+ * Investment Tracker Controller - ZeroDB Migration
+ * Issue #20 - Batch 3 Controllers
+ * Uses DatabaseAdapter for database-agnostic operations
+ */
+
+const databaseAdapter = require('../services/databaseAdapter');
+
+const MODEL_NAME = 'InvestmentTracker';
 
 async function trackInvestment(req, res, next) {
   try {
@@ -8,14 +16,14 @@ async function trackInvestment(req, res, next) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const newInvestment = new investmentTrackerModel({
+    const investmentData = {
       TrackID,
       Company,
       EquityPercentage,
       CurrentValue,
-    });
+    };
 
-    const savedInvestment = await newInvestment.save();
+    const savedInvestment = await databaseAdapter.create(MODEL_NAME, investmentData);
     res.status(201).json(savedInvestment);
   } catch (error) {
     console.log(error); // Log the error for debugging

@@ -1,9 +1,12 @@
-const EquityPlan = require('../models/EquityPlanModel');
+/**
+ * EquityPlan Controller
+ * Issue #20: Migrate to ZeroDB via DatabaseAdapter
+ */
+const databaseAdapter = require('../services/databaseAdapter');
 
 exports.createEquityPlan = async (req, res) => {
     try {
-        const newPlan = new EquityPlan(req.body);
-        const savedPlan = await newPlan.save();
+        const savedPlan = await databaseAdapter.create('EquityPlan', req.body);
         res.status(201).json(savedPlan);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -12,7 +15,7 @@ exports.createEquityPlan = async (req, res) => {
 
 exports.getEquityPlans = async (req, res) => {
     try {
-        const plans = await EquityPlan.find();
+        const plans = await databaseAdapter.find('EquityPlan', {});
         res.status(200).json(plans);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -21,7 +24,7 @@ exports.getEquityPlans = async (req, res) => {
 
 exports.getEquityPlanById = async (req, res) => {
     try {
-        const plan = await EquityPlan.findById(req.params.id);
+        const plan = await databaseAdapter.findById('EquityPlan', req.params.id);
         if (!plan) {
             return res.status(404).json({ message: 'Equity plan not found' });
         }
@@ -33,7 +36,7 @@ exports.getEquityPlanById = async (req, res) => {
 
 exports.updateEquityPlan = async (req, res) => {
     try {
-        const plan = await EquityPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const plan = await databaseAdapter.findByIdAndUpdate('EquityPlan', req.params.id, req.body, { new: true });
         if (!plan) {
             return res.status(404).json({ message: 'Equity plan not found' });
         }
@@ -45,7 +48,7 @@ exports.updateEquityPlan = async (req, res) => {
 
 exports.deleteEquityPlan = async (req, res) => {
     try {
-        const plan = await EquityPlan.findByIdAndDelete(req.params.id);
+        const plan = await databaseAdapter.findByIdAndDelete('EquityPlan', req.params.id);
         if (!plan) {
             return res.status(404).json({ message: 'Equity plan not found' });
         }

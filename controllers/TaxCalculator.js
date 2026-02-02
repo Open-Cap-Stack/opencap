@@ -1,4 +1,13 @@
-const TaxCalculator = require('../models/TaxCalculator');
+/**
+ * TaxCalculator Controller - ZeroDB Migration
+ * Issue #20 - Batch 3 Controllers
+ * Uses DatabaseAdapter for database-agnostic operations
+ */
+
+const mongoose = require('mongoose');
+const databaseAdapter = require('../services/databaseAdapter');
+
+const MODEL_NAME = 'TaxCalculator';
 
 // Calculate tax and create a new tax calculation record
 exports.calculateTax = async (req, res) => {
@@ -11,7 +20,7 @@ exports.calculateTax = async (req, res) => {
 
     const CalculatedTax = SaleAmount * TaxRate;
 
-    const taxCalculation = new TaxCalculator({
+    const taxData = {
       calculationId,
       SaleScenario,
       ShareClassInvolved,
@@ -20,9 +29,9 @@ exports.calculateTax = async (req, res) => {
       TaxImplication,
       CalculatedTax,
       TaxDueDate,
-    });
+    };
 
-    const savedCalculation = await taxCalculation.save();
+    const savedCalculation = await databaseAdapter.create(MODEL_NAME, taxData);
     return res.status(201).json(savedCalculation);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -32,11 +41,11 @@ exports.calculateTax = async (req, res) => {
 // Get all tax calculations
 exports.getTaxCalculations = async (req, res) => {
   try {
-    const taxCalculations = await TaxCalculator.find();
+    const taxCalculations = await databaseAdapter.find(MODEL_NAME, {});
     if (taxCalculations.length === 0) {
       return res.status(404).json({ message: 'No tax calculations found' });
     }
-    res.status(200).json({ taxCalculations });  // Wrap the array in an object
+    res.status(200).json({ taxCalculations });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -45,12 +54,11 @@ exports.getTaxCalculations = async (req, res) => {
 // Get a tax calculation by ID
 exports.getTaxCalculationById = async (req, res) => {
   try {
-    const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid tax calculation ID format' });
     }
-    
-    const taxCalculation = await TaxCalculator.findById(req.params.id);
+
+    const taxCalculation = await databaseAdapter.findById(MODEL_NAME, req.params.id);
     if (!taxCalculation) {
       return res.status(404).json({ message: 'Tax calculation not found' });
     }
@@ -63,12 +71,11 @@ exports.getTaxCalculationById = async (req, res) => {
 // Delete a tax calculation by ID
 exports.deleteTaxCalculation = async (req, res) => {
   try {
-    const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid tax calculation ID format' });
     }
-    
-    const taxCalculation = await TaxCalculator.findByIdAndDelete(req.params.id);
+
+    const taxCalculation = await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
     if (!taxCalculation) {
       return res.status(404).json({ message: 'Tax calculation not found' });
     }
@@ -78,23 +85,22 @@ exports.deleteTaxCalculation = async (req, res) => {
   }
 };
 
-// Update a tax calculation by ID - New Endpoint
+// Update a tax calculation by ID
 exports.updateTaxCalculation = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate ID format first
-    const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid tax calculation ID format' });
     }
-    
-    const { SaleAmount, TaxRate, SaleScenario, ShareClassInvolved, TaxImplication, TaxDueDate } = req.body;
+
+    const { SaleAmount, TaxRate } = req.body;
 
     // If updating SaleAmount or TaxRate, recalculate CalculatedTax
     if ((SaleAmount !== undefined || TaxRate !== undefined) && !req.body.CalculatedTax) {
       // Get current calculation if needed
-      const currentCalculation = await TaxCalculator.findById(id);
+      const currentCalculation = await databaseAdapter.findById(MODEL_NAME, id);
       if (!currentCalculation) {
         return res.status(404).json({ message: 'Tax calculation not found' });
       }
@@ -118,8 +124,9 @@ exports.updateTaxCalculation = async (req, res) => {
       delete req.body.calculationId;
     }
 
-    const updatedCalculation = await TaxCalculator.findByIdAndUpdate(
-      id, 
+    const updatedCalculation = await databaseAdapter.findByIdAndUpdate(
+      MODEL_NAME,
+      id,
       req.body,
       { new: true, runValidators: true }
     );

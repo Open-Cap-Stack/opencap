@@ -1,4 +1,8 @@
-const Communication = require('../models/Communication');
+/**
+ * Communication Controller
+ * Issue #20: Migrate to ZeroDB via DatabaseAdapter
+ */
+const databaseAdapter = require('../services/databaseAdapter');
 
 // Create a new communication
 exports.createCommunication = async (req, res) => {
@@ -10,16 +14,16 @@ exports.createCommunication = async (req, res) => {
     }
 
     try {
-        const communication = new Communication({
+        const communicationData = {
             communicationId,
             MessageType,
             Sender,
             Recipient,
             Timestamp,
             Content,
-        });
+        };
 
-        const savedCommunication = await communication.save();
+        const savedCommunication = await databaseAdapter.create('Communication', communicationData);
         return res.status(201).json(savedCommunication);
     } catch (error) {
         return res.status(500).json({ message: error.message });
@@ -29,7 +33,7 @@ exports.createCommunication = async (req, res) => {
 // Get all communications
 exports.getCommunications = async (req, res) => {
     try {
-        const communications = await Communication.find({});
+        const communications = await databaseAdapter.find('Communication', {});
         if (communications.length === 0) {
             return res.status(404).json({ message: 'No communications found' });
         }
@@ -44,7 +48,7 @@ exports.getCommunicationById = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const communication = await Communication.findById(id);
+        const communication = await databaseAdapter.findById('Communication', id);
         if (!communication) {
             return res.status(404).json({ message: 'Communication not found' });
         }
@@ -60,7 +64,8 @@ exports.updateCommunication = async (req, res) => {
     const { communicationId, MessageType, Sender, Recipient, Timestamp, Content } = req.body;
 
     try {
-        const updatedCommunication = await Communication.findByIdAndUpdate(
+        const updatedCommunication = await databaseAdapter.findByIdAndUpdate(
+            'Communication',
             id,
             { communicationId, MessageType, Sender, Recipient, Timestamp, Content },
             { new: true, runValidators: true }
@@ -81,7 +86,7 @@ exports.deleteCommunication = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const deletedCommunication = await Communication.findByIdAndDelete(id);
+        const deletedCommunication = await databaseAdapter.findByIdAndDelete('Communication', id);
         if (!deletedCommunication) {
             return res.status(404).json({ message: 'Communication not found' });
         }

@@ -1,4 +1,8 @@
-const ComplianceCheck = require('../models/ComplianceCheck');
+/**
+ * ComplianceCheck Controller
+ * Issue #20: Migrate to ZeroDB via DatabaseAdapter
+ */
+const databaseAdapter = require('../services/databaseAdapter');
 
 // Create a new compliance check
 exports.createComplianceCheck = async (req, res) => {
@@ -21,8 +25,7 @@ exports.createComplianceCheck = async (req, res) => {
       });
     }
 
-    // Create a new compliance check instance
-    const newComplianceCheck = new ComplianceCheck({
+    const complianceData = {
       CheckID,
       SPVID,
       RegulationType,
@@ -30,10 +33,9 @@ exports.createComplianceCheck = async (req, res) => {
       Details,
       Timestamp,
       LastCheckedBy,
-    });
+    };
 
-    // Save to database
-    const savedComplianceCheck = await newComplianceCheck.save();
+    const savedComplianceCheck = await databaseAdapter.create('ComplianceCheck', complianceData);
     res.status(201).json(savedComplianceCheck);
   } catch (error) {
     console.error('Error creating compliance check:', error.message);
@@ -47,7 +49,7 @@ exports.createComplianceCheck = async (req, res) => {
 // Get all compliance checks
 exports.getComplianceChecks = async (req, res) => {
   try {
-    const complianceChecks = await ComplianceCheck.find();
+    const complianceChecks = await databaseAdapter.find('ComplianceCheck', {});
     res.status(200).json({ complianceChecks });
   } catch (error) {
     console.error('Error retrieving compliance checks:', error.message);
@@ -63,7 +65,7 @@ exports.deleteComplianceCheck = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedComplianceCheck = await ComplianceCheck.findByIdAndDelete(id);
+    const deletedComplianceCheck = await databaseAdapter.findByIdAndDelete('ComplianceCheck', id);
 
     if (!deletedComplianceCheck) {
       return res.status(404).json({
