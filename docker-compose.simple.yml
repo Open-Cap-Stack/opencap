@@ -14,11 +14,12 @@ services:
     command: sh -c "npm install && node app.js"
     depends_on:
       - postgres
-      - mongodb
     environment:
       - DATABASE_URL=postgres://postgres:password@postgres:5432/opencap
-      - MONGODB_URI=mongodb://opencap:password123@mongodb:27017/opencap?authSource=admin
-      - MONGODB_URI_TEST=mongodb://opencap:password123@mongodb:27017/opencap_test?authSource=admin
+      - ENABLE_ZERODB=true
+      - ZERODB_API_KEY=${ZERODB_API_KEY:-}
+      - ZERODB_BASE_URL=https://api.ainative.studio/api/v1
+      - ZERODB_PROJECT_ID=${ZERODB_PROJECT_ID:-}
       - NODE_ENV=development
       - PORT=5000
       - CORS_ORIGIN=http://localhost:5173
@@ -53,19 +54,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  mongodb:
-    image: mongo:5.0
-    container_name: opencap_mongodb
-    restart: always
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: opencap
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: opencap
-    volumes:
-      - mongodb_data:/data/db
-
 volumes:
   postgres_data:
     driver: local
@@ -73,12 +61,6 @@ volumes:
       type: none
       o: bind
       device: /Volumes/Cody/docker-data/postgres_data
-  mongodb_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /Volumes/Cody/docker-data/mongodb_data
   backend_node_modules:
     driver: local
     driver_opts:

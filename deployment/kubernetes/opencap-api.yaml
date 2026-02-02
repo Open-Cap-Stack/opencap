@@ -53,11 +53,18 @@ spec:
             configMapKeyRef:
               name: opencap-api-config
               key: LOG_LEVEL
-        - name: MONGO_URI
+        - name: ENABLE_ZERODB
+          value: "true"
+        - name: ZERODB_API_KEY
           valueFrom:
             secretKeyRef:
-              name: mongodb-secret
-              key: connection-string
+              name: opencap-api-secret
+              key: zerodb-api-key
+        - name: ZERODB_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: opencap-api-secret
+              key: zerodb-project-id
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -102,6 +109,8 @@ type: Opaque
 data:
   # Base64 encoded values - replace with actual secrets in production
   jwt-secret: T3BlbkNhcEpXVFNlY3JldEtleQ==  # OpenCapJWTSecretKey
+  zerodb-api-key: eW91ci16ZXJvZGItYXBpLWtleQ==  # your-zerodb-api-key (placeholder)
+  zerodb-project-id: eW91ci1wcm9qZWN0LWlk  # your-project-id (placeholder)
 ---
 # OpenCap API Service
 apiVersion: v1

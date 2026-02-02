@@ -14,14 +14,15 @@ services:
     command: sh -c "npm install && node app.js"
     depends_on:
       - postgres
-      - mongodb
       - minio
       - spark
       - airflow-webserver
     environment:
       - DATABASE_URL=postgres://postgres:88bd0c19ffbace9ed508db3da6d49c97@postgres:5432/opencap
-      - MONGODB_URI=mongodb://opencap:cfcb9ad70ddbadba456c906a16511ebe@mongodb:27017/opencap?authSource=admin
-      - MONGODB_URI_TEST=mongodb://opencap:cfcb9ad70ddbadba456c906a16511ebe@mongodb:27017/opencap_test?authSource=admin
+      - ENABLE_ZERODB=true
+      - ZERODB_API_KEY=${ZERODB_API_KEY:-}
+      - ZERODB_BASE_URL=https://api.ainative.studio/api/v1
+      - ZERODB_PROJECT_ID=${ZERODB_PROJECT_ID:-}
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minio
       - MINIO_SECRET_KEY=73b27ae78442e20fa0a61dc24b02bb97
@@ -58,20 +59,6 @@ services:
       POSTGRES_DB: opencap
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  mongodb:
-    image: mongo:5.0
-    container_name: opencap_mongodb
-    restart: always
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: opencap
-      MONGO_INITDB_ROOT_PASSWORD: cfcb9ad70ddbadba456c906a16511ebe
-      MONGO_INITDB_DATABASE: opencap
-    volumes:
-      - mongodb_data:/data/db
-      - ./init-scripts/mongo:/docker-entrypoint-initdb.d
 
   minio:
     image: minio/minio:latest
@@ -202,6 +189,5 @@ volumes:
   spark_worker_data:
   airflow_data:
   airflow_db_data:
-  mongodb_data:
   backend_node_modules:
   frontend_node_modules:
