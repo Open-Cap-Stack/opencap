@@ -1,15 +1,22 @@
-const mongoose = require('mongoose');
-const Employee = require('../models/employeeModel');
+/**
+ * Employee Controller
+ *
+ * Issue #20: Migrate remaining controllers to ZeroDB (Batch 2)
+ *
+ * Handles CRUD operations for employees using DatabaseAdapter
+ * for ZeroDB migration support
+ */
 
+const mongoose = require('mongoose');
+const databaseAdapter = require('../services/databaseAdapter');
+
+/**
+ * Create a new employee
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.createEmployee = async (req, res) => {
   try {
-    if (!mongoose.connection.readyState) {
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Database connection error',
-      });
-    }
-
     const { EmployeeID, Name, Email } = req.body;
 
     if (!EmployeeID || !Name || !Email) {
@@ -20,7 +27,7 @@ exports.createEmployee = async (req, res) => {
     }
 
     // Check for existing employee with same EmployeeID (explicit duplicate check)
-    const existingEmployee = await Employee.findOne({ EmployeeID });
+    const existingEmployee = await databaseAdapter.findOne('Employee', { EmployeeID });
     if (existingEmployee) {
       return res.status(400).json({
         error: 'Duplicate key error',
@@ -29,7 +36,7 @@ exports.createEmployee = async (req, res) => {
     }
 
     // Check for existing employee with same Email (explicit duplicate check)
-    const existingEmail = await Employee.findOne({ Email });
+    const existingEmail = await databaseAdapter.findOne('Employee', { Email });
     if (existingEmail) {
       return res.status(400).json({
         error: 'Duplicate key error',
@@ -37,16 +44,7 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
-    const newEmployee = new Employee(req.body);
-    const validationError = newEmployee.validateSync();
-    if (validationError) {
-      return res.status(400).json({
-        error: 'Validation error',
-        message: validationError.message,
-      });
-    }
-
-    const employee = await newEmployee.save();
+    const employee = await databaseAdapter.create('Employee', req.body);
     res.status(201).json(employee);
   } catch (error) {
     res.status(400).json({
@@ -60,65 +58,63 @@ exports.createEmployee = async (req, res) => {
 
 
 
+/**
+ * Get all employees with pagination
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getEmployees = async (req, res) => {
   try {
-    if (!mongoose.connection.readyState) {
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Database connection error'
-      });
-    }
-
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit) || 10, 1);
     const skip = (page - 1) * limit;
 
-    const employees = await Employee.find()
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    const employees = await databaseAdapter.find('Employee', {}, { skip, limit });
 
     res.status(200).json(employees);
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     });
   }
 };
 
+/**
+ * Get employee by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getEmployeeById = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Validation error',
         message: 'Invalid employee ID format'
       });
     }
 
-    if (!mongoose.connection.readyState) {
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Database connection error'
-      });
-    }
-
-    const employee = await Employee.findById(req.params.id);
+    const employee = await databaseAdapter.findById('Employee', req.params.id);
     if (!employee) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Not found',
         message: 'Employee not found'
       });
     }
     res.status(200).json(employee);
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     });
   }
 };
 
+/**
+ * Update employee by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.updateEmployee = async (req, res) => {
   try {
     // Check for valid ID
@@ -139,7 +135,7 @@ exports.updateEmployee = async (req, res) => {
 
     // Manual validation for nested fields (e.g., EquityOverview, VestingSchedule)
     if (req.body.EquityOverview) {
-      const { TotalEquity, VestedEquity, UnvestedEquity } = req.body.EquityOverview;
+      const { TotalEquity } = req.body.EquityOverview;
 
       if (TotalEquity !== undefined && typeof TotalEquity !== 'number') {
         return res.status(400).json({
@@ -156,8 +152,9 @@ exports.updateEmployee = async (req, res) => {
       }
     }
 
-    // Perform update
-    const updatedEmployee = await Employee.findByIdAndUpdate(
+    // Perform update using DatabaseAdapter
+    const updatedEmployee = await databaseAdapter.findByIdAndUpdate(
+      'Employee',
       req.params.id,
       req.body,
       { new: true, runValidators: true }
@@ -191,38 +188,36 @@ exports.updateEmployee = async (req, res) => {
 
 
 
+/**
+ * Delete employee by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.deleteEmployee = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Validation error',
         message: 'Invalid employee ID format'
       });
     }
 
-    if (!mongoose.connection.readyState) {
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Database connection error'
-      });
-    }
-
-    const deletedEmployee = await Employee.findByIdAndDelete(req.params.id);
+    const deletedEmployee = await databaseAdapter.findByIdAndDelete('Employee', req.params.id);
     if (!deletedEmployee) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Not found',
         message: 'Employee not found'
       });
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Employee deleted successfully',
-      data: deletedEmployee 
+      data: deletedEmployee
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     });
   }
 };
