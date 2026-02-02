@@ -162,6 +162,7 @@ const routes = {
   taxCalculatorRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxCalculatorRoutes')),
   securityAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityAuditRoutes')),
   financialDataRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialDataRoutes')),
+  semanticSearchRoutes: safeRequire(path.join(__dirname, 'routes/v1/semanticSearchRoutes')),
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -218,6 +219,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/security-audits';
     } else if (key === 'financialDataRoutes') {
       path = '/api/v1/financial-data';
+    } else if (key === 'semanticSearchRoutes') {
+      path = '/api/v1/documents/search';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
