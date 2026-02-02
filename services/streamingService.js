@@ -28,8 +28,10 @@ class StreamingService extends EventEmitter {
     this.flushInterval = 5000; // 5 seconds
     this.intervalId = null; // Track interval ID for cleanup
 
-    // Start batch processing
-    this.startBatchProcessing();
+    // Start batch processing (skip in test environment to avoid Jest timer issues)
+    if (process.env.NODE_ENV !== 'test') {
+      this.startBatchProcessing();
+    }
   }
   
   /**
