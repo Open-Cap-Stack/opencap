@@ -1,6 +1,8 @@
-// controllers/Notification.js
-
-const Notification = require('../models/Notification');
+/**
+ * Notification Controller
+ * Issue #20: Migrate to ZeroDB via DatabaseAdapter
+ */
+const databaseAdapter = require('../services/databaseAdapter');
 
 // Create a new notification
 exports.createNotification = async (req, res) => {
@@ -11,7 +13,7 @@ exports.createNotification = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const newNotification = new Notification({
+    const notificationData = {
       notificationId,
       notificationType,
       title,
@@ -20,9 +22,9 @@ exports.createNotification = async (req, res) => {
       Timestamp,
       RelatedObjects,
       UserInvolved,
-    });
+    };
 
-    const savedNotification = await newNotification.save();
+    const savedNotification = await databaseAdapter.create('Notification', notificationData);
     res.status(201).json(savedNotification);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create notification', error: error.message });
@@ -32,7 +34,7 @@ exports.createNotification = async (req, res) => {
 // Get all notifications
 exports.getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find();
+    const notifications = await databaseAdapter.find('Notification', {});
     res.status(200).json({ notifications });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve notifications', error: error.message });
@@ -42,7 +44,7 @@ exports.getNotifications = async (req, res) => {
 // Get a notification by ID
 exports.getNotificationById = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const notification = await databaseAdapter.findById('Notification', req.params.id);
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
@@ -55,7 +57,7 @@ exports.getNotificationById = async (req, res) => {
 // Delete a notification by ID
 exports.deleteNotification = async (req, res) => {
   try {
-    const deletedNotification = await Notification.findByIdAndDelete(req.params.id);
+    const deletedNotification = await databaseAdapter.findByIdAndDelete('Notification', req.params.id);
     if (!deletedNotification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
