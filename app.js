@@ -231,6 +231,9 @@ const routes = {
   financialDataRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialDataRoutes')),
   semanticSearchRoutes: safeRequire(path.join(__dirname, 'routes/v1/semanticSearchRoutes')),
   syncAdminRoutes: safeRequire(path.join(__dirname, 'routes/v1/syncAdminRoutes')), // GitHub Issue #14: Sync admin routes
+  agentMemoryRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentMemoryRoutes')), // Issue #27: Agent memory for AI features\n  fileStorageRoutes: safeRequire(path.join(__dirname, 'routes/v1/fileStorageRoutes')), // Issue #30: File storage integration
+  rlhfRoutes: safeRequire(path.join(__dirname, 'routes/v1/rlhfRoutes')), // Issue #29: RLHF data collection
+  eventStreamingRoutes: safeRequire(path.join(__dirname, 'routes/v1/eventStreamingRoutes')), // Issue #28: Event streaming for real-time updates
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -291,6 +294,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/documents/search';
     } else if (key === 'syncAdminRoutes') {
       path = '/api/v1/sync';
+    } else if (key === 'agentMemoryRoutes') {
+      path = '/api/v1/agent-memory';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
