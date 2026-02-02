@@ -1,6 +1,14 @@
-import ShareClass from '../models/ShareClass.js';
+/**
+ * ShareClass Controller - ZeroDB Migration
+ * Issue #20 - Batch 3 Controllers
+ * Uses DatabaseAdapter for database-agnostic operations
+ */
 
-export const createShareClass = async (req, res) => {
+const databaseAdapter = require('../services/databaseAdapter');
+
+const MODEL_NAME = 'ShareClass';
+
+const createShareClass = async (req, res) => {
   const { name, description } = req.body;
 
   if (!name || !description) {
@@ -8,26 +16,25 @@ export const createShareClass = async (req, res) => {
   }
 
   try {
-    const shareClass = new ShareClass({ name, description });
-    await shareClass.save();
+    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description });
     res.status(201).json({ shareClass });
   } catch (error) {
     res.status(500).json({ error: 'Error creating share class' });
   }
 };
 
-export const getAllShareClasses = async (req, res) => {
+const getAllShareClasses = async (req, res) => {
   try {
-    const shareClasses = await ShareClass.find();
+    const shareClasses = await databaseAdapter.find(MODEL_NAME, {});
     res.status(200).json({ shareClasses });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching share classes' });
   }
 };
 
-export const getShareClassById = async (req, res) => {
+const getShareClassById = async (req, res) => {
   try {
-    const shareClass = await ShareClass.findById(req.params.id);
+    const shareClass = await databaseAdapter.findById(MODEL_NAME, req.params.id);
     if (!shareClass) {
       return res.status(404).json({ error: 'Share class not found' });
     }
@@ -37,9 +44,9 @@ export const getShareClassById = async (req, res) => {
   }
 };
 
-export const updateShareClassById = async (req, res) => {
+const updateShareClassById = async (req, res) => {
   try {
-    const updatedShareClass = await ShareClass.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedShareClass = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, req.params.id, req.body, { new: true });
     if (!updatedShareClass) {
       return res.status(404).json({ error: 'Share class not found' });
     }
@@ -49,9 +56,9 @@ export const updateShareClassById = async (req, res) => {
   }
 };
 
-export const deleteShareClassById = async (req, res) => {
+const deleteShareClassById = async (req, res) => {
   try {
-    const deletedShareClass = await ShareClass.findByIdAndDelete(req.params.id);
+    const deletedShareClass = await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
     if (!deletedShareClass) {
       return res.status(404).json({ error: 'Share class not found' });
     }
@@ -59,4 +66,12 @@ export const deleteShareClassById = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Error deleting share class' });
   }
+};
+
+module.exports = {
+  createShareClass,
+  getAllShareClasses,
+  getShareClassById,
+  updateShareClassById,
+  deleteShareClassById,
 };

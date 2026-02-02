@@ -1,17 +1,25 @@
-const IntegrationModule = require('../models/integrationModel');
+/**
+ * Integration Controller - ZeroDB Migration
+ * Issue #20 - Batch 3 Controllers
+ * Uses DatabaseAdapter for database-agnostic operations
+ */
+
+const databaseAdapter = require('../services/databaseAdapter');
+
+const MODEL_NAME = 'IntegrationModule';
 
 async function createIntegrationModule(req, res, next) {
   try {
-    const { IntegrationID, ToolName, Description, Link } = req.body; // Updated field name
+    const { IntegrationID, ToolName, Description, Link } = req.body;
 
-    const integrationModule = new IntegrationModule({
+    const integrationData = {
       IntegrationID,
       ToolName,
       Description,
-      Link, // Updated field name
-    });
+      Link,
+    };
 
-    const newIntegrationModule = await integrationModule.save();
+    const newIntegrationModule = await databaseAdapter.create(MODEL_NAME, integrationData);
     res.status(201).json(newIntegrationModule);
   } catch (error) {
     if (error.name === 'ValidationError') {

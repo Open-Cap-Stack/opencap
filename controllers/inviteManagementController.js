@@ -1,22 +1,26 @@
-// inviteManagementController.js
-const Invite = require('../models/inviteManagementModel');
+/**
+ * Invite Management Controller - ZeroDB Migration
+ * Issue #20 - Batch 3 Controllers
+ * Uses DatabaseAdapter for database-agnostic operations
+ */
+
+const databaseAdapter = require('../services/databaseAdapter');
+
+const MODEL_NAME = 'Invite';
 
 exports.createInvite = async (req, res) => {
   try {
-    const newInvite = new Invite(req.body);
-    const savedInvite = await newInvite.save();
-    res.status(201).json(savedInvite); // Ensure this returns an object
+    const savedInvite = await databaseAdapter.create(MODEL_NAME, req.body);
+    res.status(201).json(savedInvite);
   } catch (error) {
     console.error('Error creating invite:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 
-
-
 exports.getAllInvites = async (req, res) => {
   try {
-    const invites = await Invite.find();
+    const invites = await databaseAdapter.find(MODEL_NAME, {});
     res.status(200).json(invites);
   } catch (error) {
     console.error('Error fetching invites:', error);
@@ -26,7 +30,7 @@ exports.getAllInvites = async (req, res) => {
 
 exports.getInviteById = async (req, res) => {
   try {
-    const invite = await Invite.findById(req.params.id);
+    const invite = await databaseAdapter.findById(MODEL_NAME, req.params.id);
     if (!invite) {
       return res.status(404).json({ message: 'Invite not found' });
     }
@@ -39,7 +43,7 @@ exports.getInviteById = async (req, res) => {
 
 exports.updateInvite = async (req, res) => {
   try {
-    const updatedInvite = await Invite.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedInvite = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, req.params.id, req.body, { new: true });
     if (!updatedInvite) {
       return res.status(404).json({ message: 'Invite not found' });
     }
@@ -52,7 +56,7 @@ exports.updateInvite = async (req, res) => {
 
 exports.deleteInvite = async (req, res) => {
   try {
-    const result = await Invite.findByIdAndDelete(req.params.id);
+    const result = await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
     if (!result) {
       return res.status(404).json({ message: 'Invite not found' });
     }
