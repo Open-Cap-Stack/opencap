@@ -12,6 +12,7 @@ const router = express.Router();
 let monitoringDashboard;
 let alertService;
 let performanceOptimizer;
+let zerodbMonitoringService;
 
 /**
  * Initialize monitoring routes with service instances
@@ -20,6 +21,7 @@ function initializeMonitoring(services) {
   monitoringDashboard = services.monitoringDashboard;
   alertService = services.alertService;
   performanceOptimizer = services.performanceOptimizer;
+  zerodbMonitoringService = services.zerodbMonitoringService;
 }
 
 /**
@@ -411,6 +413,315 @@ router.post('/performance/export', (req, res) => {
         data
       });
     }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// =====================================
+// ZeroDB Monitoring Service Endpoints
+// =====================================
+
+/**
+ * GET /api/v1/monitoring/zerodb/dashboard
+ * Get comprehensive ZeroDB monitoring dashboard data
+ */
+router.get('/zerodb/dashboard', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const dashboard = zerodbMonitoringService.getDashboardData();
+    res.json({
+      success: true,
+      data: dashboard
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/metrics
+ * Get current ZeroDB operation metrics
+ */
+router.get('/zerodb/metrics', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const metrics = zerodbMonitoringService.getMetrics();
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/metrics/prometheus
+ * Get ZeroDB metrics in Prometheus format
+ */
+router.get('/zerodb/metrics/prometheus', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const prometheusText = zerodbMonitoringService.getPrometheusMetrics();
+    res.set('Content-Type', 'text/plain');
+    res.send(prometheusText);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/slow-queries
+ * Get slow ZeroDB queries
+ */
+router.get('/zerodb/slow-queries', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const threshold = parseInt(req.query.threshold) || undefined;
+    const slowQueries = zerodbMonitoringService.getSlowQueries(threshold);
+    const analysis = zerodbMonitoringService.analyzeSlowQueries();
+    res.json({
+      success: true,
+      data: {
+        slowQueries,
+        analysis
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/alerts
+ * Get active ZeroDB alerts
+ */
+router.get('/zerodb/alerts', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const alerts = zerodbMonitoringService.getActiveAlerts();
+    res.json({
+      success: true,
+      data: {
+        count: alerts.length,
+        alerts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/recommendations/indexes
+ * Get ZeroDB index recommendations
+ */
+router.get('/zerodb/recommendations/indexes', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const recommendations = zerodbMonitoringService.getIndexRecommendations();
+    res.json({
+      success: true,
+      data: {
+        count: recommendations.length,
+        recommendations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/recommendations/caching
+ * Get ZeroDB caching recommendations
+ */
+router.get('/zerodb/recommendations/caching', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const recommendations = zerodbMonitoringService.getCachingRecommendations();
+    res.json({
+      success: true,
+      data: recommendations
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/timeseries/:metricPath
+ * Get ZeroDB time series data
+ */
+router.get('/zerodb/timeseries/:metricPath', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const { metricPath } = req.params;
+    const timeRange = parseInt(req.query.timeRange) || 3600000;
+    const timeSeries = zerodbMonitoringService.getTimeSeries(metricPath, timeRange);
+    res.json({
+      success: true,
+      data: {
+        metricPath,
+        timeRange,
+        dataPoints: timeSeries
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/monitoring/zerodb/operations/recent
+ * Get recent ZeroDB operations
+ */
+router.get('/zerodb/operations/recent', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const limit = parseInt(req.query.limit) || 100;
+    const operations = zerodbMonitoringService.getRecentOperations(limit);
+    res.json({
+      success: true,
+      data: {
+        count: operations.length,
+        operations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/monitoring/zerodb/export
+ * Export ZeroDB monitoring data
+ */
+router.post('/zerodb/export', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    const format = req.query.format || 'json';
+    const data = zerodbMonitoringService.exportData(format);
+
+    if (format === 'json') {
+      res.set('Content-Type', 'application/json');
+      res.set(
+        'Content-Disposition',
+        `attachment; filename="zerodb-monitoring-${Date.now()}.json"`
+      );
+      res.send(data);
+    } else {
+      res.json({
+        success: true,
+        data
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/monitoring/zerodb/reset
+ * Reset ZeroDB monitoring data (admin only)
+ */
+router.post('/zerodb/reset', (req, res) => {
+  try {
+    if (!zerodbMonitoringService) {
+      return res.status(503).json({
+        success: false,
+        error: 'ZeroDB monitoring service not initialized'
+      });
+    }
+    zerodbMonitoringService.reset();
+    res.json({
+      success: true,
+      message: 'ZeroDB monitoring data reset successfully'
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
