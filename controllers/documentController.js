@@ -8,6 +8,8 @@
 const zerodbService = require('../services/zerodbService');
 const vectorService = require('../services/vectorService');
 const websocketService = require('../services/websocketService');
+const fileStorageService = require('../services/fileStorageService');
+const eventStreamingService = require('../services/eventStreamingService');
 
 const TABLE_NAME = 'documents';
 
@@ -640,5 +642,302 @@ exports.bulkIndexDocuments = async (req, res) => {
     } catch (error) {
         console.error('Bulk indexing error:', error);
         res.status(500).json({ message: 'Bulk indexing failed', error: error.message });
+    }
+};
+
+/**
+ * Helper function to check document access permissions
+ * @param {Object} document - The document to check access for
+ * @param {Object} user - The requesting user
+ * @returns {boolean} - Whether the user has access
+ */
+const checkDocumentAccess = (document, user) => {
+    // Admin users have access to all documents
+    if (user?.role === 'admin') {
+        return true;
+    }
+
+    // Public documents are accessible to everyone
+    if (document.accessLevel === 'public') {
+        return true;
+    }
+
+    // Document owner has access
+    if (document.uploadedBy === user?.userId) {
+        return true;
+    }
+
+    // Users in sharedWith array have access
+    if (document.sharedWith && document.sharedWith.includes(user?.userId)) {
+        return true;
+    }
+
+    // Company-level documents are accessible to users in the same company
+    if (document.accessLevel === 'company' && document.companyId === user?.companyId) {
+        return true;
+    }
+
+    return false;
+};
+
+/**
+ * Get preview type based on content type
+ * @param {string} contentType - MIME type of the file
+ * @returns {Object} - Preview info with type and availability
+ */
+const getPreviewInfo = (contentType) => {
+    // PDF files
+    if (contentType === 'application/pdf') {
+        return { previewAvailable: true, previewType: 'pdf' };
+    }
+
+    // Image files
+    if (contentType && contentType.startsWith('image/')) {
+        return { previewAvailable: true, previewType: 'image' };
+    }
+
+    // Word documents
+    if (contentType === 'application/msword' ||
+        contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return { previewAvailable: true, previewType: 'document' };
+    }
+
+    // Excel spreadsheets
+    if (contentType === 'application/vnd.ms-excel' ||
+        contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        return { previewAvailable: true, previewType: 'spreadsheet' };
+    }
+
+    // Text files
+    if (contentType === 'text/plain' || contentType === 'text/csv') {
+        return { previewAvailable: true, previewType: 'text' };
+    }
+
+    // Unsupported types
+    return { previewAvailable: false, previewType: null };
+};
+
+/**
+ * Download a document file
+ * Issue #122: Document download endpoint
+ */
+exports.downloadDocument = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { attachment = 'true' } = req.query;
+
+        // Get document from ZeroDB
+        const result = await zerodbService.queryTable(TABLE_NAME, {
+            filter: { id },
+            limit: 1
+        });
+
+        const documents = result.rows || result;
+        const document = documents[0];
+
+        if (!document) {
+            return res.status(404).json({ message: 'Document not found' });
+        }
+
+        // Check access permissions
+        if (!checkDocumentAccess(document, req.user)) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Check if document has a file attached
+        if (!document.fileId) {
+            return res.status(404).json({ message: 'No file attached to document' });
+        }
+
+        // Download file from storage service
+        let fileData;
+        try {
+            fileData = await fileStorageService.downloadFile(document.fileId, {
+                includeMetadata: true
+            });
+        } catch (fileError) {
+            console.error('File download error:', fileError);
+            return res.status(500).json({ message: 'Failed to download file' });
+        }
+
+        // Set response headers
+        const contentType = document.contentType || fileData.contentType || 'application/octet-stream';
+        const fileName = document.fileName || 'document';
+        const disposition = attachment === 'true' ? 'attachment' : 'inline';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+
+        if (fileData.size) {
+            res.setHeader('Content-Length', fileData.size);
+        }
+
+        // Log download in audit trail
+        try {
+            await eventStreamingService.publishEvent({
+                topic: 'document.downloaded',
+                payload: {
+                    documentId: document.id || document._id,
+                    fileName: document.fileName,
+                    userId: req.user?.userId,
+                    timestamp: new Date().toISOString()
+                },
+                metadata: {
+                    actorId: req.user?.userId,
+                    action: 'download'
+                }
+            });
+        } catch (auditError) {
+            console.warn('Audit logging failed:', auditError.message);
+            // Don't fail the download if audit logging fails
+        }
+
+        // Send the file data
+        res.status(200).send(fileData.data);
+    } catch (error) {
+        console.error('Document download error:', error);
+        res.status(500).json({ message: 'Failed to download document', error: error.message });
+    }
+};
+
+/**
+ * Get document preview metadata
+ * Issue #122: Document preview endpoint
+ */
+exports.getDocumentPreview = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get document from ZeroDB
+        const result = await zerodbService.queryTable(TABLE_NAME, {
+            filter: { id },
+            limit: 1
+        });
+
+        const documents = result.rows || result;
+        const document = documents[0];
+
+        if (!document) {
+            return res.status(404).json({ message: 'Document not found' });
+        }
+
+        // Check access permissions
+        if (!checkDocumentAccess(document, req.user)) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Check if document has a file attached
+        if (!document.fileId) {
+            return res.status(404).json({ message: 'No file attached to document' });
+        }
+
+        // Get file metadata from storage service
+        let fileMetadata;
+        try {
+            fileMetadata = await fileStorageService.getFileMetadata(document.fileId);
+        } catch (metadataError) {
+            console.error('File metadata error:', metadataError);
+            return res.status(500).json({ message: 'Failed to get preview metadata' });
+        }
+
+        const contentType = document.contentType || fileMetadata.contentType;
+        const previewInfo = getPreviewInfo(contentType);
+
+        // Build response
+        const response = {
+            documentId: document.id || document._id,
+            fileName: document.fileName || fileMetadata.fileName,
+            contentType: contentType,
+            fileSize: document.fileSize || fileMetadata.size,
+            ...previewInfo
+        };
+
+        // Add dimensions for images
+        if (previewInfo.previewType === 'image' && fileMetadata.metadata) {
+            if (fileMetadata.metadata.width && fileMetadata.metadata.height) {
+                response.dimensions = {
+                    width: fileMetadata.metadata.width,
+                    height: fileMetadata.metadata.height
+                };
+            }
+        }
+
+        // Add page count for PDFs
+        if (previewInfo.previewType === 'pdf' && fileMetadata.metadata?.pageCount) {
+            response.pageCount = fileMetadata.metadata.pageCount;
+        }
+
+        // Add message for unsupported types
+        if (!previewInfo.previewAvailable) {
+            response.message = 'Preview not available for this file type';
+        }
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Document preview error:', error);
+        res.status(500).json({ message: 'Failed to get document preview', error: error.message });
+    }
+};
+
+/**
+ * Get document access permissions
+ * Issue #122: Document access endpoint
+ */
+exports.getDocumentAccess = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get document from ZeroDB
+        const result = await zerodbService.queryTable(TABLE_NAME, {
+            filter: { id },
+            limit: 1
+        });
+
+        const documents = result.rows || result;
+        const document = documents[0];
+
+        if (!document) {
+            return res.status(404).json({ message: 'Document not found' });
+        }
+
+        // Check if user has any access to view access info
+        // For private documents, only owner, shared users, admins, or same company users can see access info
+        const hasBasicAccess = checkDocumentAccess(document, req.user);
+
+        if (!hasBasicAccess) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Determine current user's permissions
+        const isAdmin = req.user?.role === 'admin';
+        const isOwner = document.uploadedBy === req.user?.userId;
+
+        // Calculate permissions
+        const currentUserPermissions = {
+            canView: true, // If they got this far, they can view
+            canDownload: true, // View implies download for most cases
+            canEdit: isAdmin || isOwner,
+            canDelete: isAdmin || isOwner,
+            canShare: isAdmin || isOwner
+        };
+
+        // Build response
+        const response = {
+            documentId: document.id || document._id,
+            accessLevel: document.accessLevel,
+            owner: document.uploadedBy,
+            sharedWith: document.sharedWith || [],
+            currentUserPermissions
+        };
+
+        // Add permissions object if it exists on the document
+        if (document.permissions) {
+            response.permissions = document.permissions;
+        }
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Document access error:', error);
+        res.status(500).json({ message: 'Failed to get document access info' });
     }
 };
