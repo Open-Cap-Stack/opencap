@@ -251,6 +251,7 @@ const routes = {
   eventStreamingRoutes: safeRequire(path.join(__dirname, 'routes/v1/eventStreamingRoutes')), // Issue #28: Event streaming
   fileStorageRoutes: safeRequire(path.join(__dirname, 'routes/v1/fileStorageRoutes')), // Issue #30: File storage
   safeRoutes: safeRequire(path.join(__dirname, 'routes/v1/safeRoutes')), // Issue #64, #66, #68: SAFE management
+  taskRoutes: safeRequire(path.join(__dirname, 'routes/v1/taskRoutes')), // Issue #121: Task management
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -321,6 +322,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/files';
     } else if (key === 'safeRoutes') {
       path = '/api/v1/safes';
+    } else if (key === 'taskRoutes') {
+      path = '/api/v1/tasks';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
