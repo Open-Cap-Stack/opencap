@@ -20,7 +20,7 @@ const SPVSchema = new mongoose.Schema({
   },
   Status: {
     type: String,
-    enum: ['Active', 'Pending', 'Closed'],
+    enum: ['active', 'draft', 'pending', 'closed', 'liquidated'],
     required: true,
   },
   ParentCompanyID: {

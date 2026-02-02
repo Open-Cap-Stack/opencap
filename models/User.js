@@ -31,10 +31,10 @@ const userSchema = new mongoose.Schema({
   },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { 
-    type: String, 
-    required: true, 
-    enum: ['admin', 'manager', 'user', 'client'] 
+  role: {
+    type: String,
+    required: true,
+    enum: ['admin', 'founder', 'investor', 'manager', 'user', 'client']
   },
   // Add permissions array for RBAC
   permissions: {
@@ -50,6 +50,24 @@ const userSchema = new mongoose.Schema({
           'read:assets', 'write:assets', 'delete:assets',
           'read:compliance', 'write:compliance', 'delete:compliance',
           'admin:all'
+        ],
+        founder: [
+          'read:users', 'write:users',
+          'read:companies', 'write:companies',
+          'read:reports', 'write:reports',
+          'read:spv', 'write:spv',
+          'read:assets', 'write:assets',
+          'read:compliance', 'write:compliance',
+          'read:equity', 'write:equity'
+        ],
+        investor: [
+          'read:users',
+          'read:companies',
+          'read:reports',
+          'read:spv',
+          'read:assets',
+          'read:compliance',
+          'read:equity'
         ],
         manager: [
           'read:users', 'write:users',
