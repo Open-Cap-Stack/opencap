@@ -1,7 +1,22 @@
 /**
  * MongoDB Connection Module
  * Feature: OCDI-101: Set up MongoDB connection
- * 
+ * Issue #32: MongoDB is OPTIONAL - Only for Continuous Sync Feature
+ *
+ * IMPORTANT: This module is ONLY used for the continuous sync feature (GitHub Issue #14).
+ * MongoDB is NOT the primary database - ZeroDB is used for all application data.
+ *
+ * This connection is only established when:
+ * - SYNC_ENABLED=true in environment variables
+ * - The continuous sync feature is active
+ *
+ * Purpose: Real-time synchronization from MongoDB to ZeroDB using Change Streams
+ *
+ * If you want to run OpenCap Stack without MongoDB:
+ * 1. Set SYNC_ENABLED=false (or omit it)
+ * 2. Comment out MONGODB_URI in .env
+ * 3. The application will work perfectly with ZeroDB only
+ *
  * This module provides centralized MongoDB connection management
  * with environment-specific configuration and error handling.
  */

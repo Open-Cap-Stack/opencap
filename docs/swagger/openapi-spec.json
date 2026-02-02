@@ -2706,6 +2706,616 @@
         }
       }
     },
+    "/api/v1/documents/search": {
+      "post": {
+        "summary": "Search documents using semantic search",
+        "description": "Performs natural language search across indexed documents using vector similarity",
+        "tags": [
+          "Semantic Search"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Natural language search query",
+                    "minLength": 2,
+                    "maxLength": 1000,
+                    "example": "stock options vesting schedule"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "properties": {
+                      "companyId": {
+                        "type": "string",
+                        "description": "Filter by company ID"
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "Filter by document category"
+                      },
+                      "categories": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Filter by multiple categories"
+                      },
+                      "dateRange": {
+                        "type": "object",
+                        "properties": {
+                          "start": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "end": {
+                            "type": "string",
+                            "format": "date"
+                          }
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "archived",
+                          "deleted"
+                        ]
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1,
+                    "description": "Page number for pagination"
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 10,
+                    "description": "Number of results per page"
+                  },
+                  "minRelevance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 0,
+                    "description": "Minimum relevance score threshold"
+                  },
+                  "highlight": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Include highlighted excerpts in results"
+                  },
+                  "includeContent": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Include full document content in results"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results"
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "500": {
+            "description": "Search service error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/search/suggestions": {
+      "get": {
+        "summary": "Get search suggestions",
+        "description": "Returns autocomplete suggestions based on partial query",
+        "tags": [
+          "Semantic Search"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Partial search query"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Maximum number of suggestions"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search suggestions"
+          },
+          "400": {
+            "description": "Missing query parameter"
+          },
+          "500": {
+            "description": "Service error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/search/analytics": {
+      "get": {
+        "summary": "Get search analytics",
+        "description": "Returns analytics about search usage",
+        "tags": [
+          "Semantic Search"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter analytics by company"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search analytics data"
+          },
+          "500": {
+            "description": "Service error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/status": {
+      "get": {
+        "summary": "Get overall sync health and status",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "orchestrator": {
+                          "type": "object"
+                        },
+                        "mongoToZerodb": {
+                          "type": "object"
+                        },
+                        "zerodbToMongo": {
+                          "type": "object"
+                        },
+                        "connections": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/health": {
+      "get": {
+        "summary": "Get comprehensive health status for both sync directions",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Health status retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/metrics": {
+      "get": {
+        "summary": "Get detailed sync metrics",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/start": {
+      "post": {
+        "summary": "Start sync services",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync services started successfully"
+          },
+          "400": {
+            "description": "Sync already running or disabled"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/stop": {
+      "post": {
+        "summary": "Stop sync services",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync services stopped successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/pause": {
+      "post": {
+        "summary": "Temporarily pause sync services",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync services paused successfully"
+          },
+          "400": {
+            "description": "Sync not running"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/resume": {
+      "post": {
+        "summary": "Resume paused sync services",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync services resumed successfully"
+          },
+          "400": {
+            "description": "Sync not paused"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/resync/{collection}": {
+      "post": {
+        "summary": "Trigger full resync for a collection",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "collection",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Collection name to resync"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "mongo-to-zerodb",
+                      "zerodb-to-mongo"
+                    ],
+                    "default": "mongo-to-zerodb"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resync completed successfully"
+          },
+          "400": {
+            "description": "Invalid collection or direction"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/queues": {
+      "get": {
+        "summary": "Get sync queue depths and pending items",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue information retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/circuit-breakers": {
+      "get": {
+        "summary": "Get circuit breaker status for both sync directions",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Circuit breaker status retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/change-stream/stats": {
+      "get": {
+        "summary": "Get MongoDB change stream statistics",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Change stream statistics retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/change-stream/dead-letter-queue": {
+      "get": {
+        "summary": "Get dead letter queue entries from change stream",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "Maximum number of entries to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dead letter queue entries retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/change-stream/dead-letter-queue/reprocess": {
+      "post": {
+        "summary": "Reprocess dead letter queue entries",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "default": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dead letter queue entries reprocessed"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/change-stream/restart/{collection}": {
+      "post": {
+        "summary": "Restart change stream for a specific collection",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "collection",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Collection name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Change stream restarted successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/config": {
+      "get": {
+        "summary": "Get current sync configuration",
+        "tags": [
+          "Sync Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration retrieved successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/analytics/dashboard": {
       "get": {
         "tags": [
@@ -15616,5 +16226,10 @@
       }
     }
   },
-  "tags": []
+  "tags": [
+    {
+      "name": "Sync Admin",
+      "description": "Bidirectional sync management between MongoDB and ZeroDB"
+    }
+  ]
 }

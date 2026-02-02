@@ -1,9 +1,23 @@
 /**
  * Database Abstraction Layer
  *
+ * [Issue #32] MongoDB Dependency Clarification
+ *
+ * IMPORTANT: This adapter supports multiple database modes for migration scenarios.
+ * MongoDB support is OPTIONAL - ZeroDB is the recommended primary database.
+ *
  * Provides unified interface for routing operations between MongoDB and ZeroDB
- * Supports three migration modes: parallel, zerodb-only, mongodb-only
+ * Supports three migration modes:
+ * - zerodb-only: Use ZeroDB exclusively (RECOMMENDED)
+ * - mongodb-only: Use MongoDB exclusively (legacy)
+ * - parallel: Write to both, read from MongoDB with ZeroDB fallback (migration mode)
+ *
  * Includes metrics collection, fallback logic, and data consistency validation
+ *
+ * Set MIGRATION_MODE environment variable to control behavior:
+ * - MIGRATION_MODE=zerodb-only (recommended for new deployments)
+ * - MIGRATION_MODE=parallel (for migration period)
+ * - MIGRATION_MODE=mongodb-only (legacy, not recommended)
  */
 
 const mongoose = require('mongoose');

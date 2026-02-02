@@ -41,9 +41,11 @@ Following our principle of verifying existing resources before creating new ones
 kubectl get secrets -n opencap
 kubectl get services -n opencap
 
-# Deploy MongoDB and PostgreSQL
+# Deploy MongoDB (for legacy data)
 kubectl apply -f kubernetes/mongodb.yaml
-kubectl apply -f kubernetes/postgres.yaml
+
+# Note: ZeroDB is used as the primary database via MCP server connection
+# No deployment needed - accessed via API
 
 # Verify deployments are running
 kubectl get pods -n opencap
@@ -148,8 +150,8 @@ curl -H "apikey: OpenCapAPIKey1234" https://api.opencap.example.com/health
 # Verify MongoDB connectivity
 kubectl exec -it $(kubectl get pod -l app=opencap-api -n opencap -o jsonpath="{.items[0].metadata.name}") -n opencap -- node -e "const mongoose = require('mongoose'); mongoose.connect(process.env.MONGO_URI).then(() => console.log('MongoDB Connected')).catch(err => console.error(err));"
 
-# Verify PostgreSQL connectivity
-kubectl exec -it $(kubectl get pod -l app=opencap-api -n opencap -o jsonpath="{.items[0].metadata.name}") -n opencap -- node -e "const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL }); pool.query('SELECT NOW()', (err, res) => { console.log(err ? err : 'PostgreSQL Connected'); pool.end(); });"
+# Verify ZeroDB connectivity (via MCP server)
+curl -H "apikey: OpenCapAPIKey1234" https://api.opencap.example.com/api/zerodb/health
 ```
 
 ## Troubleshooting
@@ -167,7 +169,6 @@ To remove the deployment:
 ```bash
 kubectl delete -f kubernetes/kong-gateway.yaml
 kubectl delete -f kubernetes/opencap-api.yaml
-kubectl delete -f kubernetes/postgres.yaml
 kubectl delete -f kubernetes/mongodb.yaml
 kubectl delete namespace opencap
 kubectl delete namespace kong
