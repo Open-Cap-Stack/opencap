@@ -171,8 +171,8 @@ I've created these helper scripts you can run:
 
 ```bash
 # Make executable and run
-chmod +x run-servers.sh
-./run-servers.sh
+chmod +x scripts/run-servers.sh
+./scripts/run-servers.sh
 ```
 
 Or use Node directly:

@@ -1,0 +1,33 @@
+#!/bin/bash
+# Commit Message Hook - AI Attribution Enforcement
+# Blocks third-party AI tool attribution in commit messages
+
+COMMIT_MSG_FILE=$1
+
+echo "🔍 Checking commit message for AI attribution..."
+
+# Block third-party AI tool attribution
+if grep -qiE "(claude|anthropic|chatgpt|openai.*generated|copilot.*generated|co-authored-by:.*claude|co-authored-by:.*chatgpt|co-authored-by:.*copilot|generated with claude|generated with chatgpt|generated with.*https://claude\.com)" "$COMMIT_MSG_FILE"; then
+    echo "❌ ERROR: Commit message contains FORBIDDEN third-party AI attribution!"
+    echo ""
+    echo "🚫 FORBIDDEN TERMS DETECTED:"
+    echo "  - Claude, Anthropic, claude.com"
+    echo "  - ChatGPT, OpenAI (as code author)"
+    echo "  - Copilot, GitHub Copilot"
+    echo "  - 'Generated with', 'Powered by' + third-party tools"
+    echo "  - 'Co-Authored-By: Claude/ChatGPT/Copilot'"
+    echo ""
+    echo "✅ ALLOWED - Use AINative branding instead:"
+    echo "  - Built by AINative Dev Team"
+    echo "  - Built Using AINative Studio"
+    echo "  - All Data Services Built on ZeroDB"
+    echo "  - Powered by AINative Cloud"
+    echo "  - Built by Agent Swarm"
+    echo ""
+    echo "📖 See .ainative/git-rules.md for complete guidelines"
+    echo ""
+    exit 1
+fi
+
+echo "✅ Commit message: PASS"
+exit 0

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://google-gemini.github.io/gemini-cli/schemas/settings.schema.json",
+  "version": "1.0.0",
+  "project": {
+    "name": "AINative Studio Website (Next.js)",
+    "type": "web-application",
+    "framework": "next.js",
+    "language": "typescript"
+  },
+  "paths": {
+    "nextjs": "/Users/aideveloper/ainative-website-nextjs-staging",
+    "vite_reference": "/Users/aideveloper/core/AINative-website",
+    "include_directories": [
+      "app",
+      "components",
+      "lib",
+      "services",
+      "public"
+    ],
+    "exclude_patterns": [
+      "node_modules",
+      ".next",
+      "dist",
+      "build",
+      "*.test.ts",
+      "*.test.tsx"
+    ]
+  },
+  "context": {
+    "primary_context_file": ".ainative/AINATIVE.md",
+    "supplementary_files": [
+      ".claude/CLAUDE.md",
+      "gaps-backlog.md",
+      "design-gaps-backlog.md",
+      "seo-gaps-backlog.md",
+      "GAP_ANALYSIS_SUMMARY.md",
+      "DESIGN_GAP_ANALYSIS_SUMMARY.md",
+      "SEO_GAP_ANALYSIS_SUMMARY.md"
+    ],
+    "max_context_files": 10
+  },
+  "model": {
+    "default": "gemini-2.5-pro",
+    "context_window": "1M",
+    "temperature": 0.7,
+    "tool_output_summarization": true
+  },
+  "tools": {
+    "enabled": [
+      "file_read",
+      "file_write",
+      "shell",
+      "web_fetch",
+      "memory"
+    ],
+    "shell": {
+      "allowed_commands": [
+        "npm",
+        "git",
+        "node",
+        "npx",
+        "curl",
+        "grep",
+        "find"
+      ],
+      "working_directory": "/Users/aideveloper/ainative-website-nextjs-staging"
+    }
+  },
+  "security": {
+    "trusted_folders": [
+      "/Users/aideveloper/ainative-website-nextjs-staging",
+      "/Users/aideveloper/core/AINative-website"
+    ],
+    "sandbox_profile": "default"
+  },
+  "ui": {
+    "theme": "dark",
+    "show_citations": true,
+    "show_line_numbers": true
+  },
+  "privacy": {
+    "collect_usage_stats": false
+  },
+  "extensions": {
+    "mcp_servers": {
+      "zerodb": {
+        "enabled": true,
+        "description": "ZeroDB vector database and embeddings"
+      },
+      "github": {
+        "enabled": true,
+        "description": "GitHub API integration"
+      },
+      "ainative-design": {
+        "enabled": true,
+        "description": "Design system analysis and token extraction"
+      }
+    }
+  },
+  "ai_coding_rules": {
+    "git_attribution": {
+      "rule": "ZERO_TOLERANCE",
+      "description": "NEVER include AI tool attribution in commits, PRs, or issues",
+      "forbidden_terms": [
+        "Claude",
+        "Anthropic",
+        "claude.com",
+        "Generated with Claude",
+        "Co-Authored-By: Claude",
+        "Gemini",
+        "AI-generated",
+        "🤖 Generated with"
+      ]
+    },
+    "commit_style": {
+      "format": "conventional",
+      "examples": [
+        "feat: Add user authentication",
+        "fix: Resolve navigation bug",
+        "docs: Update API documentation",
+        "style: Format code with Prettier",
+        "refactor: Simplify pricing logic",
+        "test: Add unit tests for services",
+        "chore: Update dependencies"
+      ]
+    },
+    "code_quality": {
+      "linting": "required",
+      "type_checking": "required",
+      "testing": "required_for_features",
+      "min_coverage": 80
+    }
+  },
+  "development": {
+    "port": 3000,
+    "auto_restart": true,
+    "hot_reload": true,
+    "source_maps": true
+  },
+  "deployment": {
+    "target": "railway",
+    "staging_url": "https://ainative-website-nextjs-staging.up.railway.app",
+    "production_url": "https://www.ainative.studio"
+  }
+}

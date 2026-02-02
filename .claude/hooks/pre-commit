@@ -1,0 +1,64 @@
+#!/bin/bash
+# File Placement Pre-commit Hook
+# Enforces .claude/skills/file-placement rules
+
+echo "🔍 Checking file placement rules..."
+
+# Check for .md files in root (except README.md and CLAUDE.md)
+VIOLATIONS=$(git diff --cached --name-only --diff-filter=A | grep -E '^[^/]+\.md$' | grep -v -E '^(README\.md|CLAUDE\.md)$' || true)
+if [ ! -z "$VIOLATIONS" ]; then
+  echo "❌ BLOCKED: Attempting to add .md files to root directory:"
+  echo "$VIOLATIONS"
+  echo ""
+  echo "Per .claude/skills/file-placement rules:"
+  echo "Only README.md and CLAUDE.md are allowed in root."
+  echo ""
+  echo "Move to appropriate docs/ subdirectory:"
+  echo "  - Product docs → docs/product/"
+  echo "  - Planning docs → docs/planning/"
+  echo "  - API docs → docs/api/"
+  echo "  - Implementation → docs/reports/"
+  echo "  - Issues → docs/issues/"
+  echo "  - Backend docs → docs/backend/"
+  echo ""
+  exit 1
+fi
+
+# Check for .sh files in root
+VIOLATIONS=$(git diff --cached --name-only --diff-filter=A | grep -E '^[^/]+\.sh$' || true)
+if [ ! -z "$VIOLATIONS" ]; then
+  echo "❌ BLOCKED: Attempting to add .sh files to root directory:"
+  echo "$VIOLATIONS"
+  echo ""
+  echo "Per .claude/skills/file-placement rules:"
+  echo "All scripts must be in scripts/ directory"
+  echo ""
+  exit 1
+fi
+
+# Check for .sh files in backend (except start.sh)
+VIOLATIONS=$(git diff --cached --name-only --diff-filter=A | grep -E '^backend/.*\.sh$' | grep -v 'backend/start.sh' || true)
+if [ ! -z "$VIOLATIONS" ]; then
+  echo "❌ BLOCKED: Attempting to add .sh files to backend/ (except start.sh):"
+  echo "$VIOLATIONS"
+  echo ""
+  echo "Per .claude/skills/file-placement rules:"
+  echo "All scripts must be in scripts/ directory"
+  echo "Exception: backend/start.sh only"
+  echo ""
+  exit 1
+fi
+
+# Check for .md files in src/backend/
+VIOLATIONS=$(git diff --cached --name-only --diff-filter=A | grep -E '^src/backend/.*\.md$' || true)
+if [ ! -z "$VIOLATIONS" ]; then
+  echo "❌ BLOCKED: Attempting to add .md files to src/backend/:"
+  echo "$VIOLATIONS"
+  echo ""
+  echo "Documentation must be in docs/ directory"
+  echo ""
+  exit 1
+fi
+
+echo "✅ File placement rules: PASS"
+exit 0

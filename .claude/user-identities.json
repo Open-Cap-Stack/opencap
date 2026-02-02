@@ -1,0 +1,16 @@
+{
+  "git_emails": [
+    "utventures@gmail.com",
+    "toby@rely.ventures",
+    "developer@ainative.studio",
+    "admin@ainative.studio"
+  ],
+  "github_usernames": [
+    "urbantech",
+    "relycapital",
+    "developer-ainative"
+  ],
+  "primary_name": "Admin User",
+  "primary_email": "admin@ainative.studio",
+  "description": "All git identities used by this developer across different projects"
+}

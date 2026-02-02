@@ -1,0 +1,35 @@
+#!/bin/bash
+# API Catalog Auto-Sync Hook
+# Detects changes to API routes and suggests syncing the catalog
+
+# Get the list of files changed in the last commit
+CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+# Files that might indicate API changes
+API_FILES=(
+    "src/backend/app/api/"
+    "src/backend/app/main.py"
+    "src/backend/app/api/api_v1/"
+    "src/backend/app/api/v1/"
+)
+
+# Check if any API-related files were changed
+API_CHANGED=false
+for file in $CHANGED_FILES; do
+    for api_path in "${API_FILES[@]}"; do
+        if [[ $file == *"$api_path"* ]]; then
+            API_CHANGED=true
+            break 2
+        fi
+    done
+done
+
+if [ "$API_CHANGED" = true ]; then
+    echo ""
+    echo "🔔 API files were modified in this commit!"
+    echo "   Consider updating the API catalog for agents:"
+    echo ""
+    echo "   Run: /api-catalog-sync"
+    echo "   Or:  python3 scripts/catalog_apis.py"
+    echo ""
+fi

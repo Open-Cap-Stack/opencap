@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://api.ainative.studio/v1/public/api-keys/ -w \"\\nHTTP Status: %{http_code}\\n\")",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(git commit:*)",
+      "Bash(cat:*)",
+      "Bash(chmod:*)",
+      "Bash(tree:*)",
+      "Bash(npm view:*)",
+      "Bash(find:*)",
+      "Bash(git push:*)",
+      "Bash(export RAILWAY_TOKEN=\"796720e7-e088-4589-91ac-bd915eeb0eb0\")",
+      "Bash(railway whoami:*)",
+      "Read(//private/tmp/**)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWI3MTdiZS1mNDQ5LTQzYzYtYWJiNC0xOGExYTZhMGM3MGUiLCJlbWFpbCI6ImFkbWluQGFpbmF0aXZlLnN0dWRpbyIsInJvbGUiOiJBRE1JTiIsImV4cCI6MTc2MTIwMjUwNX0.nLZBsGS195YzMZl-1ZBDdYHtSnbkqk0yA-wDLSKIvyc\")",
+      "Bash(gh issue view:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Read(//Users/aideveloper/ai-kit/packages/tools/**)",
+      "Read(//Users/aideveloper/ocean-backend/**)",
+      "Read(//Users/aideveloper/dothack-backend/python-api/**)",
+      "Bash(source venv/bin/activate)",
+      "Bash(cp:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "ainative-zerodb": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "ainative-zerodb-mcp-server"
+      ],
+      "env": {
+        "ZERODB_USERNAME": "${ZERODB_USERNAME}",
+        "ZERODB_PASSWORD": "${ZERODB_PASSWORD}",
+        "ZERODB_API_URL": "${ZERODB_API_URL:-https://api.ainative.studio}"
+      }
+    },
+    "Railway": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-railway"
+      ],
+      "env": {
+        "RAILWAY_TOKEN": "${RAILWAY_TOKEN}"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "args": [
+        "/Users/aideveloper/core"
+      ]
+    }
+  }
+}
