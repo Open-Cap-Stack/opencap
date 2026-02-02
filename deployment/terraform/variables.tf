@@ -22,28 +22,14 @@ variable "node_count" {
   default     = 3
 }
 
-variable "mongodb_username" {
-  description = "MongoDB username"
-  type        = string
-  default     = "opencap"
-  sensitive   = true
-}
-
-variable "mongodb_password" {
-  description = "MongoDB password"
+variable "zerodb_api_key" {
+  description = "ZeroDB API key for database operations"
   type        = string
   sensitive   = true
 }
 
-variable "postgres_username" {
-  description = "PostgreSQL username"
-  type        = string
-  default     = "postgres"
-  sensitive   = true
-}
-
-variable "postgres_password" {
-  description = "PostgreSQL password"
+variable "ainative_api_token" {
+  description = "AINative API token for ZeroDB authentication"
   type        = string
   sensitive   = true
 }

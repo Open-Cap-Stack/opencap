@@ -2,6 +2,14 @@
 
 This guide outlines the steps to deploy the OpenCap stack on Digital Ocean Kubernetes Service (DOKS), following the Semantic Seed Venture Studio Coding Standards V2.0 principles for secure, quality-focused deployments.
 
+## Architecture Overview
+
+OpenCap uses **ZeroDB** as its primary database, which is accessed via the AINative API. This eliminates the need to deploy and manage local database instances.
+
+- **Primary Database**: ZeroDB (managed via AINative API)
+- **File Storage**: MinIO (S3-compatible) or ZeroDB File Storage
+- **API Gateway**: Kong
+
 ## Prerequisites
 
 1. **Digital Ocean Account**: With permissions to create Kubernetes clusters
@@ -9,6 +17,7 @@ This guide outlines the steps to deploy the OpenCap stack on Digital Ocean Kuber
 3. **kubectl**: Installed and configured
 4. **Docker**: For building and pushing images
 5. **Docker Hub or Digital Ocean Container Registry**: For storing Docker images
+6. **ZeroDB Credentials**: API key and token from https://ainative.studio
 
 ## Step 1: Create Kubernetes Cluster
 
@@ -24,34 +33,20 @@ doctl kubernetes cluster create opencap-cluster \
 doctl kubernetes cluster kubeconfig save opencap-cluster
 ```
 
-## Step 2: Create Namespaces
+## Step 2: Create Namespaces and Secrets
 
 ```bash
 # Create required namespaces
 kubectl apply -f kubernetes/opencap-api.yaml
-kubectl apply -f kubernetes/kong-gateway.yaml
+
+# Create ZeroDB credentials secret
+kubectl create secret generic opencap-api-secret -n opencap \
+  --from-literal=jwt-secret=YOUR_JWT_SECRET \
+  --from-literal=zerodb-api-key=YOUR_ZERODB_API_KEY \
+  --from-literal=ainative-api-token=YOUR_AINATIVE_API_TOKEN
 ```
 
-## Step 3: Deploy Database Services
-
-Following our principle of verifying existing resources before creating new ones:
-
-```bash
-# Check if there are any existing secrets or services
-kubectl get secrets -n opencap
-kubectl get services -n opencap
-
-# Deploy MongoDB (for legacy data)
-kubectl apply -f kubernetes/mongodb.yaml
-
-# Note: ZeroDB is used as the primary database via MCP server connection
-# No deployment needed - accessed via API
-
-# Verify deployments are running
-kubectl get pods -n opencap
-```
-
-## Step 4: Build and Push Docker Images
+## Step 3: Build and Push Docker Images
 
 ```bash
 # Build the OpenCap API Docker image
@@ -61,7 +56,7 @@ docker build -t your-docker-username/opencap-api:latest .
 docker push your-docker-username/opencap-api:latest
 ```
 
-## Step 5: Update Kubernetes Configurations
+## Step 4: Update Kubernetes Configurations
 
 Update the `opencap-api.yaml` file to use your Docker image:
 
@@ -70,7 +65,7 @@ Update the `opencap-api.yaml` file to use your Docker image:
 sed -i 's|\${DOCKER_REGISTRY}/opencap/api:\${IMAGE_TAG}|your-docker-username/opencap-api:latest|g' kubernetes/opencap-api.yaml
 ```
 
-## Step 6: Deploy OpenCap API
+## Step 5: Deploy OpenCap API
 
 ```bash
 # Deploy the OpenCap API
@@ -81,7 +76,7 @@ kubectl get pods -n opencap
 kubectl get services -n opencap
 ```
 
-## Step 7: Deploy Kong API Gateway
+## Step 6: Deploy Kong API Gateway
 
 ```bash
 # Deploy Kong API Gateway
@@ -92,7 +87,7 @@ kubectl get pods -n kong
 kubectl get services -n kong
 ```
 
-## Step 8: Configure DNS
+## Step 7: Configure DNS
 
 Once Kong service receives an external IP:
 
@@ -103,7 +98,7 @@ kubectl get service kong-proxy -n kong
 # Configure your DNS provider to point api.opencap.example.com to this IP
 ```
 
-## Step 9: TLS/SSL Configuration
+## Step 8: TLS/SSL Configuration
 
 For production deployments, configure TLS:
 
@@ -127,6 +122,7 @@ Following secure deployment practices:
 3. **Resource Limits**: All deployments have CPU and memory limits
 4. **Health Checks**: Liveness and readiness probes implemented
 5. **Autoscaling**: HPA configured for the OpenCap API
+6. **ZeroDB Security**: API keys rotated regularly, never committed to version control
 
 ## Monitoring
 
@@ -145,22 +141,31 @@ After deployment, run verification checks to ensure all components are operation
 
 ```bash
 # Verify API health endpoint
-curl -H "apikey: OpenCapAPIKey1234" https://api.opencap.example.com/health
+curl -H "apikey: YOUR_API_KEY" https://api.opencap.example.com/health
 
-# Verify MongoDB connectivity
-kubectl exec -it $(kubectl get pod -l app=opencap-api -n opencap -o jsonpath="{.items[0].metadata.name}") -n opencap -- node -e "const mongoose = require('mongoose'); mongoose.connect(process.env.MONGO_URI).then(() => console.log('MongoDB Connected')).catch(err => console.error(err));"
+# Verify ZeroDB connectivity
+curl -H "apikey: YOUR_API_KEY" https://api.opencap.example.com/api/v1/health/zerodb
 
-# Verify ZeroDB connectivity (via MCP server)
-curl -H "apikey: OpenCapAPIKey1234" https://api.opencap.example.com/api/zerodb/health
+# Check API logs
+kubectl logs deployment/opencap-api -n opencap
 ```
 
 ## Troubleshooting
 
 Common issues and solutions:
 
-1. **Database Connection Issues**: Check credentials in secrets and verify network policies
-2. **API Errors**: Check logs with `kubectl logs deployment/opencap-api -n opencap`
-3. **Kong Gateway Issues**: Check configuration with `kubectl get KongPlugin -n kong`
+1. **ZeroDB Connection Issues**:
+   - Verify API key and token are correct
+   - Check network egress is allowed to api.ainative.studio
+   - Review logs: `kubectl logs deployment/opencap-api -n opencap`
+
+2. **API Errors**:
+   - Check logs with `kubectl logs deployment/opencap-api -n opencap`
+   - Verify environment variables are set correctly
+
+3. **Kong Gateway Issues**:
+   - Check configuration with `kubectl get KongPlugin -n kong`
+   - Review Kong logs: `kubectl logs deployment/kong -n kong`
 
 ## Cleanup
 
@@ -169,7 +174,18 @@ To remove the deployment:
 ```bash
 kubectl delete -f kubernetes/kong-gateway.yaml
 kubectl delete -f kubernetes/opencap-api.yaml
-kubectl delete -f kubernetes/mongodb.yaml
 kubectl delete namespace opencap
 kubectl delete namespace kong
 ```
+
+## Environment Variables Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `ENABLE_ZERODB` | Enable ZeroDB as primary database | Yes |
+| `ZERODB_API_KEY` | ZeroDB API key | Yes |
+| `AINATIVE_API_TOKEN` | AINative API token | Yes |
+| `ZERODB_BASE_URL` | ZeroDB API endpoint | Yes |
+| `JWT_SECRET` | JWT signing secret | Yes |
+| `NODE_ENV` | Node environment (production/development) | Yes |
+| `PORT` | API server port | Yes |

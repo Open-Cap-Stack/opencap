@@ -13,19 +13,19 @@ services:
     working_dir: /app
     command: sh -c "npm install && node app.js"
     depends_on:
-      - postgres
       - minio
-      - spark
-      - airflow-webserver
     environment:
-      - DATABASE_URL=postgres://postgres:88bd0c19ffbace9ed508db3da6d49c97@postgres:5432/opencap
+      # ZeroDB Configuration (Primary Database)
       - ENABLE_ZERODB=true
-      - ZERODB_API_KEY=${ZERODB_API_KEY:-}
+      - ZERODB_API_KEY=${ZERODB_API_KEY}
       - ZERODB_BASE_URL=https://api.ainative.studio/api/v1
       - ZERODB_PROJECT_ID=${ZERODB_PROJECT_ID:-}
+      - AINATIVE_API_TOKEN=${AINATIVE_API_TOKEN}
+      # MinIO Configuration
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minio
       - MINIO_SECRET_KEY=73b27ae78442e20fa0a61dc24b02bb97
+      # Server Configuration
       - NODE_ENV=development
       - PORT=5000
       - CORS_ORIGIN=http://localhost:5173
@@ -47,23 +47,11 @@ services:
     depends_on:
       - app
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: opencap_postgres
-    restart: always
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 88bd0c19ffbace9ed508db3da6d49c97
-      POSTGRES_DB: opencap
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+  # MinIO S3-Compatible Storage
   minio:
     image: minio/minio:latest
     container_name: opencap_minio
-    command: server /data
+    command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -73,9 +61,12 @@ services:
     volumes:
       - minio_data:/data
 
+  # Apache Spark (Optional - for data processing)
   spark:
     image: bitnami/spark:latest
     container_name: opencap_spark
+    profiles:
+      - data-processing
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_PORT=7077
@@ -89,6 +80,8 @@ services:
   spark-worker:
     image: bitnami/spark:latest
     container_name: opencap_spark_worker
+    profiles:
+      - data-processing
     depends_on:
       - spark
     environment:
@@ -99,9 +92,12 @@ services:
     volumes:
       - spark_worker_data:/opt/bitnami/spark
 
+  # Airflow (Optional - for workflow orchestration)
   airflow-webserver:
     image: apache/airflow:2.7.2
     container_name: opencap_airflow_webserver
+    profiles:
+      - workflow
     restart: always
     command: webserver
     ports:
@@ -126,6 +122,8 @@ services:
   airflow-db:
     image: postgres:15-alpine
     container_name: opencap_airflow_db
+    profiles:
+      - workflow
     restart: always
     environment:
       POSTGRES_USER: airflow
@@ -137,6 +135,8 @@ services:
   airflow-redis:
     image: redis:6-alpine
     container_name: opencap_airflow_redis
+    profiles:
+      - workflow
     restart: always
     ports:
       - "6379:6379"
@@ -144,6 +144,8 @@ services:
   airflow-init:
     image: apache/airflow:2.7.2
     container_name: opencap_airflow_init
+    profiles:
+      - workflow
     depends_on:
       - airflow-db
     environment:
@@ -164,6 +166,8 @@ services:
   airflow-scheduler:
     image: apache/airflow:2.7.2
     container_name: opencap_airflow_scheduler
+    profiles:
+      - workflow
     restart: always
     command: scheduler
     depends_on:
@@ -183,7 +187,6 @@ services:
       - ./dags:/opt/airflow/dags
 
 volumes:
-  postgres_data:
   minio_data:
   spark_data:
   spark_worker_data:

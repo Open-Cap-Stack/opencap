@@ -60,11 +60,11 @@ spec:
             secretKeyRef:
               name: opencap-api-secret
               key: zerodb-api-key
-        - name: ZERODB_PROJECT_ID
+        - name: AINATIVE_API_TOKEN
           valueFrom:
             secretKeyRef:
               name: opencap-api-secret
-              key: zerodb-project-id
+              key: ainative-api-token
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -109,8 +109,9 @@ type: Opaque
 data:
   # Base64 encoded values - replace with actual secrets in production
   jwt-secret: T3BlbkNhcEpXVFNlY3JldEtleQ==  # OpenCapJWTSecretKey
-  zerodb-api-key: eW91ci16ZXJvZGItYXBpLWtleQ==  # your-zerodb-api-key (placeholder)
-  zerodb-project-id: eW91ci1wcm9qZWN0LWlk  # your-project-id (placeholder)
+  # ZeroDB credentials - replace with actual values in production
+  zerodb-api-key: eW91cl96ZXJvZGJfYXBpX2tleV9oZXJl  # your_zerodb_api_key_here
+  ainative-api-token: eW91cl9haW5hdGl2ZV9hcGlfdG9rZW5faGVyZQ==  # your_ainative_api_token_here
 ---
 # OpenCap API Service
 apiVersion: v1

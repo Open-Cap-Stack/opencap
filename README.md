@@ -1,6 +1,25 @@
 # OpenCap Stack 🚀
 
-**OpenCap Stack** is a comprehensive MERN stack application designed to manage stakeholders, share classes, documents, activities, notifications, equity simulations, tax calculations, and financial reporting. The project follows a Test-Driven Development (TDD) approach to ensure code quality and reliability and is fully aligned with the Open Cap Table Alliance (OCTA) schema.
+**OpenCap Stack** is a comprehensive financial management application designed to manage stakeholders, share classes, documents, activities, notifications, equity simulations, tax calculations, and financial reporting. The project follows a Test-Driven Development (TDD) approach to ensure code quality and reliability and is fully aligned with the Open Cap Table Alliance (OCTA) schema.
+
+## Architecture Overview 🏗️
+
+OpenCap Stack uses a modern, cloud-native architecture:
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Primary Database** | ZeroDB (AINative) | NoSQL tables, vector search, event streaming |
+| **Backend** | Node.js + Express | REST API server |
+| **File Storage** | MinIO / ZeroDB | S3-compatible file storage |
+| **API Gateway** | Kong | Rate limiting, authentication |
+| **Containerization** | Docker | Deployment and development |
+
+**ZeroDB provides:**
+- NoSQL table storage for all application data
+- Vector search for semantic document search
+- Memory management for AI agent context
+- Event streaming for real-time updates
+- File metadata storage
 
 ## Development Workflow 📝
 
@@ -380,28 +399,39 @@ Here are the primary API endpoints for the project:
 - **PUT /api/financial-reports/:id**: Update a financial report by ID
 - **DELETE /api/financial-reports/:id**: Delete a financial report by ID
 
-## Project Structure
+## Project Structure 🗂️
 
 The project structure is organized as follows:
 
 ```bash
 opencap/
-├── controllers/       # Controllers for handling API requests
-├── models/            # Data model definitions
-├── routes/            # API routes
-├── services/          # Business logic and ZeroDB service
-├── __tests__/         # Test cases (unit, integration)
-├── docs/              # Project documentation
-│   └── zerodb/        # ZeroDB-specific documentation
-├── scripts/           # Utility and migration scripts
-├── dags/              # Airflow DAGs for data pipelines
-├── .env               # Environment variables
-├── .github/           # GitHub workflows for CI/CD
-├── docker-compose.yml # Docker compose configuration
-├── .gitignore         # Files to ignore in Git
-├── CODE_OF_CONDUCT.md # Contributor code of conduct
-├── package.json       # Project metadata and dependencies
-├── README.md          # Project documentation
+├── controllers/           # Controllers for handling API requests
+├── models/                # Data models (Mongoose schemas, compatible with ZeroDB)
+├── routes/                # API routes
+│   └── v1/                # Versioned API routes
+├── services/              # Business logic and external service integrations
+│   ├── zerodbService.js   # ZeroDB API client
+│   ├── databaseAdapter.js # Database abstraction layer
+│   └── ...                # Other services
+├── middleware/            # Express middleware (auth, validation, etc.)
+├── tests/                 # Test cases
+│   ├── unit/              # Unit tests
+│   ├── integration/       # Integration tests
+│   ├── e2e/               # End-to-end tests
+│   └── security/          # Security tests
+├── docs/                  # Project documentation
+│   ├── api/               # API documentation
+│   ├── security/          # Security documentation
+│   └── reports/           # Generated reports
+├── scripts/               # Utility scripts
+├── deployment/            # Deployment configurations
+│   ├── kubernetes/        # K8s manifests
+│   └── terraform/         # Infrastructure as code
+├── config/                # Configuration files
+├── .env.example           # Environment template
+├── docker-compose.yml     # Docker compose for development
+├── package.json           # Project metadata and dependencies
+└── README.md              # This file
 ```
 
 ## Contributing 🤝
