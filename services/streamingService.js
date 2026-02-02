@@ -13,7 +13,7 @@ class StreamingService extends EventEmitter {
     super();
     this.topics = {
       FINANCIAL_TRANSACTION: 'financial_transaction',
-      USER_ACTIVITY: 'user_activity', 
+      USER_ACTIVITY: 'user_activity',
       DOCUMENT_ACTIVITY: 'document_activity',
       COMPLIANCE_EVENT: 'compliance_event',
       WORKFLOW_STATE: 'workflow_state',
@@ -21,12 +21,13 @@ class StreamingService extends EventEmitter {
       SPV_ACTIVITY: 'spv_activity',
       NOTIFICATION: 'notification'
     };
-    
+
     this.eventBuffer = [];
     this.maxBufferSize = 1000;
     this.batchSize = 10;
     this.flushInterval = 5000; // 5 seconds
-    
+    this.intervalId = null; // Track interval ID for cleanup
+
     // Start batch processing
     this.startBatchProcessing();
   }
@@ -296,9 +297,29 @@ class StreamingService extends EventEmitter {
    * Start batch processing of events
    */
   startBatchProcessing() {
-    setInterval(async () => {
+    // Clear any existing interval
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+
+    this.intervalId = setInterval(async () => {
       await this.flushEventBuffer();
     }, this.flushInterval);
+  }
+
+  /**
+   * Stop batch processing and cleanup resources
+   */
+  cleanup() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    // Remove all event listeners
+    this.removeAllListeners();
+
+    console.log('Streaming service cleaned up');
   }
   
   /**

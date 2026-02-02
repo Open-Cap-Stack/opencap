@@ -1,0 +1,495 @@
+# Database Cleanup Report
+
+Generated: 2026-02-02T08:49:01.690Z
+
+## Summary
+
+- **Files Scanned**: 255
+- **Issues Found**: 432
+- **Issues Fixed**: 0
+
+## Issues by Category
+
+### MongoDB References (411)
+
+**Action Required**: Remove MongoDB dependencies (Issue #32)
+
+Files affected:
+- `__tests__/documentation/documentation.test.js`
+- `__tests__/documentation/documentation.test.js`
+- `__tests__/scripts/rollback-to-mongodb.test.js`
+- `__tests__/scripts/rollback-to-mongodb.test.js`
+- `__tests__/scripts/rollback-to-mongodb.test.js`
+- `__tests__/scripts/rollback-to-mongodb.test.js`
+- `app.js`
+- `app.js`
+- `app.js`
+- `config/index.js`
+- `config/index.js`
+- `controllers/SPV.js`
+- `controllers/SPV.js`
+- `controllers/SPV.js`
+- `controllers/SPVasset.js`
+- `controllers/SPVasset.js`
+- `controllers/SPVasset.js`
+- `controllers/SPVasset.js`
+- `controllers/TaxCalculator.js`
+- `controllers/TaxCalculator.js`
+- `controllers/adminController.js`
+- `controllers/analyticsController.js`
+- `controllers/authController.js`
+- `controllers/authController.js`
+- `controllers/authController.js`
+- `controllers/employeeController.js`
+- `controllers/employeeController.js`
+- `controllers/employeeController.js`
+- `controllers/financialReportingController.js`
+- `controllers/financialReportingController.js`
+- `controllers/financialReportingController.js`
+- `controllers/semanticSearchController.js`
+- `controllers/semanticSearchController.js`
+- `controllers/semanticSearchController.js`
+- `controllers/v1/financialMetricsController.js`
+- `controllers/v1/financialMetricsController.js`
+- `controllers/v1/financialReportController.js`
+- `controllers/v1/financialReportController.js`
+- `controllers/v1/financialReportController.js`
+- `controllers/v1/shareClassController.js`
+- `controllers/v1/shareClassController.js`
+- `db/index.js`
+- `db/index.js`
+- `db/index.js`
+- `db/index.js`
+- `db/mongoConnection.js`
+- `db/mongoConnection.js`
+- `db/mongoConnection.js`
+- `db/mongoConnection.js`
+- `db/mongoConnection.js`
+- `db.js`
+- `db.js`
+- `db.js`
+- `db.js`
+- `db.js`
+- `e2e/utils/testFixtures.js`
+- `examples/zerodb-sync-usage.js`
+- `examples/zerodb-sync-usage.js`
+- `examples/zerodb-sync-usage.js`
+- `examples/zerodb-sync-usage.js`
+- `init-scripts/mongo/01-init-mongo.js`
+- `init-scripts/mongo/01-init-mongo.js`
+- `middleware/authMiddleware.js`
+- `middleware/databaseMonitor.js`
+- `middleware/databaseMonitor.js`
+- `middleware/databaseMonitor.js`
+- `middleware/databaseMonitor.js`
+- `middleware/errorHandler.js`
+- `migrations/20250325215500-document-model-enhancement.js`
+- `migrations/20250325215500-document-model-enhancement.js`
+- `migrations/20250325215500-document-model-enhancement.js`
+- `migrations/20250325215500-document-model-enhancement.js`
+- `models/Activity.js`
+- `models/Activity.js`
+- `models/Activity.js`
+- `models/Activity.js`
+- `models/BalanceSheet.js`
+- `models/BalanceSheet.js`
+- `models/BalanceSheet.js`
+- `models/CashFlowStatement.js`
+- `models/CashFlowStatement.js`
+- `models/CashFlowStatement.js`
+- `models/Communication.js`
+- `models/Communication.js`
+- `models/Communication.js`
+- `models/Communication.js`
+- `models/Company.js`
+- `models/Company.js`
+- `models/Company.js`
+- `models/ComplianceCheck.js`
+- `models/ComplianceCheck.js`
+- `models/ComplianceCheck.js`
+- `models/ComplianceCheck.js`
+- `models/Document.js`
+- `models/Document.js`
+- `models/Document.js`
+- `models/DocumentAccessModel.js`
+- `models/DocumentAccessModel.js`
+- `models/DocumentAccessModel.js`
+- `models/DocumentAccessModel.js`
+- `models/DocumentEmbeddingModel.js`
+- `models/DocumentEmbeddingModel.js`
+- `models/DocumentEmbeddingModel.js`
+- `models/DocumentEmbeddingModel.js`
+- `models/EquityPlanModel.js`
+- `models/EquityPlanModel.js`
+- `models/EquityPlanModel.js`
+- `models/EquityPlanModel.js`
+- `models/FinancialMetrics.js`
+- `models/FinancialMetrics.js`
+- `models/FinancialMetrics.js`
+- `models/FundraisingRoundModel.js`
+- `models/FundraisingRoundModel.js`
+- `models/FundraisingRoundModel.js`
+- `models/FundraisingRoundModel.js`
+- `models/Investor.js`
+- `models/Investor.js`
+- `models/Investor.js`
+- `models/Investor.js`
+- `models/Migration.js`
+- `models/Migration.js`
+- `models/Migration.js`
+- `models/Notification.js`
+- `models/Notification.js`
+- `models/Notification.js`
+- `models/Notification.js`
+- `models/SPV.js`
+- `models/SPV.js`
+- `models/SPV.js`
+- `models/SPV.js`
+- `models/SPVAssetModel.js`
+- `models/SPVAssetModel.js`
+- `models/SPVAssetModel.js`
+- `models/SPVAssetModel.js`
+- `models/SPVasset.js`
+- `models/SPVasset.js`
+- `models/SPVasset.js`
+- `models/SPVasset.js`
+- `models/SecurityAudit.js`
+- `models/SecurityAudit.js`
+- `models/SecurityAudit.js`
+- `models/SecurityAudit.js`
+- `models/SecurityAudit.js`
+- `models/ShareClass.js`
+- `models/ShareClass.js`
+- `models/ShareClass.js`
+- `models/ShareClass.js`
+- `models/Stakeholder.js`
+- `models/Stakeholder.js`
+- `models/Stakeholder.js`
+- `models/Stakeholder.js`
+- `models/TaxCalculator.js`
+- `models/TaxCalculator.js`
+- `models/TaxCalculator.js`
+- `models/TaxCalculator.js`
+- `models/Transaction.js`
+- `models/Transaction.js`
+- `models/Transaction.js`
+- `models/Transaction.js`
+- `models/User.js`
+- `models/User.js`
+- `models/User.js`
+- `models/User.js`
+- `models/admin.js`
+- `models/admin.js`
+- `models/admin.js`
+- `models/admin.js`
+- `models/documentModel.js`
+- `models/documentModel.js`
+- `models/documentModel.js`
+- `models/documentModel.js`
+- `models/employeeModel.js`
+- `models/employeeModel.js`
+- `models/employeeModel.js`
+- `models/employeeModel.js`
+- `models/financialReport.js`
+- `models/financialReport.js`
+- `models/financialReport.js`
+- `models/integrationModel.js`
+- `models/integrationModel.js`
+- `models/integrationModel.js`
+- `models/integrationModel.js`
+- `models/investmentTrackerModel.js`
+- `models/investmentTrackerModel.js`
+- `models/investmentTrackerModel.js`
+- `models/investmentTrackerModel.js`
+- `models/inviteManagementModel.js`
+- `models/inviteManagementModel.js`
+- `models/inviteManagementModel.js`
+- `models/inviteManagementModel.js`
+- `models/invitemanagement.js`
+- `models/invitemanagement.js`
+- `models/invitemanagement.js`
+- `models/invitemanagement.js`
+- `models/userModel.js`
+- `models/userModel.js`
+- `models/userModel.js`
+- `routes/syncRoutes.js`
+- `routes/v1/communicationRoutes.js`
+- `routes/v1/communicationRoutes.js`
+- `routes/v1/complianceCheckRoutes.js`
+- `routes/v1/complianceCheckRoutes.js`
+- `routes/v1/complianceCheckRoutes.js`
+- `routes/v1/spvAssetRoutes.js`
+- `routes/v1/spvRoutes.js`
+- `routes/v1/syncAdminRoutes.js`
+- `scripts/add-missing-stories-modified.js`
+- `scripts/add-missing-stories.js`
+- `scripts/add-test-fixes-backlog.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanupTestFiles.js`
+- `scripts/create-opencap-backlog.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createProductionUsers.js`
+- `scripts/createTestUsers.js`
+- `scripts/createTestUsers.js`
+- `scripts/createTestUsers.js`
+- `scripts/createTestUsers.js`
+- `scripts/createZeroDBTables.js`
+- `scripts/databaseMigration.js`
+- `scripts/databaseMigration.js`
+- `scripts/databaseMigration.js`
+- `scripts/databaseMigration.js`
+- `scripts/databaseMigration.js`
+- `scripts/migrate-companies.js`
+- `scripts/migrate-companies.js`
+- `scripts/migrate-companies.js`
+- `scripts/migrate-companies.js`
+- `scripts/migrate-companies.js`
+- `scripts/migrate-documents.js`
+- `scripts/migrate-documents.js`
+- `scripts/migrate-documents.js`
+- `scripts/migrate-documents.js`
+- `scripts/migrate-documents.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-financial-metrics.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-share-classes.js`
+- `scripts/migrate-stakeholders.js`
+- `scripts/migrate-stakeholders.js`
+- `scripts/migrate-stakeholders.js`
+- `scripts/migrate-stakeholders.js`
+- `scripts/migrate-stakeholders.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-transactions.js`
+- `scripts/migrate-users.js`
+- `scripts/migrate-users.js`
+- `scripts/migrate-users.js`
+- `scripts/migrate-users.js`
+- `scripts/migrate-users.js`
+- `scripts/seedDatabase.js`
+- `scripts/seedDatabase.js`
+- `scripts/seedDatabase.js`
+- `scripts/seedDatabase.js`
+- `scripts/test-mongodb-connection.js`
+- `scripts/test-mongodb-connection.js`
+- `scripts/update-mongoose-connections.js`
+- `scripts/update-mongoose-connections.js`
+- `scripts/update-mongoose-connections.js`
+- `scripts/validate-zerodb-migration.js`
+- `scripts/validate-zerodb-migration.js`
+- `scripts/validate-zerodb-migration.js`
+- `server.js`
+- `server.js`
+- `services/dataProcessing.js`
+- `services/dataProcessing.js`
+- `services/dataProcessing.js`
+- `services/dataProcessing.js`
+- `services/databaseAdapter.js`
+- `services/databaseAdapter.js`
+- `services/databaseAdapter.js`
+- `services/databaseAdapter.js`
+- `services/documentEmbeddingService.js`
+- `services/financialDataService.js`
+- `services/mongoChangeStreamListener.js`
+- `services/mongoChangeStreamListener.js`
+- `services/mongoChangeStreamListener.js`
+- `services/mongoChangeStreamListener.js`
+- `services/monitoringDashboard.js`
+- `services/syncOrchestrator.js`
+- `services/syncOrchestrator.js`
+- `services/syncOrchestrator.js`
+- `services/syncOrchestrator.js`
+- `services/syncOrchestrator.js`
+- `services/zerodbService.js`
+- `services/zerodbSyncService.js`
+- `services/zerodbSyncService.js`
+- `services/zerodbSyncService.js`
+- `services/zerodbSyncService.js`
+- `services/zerodbSyncService.js`
+- `test-init-scripts/mongo/00-create-users.js`
+- `test-init-scripts/mongo/01-init-mongo.js`
+- `tests/deployment/container-health.validation.test.js`
+- `tests/deployment/deployment-scripts.validation.test.js`
+- `tests/deployment/deployment-scripts.validation.test.js`
+- `tests/deployment/docker-compose.validation.test.js`
+- `tests/deployment/docker-compose.validation.test.js`
+- `tests/deployment/docker.test.js`
+- `tests/deployment/environment.test.js`
+- `tests/deployment/environment.test.js`
+- `tests/deployment/environment.validation.test.js`
+- `tests/deployment/environment.validation.test.js`
+- `tests/e2e/data-integrity-validation.test.js`
+- `tests/e2e/data-integrity-validation.test.js`
+- `tests/e2e/data-integrity-validation.test.js`
+- `tests/e2e/data-integrity-validation.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/integration/continuousSync.test.js`
+- `tests/migration/mongodb-to-zerodb.test.js`
+- `tests/migration/mongodb-to-zerodb.test.js`
+- `tests/migration/mongodb-to-zerodb.test.js`
+- `tests/migration/mongodb-to-zerodb.test.js`
+- `tests/migration/post-migration/zerodb-only.test.js`
+- `tests/migration/post-migration/zerodb-only.test.js`
+- `tests/migration/post-migration/zerodb-only.test.js`
+- `tests/migration/post-migration/zerodb-only.test.js`
+- `tests/migration/pre-migration/mongodb-baseline.test.js`
+- `tests/migration/pre-migration/mongodb-baseline.test.js`
+- `tests/migration/pre-migration/mongodb-baseline.test.js`
+- `tests/migration/pre-migration/mongodb-baseline.test.js`
+- `tests/services/mongoChangeStreamListener.test.js`
+- `tests/services/mongoChangeStreamListener.test.js`
+- `tests/services/mongoChangeStreamListener.test.js`
+- `tests/services/mongoChangeStreamListener.test.js`
+- `tests/services/mongoChangeStreamListener.test.js`
+- `tests/services/syncOrchestrator.test.js`
+- `tests/services/syncOrchestrator.test.js`
+- `tests/services/syncOrchestrator.test.js`
+- `tests/setup/db.js`
+- `tests/setup/db.js`
+- `tests/setup/db.js`
+- `tests/setup/db.js`
+- `tests/setup.js`
+- `tests/setup.js`
+- `tests/setup.js`
+- `tests/setup.js`
+- `tests/unit/controllers/analyticsController.test.js`
+- `tests/unit/controllers/analyticsController.test.js`
+- `tests/unit/controllers/analyticsController.test.js`
+- `tests/unit/controllers/analyticsController.test.js`
+- `tests/unit/controllers/analyticsController.test.js`
+- `tests/unit/controllers/semanticSearchController.test.js`
+- `tests/unit/controllers/semanticSearchController.test.js`
+- `tests/unit/controllers/v1/shareClassController.comprehensive.test.js`
+- `tests/unit/controllers/v1/shareClassController.comprehensive.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/metricsCollector.test.js`
+- `tests/unit/models/Document.comprehensive.test.js`
+- `tests/unit/models/Document.comprehensive.test.js`
+- `tests/unit/models/Document.comprehensive.test.js`
+- `tests/unit/models/User.comprehensive.test.js`
+- `tests/unit/models/User.comprehensive.test.js`
+- `tests/unit/mongodb-removal.test.js`
+- `tests/unit/services/dataProcessing.test.js`
+- `tests/unit/services/dataProcessing.test.js`
+- `tests/unit/services/dataProcessing.test.js`
+- `tests/unit/services/dataProcessing.test.js`
+- `tests/unit/services/databaseAdapter.test.js`
+- `tests/unit/services/databaseAdapter.test.js`
+- `tests/unit/services/databaseAdapter.test.js`
+- `tests/unit/services/databaseAdapter.test.js`
+- `tests/unit/services/databaseAdapter.test.js`
+- `tests/unit/services/documentEmbeddingService.test.js`
+- `tests/unit/services/documentEmbeddingService.test.js`
+- `tests/unit/services/mongoChangeStreamListener.test.js`
+- `tests/unit/services/monitoringDashboard.test.js`
+- `tests/unit/services/semanticSearchService.test.js`
+- `tests/unit/services/semanticSearchService.test.js`
+- `tests/unit/services/syncOrchestrator.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/unit/services/zerodbSyncService.test.js`
+- `tests/utils/testHelpers.js`
+- `tests/utils/testHelpers.js`
+- `utils/metricsCollector.js`
+- `utils/mongoDbConnection.js`
+- `utils/mongoDbConnection.js`
+- `utils/mongoDbConnection.js`
+- `utils/mongoDbConnection.js`
+- `utils/mongoDbConnection.js`
+- `utils/mongoDbConnection.js`
+- `package.json`
+- `.env.example`
+- `docker-compose.yml`
+- `docker-compose.simple.yml`
+
+### Neo4j References (14)
+
+**Action Required**: Remove Neo4j dependencies (Issue #34)
+
+Files affected:
+- `scripts/add-missing-stories-modified.js`
+- `scripts/add-missing-stories.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/organize-stories.js`
+- `scripts/prioritize-stories.js`
+- `scripts/shortcut-api.js`
+- `scripts/validate-zerodb-migration.js`
+- `scripts/validate-zerodb-migration.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/database/zerodbRelationships.test.js`
+
+### PostgreSQL References (13)
+
+**Action Required**: Remove PostgreSQL dependencies (Issue #34)
+
+Files affected:
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/cleanup-old-db-references.js`
+- `scripts/validate-zerodb-migration.js`
+- `tests/deployment/docker-compose.validation.test.js`
+- `tests/migration/post-migration/zerodb-only.test.js`
+- `tests/unit/controllers/semanticSearchController.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `tests/unit/database/noDatabaseDependencies.test.js`
+- `docker-compose.yml`
+- `docker-compose.simple.yml`
+
+### Dead Code Items (4)
+
+Files/directories that should be removed:
+
+- `db.js` - Legacy database code - should be removed after ZeroDB migration
+- `db/mongoConnection.js` - Legacy database code - should be removed after ZeroDB migration
+- `init-scripts/mongo` - Legacy database code - should be removed after ZeroDB migration
+- `deployment/kubernetes/mongodb.yaml` - Legacy database code - should be removed after ZeroDB migration
+
+## Recommendations
+
+1. **Phase 6.1 (Issue #32)**: Remove all MongoDB dependencies from package.json
+2. **Phase 6.2 (Issue #33)**: Remove MongoDB from Docker configurations
+3. **Phase 6.3 (Issue #34)**: Remove Neo4j and PostgreSQL dependencies
+4. **Code Cleanup**: Remove dead code files and unused imports
+5. **Testing**: Ensure all tests pass after cleanup
+6. **Documentation**: Update README and architecture docs
+
+## Next Steps
+
+- [ ] Review this report
+- [ ] Create backup before making changes
+- [ ] Execute cleanup in phases
+- [ ] Run full test suite after each phase
+- [ ] Update deployment configurations
+- [ ] Document migration completion
+

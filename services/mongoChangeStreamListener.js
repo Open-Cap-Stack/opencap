@@ -2,6 +2,16 @@
  * MongoDB Change Streams Listener Service
  *
  * [Feature] GitHub Issue #14: Continuous sync from MongoDB to ZeroDB
+ * [Issue #32] MongoDB Dependency Clarification
+ *
+ * IMPORTANT: This service is OPTIONAL and only used when continuous sync is enabled.
+ * MongoDB is NOT required to run OpenCap Stack - ZeroDB is the primary database.
+ *
+ * This service is only active when SYNC_ENABLED=true in environment variables.
+ * It enables real-time synchronization from an existing MongoDB database to ZeroDB.
+ *
+ * Use Case: You have an existing MongoDB database and want to migrate/sync to ZeroDB
+ * while maintaining real-time synchronization during the transition period.
  *
  * Watches MongoDB collections for real-time changes and synchronizes them to ZeroDB.
  * Implements fault tolerance, backpressure handling, and comprehensive error recovery.

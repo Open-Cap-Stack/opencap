@@ -21,9 +21,9 @@ Follow these steps to set up the project on your local machine:
 ### Prerequisites ✅
 
 - Node.js (v14 or higher)
-- MongoDB
 - Docker and Docker Compose (for containerized development)
 - Git
+- ZeroDB Account (sign up at https://api.ainative.studio/)
 
 ### Clone the Repository 📂
 
@@ -50,18 +50,16 @@ cp .env.example .env
 
 ### Required Configuration
 
-#### Database Configuration
+#### Primary Database: ZeroDB (REQUIRED)
 
-```bash
-# MongoDB (Legacy - To be phased out during ZeroDB migration)
-MONGODB_URI=mongodb://localhost:27017/opencap
-```
+OpenCap Stack uses ZeroDB (via AINative Studio) as its **primary database** for all operations including:
+- NoSQL table storage for all application data
+- Vector search for semantic document search
+- Memory management for agent context
+- Event streaming for real-time updates
+- File storage for document uploads
 
-Replace `mongodb://localhost:27017/opencap` with your MongoDB connection string if it's different.
-
-#### ZeroDB Configuration
-
-OpenCap Stack uses ZeroDB (via AINative Studio) for lakehouse database capabilities including vector search, memory management, event streaming, and file storage.
+**ZeroDB is required to run OpenCap Stack.**
 
 ```bash
 # ZeroDB API Configuration
@@ -99,11 +97,29 @@ ZERODB_PROJECT_ID=your_project_id_here
    ```
    You should see `status: ACTIVE` and `database_enabled: true`
 
-#### MongoDB to ZeroDB Real-Time Sync (GitHub Issue #14)
+For complete migration instructions from MongoDB, see the [ZeroDB Migration Guide](docs/zerodb-migration-guide.md).
 
-OpenCap Stack includes a comprehensive MongoDB Change Streams listener for real-time data synchronization from MongoDB to ZeroDB:
+For detailed API documentation, see the [ZeroDB API Reference](docs/zerodb-api-reference.md).
+
+If you encounter any issues, check the [Troubleshooting Guide](docs/troubleshooting.md).
+
+#### MongoDB Configuration (OPTIONAL - For Continuous Sync Only)
+
+**MongoDB is completely optional** and only needed if you want to use the continuous sync feature (GitHub Issue #14).
+
+**To run OpenCap Stack without MongoDB:**
+1. Set `SYNC_ENABLED=false` in your `.env` file (or omit it entirely)
+2. Comment out or remove `MONGODB_URI`
+3. Start the application normally - it will use ZeroDB as the sole database
+
+**To enable MongoDB for continuous sync:**
+
+If you have an existing MongoDB database and want real-time synchronization to ZeroDB, you can enable the continuous sync feature:
 
 ```bash
+# MongoDB connection (only needed if SYNC_ENABLED=true)
+MONGODB_URI=mongodb://localhost:27017/opencap
+
 # Enable real-time sync
 SYNC_ENABLED=true
 
@@ -123,7 +139,7 @@ SYNC_COLLECTIONS=users,companies,stakeholders,transactions,documents
 SYNC_OPERATION_TYPES=insert,update,delete,replace
 ```
 
-**Features:**
+**Continuous Sync Features:**
 - Real-time change detection using MongoDB Change Streams
 - Automatic resume on connection loss with resume tokens
 - Batch processing for high performance

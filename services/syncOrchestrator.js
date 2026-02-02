@@ -2,6 +2,12 @@
  * Sync Orchestrator Service
  *
  * [Feature] GitHub Issue #14: Continuous data sync implementation
+ * [Issue #32] MongoDB Dependency Clarification
+ *
+ * IMPORTANT: This service is OPTIONAL and only used when continuous sync is enabled.
+ * MongoDB is NOT required to run OpenCap Stack - ZeroDB is the primary database.
+ *
+ * This orchestrator is only active when SYNC_ENABLED=true in environment variables.
  *
  * Coordinates bidirectional synchronization between MongoDB and ZeroDB:
  * - MongoDB → ZeroDB via change streams

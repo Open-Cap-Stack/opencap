@@ -103,15 +103,30 @@ setupSwagger(app);
 // Determine if the environment is a test environment
 const isTestEnv = process.env.NODE_ENV === "test";
 
-// Conditionally connect to MongoDB unless in a test environment
-if (!isTestEnv) {
+// ============================================================================
+// MONGODB CONNECTION - OPTIONAL (Only for Continuous Sync Feature)
+// ============================================================================
+// MongoDB is ONLY needed if you enable the continuous sync feature (Issue #14)
+// To run without MongoDB: Set SYNC_ENABLED=false or omit it entirely
+//
+// The application will work perfectly with ZeroDB only when sync is disabled
+// ============================================================================
+if (!isTestEnv && process.env.SYNC_ENABLED === 'true') {
+  console.log('🔄 Continuous sync enabled - connecting to MongoDB...');
   connectToMongoDB()
     .then(() => {
-      console.log('✅ MongoDB connected successfully');
+      console.log('✅ MongoDB connected successfully (for continuous sync)');
       // GitHub Issue #8: Initialize database monitoring after MongoDB connection
       databaseMonitor.initialize();
     })
-    .catch(err => console.error("MongoDB connection failed:", err));
+    .catch(err => {
+      console.error("❌ MongoDB connection failed:", err);
+      console.error("⚠️  Continuous sync feature will not be available");
+      console.error("💡 To run without MongoDB, set SYNC_ENABLED=false");
+    });
+} else if (!isTestEnv) {
+  console.log('ℹ️  MongoDB connection skipped (SYNC_ENABLED=false or not set)');
+  console.log('✓ Running in ZeroDB-only mode');
 }
 
 // Initialize ZeroDB if enabled
