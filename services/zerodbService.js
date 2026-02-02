@@ -144,6 +144,112 @@ class ZeroDBService {
       throw error;
     }
   }
+
+  /**
+   * Insert rows into a table
+   * @param {string} tableName - Name of the table
+   * @param {Array} rows - Array of row objects to insert
+   * @returns {Array} Inserted rows
+   */
+  async insertRows(tableName, rows) {
+    try {
+      const response = await this.client.post(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { rows }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error inserting rows:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Query a table with filters, pagination, and sorting
+   * @param {string} tableName - Name of the table
+   * @param {Object} options - Query options
+   * @param {Object} options.filter - Filter conditions (MongoDB-style)
+   * @param {number} options.skip - Number of records to skip
+   * @param {number} options.limit - Maximum records to return
+   * @param {Object} options.sort - Sort specification
+   * @param {Object} options.projection - Field projection
+   * @returns {Array} Query results
+   */
+  async queryTable(tableName, options = {}) {
+    try {
+      const { filter = {}, skip = 0, limit = 100, sort = {}, projection = {} } = options;
+      const response = await this.client.post(
+        `/projects/${this.projectId}/database/tables/${tableName}/query`,
+        { filter, skip, limit, sort, projection }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error querying table:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update rows in a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} options - Update options
+   * @param {Object} options.filter - Filter conditions
+   * @param {Object} options.update - Update operations
+   * @returns {Object} Update result
+   */
+  async updateRows(tableName, options) {
+    try {
+      const { filter, update } = options;
+      const response = await this.client.put(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { filter, update }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating rows:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete rows from a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} options - Delete options
+   * @param {Object} options.filter - Filter conditions
+   * @returns {Object} Delete result
+   */
+  async deleteRows(tableName, options) {
+    try {
+      const { filter } = options;
+      const response = await this.client.delete(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { data: { filter } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting rows:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Count rows in a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} filter - Filter conditions
+   * @returns {number} Count of matching rows
+   */
+  async countRows(tableName, filter = {}) {
+    try {
+      const response = await this.client.post(
+        `/projects/${this.projectId}/database/tables/${tableName}/count`,
+        { filter }
+      );
+      return response.data.count;
+    } catch (error) {
+      console.error('Error counting rows:', error);
+      throw error;
+    }
+  }
   
   /**
    * Upsert a vector embedding

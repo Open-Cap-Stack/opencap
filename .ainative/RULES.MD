@@ -346,3 +346,33 @@ Before creating ANY .md file or .sh script, you MUST:
 * [ ] NO AI ATTRIBUTION in any commits or PR description
 
 Adhere to these rules **by default** for every task. Your output must follow the **Default Loop** section and include code diffs and tests for any change.
+
+---
+
+## 10) Agent Execution Rules
+
+### ALWAYS RUN AGENTS IN FOREGROUND
+
+**NEVER run agents in background mode.** All Task agents must run in foreground so the user can:
+- See real-time progress
+- Monitor output as it happens
+- Interrupt if needed
+- Verify work immediately
+
+#### FORBIDDEN:
+```
+// ❌ NEVER use run_in_background: true
+```
+
+#### REQUIRED:
+```
+// ✅ ALWAYS run agents in foreground (omit run_in_background parameter)
+```
+
+#### WHY THIS MATTERS:
+- Background agents hide progress from user
+- User cannot see real-time output
+- Difficult to debug issues
+- User loses visibility into what's happening
+
+**THIS IS A MANDATORY RULE. ALWAYS RUN AGENTS IN FOREGROUND.**
