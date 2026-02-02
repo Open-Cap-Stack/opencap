@@ -205,7 +205,8 @@ class PerformanceOptimizer {
       // Add small tiebreaker based on frequency to ensure unique priorities
       const priority = (frequency * avgDuration) / 1000 + (frequency * 0.01);
 
-      if (frequency >= 5 && avgDuration > 500) {
+      // Recommend if query appears multiple times OR is slow
+      if (frequency >= 2 && (avgDuration > 100 || frequency >= 5)) {
         recommendations.push({
           tableName: stat.tableName,
           field: stat.field,
@@ -400,13 +401,14 @@ class PerformanceOptimizer {
 
         // Recommend TTL based on query frequency
         const recommendedTTL = Math.min(avgInterval * 0.5, 300000); // Max 5 minutes
+        const ttlSeconds = Math.max(1, Math.round(recommendedTTL / 1000)); // Ensure at least 1 second
 
         cacheableQueries.push({
           tableName: sig.query.tableName,
           filter: sig.query.filter,
           frequency: sig.count,
           averageDuration: sig.totalDuration / sig.count,
-          recommendedTTL: Math.round(recommendedTTL / 1000), // Convert to seconds
+          recommendedTTL: ttlSeconds, // Convert to seconds, minimum 1
           estimatedHitRatio: Math.min(90, (sig.count / this.queries.length) * 100),
           estimatedLatencyReduction: (sig.totalDuration / sig.count) * 0.95 // Assume 95% reduction
         });
