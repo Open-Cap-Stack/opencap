@@ -40,6 +40,11 @@ module.exports = {
     'services/zerodbSyncService.js',
     'services/syncOrchestrator.js',
 
+    // Monitoring Services (Issue #37)
+    'services/monitoringDashboard.js',
+    'services/alertService.js',
+    'services/performanceOptimizer.js',
+
     // Core Models (business entities)
     'models/User.js',
     'models/Company.js',
