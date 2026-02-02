@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const SPVController = require('../../controllers/SPV');
+const SPVNestedController = require('../../controllers/SPVNested');
 
 /**
  * @route POST /api/spvs
@@ -52,6 +53,46 @@ router.get('/compliance/:status', SPVController.getSPVsByComplianceStatus);
  * @access Private
  */
 router.get('/parent/:id', SPVController.getSPVsByParentCompany);
+
+/**
+ * SPV Nested Endpoints (Issue #123)
+ * These routes must be defined BEFORE the generic /:id route
+ */
+
+/**
+ * @route GET /api/spvs/:id/investments
+ * @desc Get all investments for an SPV
+ * @access Private
+ */
+router.get('/:id/investments', SPVNestedController.getSPVInvestments);
+
+/**
+ * @route GET /api/spvs/:id/performance
+ * @desc Get performance metrics for an SPV (NAV, ROI, IRR)
+ * @access Private
+ */
+router.get('/:id/performance', SPVNestedController.getSPVPerformance);
+
+/**
+ * @route GET /api/spvs/:id/reports/:type
+ * @desc Generate report for an SPV (summary, detailed, tax)
+ * @access Private
+ */
+router.get('/:id/reports/:type', SPVNestedController.getSPVReport);
+
+/**
+ * @route POST /api/spvs/:id/close
+ * @desc Close an SPV
+ * @access Private
+ */
+router.post('/:id/close', SPVNestedController.closeSPV);
+
+/**
+ * @route POST /api/spvs/:id/liquidate
+ * @desc Liquidate an SPV and distribute assets
+ * @access Private
+ */
+router.post('/:id/liquidate', SPVNestedController.liquidateSPV);
 
 /**
  * @route GET /api/spvs/:id
