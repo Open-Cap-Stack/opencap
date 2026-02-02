@@ -1,4 +1,5 @@
 module.exports = {
+  rootDir: '..',
   testEnvironment: 'node',
   testMatch: [
     '**/tests/**/*.test.js',
@@ -51,5 +52,5 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  setupFilesAfterEnv: ['./tests/setup.js']
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js']
 };
