@@ -380,17 +380,20 @@ Here are the primary API endpoints for the project:
 - **PUT /api/financial-reports/:id**: Update a financial report by ID
 - **DELETE /api/financial-reports/:id**: Delete a financial report by ID
 
-## Project Structure 🗂️
+## Project Structure
 
 The project structure is organized as follows:
 
 ```bash
 opencap/
 ├── controllers/       # Controllers for handling API requests
-├── models/            # Mongoose models
+├── models/            # Data model definitions
 ├── routes/            # API routes
+├── services/          # Business logic and ZeroDB service
 ├── __tests__/         # Test cases (unit, integration)
 ├── docs/              # Project documentation
+│   └── zerodb/        # ZeroDB-specific documentation
+├── scripts/           # Utility and migration scripts
 ├── dags/              # Airflow DAGs for data pipelines
 ├── .env               # Environment variables
 ├── .github/           # GitHub workflows for CI/CD
