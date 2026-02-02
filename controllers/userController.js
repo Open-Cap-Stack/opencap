@@ -1,7 +1,19 @@
-// controllers/userController.js
+/**
+ * User Controller
+ *
+ * Handles user management operations with ZeroDB migration support.
+ * Uses DatabaseAdapter for abstracted database operations.
+ *
+ * Issue #15: Migrate User controller to ZeroDB
+ */
 
-const User = require('../models/User');
+const databaseAdapter = require('../services/databaseAdapter');
 
+/**
+ * Create a new user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const createUser = async (req, res) => {
   const { userId, name, username, email, password, role } = req.body;
 
@@ -10,13 +22,21 @@ const createUser = async (req, res) => {
   }
 
   try {
-    const existingUser = await User.findOne({ email });
+    // Check if email already exists using databaseAdapter
+    const existingUser = await databaseAdapter.findOne('User', { email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    const user = new User({ userId, name, username, email, password, role });
-    await user.save();
+    // Create user using databaseAdapter
+    const user = await databaseAdapter.create('User', {
+      userId,
+      name,
+      username,
+      email,
+      password,
+      role
+    });
     res.status(201).json(user);
   } catch (error) {
     console.error('Error creating user:', error);
@@ -24,9 +44,15 @@ const createUser = async (req, res) => {
   }
 };
 
+/**
+ * Get all users
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find();
+    // Use databaseAdapter.find for fetching all users
+    const users = await databaseAdapter.find('User', {}, {});
     res.status(200).json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -34,9 +60,15 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+/**
+ * Get user by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    // Use databaseAdapter.findById for fetching user by ID
+    const user = await databaseAdapter.findById('User', req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -47,24 +79,29 @@ const getUserById = async (req, res) => {
   }
 };
 
+/**
+ * Get current user's profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const getProfile = async (req, res) => {
   try {
     // The user ID is attached to the request by the auth middleware
     let user;
-    
+
     // Try to find by userId first (new format)
     if (req.user.userId) {
-      user = await User.findOne({ userId: req.user.userId }).select('-password');
-    } 
+      user = await databaseAdapter.findOne('User', { userId: req.user.userId }, { select: '-password' });
+    }
     // Fall back to _id if userId not found
     if (!user && req.user.id) {
-      user = await User.findById(req.user.id).select('-password');
+      user = await databaseAdapter.findById('User', req.user.id, { select: '-password' });
     }
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     res.status(200).json(user);
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -72,9 +109,16 @@ const getProfile = async (req, res) => {
   }
 };
 
+/**
+ * Update user by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const updateUserById = async (req, res) => {
   try {
-    const updatedUser = await User.findByIdAndUpdate(
+    // Use databaseAdapter.findByIdAndUpdate for updating user
+    const updatedUser = await databaseAdapter.findByIdAndUpdate(
+      'User',
       req.params.id,
       req.body,
       { new: true, runValidators: true }
@@ -89,9 +133,15 @@ const updateUserById = async (req, res) => {
   }
 };
 
+/**
+ * Delete user by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 const deleteUserById = async (req, res) => {
   try {
-    const deletedUser = await User.findByIdAndDelete(req.params.id);
+    // Use databaseAdapter.findByIdAndDelete for deleting user
+    const deletedUser = await databaseAdapter.findByIdAndDelete('User', req.params.id);
     if (!deletedUser) {
       return res.status(404).json({ error: 'User not found' });
     }

@@ -164,9 +164,10 @@ class DatabaseAdapter {
    * Find a single document by query
    * @param {string} modelName - Name of the Mongoose model
    * @param {Object} query - Query object
+   * @param {Object} options - Query options (select, etc.)
    * @returns {Object} Found document
    */
-  async findOne(modelName, query = {}) {
+  async findOne(modelName, query = {}, options = {}) {
     this._checkInitialized();
 
     const results = {};
@@ -177,7 +178,9 @@ class DatabaseAdapter {
       try {
         const startTime = Date.now();
         const Model = mongoose.model(modelName);
-        results.mongodb = await Model.findOne(query).exec();
+        let mongoQuery = Model.findOne(query);
+        if (options.select) mongoQuery = mongoQuery.select(options.select);
+        results.mongodb = await mongoQuery.exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
         errors.mongodb = error;
@@ -191,7 +194,7 @@ class DatabaseAdapter {
       try {
         const startTime = Date.now();
         const tableName = this._modelToTableName(modelName);
-        const zerodbResults = await this._findInZeroDB(tableName, query, { limit: 1 });
+        const zerodbResults = await this._findInZeroDB(tableName, query, { limit: 1, ...options });
         results.zerodb = zerodbResults && zerodbResults.length > 0 ? zerodbResults[0] : null;
         this._recordMetric('zerodb', Date.now() - startTime, true);
       } catch (error) {
@@ -209,9 +212,10 @@ class DatabaseAdapter {
    * Find document by ID
    * @param {string} modelName - Name of the Mongoose model
    * @param {string} id - Document ID
+   * @param {Object} options - Query options (select, etc.)
    * @returns {Object} Found document
    */
-  async findById(modelName, id) {
+  async findById(modelName, id, options = {}) {
     this._checkInitialized();
 
     const results = {};
@@ -222,7 +226,9 @@ class DatabaseAdapter {
       try {
         const startTime = Date.now();
         const Model = mongoose.model(modelName);
-        results.mongodb = await Model.findById(id).exec();
+        let mongoQuery = Model.findById(id);
+        if (options.select) mongoQuery = mongoQuery.select(options.select);
+        results.mongodb = await mongoQuery.exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
         errors.mongodb = error;
@@ -236,7 +242,7 @@ class DatabaseAdapter {
       try {
         const startTime = Date.now();
         const tableName = this._modelToTableName(modelName);
-        const zerodbResults = await this._findInZeroDB(tableName, { _id: id }, { limit: 1 });
+        const zerodbResults = await this._findInZeroDB(tableName, { _id: id }, { limit: 1, ...options });
         results.zerodb = zerodbResults && zerodbResults.length > 0 ? zerodbResults[0] : null;
         this._recordMetric('zerodb', Date.now() - startTime, true);
       } catch (error) {
@@ -567,7 +573,11 @@ class DatabaseAdapter {
   _modelToTableName(modelName) {
     // Convert Mongoose model name to ZeroDB table name
     // Convention: lowercase with underscores
-    return modelName.toLowerCase().replace(/([A-Z])/g, '_$1').replace(/^_/, '');
+    // e.g., "ShareClass" -> "share_class", "FinancialReport" -> "financial_report"
+    return modelName
+      .replace(/([A-Z])/g, '_$1')  // Add underscore before uppercase letters
+      .toLowerCase()               // Convert to lowercase
+      .replace(/^_/, '');          // Remove leading underscore
   }
 
   _handleOperationResults(results, errors, operation) {
@@ -653,29 +663,60 @@ class DatabaseAdapter {
     return differences;
   }
 
-  // ZeroDB-specific operations (to be implemented based on ZeroDB API)
+  // ZeroDB-specific operations
 
+  /**
+   * Create a document in ZeroDB
+   * @param {string} tableName - Name of the table
+   * @param {Object} data - Document data to insert
+   * @returns {Object} Created document
+   */
   async _createInZeroDB(tableName, data) {
-    // TODO: Implement ZeroDB table insert logic
-    // This will need to map Mongoose document structure to ZeroDB table schema
-    // For now, we'll use a placeholder that uses ZeroDB's table API
-    throw new Error('ZeroDB create operation not yet implemented');
+    return await zerodbService.insertRow(tableName, data);
   }
 
+  /**
+   * Find documents in ZeroDB
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter (MongoDB-style)
+   * @param {Object} options - Query options (limit, sort, skip, projection)
+   * @returns {Array} Found documents
+   */
   async _findInZeroDB(tableName, query, options) {
-    // TODO: Implement ZeroDB table query logic
-    // This will need to translate Mongoose query to ZeroDB query format
-    throw new Error('ZeroDB find operation not yet implemented');
+    const { limit, sort, skip, projection } = options;
+    return await zerodbService.queryTable(tableName, {
+      filter: query,
+      limit,
+      sort,
+      skip,
+      projection
+    });
   }
 
+  /**
+   * Update documents in ZeroDB
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter
+   * @param {Object} update - Update operations
+   * @returns {Object} Update result
+   */
   async _updateInZeroDB(tableName, query, update) {
-    // TODO: Implement ZeroDB table update logic
-    throw new Error('ZeroDB update operation not yet implemented');
+    return await zerodbService.updateRows(tableName, {
+      filter: query,
+      update: update
+    });
   }
 
+  /**
+   * Delete documents from ZeroDB
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter
+   * @returns {Object} Delete result
+   */
   async _deleteInZeroDB(tableName, query) {
-    // TODO: Implement ZeroDB table delete logic
-    throw new Error('ZeroDB delete operation not yet implemented');
+    return await zerodbService.deleteRows(tableName, {
+      filter: query
+    });
   }
 }
 
