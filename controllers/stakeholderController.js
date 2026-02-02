@@ -1,4 +1,13 @@
-const Stakeholder = require('../models/Stakeholder');
+/**
+ * Stakeholder Controller
+ *
+ * Migrated to use ZeroDB instead of MongoDB
+ * Issue #17: Migrate Stakeholder controller to ZeroDB
+ */
+
+const zerodbService = require('../services/zerodbService');
+
+const TABLE_NAME = 'stakeholders';
 
 exports.createStakeholder = async (req, res) => {
   const { stakeholderId, name, role, projectId } = req.body;
@@ -8,9 +17,10 @@ exports.createStakeholder = async (req, res) => {
   }
 
   try {
-    const stakeholder = new Stakeholder({ stakeholderId, name, role, projectId });
-    await stakeholder.save();
-    res.status(201).json(stakeholder);
+    const stakeholderData = { stakeholderId, name, role, projectId };
+    const result = await zerodbService.insertRow(TABLE_NAME, stakeholderData);
+    const createdStakeholder = result.rows && result.rows[0] ? result.rows[0] : stakeholderData;
+    res.status(201).json(createdStakeholder);
   } catch (error) {
     res.status(500).json({ error: 'Error creating stakeholder' });
   }
@@ -18,8 +28,8 @@ exports.createStakeholder = async (req, res) => {
 
 exports.getAllStakeholders = async (req, res) => {
   try {
-    const stakeholders = await Stakeholder.find();
-    res.status(200).json(stakeholders); // Ensure this returns just the array
+    const stakeholders = await zerodbService.queryTable(TABLE_NAME, {});
+    res.status(200).json(stakeholders);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching stakeholders' });
   }
@@ -27,11 +37,15 @@ exports.getAllStakeholders = async (req, res) => {
 
 exports.getStakeholderById = async (req, res) => {
   try {
-    const stakeholder = await Stakeholder.findById(req.params.id);
-    if (!stakeholder) {
+    const stakeholders = await zerodbService.queryTable(TABLE_NAME, {
+      filter: { id: req.params.id }
+    });
+
+    if (!stakeholders || stakeholders.length === 0) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    res.status(200).json({ stakeholder });
+
+    res.status(200).json({ stakeholder: stakeholders[0] });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching stakeholder' });
   }
@@ -39,10 +53,17 @@ exports.getStakeholderById = async (req, res) => {
 
 exports.updateStakeholderById = async (req, res) => {
   try {
-    const updatedStakeholder = await Stakeholder.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updatedStakeholder) {
+    const result = await zerodbService.updateRows(
+      TABLE_NAME,
+      { id: req.params.id },
+      { $set: req.body }
+    );
+
+    if (!result || result.modifiedCount === 0) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
+
+    const updatedStakeholder = result.rows && result.rows[0] ? result.rows[0] : null;
     res.status(200).json({ stakeholder: updatedStakeholder });
   } catch (error) {
     res.status(500).json({ error: 'Error updating stakeholder' });
@@ -51,10 +72,12 @@ exports.updateStakeholderById = async (req, res) => {
 
 exports.deleteStakeholderById = async (req, res) => {
   try {
-    const deletedStakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
-    if (!deletedStakeholder) {
+    const result = await zerodbService.deleteRows(TABLE_NAME, { id: req.params.id });
+
+    if (!result || result.deletedCount === 0) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
+
     res.status(200).json({ message: 'Stakeholder deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting stakeholder' });
