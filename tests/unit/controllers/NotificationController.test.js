@@ -1,6 +1,7 @@
 /**
  * Notification Controller Unit Tests
  * Issue #20: Migrate remaining controllers to ZeroDB (Batch 1)
+ * Issue #124: Updated for new filtering response format
  * TDD Red Phase: Tests written before migration
  */
 process.env.SKIP_DB_SETUP = 'true';
@@ -16,7 +17,8 @@ jest.mock('../../../services/databaseAdapter', () => ({
   findByIdAndDelete: jest.fn(),
   findOneAndUpdate: jest.fn(),
   findOneAndDelete: jest.fn(),
-  aggregate: jest.fn()
+  aggregate: jest.fn(),
+  count: jest.fn()
 }));
 
 const httpMocks = require('node-mocks-http');
@@ -81,27 +83,36 @@ describe('Notification Controller', () => {
   });
 
   describe('getNotifications', () => {
-    it('should return all notifications', async () => {
+    it('should return all notifications with pagination info', async () => {
       const mockNotifications = [
         { _id: 'notif1', notificationId: 'NOTIF001', title: 'Notification 1' },
         { _id: 'notif2', notificationId: 'NOTIF002', title: 'Notification 2' }
       ];
       databaseAdapter.find.mockResolvedValue(mockNotifications);
+      databaseAdapter.count.mockResolvedValue(2);
 
       await notificationController.getNotifications(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('Notification', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('Notification', {}, expect.any(Object));
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res._getData())).toEqual({ notifications: mockNotifications });
+      const data = JSON.parse(res._getData());
+      expect(data.notifications).toEqual(mockNotifications);
+      expect(data).toHaveProperty('total');
+      expect(data).toHaveProperty('hasMore');
+      expect(data).toHaveProperty('unreadCount');
     });
 
     it('should return empty array when no notifications exist', async () => {
       databaseAdapter.find.mockResolvedValue([]);
+      databaseAdapter.count.mockResolvedValue(0);
 
       await notificationController.getNotifications(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res._getData())).toEqual({ notifications: [] });
+      const data = JSON.parse(res._getData());
+      expect(data.notifications).toEqual([]);
+      expect(data.total).toBe(0);
+      expect(data.hasMore).toBe(false);
     });
 
     it('should return 500 on database error', async () => {

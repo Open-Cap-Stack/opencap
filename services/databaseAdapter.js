@@ -436,6 +436,50 @@ class DatabaseAdapter {
   }
 
   /**
+   * Count documents matching query
+   * @param {string} modelName - Name of the Mongoose model
+   * @param {Object} query - Query object
+   * @returns {number} Count of matching documents
+   */
+  async count(modelName, query = {}) {
+    this._checkInitialized();
+
+    const results = {};
+    const errors = {};
+
+    // MongoDB operation
+    if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
+      try {
+        const startTime = Date.now();
+        const Model = mongoose.model(modelName);
+        results.mongodb = await Model.countDocuments(query).exec();
+        this._recordMetric('mongodb', Date.now() - startTime, true);
+      } catch (error) {
+        errors.mongodb = error;
+        this._recordMetric('mongodb', 0, false);
+        console.error(`MongoDB count error for ${modelName}:`, error);
+      }
+    }
+
+    // ZeroDB operation
+    if (this.migrationMode === 'zerodb-only' || this.migrationMode === 'parallel') {
+      try {
+        const startTime = Date.now();
+        const tableName = this._modelToTableName(modelName);
+        results.zerodb = await this._countInZeroDB(tableName, query);
+        this._recordMetric('zerodb', Date.now() - startTime, true);
+      } catch (error) {
+        errors.zerodb = error;
+        this._recordMetric('zerodb', 0, false);
+        console.error(`ZeroDB count error for ${modelName}:`, error);
+      }
+    }
+
+    // Handle results based on mode
+    return this._handleOperationResults(results, errors, 'count');
+  }
+
+  /**
    * Get metrics for both databases
    * @returns {Object} Metrics data
    */
@@ -717,6 +761,20 @@ class DatabaseAdapter {
     return await zerodbService.deleteRows(tableName, {
       filter: query
     });
+  }
+
+  /**
+   * Count documents in ZeroDB
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter
+   * @returns {number} Count of matching documents
+   */
+  async _countInZeroDB(tableName, query) {
+    const results = await zerodbService.queryTable(tableName, {
+      filter: query,
+      countOnly: true
+    });
+    return typeof results === 'number' ? results : (results?.count || results?.length || 0);
   }
 }
 

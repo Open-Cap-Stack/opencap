@@ -1,12 +1,49 @@
+/**
+ * Activity Routes
+ * Issue #124: Add Activity and Notification Filtering by Company
+ *
+ * Routes for activity management with filtering support.
+ */
 const express = require('express');
 const router = express.Router();
 const activityController = require('../../controllers/activityController');
 
-//Activity Routes
+/**
+ * POST /api/v1/activities
+ * Create a new activity
+ */
 router.post('/', activityController.createActivity);
+
+/**
+ * GET /api/v1/activities
+ * Get all activities with optional filtering
+ *
+ * Query Parameters:
+ * - companyId: Filter by company ID
+ * - type: Filter by activity type (comma-separated for multiple)
+ * - startDate: Filter activities from this date
+ * - endDate: Filter activities until this date
+ * - limit: Number of results (default: 100)
+ * - offset: Number to skip (default: 0)
+ */
 router.get('/', activityController.getActivities);
+
+/**
+ * GET /api/v1/activities/:id
+ * Get activity by ID
+ */
 router.get('/:id', activityController.getActivityById);
+
+/**
+ * PUT /api/v1/activities/:id
+ * Update activity by ID
+ */
 router.put('/:id', activityController.updateActivity);
+
+/**
+ * DELETE /api/v1/activities/:id
+ * Delete activity by ID
+ */
 router.delete('/:id', activityController.deleteActivity);
 
 module.exports = router;

@@ -2,6 +2,7 @@
  * Activity Controller Tests
  *
  * Issue #20: Migrate remaining controllers to ZeroDB (Batch 2)
+ * Issue #124: Updated for new filtering response format
  *
  * Tests for the activity controller using DatabaseAdapter for ZeroDB migration
  * Follows TDD pattern: Red -> Green -> Refactor
@@ -12,7 +13,16 @@ const activityController = require('../../../controllers/activityController');
 const databaseAdapter = require('../../../services/databaseAdapter');
 
 // Mock the database adapter
-jest.mock('../../../services/databaseAdapter');
+jest.mock('../../../services/databaseAdapter', () => ({
+  initialized: true,
+  create: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  findById: jest.fn(),
+  findByIdAndUpdate: jest.fn(),
+  findByIdAndDelete: jest.fn(),
+  count: jest.fn()
+}));
 
 describe('ActivityController', () => {
   let req, res;
@@ -74,31 +84,36 @@ describe('ActivityController', () => {
   });
 
   describe('getActivities', () => {
-    it('should return all activities', async () => {
+    it('should return all activities with pagination info', async () => {
       const mockActivities = [
         { _id: 'mongo_1', ActivityID: 'ACT-001', Type: 'EQUITY_GRANT' },
         { _id: 'mongo_2', ActivityID: 'ACT-002', Type: 'SHARE_TRANSFER' }
       ];
 
       databaseAdapter.find.mockResolvedValue(mockActivities);
+      databaseAdapter.count.mockResolvedValue(2);
 
       await activityController.getActivities(req, res);
 
       expect(res.statusCode).toBe(200);
       expect(databaseAdapter.find).toHaveBeenCalledWith('Activity', {}, expect.any(Object));
+      const data = JSON.parse(res._getData());
+      expect(data).toHaveProperty('activities');
+      expect(data).toHaveProperty('total');
+      expect(data).toHaveProperty('hasMore');
     });
 
     it('should return empty array when no activities exist', async () => {
       databaseAdapter.find.mockResolvedValue([]);
+      databaseAdapter.count.mockResolvedValue(0);
 
       await activityController.getActivities(req, res);
 
       expect(res.statusCode).toBe(200);
-      const data = res._getData();
-      // Handle both string and object response
-      const activities = typeof data === 'string' ? JSON.parse(data) : data;
-      expect(Array.isArray(activities)).toBe(true);
-      expect(activities.length).toBe(0);
+      const data = JSON.parse(res._getData());
+      expect(data.activities).toEqual([]);
+      expect(data.total).toBe(0);
+      expect(data.hasMore).toBe(false);
     });
 
     it('should handle database errors', async () => {
@@ -109,11 +124,12 @@ describe('ActivityController', () => {
       expect(res.statusCode).toBe(500);
     });
 
-    it('should support pagination', async () => {
+    it('should support pagination with page parameter', async () => {
       req.query = { page: 2, limit: 10 };
       const mockActivities = [{ _id: 'mongo_1', ActivityID: 'ACT-001' }];
 
       databaseAdapter.find.mockResolvedValue(mockActivities);
+      databaseAdapter.count.mockResolvedValue(15);
 
       await activityController.getActivities(req, res);
 
