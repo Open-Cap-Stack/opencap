@@ -230,10 +230,11 @@ const routes = {
   securityAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityAuditRoutes')),
   financialDataRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialDataRoutes')),
   semanticSearchRoutes: safeRequire(path.join(__dirname, 'routes/v1/semanticSearchRoutes')),
-  agentMemoryRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentMemoryRoutes')), // Issue #27: Agent memory for AI features
+  agentMemoryRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentMemoryRoutes')), // Issue #27: Agent memory
   rlhfRoutes: safeRequire(path.join(__dirname, 'routes/v1/rlhfRoutes')), // Issue #29: RLHF data collection
-  advancedAnalyticsRoutes: safeRequire(path.join(__dirname, 'routes/v1/advancedAnalyticsRoutes')), // Issue #31: Advanced analytics
+  advancedAnalyticsRoutes: safeRequire(path.join(__dirname, 'routes/v1/advancedAnalyticsRoutes')), // Issue #31: Analytics
   eventStreamingRoutes: safeRequire(path.join(__dirname, 'routes/v1/eventStreamingRoutes')), // Issue #28: Event streaming
+  fileStorageRoutes: safeRequire(path.join(__dirname, 'routes/v1/fileStorageRoutes')), // Issue #30: File storage
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -300,6 +301,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/analytics';
     } else if (key === 'eventStreamingRoutes') {
       path = '/api/v1/events';
+    } else if (key === 'fileStorageRoutes') {
+      path = '/api/v1/files';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
