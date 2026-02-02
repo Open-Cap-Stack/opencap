@@ -35,6 +35,11 @@ module.exports = {
     'services/semanticSearchService.js',
     'services/similarityService.js',
 
+    // Continuous Sync Services (Issue #14)
+    'services/mongoChangeStreamListener.js',
+    'services/zerodbSyncService.js',
+    'services/syncOrchestrator.js',
+
     // Core Models (business entities)
     'models/User.js',
     'models/Company.js',

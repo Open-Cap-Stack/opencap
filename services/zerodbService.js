@@ -475,7 +475,7 @@ class ZeroDBService {
       throw error;
     }
   }
-  
+
   /**
    * Store agent log
    * @param {string} agentId - Agent identifier
@@ -500,7 +500,7 @@ class ZeroDBService {
       throw error;
     }
   }
-  
+
   /**
    * List agent logs
    * @param {string} agentId - Filter by agent
@@ -516,13 +516,95 @@ class ZeroDBService {
       if (agentId) params.agent_id = agentId;
       if (sessionId) params.session_id = sessionId;
       if (logLevel) params.log_level = logLevel;
-      
+
       const response = await this.client.get(`/projects/${this.projectId}/database/agent/logs`, {
         params
       });
       return response.data;
     } catch (error) {
       console.error('Error listing agent logs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Insert row(s) into a table
+   * @param {string} tableName - Name of the table
+   * @param {Object|Array} rowData - Row data (single object or array of objects)
+   * @returns {Object} Insert result with created row IDs
+   */
+  async insertRow(tableName, rowData) {
+    try {
+      const response = await this.client.post(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { rows: Array.isArray(rowData) ? rowData : [rowData] }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error inserting row:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Query rows from a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter (MongoDB-style query object)
+   * @param {Object} options - Query options (skip, limit, sort)
+   * @returns {Array} Query results
+   */
+  async queryRows(tableName, query = {}, options = {}) {
+    try {
+      const params = { ...options };
+      if (Object.keys(query).length > 0) {
+        params.filter = JSON.stringify(query);
+      }
+      const response = await this.client.get(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error querying rows:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update rows in a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter to match rows
+   * @param {Object} update - Update operations (MongoDB-style update object)
+   * @returns {Object} Update result with count of modified rows
+   */
+  async updateRows(tableName, query, update) {
+    try {
+      const response = await this.client.put(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { filter: query, update }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating rows:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete rows from a table
+   * @param {string} tableName - Name of the table
+   * @param {Object} query - Query filter to match rows
+   * @returns {Object} Delete result with count of deleted rows
+   */
+  async deleteRows(tableName, query) {
+    try {
+      const response = await this.client.delete(
+        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        { data: { filter: query } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting rows:', error);
       throw error;
     }
   }

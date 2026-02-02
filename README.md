@@ -42,14 +42,112 @@ npm install
 
 ## Environment Variables
 
-Create a `.env` file in the root directory and add the following:
+Create a `.env` file in the root directory based on the `.env.example` template:
 
 ```bash
-MONGODB_URI=mongodb://mongo:27017/opencap
-PORT=5000
+cp .env.example .env
 ```
 
-Replace `mongodb://mongo:27017/opencap` with your MongoDB connection string if it's different.
+### Required Configuration
+
+#### Database Configuration
+
+```bash
+# MongoDB (Legacy - To be phased out during ZeroDB migration)
+MONGODB_URI=mongodb://localhost:27017/opencap
+```
+
+Replace `mongodb://localhost:27017/opencap` with your MongoDB connection string if it's different.
+
+#### ZeroDB Configuration
+
+OpenCap Stack uses ZeroDB (via AINative Studio) for lakehouse database capabilities including vector search, memory management, event streaming, and file storage.
+
+```bash
+# ZeroDB API Configuration
+ZERODB_API_KEY=your_zerodb_api_key_here
+ZERODB_BASE_URL=https://api.ainative.studio/api/v1
+ZERODB_PROJECT_ID=your_project_id_here
+```
+
+**Setting up ZeroDB:**
+
+1. **Create an AINative Studio Account**:
+   - Visit [https://api.ainative.studio/](https://api.ainative.studio/)
+   - Sign up for an account or log in
+
+2. **Obtain API Credentials**:
+   - Navigate to your account settings
+   - Generate an API token
+   - Copy the token to `ZERODB_API_KEY` in your `.env` file
+
+3. **Create a ZeroDB Project**:
+   - Option A: Create via API (recommended for automation):
+     ```bash
+     curl -X POST https://api.ainative.studio/api/v1/projects/ \
+       -H "Authorization: Bearer YOUR_API_KEY" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "OpenCap", "description": "OpenCap Financial Management System with Lakehouse Analytics"}'
+     ```
+   - Option B: Create via AINative Studio dashboard
+   - Copy the project ID from the response to `ZERODB_PROJECT_ID`
+
+4. **Verify ZeroDB Setup**:
+   ```bash
+   curl -X GET https://api.ainative.studio/api/v1/projects/YOUR_PROJECT_ID/database/status \
+     -H "Authorization: Bearer YOUR_API_KEY"
+   ```
+   You should see `status: ACTIVE` and `database_enabled: true`
+
+#### MongoDB to ZeroDB Real-Time Sync (GitHub Issue #14)
+
+OpenCap Stack includes a comprehensive MongoDB Change Streams listener for real-time data synchronization from MongoDB to ZeroDB:
+
+```bash
+# Enable real-time sync
+SYNC_ENABLED=true
+
+# Batch processing configuration
+SYNC_BATCH_SIZE=50
+SYNC_BATCH_TIMEOUT_MS=5000
+
+# Retry configuration
+SYNC_RETRY_ATTEMPTS=3
+SYNC_RETRY_DELAY_MS=1000
+SYNC_MAX_RETRY_DELAY_MS=30000
+
+# Collections to sync (comma-separated, leave empty for all)
+SYNC_COLLECTIONS=users,companies,stakeholders,transactions,documents
+
+# Operation types to sync
+SYNC_OPERATION_TYPES=insert,update,delete,replace
+```
+
+**Features:**
+- Real-time change detection using MongoDB Change Streams
+- Automatic resume on connection loss with resume tokens
+- Batch processing for high performance
+- Exponential backoff retry with dead letter queue
+- Comprehensive metrics and health monitoring
+- Graceful shutdown with state persistence
+
+For detailed documentation, see [MongoDB to ZeroDB Sync Guide](./docs/mongodb-zerodb-sync.md)
+
+#### Server Configuration
+
+```bash
+PORT=3001
+NODE_ENV=development
+```
+
+#### Authentication
+
+```bash
+JWT_SECRET=your_jwt_secret_change_this_in_production
+JWT_EXPIRATION=24h
+```
+
+**Important**: Change the default JWT_SECRET to a strong, random value in production.
 
 ## Running the Project ▶️
 
