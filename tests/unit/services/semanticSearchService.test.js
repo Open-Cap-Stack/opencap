@@ -11,18 +11,24 @@ const mongoose = require('mongoose');
 // Mock dependencies before requiring the service
 jest.mock('../../../services/vectorService');
 jest.mock('../../../services/zerodbService');
+jest.mock('../../../models/Document');
+jest.mock('../../../models/DocumentEmbeddingModel');
 
 const vectorService = require('../../../services/vectorService');
 const zerodbService = require('../../../services/zerodbService');
+const Document = require('../../../models/Document');
+const DocumentEmbedding = require('../../../models/DocumentEmbeddingModel');
 
 describe('SemanticSearchService', () => {
   let SemanticSearchService;
   let mockCompanyId;
+  let mockUserId;
 
   beforeAll(async () => {
     // Import after mocks are set up
     SemanticSearchService = require('../../../services/semanticSearchService');
     mockCompanyId = new mongoose.Types.ObjectId().toString();
+    mockUserId = new mongoose.Types.ObjectId().toString();
   });
 
   beforeEach(() => {
@@ -441,11 +447,11 @@ describe('SemanticSearchService', () => {
     it('should track search query', async () => {
       const trackSpy = jest.spyOn(SemanticSearchService, 'trackSearchAnalytics');
 
-      await SemanticSearchService.search('test query', { userId: 'user-1' });
+      await SemanticSearchService.search('test query', { userId: mockUserId });
 
       expect(trackSpy).toHaveBeenCalledWith(expect.objectContaining({
         query: 'test query',
-        userId: 'user-1'
+        userId: mockUserId
       }));
     });
 
@@ -558,6 +564,7 @@ describe('SemanticSearchService', () => {
 
   describe('Search Analytics', () => {
     beforeEach(() => {
+      // Prime the analytics store with some data
       vectorService.generateEmbedding.mockResolvedValue(new Array(768).fill(0));
       zerodbService.searchVectors.mockResolvedValue({ vectors: [], search_time_ms: 10 });
     });
@@ -611,7 +618,7 @@ describe('SemanticSearchService', () => {
             title: 'Stock Option Plan',
             type: 'equity'
           },
-          document: 'This is a comprehensive stock option plan that covers all employees. The stock options vest over four years with a one year cliff.'
+          document: 'This is a comprehensive stock option plan that covers all employees. The stock options vest over four years with a one year cliff. Stock grants are subject to board approval.'
         }
       ],
       search_time_ms: 15
@@ -642,25 +649,110 @@ describe('SemanticSearchService', () => {
     });
   });
 
-  describe('Minimum Relevance Filtering', () => {
-    it('should apply minimum relevance threshold', async () => {
-      const mockVectors = {
-        vectors: [
-          { id: 'v1', similarity_score: 0.95, vector_metadata: { document_id: 'd1', title: 'T1', type: 't' } },
-          { id: 'v2', similarity_score: 0.5, vector_metadata: { document_id: 'd2', title: 'T2', type: 't' } }
-        ],
-        search_time_ms: 20
-      };
+  describe('Snippet Generation', () => {
+    const createMockWithLongContent = (content) => ({
+      vectors: [
+        {
+          id: 'v1',
+          similarity_score: 0.9,
+          vector_metadata: {
+            document_id: 'd1',
+            title: 'Test Document',
+            type: 'test'
+          },
+          document: content
+        }
+      ],
+      search_time_ms: 10
+    });
 
+    beforeEach(() => {
       vectorService.generateEmbedding.mockResolvedValue(new Array(768).fill(0));
-      zerodbService.searchVectors.mockResolvedValue(mockVectors);
+    });
 
-      const result = await SemanticSearchService.search('query', {
-        minRelevance: 0.7
+    it('should generate snippet from document content', async () => {
+      const longContent = 'Lorem ipsum dolor sit amet. '.repeat(50) +
+        'This is the important equity vesting content that should be found. ' +
+        'More content after the match. '.repeat(50);
+
+      zerodbService.searchVectors.mockResolvedValue(createMockWithLongContent(longContent));
+
+      const result = await SemanticSearchService.search('equity vesting');
+
+      expect(result.results[0]).toHaveProperty('snippet');
+      expect(result.results[0].snippet.length).toBeLessThanOrEqual(250);
+    });
+
+    it('should handle empty content gracefully', async () => {
+      zerodbService.searchVectors.mockResolvedValue(createMockWithLongContent(''));
+
+      const result = await SemanticSearchService.search('query');
+
+      expect(result.results[0].snippet).toBe('');
+    });
+
+    it('should add ellipsis for truncated snippets', async () => {
+      const longContent = 'Start of content. '.repeat(100) +
+        'Important keyword here. ' +
+        'More content after. '.repeat(100);
+
+      zerodbService.searchVectors.mockResolvedValue(createMockWithLongContent(longContent));
+
+      const result = await SemanticSearchService.search('keyword');
+
+      expect(result.results[0].snippet).toContain('...');
+    });
+  });
+
+  describe('Advanced Filtering', () => {
+    const createMockWithMetadata = () => ({
+      vectors: [
+        {
+          id: 'v1',
+          similarity_score: 0.95,
+          vector_metadata: {
+            document_id: 'd1',
+            title: 'Financial Report',
+            type: 'financial',
+            company_id: mockCompanyId,
+            indexed_at: '2024-06-15T10:00:00Z'
+          }
+        },
+        {
+          id: 'v2',
+          similarity_score: 0.90,
+          vector_metadata: {
+            document_id: 'd2',
+            title: 'Legal Agreement',
+            type: 'legal',
+            company_id: 'other-company',
+            indexed_at: '2024-03-01T10:00:00Z'
+          }
+        }
+      ],
+      search_time_ms: 20
+    });
+
+    beforeEach(() => {
+      vectorService.generateEmbedding.mockResolvedValue(new Array(768).fill(0));
+      zerodbService.searchVectors.mockResolvedValue(createMockWithMetadata());
+    });
+
+    it('should filter by multiple categories', async () => {
+      const result = await SemanticSearchService.search('documents', {
+        filters: { categories: ['financial', 'legal'] }
+      });
+
+      expect(result.results.length).toBe(2);
+    });
+
+    it('should apply minimum relevance threshold', async () => {
+      const result = await SemanticSearchService.search('documents', {
+        minRelevance: 0.92
       });
 
       result.results.forEach(r => {
-        expect(r.relevanceScore).toBeGreaterThanOrEqual(0.7);
+        expect(r.relevanceScore).toBeGreaterThanOrEqual(0.92);
       });
     });
   });
