@@ -1,4 +1,5 @@
 module.exports = {
+  rootDir: '..',
   testEnvironment: 'node',
   testMatch: [
     '**/tests/**/*.test.js',
@@ -25,6 +26,7 @@ module.exports = {
     'services/streamingService.js',
     'services/memoryService.js',
     'services/vectorService.js',
+    'services/documentEmbeddingService.js',
     
     // Core Models (business entities)
     'models/User.js',
@@ -51,5 +53,5 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  setupFilesAfterEnv: ['./tests/setup.js']
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js']
 };
