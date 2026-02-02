@@ -1,6 +1,19 @@
-const Admin = require('../models/admin');
-const mongoose = require('mongoose');
+/**
+ * Admin Controller
+ *
+ * Issue #20: Migrate remaining controllers to ZeroDB (Batch 2)
+ *
+ * Handles CRUD operations for admin users using DatabaseAdapter
+ * for ZeroDB migration support
+ */
 
+const databaseAdapter = require('../services/databaseAdapter');
+
+/**
+ * Create a new admin
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.createAdmin = async (req, res) => {
   const { UserID, Name, Email, UserRoles, NotificationSettings } = req.body;
 
@@ -8,25 +21,28 @@ exports.createAdmin = async (req, res) => {
     return res.status(400).json({ message: "Invalid admin data" });
   }
 
-  const newAdmin = new Admin({
-    UserID,
-    Name,
-    Email,
-    UserRoles,
-    NotificationSettings,
-  });
-
   try {
-    const createdAdmin = await newAdmin.save();
+    const createdAdmin = await databaseAdapter.create('Admin', {
+      UserID,
+      Name,
+      Email,
+      UserRoles,
+      NotificationSettings,
+    });
     return res.status(201).json(createdAdmin);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
 
+/**
+ * Get all admins
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getAllAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find();
+    const admins = await databaseAdapter.find('Admin', {}, {});
     if (admins.length === 0) {
       return res.status(404).json({ message: 'No admins found' });
     }
@@ -36,9 +52,14 @@ exports.getAllAdmins = async (req, res) => {
   }
 };
 
+/**
+ * Get admin by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getAdminById = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.params.id);
+    const admin = await databaseAdapter.findById('Admin', req.params.id);
 
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -50,11 +71,19 @@ exports.getAdminById = async (req, res) => {
   }
 };
 
+/**
+ * Update admin by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.updateAdmin = async (req, res) => {
   try {
-    const updatedAdmin = await Admin.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const updatedAdmin = await databaseAdapter.findByIdAndUpdate(
+      'Admin',
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
     if (!updatedAdmin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -66,9 +95,14 @@ exports.updateAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Delete admin by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.deleteAdmin = async (req, res) => {
   try {
-    const deletedAdmin = await Admin.findByIdAndDelete(req.params.id);
+    const deletedAdmin = await databaseAdapter.findByIdAndDelete('Admin', req.params.id);
 
     if (!deletedAdmin) {
       return res.status(404).json({ message: "Admin not found" });
@@ -80,28 +114,33 @@ exports.deleteAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Login admin
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
-    
-    // Find admin by email
-    const admin = await Admin.findOne({ Email: email });
+
+    // Find admin by email using DatabaseAdapter
+    const admin = await databaseAdapter.findOne('Admin', { Email: email });
     if (!admin) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    
+
     // In a real implementation, you would verify the password here
     // For now, we'll require the JWT_SECRET environment variable
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET environment variable is required');
     }
-    
+
     // Return success without a token (requires proper JWT implementation)
-    res.status(501).json({ 
+    res.status(501).json({
       message: "Login functionality requires proper JWT implementation",
       error: "JWT authentication not yet implemented"
     });
@@ -110,11 +149,21 @@ exports.loginAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Logout admin
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.logoutAdmin = async (req, res) => {
   // Implement logout logic
   res.status(200).json({ message: "Admin logged out" });
 };
 
+/**
+ * Change admin password
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.changePassword = async (req, res) => {
   // Implement password change logic
   res.status(200).json({ message: "Password changed" });

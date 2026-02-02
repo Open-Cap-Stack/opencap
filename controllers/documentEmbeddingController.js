@@ -1,13 +1,14 @@
 /**
- * Document Processing Pipeline Controller
- * 
+ * Document Processing Pipeline Controller - ZeroDB Migration
+ *
  * [Feature] OCAE-404: Advanced Document Processing
  * Implements document text extraction, OCR, classification, and summarization
  * with AI-powered analysis and automated processing workflows
+ *
+ * Migrated from MongoDB/Mongoose to ZeroDB for Issue #19
  */
 
-const DocumentEmbedding = require('../models/DocumentEmbeddingModel');
-const Document = require('../models/Document');
+const zerodbService = require('../services/zerodbService');
 const vectorService = require('../services/vectorService');
 const streamingService = require('../services/streamingService');
 const memoryService = require('../services/memoryService');
@@ -19,6 +20,9 @@ const tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const mammoth = require('mammoth');
 const { Configuration, OpenAIApi } = require('openai');
+
+const DOCUMENTS_TABLE = 'documents';
+const EMBEDDINGS_TABLE = 'document_embeddings';
 
 // Configure OpenAI for text processing
 const openai = new OpenAIApi(new Configuration({
@@ -41,7 +45,7 @@ const upload = multer({
       'image/png',
       'image/tiff'
     ];
-    
+
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -58,15 +62,27 @@ const extractDocumentText = async (req, res) => {
   try {
     const { documentId } = req.params;
     const { ocrLanguage = 'eng' } = req.body;
-    
-    // Get document from database
-    const document = await Document.findById(documentId);
+
+    // Get document from ZeroDB
+    const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+      filter: { id: documentId },
+      limit: 1
+    });
+    const documents = docResult.rows || docResult;
+    const document = documents[0];
+
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
-    
+
     // Check if document already has extracted text
-    const existingExtraction = await DocumentEmbedding.findOne({ documentId });
+    const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { documentId },
+      limit: 1
+    });
+    const embeddings = embResult.rows || embResult;
+    const existingExtraction = embeddings[0];
+
     if (existingExtraction && existingExtraction.extractedText) {
       return res.status(200).json({
         documentId,
@@ -75,51 +91,77 @@ const extractDocumentText = async (req, res) => {
         cached: true
       });
     }
-    
+
     let extractedText = '';
     let extractionMethod = 'unknown';
-    
+
     // Determine extraction method based on file type
-    const fileExtension = path.extname(document.filename).toLowerCase();
-    
+    const fileExtension = path.extname(document.filename || document.name || '').toLowerCase();
+
     switch (fileExtension) {
       case '.pdf':
-        extractedText = await extractPDFText(document.filePath);
+        extractedText = await extractPDFText(document.filePath || document.path);
         extractionMethod = 'pdf_extraction';
         break;
       case '.docx':
       case '.doc':
-        extractedText = await extractWordText(document.filePath);
+        extractedText = await extractWordText(document.filePath || document.path);
         extractionMethod = 'word_extraction';
         break;
       case '.txt':
-        extractedText = await extractPlainText(document.filePath);
+        extractedText = await extractPlainText(document.filePath || document.path);
         extractionMethod = 'plain_text';
         break;
       case '.jpg':
       case '.jpeg':
       case '.png':
       case '.tiff':
-        extractedText = await extractImageText(document.filePath, ocrLanguage);
+        extractedText = await extractImageText(document.filePath || document.path, ocrLanguage);
         extractionMethod = 'ocr';
         break;
       default:
         return res.status(400).json({ error: 'Unsupported file type for text extraction' });
     }
-    
-    // Store extracted text
-    const embedding = await DocumentEmbedding.findOneAndUpdate(
-      { documentId },
-      {
+
+    const now = new Date().toISOString();
+    const wordCount = extractedText.split(/\s+/).length;
+    const characterCount = extractedText.length;
+
+    // Store extracted text using upsert logic
+    let embedding;
+    if (existingExtraction) {
+      await zerodbService.updateRows(EMBEDDINGS_TABLE,
+        { documentId },
+        {
+          $set: {
+            extractedText,
+            extractionMethod,
+            extractionDate: now,
+            wordCount,
+            characterCount,
+            updatedAt: now
+          }
+        }
+      );
+      const updated = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+        filter: { documentId },
+        limit: 1
+      });
+      embedding = (updated.rows || updated)[0];
+    } else {
+      const insertResult = await zerodbService.insertRow(EMBEDDINGS_TABLE, {
+        documentId,
         extractedText,
         extractionMethod,
-        extractionDate: new Date(),
-        wordCount: extractedText.split(/\s+/).length,
-        characterCount: extractedText.length
-      },
-      { upsert: true, new: true }
-    );
-    
+        extractionDate: now,
+        wordCount,
+        characterCount,
+        createdAt: now,
+        updatedAt: now
+      });
+      embedding = insertResult.rows ? insertResult.rows[0] : insertResult;
+    }
+
     // Publish text extraction event
     await streamingService.publishEvent('document.text.extracted', {
       documentId,
@@ -127,7 +169,7 @@ const extractDocumentText = async (req, res) => {
       wordCount: embedding.wordCount,
       timestamp: new Date()
     });
-    
+
     res.status(200).json({
       documentId,
       extractedText,
@@ -136,10 +178,10 @@ const extractDocumentText = async (req, res) => {
       characterCount: embedding.characterCount,
       extractionDate: embedding.extractionDate
     });
-    
+
   } catch (error) {
     console.error('Text extraction error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to extract text from document',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -154,52 +196,93 @@ const performOCR = async (req, res) => {
   try {
     const { documentId } = req.params;
     const { language = 'eng', preprocessImage = true } = req.body;
-    
-    const document = await Document.findById(documentId);
+
+    // Get document from ZeroDB
+    const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+      filter: { id: documentId },
+      limit: 1
+    });
+    const documents = docResult.rows || docResult;
+    const document = documents[0];
+
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
-    
+
     // Check if file is an image
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.tiff', '.bmp'];
-    const fileExtension = path.extname(document.filename).toLowerCase();
-    
+    const fileExtension = path.extname(document.filename || document.name || '').toLowerCase();
+
     if (!imageExtensions.includes(fileExtension)) {
       return res.status(400).json({ error: 'OCR is only supported for image files' });
     }
-    
-    let imagePath = document.filePath;
-    
+
+    let imagePath = document.filePath || document.path;
+
     // Preprocess image if requested
     if (preprocessImage) {
-      imagePath = await preprocessImageForOCR(document.filePath);
+      imagePath = await preprocessImageForOCR(imagePath);
     }
-    
+
     // Perform OCR
     const { data: { text, confidence } } = await tesseract.recognize(imagePath, language, {
       logger: m => console.log(`OCR Progress: ${m.progress}%`)
     });
-    
-    // Store OCR results
-    const embedding = await DocumentEmbedding.findOneAndUpdate(
-      { documentId },
-      {
+
+    const now = new Date().toISOString();
+    const wordCount = text.split(/\s+/).length;
+    const characterCount = text.length;
+
+    // Check for existing embedding
+    const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { documentId },
+      limit: 1
+    });
+    const existingEmbedding = (embResult.rows || embResult)[0];
+
+    let embedding;
+    if (existingEmbedding) {
+      await zerodbService.updateRows(EMBEDDINGS_TABLE,
+        { documentId },
+        {
+          $set: {
+            extractedText: text,
+            extractionMethod: 'ocr',
+            ocrConfidence: confidence,
+            ocrLanguage: language,
+            extractionDate: now,
+            wordCount,
+            characterCount,
+            updatedAt: now
+          }
+        }
+      );
+      const updated = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+        filter: { documentId },
+        limit: 1
+      });
+      embedding = (updated.rows || updated)[0];
+    } else {
+      const insertResult = await zerodbService.insertRow(EMBEDDINGS_TABLE, {
+        documentId,
         extractedText: text,
         extractionMethod: 'ocr',
         ocrConfidence: confidence,
         ocrLanguage: language,
-        extractionDate: new Date(),
-        wordCount: text.split(/\s+/).length,
-        characterCount: text.length
-      },
-      { upsert: true, new: true }
-    );
-    
+        extractionDate: now,
+        wordCount,
+        characterCount,
+        createdAt: now,
+        updatedAt: now
+      });
+      embedding = insertResult.rows ? insertResult.rows[0] : insertResult;
+    }
+
     // Clean up preprocessed image if created
-    if (preprocessImage && imagePath !== document.filePath) {
+    if (preprocessImage && imagePath !== (document.filePath || document.path)) {
       await fs.unlink(imagePath).catch(console.error);
     }
-    
+
     // Publish OCR completion event
     await streamingService.publishEvent('document.ocr.completed', {
       documentId,
@@ -208,7 +291,7 @@ const performOCR = async (req, res) => {
       wordCount: embedding.wordCount,
       timestamp: new Date()
     });
-    
+
     res.status(200).json({
       documentId,
       extractedText: text,
@@ -218,10 +301,10 @@ const performOCR = async (req, res) => {
       characterCount: embedding.characterCount,
       extractionDate: embedding.extractionDate
     });
-    
+
   } catch (error) {
     console.error('OCR processing error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to perform OCR on document',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -236,20 +319,32 @@ const classifyDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
     const { reclassify = false } = req.body;
-    
-    const document = await Document.findById(documentId);
+
+    // Get document from ZeroDB
+    const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+      filter: { id: documentId },
+      limit: 1
+    });
+    const documents = docResult.rows || docResult;
+    const document = documents[0];
+
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
-    
+
     // Get or extract text first
-    let embedding = await DocumentEmbedding.findOne({ documentId });
+    const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { documentId },
+      limit: 1
+    });
+    let embedding = (embResult.rows || embResult)[0];
+
     if (!embedding || !embedding.extractedText) {
-      return res.status(400).json({ 
-        error: 'Document text must be extracted before classification' 
+      return res.status(400).json({
+        error: 'Document text must be extracted before classification'
       });
     }
-    
+
     // Skip if already classified (unless reclassify is true)
     if (embedding.classification && !reclassify) {
       return res.status(200).json({
@@ -259,28 +354,44 @@ const classifyDocument = async (req, res) => {
         cached: true
       });
     }
-    
+
     // Classify document using AI
     const classification = await classifyDocumentText(embedding.extractedText, document.title);
-    
+
+    const now = new Date().toISOString();
+
     // Update embedding with classification
-    embedding = await DocumentEmbedding.findOneAndUpdate(
+    await zerodbService.updateRows(EMBEDDINGS_TABLE,
       { documentId },
       {
-        classification: classification.category,
-        classificationConfidence: classification.confidence,
-        classificationTags: classification.tags,
-        classificationDate: new Date()
-      },
-      { new: true }
+        $set: {
+          classification: classification.category,
+          classificationConfidence: classification.confidence,
+          classificationTags: classification.tags,
+          classificationDate: now,
+          updatedAt: now
+        }
+      }
     );
-    
-    // Update document with classification
-    await Document.findByIdAndUpdate(documentId, {
-      documentType: classification.category,
-      tags: classification.tags
+
+    const updated = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { documentId },
+      limit: 1
     });
-    
+    embedding = (updated.rows || updated)[0];
+
+    // Update document with classification
+    await zerodbService.updateRows(DOCUMENTS_TABLE,
+      { id: documentId },
+      {
+        $set: {
+          documentType: classification.category,
+          tags: classification.tags,
+          updatedAt: now
+        }
+      }
+    );
+
     // Publish classification event
     await streamingService.publishEvent('document.classified', {
       documentId,
@@ -289,7 +400,7 @@ const classifyDocument = async (req, res) => {
       tags: classification.tags,
       timestamp: new Date()
     });
-    
+
     res.status(200).json({
       documentId,
       classification: classification.category,
@@ -297,10 +408,10 @@ const classifyDocument = async (req, res) => {
       tags: classification.tags,
       classificationDate: embedding.classificationDate
     });
-    
+
   } catch (error) {
     console.error('Document classification error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to classify document',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -315,20 +426,32 @@ const generateDocumentSummary = async (req, res) => {
   try {
     const { documentId } = req.params;
     const { summaryType = 'extractive', maxLength = 200 } = req.body;
-    
-    const document = await Document.findById(documentId);
+
+    // Get document from ZeroDB
+    const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+      filter: { id: documentId },
+      limit: 1
+    });
+    const documents = docResult.rows || docResult;
+    const document = documents[0];
+
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
-    
+
     // Get extracted text
-    const embedding = await DocumentEmbedding.findOne({ documentId });
+    const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { documentId },
+      limit: 1
+    });
+    const embedding = (embResult.rows || embResult)[0];
+
     if (!embedding || !embedding.extractedText) {
-      return res.status(400).json({ 
-        error: 'Document text must be extracted before summarization' 
+      return res.status(400).json({
+        error: 'Document text must be extracted before summarization'
       });
     }
-    
+
     // Skip if already summarized
     if (embedding.summary && embedding.summaryType === summaryType) {
       return res.status(200).json({
@@ -338,21 +461,25 @@ const generateDocumentSummary = async (req, res) => {
         cached: true
       });
     }
-    
+
     // Generate summary using AI
     const summary = await generateAISummary(embedding.extractedText, summaryType, maxLength);
-    
+
+    const now = new Date().toISOString();
+
     // Update embedding with summary
-    await DocumentEmbedding.findOneAndUpdate(
+    await zerodbService.updateRows(EMBEDDINGS_TABLE,
       { documentId },
       {
-        summary,
-        summaryType,
-        summaryDate: new Date()
-      },
-      { new: true }
+        $set: {
+          summary,
+          summaryType,
+          summaryDate: now,
+          updatedAt: now
+        }
+      }
     );
-    
+
     // Publish summarization event
     await streamingService.publishEvent('document.summarized', {
       documentId,
@@ -360,17 +487,17 @@ const generateDocumentSummary = async (req, res) => {
       summaryLength: summary.length,
       timestamp: new Date()
     });
-    
+
     res.status(200).json({
       documentId,
       summary,
       summaryType,
       summaryDate: new Date()
     });
-    
+
   } catch (error) {
     console.error('Document summarization error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to generate document summary',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -384,43 +511,43 @@ const generateDocumentSummary = async (req, res) => {
 const batchProcessDocuments = async (req, res) => {
   try {
     const { documentIds, operations = ['extract', 'classify', 'summarize'] } = req.body;
-    
+
     if (!Array.isArray(documentIds) || documentIds.length === 0) {
       return res.status(400).json({ error: 'Document IDs array is required' });
     }
-    
+
     const results = [];
     const errors = [];
-    
+
     for (const documentId of documentIds) {
       try {
         const result = { documentId, operations: {} };
-        
+
         // Extract text
         if (operations.includes('extract')) {
           const extractResult = await extractDocumentTextInternal(documentId);
           result.operations.extract = extractResult;
         }
-        
+
         // Classify document
         if (operations.includes('classify')) {
           const classifyResult = await classifyDocumentInternal(documentId);
           result.operations.classify = classifyResult;
         }
-        
+
         // Generate summary
         if (operations.includes('summarize')) {
           const summaryResult = await generateDocumentSummaryInternal(documentId);
           result.operations.summarize = summaryResult;
         }
-        
+
         results.push(result);
-        
+
       } catch (error) {
         errors.push({ documentId, error: error.message });
       }
     }
-    
+
     // Publish batch processing event
     await streamingService.publishEvent('document.batch.processed', {
       totalDocuments: documentIds.length,
@@ -429,7 +556,7 @@ const batchProcessDocuments = async (req, res) => {
       operations,
       timestamp: new Date()
     });
-    
+
     res.status(200).json({
       totalDocuments: documentIds.length,
       successCount: results.length,
@@ -437,10 +564,10 @@ const batchProcessDocuments = async (req, res) => {
       results,
       errors
     });
-    
+
   } catch (error) {
     console.error('Batch processing error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process documents in batch',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -455,18 +582,18 @@ const batchProcessDocuments = async (req, res) => {
 async function extractPDFText(filePath) {
   const pdfExtract = new PDFExtract();
   const options = {};
-  
+
   return new Promise((resolve, reject) => {
     pdfExtract.extract(filePath, options, (err, data) => {
       if (err) {
         reject(err);
         return;
       }
-      
+
       const text = data.pages
         .map(page => page.content.map(item => item.str).join(' '))
         .join('\n');
-      
+
       resolve(text);
     });
   });
@@ -501,14 +628,14 @@ async function extractImageText(filePath, language = 'eng') {
  */
 async function preprocessImageForOCR(originalPath) {
   const preprocessedPath = originalPath.replace(/\.(jpg|jpeg|png|tiff)$/i, '_preprocessed.png');
-  
+
   await sharp(originalPath)
     .grayscale()
     .normalize()
     .sharpen()
     .png()
     .toFile(preprocessedPath);
-  
+
   return preprocessedPath;
 }
 
@@ -538,7 +665,7 @@ Return a JSON object with:
 - tags: array of relevant tags
 
 JSON:`;
-  
+
   try {
     const response = await openai.createCompletion({
       model: 'gpt-3.5-turbo-instruct',
@@ -546,7 +673,7 @@ JSON:`;
       max_tokens: 200,
       temperature: 0.3
     });
-    
+
     const result = JSON.parse(response.data.choices[0].text.trim());
     return result;
   } catch (error) {
@@ -565,7 +692,7 @@ async function generateAISummary(text, summaryType, maxLength) {
 ${text.substring(0, 3000)}...
 
 Summary:`;
-  
+
   try {
     const response = await openai.createCompletion({
       model: 'gpt-3.5-turbo-instruct',
@@ -573,7 +700,7 @@ Summary:`;
       max_tokens: Math.min(maxLength * 2, 500),
       temperature: 0.3
     });
-    
+
     return response.data.choices[0].text.trim();
   } catch (error) {
     console.error('AI summarization error:', error);
@@ -587,19 +714,19 @@ Summary:`;
  */
 function classifyDocumentRuleBased(text, title) {
   const lowerText = text.toLowerCase();
-  
+
   if (lowerText.includes('financial') || lowerText.includes('revenue') || lowerText.includes('profit')) {
     return { category: 'Financial Report', confidence: 0.7, tags: ['financial', 'report'] };
   }
-  
+
   if (lowerText.includes('contract') || lowerText.includes('agreement') || lowerText.includes('terms')) {
     return { category: 'Contract', confidence: 0.7, tags: ['contract', 'legal'] };
   }
-  
+
   if (lowerText.includes('compliance') || lowerText.includes('audit') || lowerText.includes('regulation')) {
     return { category: 'Compliance Document', confidence: 0.7, tags: ['compliance', 'audit'] };
   }
-  
+
   return { category: 'Other', confidence: 0.5, tags: ['uncategorized'] };
 }
 
@@ -608,7 +735,7 @@ function classifyDocumentRuleBased(text, title) {
  */
 function generateExtractiveSummary(text, maxLength) {
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-  
+
   // Simple ranking by sentence length and position
   const rankedSentences = sentences
     .map((sentence, index) => ({
@@ -618,94 +745,155 @@ function generateExtractiveSummary(text, maxLength) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
     .map(s => s.text);
-  
+
   return rankedSentences.join('. ') + '.';
 }
 
 // Internal processing functions for batch operations
 
 async function extractDocumentTextInternal(documentId) {
-  const document = await Document.findById(documentId);
+  const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+    filter: { id: documentId },
+    limit: 1
+  });
+  const documents = docResult.rows || docResult;
+  const document = documents[0];
+
   if (!document) throw new Error('Document not found');
-  
-  const fileExtension = path.extname(document.filename).toLowerCase();
+
+  const fileExtension = path.extname(document.filename || document.name || '').toLowerCase();
   let extractedText = '';
-  
+  const filePath = document.filePath || document.path;
+
   switch (fileExtension) {
     case '.pdf':
-      extractedText = await extractPDFText(document.filePath);
+      extractedText = await extractPDFText(filePath);
       break;
     case '.docx':
     case '.doc':
-      extractedText = await extractWordText(document.filePath);
+      extractedText = await extractWordText(filePath);
       break;
     case '.txt':
-      extractedText = await extractPlainText(document.filePath);
+      extractedText = await extractPlainText(filePath);
       break;
     default:
       throw new Error('Unsupported file type');
   }
-  
-  await DocumentEmbedding.findOneAndUpdate(
-    { documentId },
-    {
+
+  const now = new Date().toISOString();
+
+  // Check for existing embedding
+  const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+    filter: { documentId },
+    limit: 1
+  });
+  const existingEmbedding = (embResult.rows || embResult)[0];
+
+  if (existingEmbedding) {
+    await zerodbService.updateRows(EMBEDDINGS_TABLE,
+      { documentId },
+      {
+        $set: {
+          extractedText,
+          extractionMethod: 'auto',
+          extractionDate: now,
+          updatedAt: now
+        }
+      }
+    );
+  } else {
+    await zerodbService.insertRow(EMBEDDINGS_TABLE, {
+      documentId,
       extractedText,
       extractionMethod: 'auto',
-      extractionDate: new Date()
-    },
-    { upsert: true }
-  );
-  
+      extractionDate: now,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+
   return { success: true, wordCount: extractedText.split(/\s+/).length };
 }
 
 async function classifyDocumentInternal(documentId) {
-  const embedding = await DocumentEmbedding.findOne({ documentId });
+  const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+    filter: { documentId },
+    limit: 1
+  });
+  const embedding = (embResult.rows || embResult)[0];
+
   if (!embedding || !embedding.extractedText) {
     throw new Error('Text extraction required first');
   }
-  
-  const document = await Document.findById(documentId);
-  const classification = await classifyDocumentText(embedding.extractedText, document.title);
-  
-  await DocumentEmbedding.findOneAndUpdate(
+
+  const docResult = await zerodbService.queryTable(DOCUMENTS_TABLE, {
+    filter: { id: documentId },
+    limit: 1
+  });
+  const document = (docResult.rows || docResult)[0];
+
+  const classification = await classifyDocumentText(embedding.extractedText, document?.title || '');
+
+  const now = new Date().toISOString();
+
+  await zerodbService.updateRows(EMBEDDINGS_TABLE,
     { documentId },
     {
-      classification: classification.category,
-      classificationConfidence: classification.confidence,
-      classificationTags: classification.tags,
-      classificationDate: new Date()
+      $set: {
+        classification: classification.category,
+        classificationConfidence: classification.confidence,
+        classificationTags: classification.tags,
+        classificationDate: now,
+        updatedAt: now
+      }
     }
   );
-  
+
   return { success: true, classification: classification.category };
 }
 
 async function generateDocumentSummaryInternal(documentId) {
-  const embedding = await DocumentEmbedding.findOne({ documentId });
+  const embResult = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+    filter: { documentId },
+    limit: 1
+  });
+  const embedding = (embResult.rows || embResult)[0];
+
   if (!embedding || !embedding.extractedText) {
     throw new Error('Text extraction required first');
   }
-  
+
   const summary = await generateAISummary(embedding.extractedText, 'extractive', 200);
-  
-  await DocumentEmbedding.findOneAndUpdate(
+
+  const now = new Date().toISOString();
+
+  await zerodbService.updateRows(EMBEDDINGS_TABLE,
     { documentId },
     {
-      summary,
-      summaryType: 'extractive',
-      summaryDate: new Date()
+      $set: {
+        summary,
+        summaryType: 'extractive',
+        summaryDate: now,
+        updatedAt: now
+      }
     }
   );
-  
+
   return { success: true, summaryLength: summary.length };
 }
 
-// Legacy functions for backward compatibility
+// Legacy functions migrated to ZeroDB
 const createDocumentEmbedding = async (req, res) => {
   try {
-    const newEmbedding = new DocumentEmbedding(req.body);
-    const savedEmbedding = await newEmbedding.save();
+    const embeddingData = {
+      ...req.body,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const result = await zerodbService.insertRow(EMBEDDINGS_TABLE, embeddingData);
+    const savedEmbedding = result.rows ? result.rows[0] : result;
+
     res.status(201).json(savedEmbedding);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -714,7 +902,9 @@ const createDocumentEmbedding = async (req, res) => {
 
 const getDocumentEmbeddings = async (req, res) => {
   try {
-    const embeddings = await DocumentEmbedding.find();
+    const result = await zerodbService.queryTable(EMBEDDINGS_TABLE, {});
+    const embeddings = result.rows || result;
+
     res.status(200).json(embeddings);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -723,10 +913,18 @@ const getDocumentEmbeddings = async (req, res) => {
 
 const getDocumentEmbeddingById = async (req, res) => {
   try {
-    const embedding = await DocumentEmbedding.findById(req.params.id);
+    const result = await zerodbService.queryTable(EMBEDDINGS_TABLE, {
+      filter: { id: req.params.id },
+      limit: 1
+    });
+
+    const embeddings = result.rows || result;
+    const embedding = embeddings[0];
+
     if (!embedding) {
       return res.status(404).json({ message: 'Document embedding not found' });
     }
+
     res.status(200).json(embedding);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -739,14 +937,14 @@ module.exports = {
   createDocumentEmbedding,
   getDocumentEmbeddings,
   getDocumentEmbeddingById,
-  
+
   // New advanced functions
   extractDocumentText,
   performOCR,
   classifyDocument,
   generateDocumentSummary,
   batchProcessDocuments,
-  
+
   // File upload middleware
   upload
 };
