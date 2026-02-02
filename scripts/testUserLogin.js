@@ -7,16 +7,26 @@
 const request = require('supertest');
 const app = require('../app');
 
+// SECURITY: Test credentials should be loaded from environment variables
+// These should match the credentials created by createProductionUsers.js
 const testCredentials = {
   admin: {
     email: 'sanket@opencapstack.com',
-    password: 'MEok921$4sCP'
+    password: process.env.ADMIN_PASSWORD || ''
   },
   user: {
-    email: 'test@opencapstack.com', 
-    password: 'nzNN6YtN#EA3'
+    email: 'test@opencapstack.com',
+    password: process.env.TEST_USER_PASSWORD || ''
   }
 };
+
+// Validate credentials are provided
+if (!testCredentials.admin.password || !testCredentials.user.password) {
+  console.error('ERROR: Test credentials not found in environment variables');
+  console.error('Please set ADMIN_PASSWORD and TEST_USER_PASSWORD environment variables');
+  console.error('These should match the passwords used when running createProductionUsers.js');
+  process.exit(1);
+}
 
 async function testUserAuthentication() {
   try {

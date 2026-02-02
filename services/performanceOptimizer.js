@@ -202,7 +202,8 @@ class PerformanceOptimizer {
       const frequency = stat.count;
 
       // Calculate priority (based on frequency and duration)
-      const priority = (frequency * avgDuration) / 1000;
+      // Add small tiebreaker based on frequency to ensure unique priorities
+      const priority = (frequency * avgDuration) / 1000 + (frequency * 0.01);
 
       if (frequency >= 5 && avgDuration > 500) {
         recommendations.push({
