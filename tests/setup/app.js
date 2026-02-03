@@ -20,6 +20,7 @@ const companyRoutes = require('../../routes/v1/companyRoutes');
 const stakeholderRoutes = require('../../routes/v1/stakeholderRoutes');
 const documentRoutes = require('../../routes/v1/documentRoutes');
 const adminRoutes = require('../../routes/v1/adminRoutes');
+const spvRoutes = require('../../routes/v1/spvRoutes');
 
 let server;
 
@@ -68,6 +69,10 @@ function createApp() {
   app.use('/api/v1/documents', documentRoutes);
   app.use('/api/v1/admin', adminRoutes);
   
+  // SPV routes
+  app.use('/api/spvs', spvRoutes);
+  app.use('/api/v1/spvs', spvRoutes);
+
   // Legacy routes (for backward compatibility in tests)
   app.use('/api/users', userRoutes);
   
