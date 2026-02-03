@@ -256,6 +256,15 @@ const routes = {
   valuation409ARoutes: safeRequire(path.join(__dirname, 'routes/v1/valuation409ARoutes')), // Issue #59: 409A Valuation Request System
   materialEventRoutes: safeRequire(path.join(__dirname, 'routes/v1/materialEventRoutes')), // Issue #60: Material Events Tracking
   valuationPartnerRoutes: safeRequire(path.join(__dirname, 'routes/v1/valuationPartnerRoutes')), // Issue #61: Valuation Specialist Integration
+  equityGrantRoutes: safeRequire(path.join(__dirname, 'routes/v1/equityGrantRoutes')), // Issue #77: Equity Grant Management
+  exerciseRoutes: safeRequire(path.join(__dirname, 'routes/v1/exerciseRoutes')), // Issue #79: Exercise Management System
+  terminationRoutes: safeRequire(path.join(__dirname, 'routes/v1/terminationRoutes')), // Issue #81: Termination Equity Workflow
+  bulkMessageRoutes: safeRequire(path.join(__dirname, 'routes/v1/bulkMessageRoutes')), // Issue #86: Bulk Messaging System
+  emailTrackingRoutes: safeRequire(path.join(__dirname, 'routes/v1/emailTrackingRoutes')), // Issue #87: Email Delivery Tracking
+  investorRightsRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorRightsRoutes')), // Issue #92: Investor Rights Tracking
+  investorCommunicationRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorCommunicationRoutes')), // Issue #91: Investor Communication System
+  messageTriggerRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageTriggerRoutes')), // Issue #88: Automated Triggered Messages
+  securityIssuanceRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityIssuanceRoutes')), // Issue #76: Security Issuances Register
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -336,6 +345,24 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/material-events';
     } else if (key === 'valuationPartnerRoutes') {
       path = '/api/v1/valuation-partners';
+    } else if (key === 'equityGrantRoutes') {
+      path = '/api/v1/equity-grants';
+    } else if (key === 'exerciseRoutes') {
+      path = '/api/v1'; // Routes already have /exercise-requests prefix
+    } else if (key === 'terminationRoutes') {
+      path = '/api/v1/terminations';
+    } else if (key === 'investorRightsRoutes') {
+      path = '/api/v1/investor-rights';
+    } else if (key === 'emailTrackingRoutes') {
+      path = '/api/v1/email-tracking';
+    } else if (key === 'bulkMessageRoutes') {
+      path = '/api/v1/bulk-messages';
+    } else if (key === 'investorCommunicationRoutes') {
+      path = '/api/v1/investor-communications';
+    } else if (key === 'messageTriggerRoutes') {
+      path = '/api/v1/message-triggers';
+    } else if (key === 'securityIssuanceRoutes') {
+      path = '/api/v1/security-issuances';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
