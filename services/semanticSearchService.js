@@ -475,6 +475,320 @@ class SemanticSearchService {
       searchesByCategory
     };
   }
+
+  /**
+   * Find documents similar to a given document
+   * @param {string} documentId - Source document ID
+   * @param {Object} options - Search options
+   * @returns {Promise<Object>} - Similar documents result
+   */
+  async findSimilar(documentId, options = {}) {
+    if (!documentId) {
+      throw new Error('Document ID is required');
+    }
+
+    const limit = options.limit || 10;
+    const namespace = options.namespace || CONFIG.DEFAULT_NAMESPACE;
+    const minSimilarity = options.minSimilarity || 0;
+
+    try {
+      // Get source document embedding from ZeroDB
+      const sourceVector = await zerodbService.getVector(`document:${documentId}`, namespace);
+
+      if (!sourceVector || !sourceVector.vector_embedding) {
+        throw new Error(`Document ${documentId} not found in vector database`);
+      }
+
+      // Search for similar documents using the source embedding
+      const searchResults = await zerodbService.searchVectors(
+        sourceVector.vector_embedding,
+        limit + 1, // +1 to exclude source document
+        namespace
+      );
+
+      // Filter out the source document and apply minimum similarity threshold
+      let similarDocuments = (searchResults.vectors || [])
+        .filter(v => {
+          const vecDocId = v.vector_metadata?.document_id;
+          const similarity = v.similarity_score || 0;
+          return vecDocId !== documentId && similarity >= minSimilarity;
+        })
+        .slice(0, limit)
+        .map(v => ({
+          documentId: v.vector_metadata?.document_id,
+          title: v.vector_metadata?.title,
+          category: v.vector_metadata?.type,
+          companyId: v.vector_metadata?.company_id,
+          similarityScore: v.similarity_score,
+          indexedAt: v.vector_metadata?.indexed_at
+        }));
+
+      // Apply filters if specified
+      if (options.filters) {
+        similarDocuments = this.applyFilters(similarDocuments, options.filters);
+      }
+
+      return {
+        sourceDocumentId: documentId,
+        similarDocuments,
+        totalCount: similarDocuments.length,
+        searchTimeMs: searchResults.search_time_ms || 0
+      };
+    } catch (error) {
+      console.error('Error finding similar documents:', error);
+      if (error.message.includes('not found')) {
+        throw error;
+      }
+      throw new Error('Failed to find similar documents');
+    }
+  }
+
+  /**
+   * Rank search results by relevance with custom scoring
+   * @param {Array} results - Search results to rank
+   * @param {Object} options - Ranking options
+   * @returns {Array} - Ranked results
+   */
+  rankResults(results, options = {}) {
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    const {
+      weights = {},
+      boosts = {},
+      decayFunction = null
+    } = options;
+
+    // Default weights
+    const defaultWeights = {
+      relevanceScore: 0.6,
+      recency: 0.2,
+      popularity: 0.1,
+      titleMatch: 0.1
+    };
+
+    const finalWeights = { ...defaultWeights, ...weights };
+
+    // Calculate composite scores
+    const rankedResults = results.map(result => {
+      let compositeScore = 0;
+
+      // Base relevance score
+      compositeScore += (result.relevanceScore || 0) * finalWeights.relevanceScore;
+
+      // Recency score
+      if (result.indexedAt && finalWeights.recency > 0) {
+        const recencyScore = this.calculateRecencyScore(result.indexedAt, decayFunction);
+        compositeScore += recencyScore * finalWeights.recency;
+      }
+
+      // Popularity score (if available)
+      if (result.viewCount && finalWeights.popularity > 0) {
+        const popularityScore = Math.min(result.viewCount / 1000, 1);
+        compositeScore += popularityScore * finalWeights.popularity;
+      }
+
+      // Title match boost
+      if (result.titleMatch && finalWeights.titleMatch > 0) {
+        compositeScore += finalWeights.titleMatch;
+      }
+
+      // Apply custom boosts
+      if (boosts.category && result.category === boosts.category) {
+        compositeScore *= (boosts.categoryMultiplier || 1.2);
+      }
+
+      if (boosts.companyId && result.companyId === boosts.companyId) {
+        compositeScore *= (boosts.companyMultiplier || 1.1);
+      }
+
+      return {
+        ...result,
+        compositeScore,
+        rankingFactors: {
+          relevance: (result.relevanceScore || 0) * finalWeights.relevanceScore,
+          recency: result.indexedAt ? this.calculateRecencyScore(result.indexedAt) * finalWeights.recency : 0,
+          popularity: result.viewCount ? Math.min(result.viewCount / 1000, 1) * finalWeights.popularity : 0
+        }
+      };
+    });
+
+    // Sort by composite score
+    return rankedResults.sort((a, b) => b.compositeScore - a.compositeScore);
+  }
+
+  /**
+   * Calculate recency score based on indexing date
+   * @param {string|Date} indexedAt - Document indexing date
+   * @param {Function} decayFunction - Optional custom decay function
+   * @returns {number} - Recency score between 0 and 1
+   */
+  calculateRecencyScore(indexedAt, decayFunction = null) {
+    const now = new Date();
+    const indexedDate = new Date(indexedAt);
+    const daysSinceIndexed = (now - indexedDate) / (1000 * 60 * 60 * 24);
+
+    if (decayFunction) {
+      return decayFunction(daysSinceIndexed);
+    }
+
+    // Default exponential decay: score halves every 30 days
+    return Math.exp(-0.023 * daysSinceIndexed);
+  }
+
+  /**
+   * Highlight matching content in document
+   * @param {string} content - Document content
+   * @param {string} query - Search query
+   * @param {Object} options - Highlighting options
+   * @returns {Object} - Highlighted content result
+   */
+  highlightMatches(content, query, options = {}) {
+    if (!content || !query) {
+      return {
+        highlightedContent: content || '',
+        matches: [],
+        matchCount: 0
+      };
+    }
+
+    const {
+      highlightTag = 'mark',
+      maxMatches = 10,
+      contextLength = 50,
+      caseSensitive = false
+    } = options;
+
+    const queryWords = query.split(/\s+/).filter(w => w.length > 2);
+    const matches = [];
+    let highlightedContent = content;
+    let matchCount = 0;
+
+    // Find all matches
+    for (const word of queryWords) {
+      const flags = caseSensitive ? 'g' : 'gi';
+      const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, flags);
+
+      let match;
+      while ((match = regex.exec(content)) !== null && matches.length < maxMatches) {
+        const start = Math.max(0, match.index - contextLength);
+        const end = Math.min(content.length, match.index + match[0].length + contextLength);
+
+        matches.push({
+          word: match[0],
+          position: match.index,
+          context: content.substring(start, end),
+          startInContext: match.index - start,
+          endInContext: match.index - start + match[0].length
+        });
+
+        matchCount++;
+      }
+    }
+
+    // Apply highlighting to content
+    for (const word of queryWords) {
+      const flags = caseSensitive ? 'g' : 'gi';
+      const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, flags);
+      highlightedContent = highlightedContent.replace(regex, `<${highlightTag}>$1</${highlightTag}>`);
+    }
+
+    return {
+      highlightedContent,
+      matches,
+      matchCount,
+      queryWords
+    };
+  }
+
+  /**
+   * Escape special regex characters
+   * @param {string} string - String to escape
+   * @returns {string} - Escaped string
+   */
+  escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Search documents across multiple namespaces
+   * @param {string} query - Search query
+   * @param {Array} namespaces - Namespaces to search
+   * @param {Object} options - Search options
+   * @returns {Promise<Object>} - Combined search results
+   */
+  async searchAcrossNamespaces(query, namespaces, options = {}) {
+    if (!namespaces || namespaces.length === 0) {
+      namespaces = [CONFIG.DEFAULT_NAMESPACE];
+    }
+
+    const allResults = [];
+    let totalSearchTime = 0;
+
+    for (const namespace of namespaces) {
+      try {
+        const namespaceOptions = {
+          ...options,
+          filters: { ...options.filters, namespace }
+        };
+
+        const result = await this.search(query, namespaceOptions);
+
+        result.results.forEach(r => {
+          r.namespace = namespace;
+        });
+
+        allResults.push(...result.results);
+        totalSearchTime += result.searchTimeMs || 0;
+      } catch (error) {
+        console.error(`Error searching namespace ${namespace}:`, error);
+      }
+    }
+
+    // Rank combined results
+    const rankedResults = this.rankResults(allResults, options.ranking);
+
+    // Apply pagination to combined results
+    const pagination = options.pagination || { page: 1, pageSize: CONFIG.DEFAULT_PAGE_SIZE };
+    const startIndex = (pagination.page - 1) * pagination.pageSize;
+    const paginatedResults = rankedResults.slice(startIndex, startIndex + pagination.pageSize);
+
+    return {
+      results: paginatedResults,
+      totalCount: rankedResults.length,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages: Math.ceil(rankedResults.length / pagination.pageSize),
+      namespaces,
+      searchTimeMs: totalSearchTime
+    };
+  }
+
+  /**
+   * Get related search terms
+   * @param {string} query - Original search query
+   * @param {Object} options - Options
+   * @returns {Promise<Array>} - Related search terms
+   */
+  async getRelatedTerms(query, options = {}) {
+    const limit = options.limit || 5;
+
+    // Get recent searches that co-occur with the query
+    const relatedQueries = searchAnalyticsStore
+      .filter(a => a.query !== query && a.query.toLowerCase().includes(query.toLowerCase().split(' ')[0]))
+      .map(a => a.query);
+
+    const termFrequency = {};
+    relatedQueries.forEach(q => {
+      termFrequency[q] = (termFrequency[q] || 0) + 1;
+    });
+
+    return Object.entries(termFrequency)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([term, count]) => ({ term, frequency: count }));
+  }
 }
 
 // Export singleton instance

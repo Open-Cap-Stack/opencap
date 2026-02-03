@@ -2,13 +2,17 @@
  * AlertService
  *
  * Monitoring alert system with threshold-based alerting
- * Supports alert deduplication, severity levels, and notification delivery
+ * Supports alert deduplication, severity levels, notification delivery,
+ * alert routing, escalation policies, and webhook notifications.
  */
 
 const crypto = require('crypto');
+const EventEmitter = require('events');
 
-class AlertService {
+class AlertService extends EventEmitter {
   constructor(monitoringDashboard, config = {}) {
+    super();
+
     this.monitoringDashboard = monitoringDashboard;
 
     this.thresholds = {
@@ -17,6 +21,9 @@ class AlertService {
       dlqSize: config.thresholds?.dlqSize || 100,
       queryLatencyP99: config.thresholds?.queryLatencyP99 || 1000, // 1 second
       apiRateLimitWarning: config.thresholds?.apiRateLimitWarning || 80, // 80%
+      httpErrorRate: config.thresholds?.httpErrorRate || 5, // 5%
+      responseTime: config.thresholds?.responseTime || 2000, // 2 seconds
+      memoryUsage: config.thresholds?.memoryUsage || 90, // 90%
       ...config.thresholds
     };
 
@@ -30,6 +37,26 @@ class AlertService {
 
     this.isRunning = false;
     this.checkTimer = null;
+
+    // Alert routing configuration
+    this.routingRules = config.routingRules || [];
+
+    // Escalation configuration
+    this.escalationPolicies = config.escalationPolicies || {
+      default: {
+        levels: [
+          { delay: 0, targets: ['oncall'] },
+          { delay: 900000, targets: ['oncall', 'team-lead'] }, // 15 min
+          { delay: 1800000, targets: ['oncall', 'team-lead', 'manager'] } // 30 min
+        ]
+      }
+    };
+
+    // Webhook configurations
+    this.webhooks = config.webhooks || [];
+
+    // Escalation timers
+    this.escalationTimers = new Map();
   }
 
   /**
@@ -433,6 +460,410 @@ class AlertService {
     if (alert.action) {
       console.log(`   Action: ${alert.action}`);
     }
+  }
+
+  /**
+   * Route alert to appropriate handlers based on rules
+   * @param {Object} alert - Alert object
+   * @returns {Array} List of targets to notify
+   */
+  routeAlert(alert) {
+    const targets = [];
+
+    for (const rule of this.routingRules) {
+      let matches = true;
+
+      // Check severity match
+      if (rule.severity && rule.severity !== alert.severity) {
+        matches = false;
+      }
+
+      // Check type match
+      if (rule.type && rule.type !== alert.type) {
+        matches = false;
+      }
+
+      // Check category match (using regex)
+      if (rule.categoryPattern) {
+        const pattern = new RegExp(rule.categoryPattern);
+        if (!pattern.test(alert.type)) {
+          matches = false;
+        }
+      }
+
+      if (matches && rule.targets) {
+        targets.push(...rule.targets);
+      }
+    }
+
+    // Return unique targets or default
+    return targets.length > 0 ? [...new Set(targets)] : ['default'];
+  }
+
+  /**
+   * Add a routing rule
+   * @param {Object} rule - Routing rule configuration
+   */
+  addRoutingRule(rule) {
+    this.routingRules.push(rule);
+  }
+
+  /**
+   * Remove a routing rule by index
+   * @param {number} index - Index of rule to remove
+   */
+  removeRoutingRule(index) {
+    this.routingRules.splice(index, 1);
+  }
+
+  /**
+   * Start escalation for an alert
+   * @param {Object} alert - Alert object
+   * @param {string} policyName - Name of escalation policy to use
+   */
+  startEscalation(alert, policyName = 'default') {
+    const policy = this.escalationPolicies[policyName];
+    if (!policy) {
+      console.warn(`Escalation policy not found: ${policyName}`);
+      return;
+    }
+
+    // Clear existing escalation for this alert
+    this.clearEscalation(alert.id);
+
+    // Set up escalation timers
+    const timers = [];
+    policy.levels.forEach((level, index) => {
+      const timer = setTimeout(() => {
+        this.escalateAlert(alert, level, index);
+      }, level.delay);
+      timers.push(timer);
+    });
+
+    this.escalationTimers.set(alert.id, timers);
+
+    // Update alert with escalation info
+    alert.escalationPolicy = policyName;
+    alert.escalationLevel = 0;
+    alert.escalationTargets = policy.levels[0].targets;
+  }
+
+  /**
+   * Escalate an alert to the next level
+   * @param {Object} alert - Alert object
+   * @param {Object} level - Escalation level configuration
+   * @param {number} levelIndex - Current escalation level index
+   */
+  escalateAlert(alert, level, levelIndex) {
+    const currentAlert = this.alerts.get(alert.id);
+    if (!currentAlert || currentAlert.resolved || currentAlert.acknowledged) {
+      return;
+    }
+
+    currentAlert.escalationLevel = levelIndex;
+    currentAlert.escalationTargets = level.targets;
+    currentAlert.lastEscalatedAt = Date.now();
+
+    // Emit escalation event
+    this.emit('escalation', {
+      alert: currentAlert,
+      level: levelIndex,
+      targets: level.targets
+    });
+
+    // Notify escalation targets
+    level.targets.forEach(target => {
+      this.notifyTarget(target, currentAlert, 'escalation');
+    });
+  }
+
+  /**
+   * Clear escalation timers for an alert
+   * @param {string} alertId - Alert ID
+   */
+  clearEscalation(alertId) {
+    const timers = this.escalationTimers.get(alertId);
+    if (timers) {
+      timers.forEach(timer => clearTimeout(timer));
+      this.escalationTimers.delete(alertId);
+    }
+  }
+
+  /**
+   * Notify a specific target
+   * @param {string} target - Target identifier
+   * @param {Object} alert - Alert object
+   * @param {string} eventType - Type of notification event
+   */
+  notifyTarget(target, alert, eventType = 'alert') {
+    this.emit('notify', {
+      target,
+      alert,
+      eventType,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Add an escalation policy
+   * @param {string} name - Policy name
+   * @param {Object} policy - Policy configuration
+   */
+  addEscalationPolicy(name, policy) {
+    this.escalationPolicies[name] = policy;
+  }
+
+  /**
+   * Configure a webhook for alert notifications
+   * @param {Object} webhookConfig - Webhook configuration
+   */
+  addWebhook(webhookConfig) {
+    const webhook = {
+      id: crypto.randomBytes(4).toString('hex'),
+      url: webhookConfig.url,
+      events: webhookConfig.events || ['alert', 'resolved'],
+      severities: webhookConfig.severities || ['CRITICAL', 'WARNING', 'INFO'],
+      headers: webhookConfig.headers || {},
+      enabled: webhookConfig.enabled !== false,
+      retries: webhookConfig.retries || 3,
+      timeout: webhookConfig.timeout || 5000
+    };
+
+    this.webhooks.push(webhook);
+    return webhook.id;
+  }
+
+  /**
+   * Remove a webhook
+   * @param {string} webhookId - Webhook ID to remove
+   */
+  removeWebhook(webhookId) {
+    const index = this.webhooks.findIndex(w => w.id === webhookId);
+    if (index !== -1) {
+      this.webhooks.splice(index, 1);
+    }
+  }
+
+  /**
+   * Send alert to all configured webhooks
+   * @param {Object} alert - Alert object
+   * @param {string} eventType - Event type (alert, resolved, escalation)
+   */
+  async sendToWebhooks(alert, eventType = 'alert') {
+    const applicableWebhooks = this.webhooks.filter(webhook =>
+      webhook.enabled &&
+      webhook.events.includes(eventType) &&
+      webhook.severities.includes(alert.severity)
+    );
+
+    const results = await Promise.allSettled(
+      applicableWebhooks.map(webhook => this.sendWebhookRequest(webhook, alert, eventType))
+    );
+
+    return results.map((result, index) => ({
+      webhookId: applicableWebhooks[index].id,
+      success: result.status === 'fulfilled',
+      error: result.reason?.message
+    }));
+  }
+
+  /**
+   * Send request to a webhook
+   * @param {Object} webhook - Webhook configuration
+   * @param {Object} alert - Alert object
+   * @param {string} eventType - Event type
+   */
+  async sendWebhookRequest(webhook, alert, eventType) {
+    const payload = {
+      event: eventType,
+      timestamp: new Date().toISOString(),
+      alert: {
+        id: alert.id,
+        type: alert.type,
+        severity: alert.severity,
+        message: alert.message,
+        metric: alert.metric,
+        value: alert.value,
+        threshold: alert.threshold,
+        action: alert.action,
+        timestamp: alert.timestamp,
+        resolved: alert.resolved
+      }
+    };
+
+    // Use dynamic import for fetch if available, or fallback
+    try {
+      const response = await this.makeHttpRequest(webhook.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...webhook.headers
+        },
+        body: JSON.stringify(payload),
+        timeout: webhook.timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook returned ${response.status}`);
+      }
+
+      return { success: true };
+    } catch (error) {
+      // Emit webhook failure event
+      this.emit('webhookFailure', {
+        webhookId: webhook.id,
+        error: error.message,
+        alert
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Make HTTP request (abstracted for testing)
+   * @param {string} url - Request URL
+   * @param {Object} options - Request options
+   */
+  async makeHttpRequest(url, options) {
+    // Use native fetch if available (Node 18+) or require http/https
+    if (typeof fetch === 'function') {
+      return fetch(url, options);
+    }
+
+    // Fallback to https module
+    const https = require('https');
+    const http = require('http');
+    const { URL } = require('url');
+
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const protocol = parsedUrl.protocol === 'https:' ? https : http;
+
+      const req = protocol.request(url, {
+        method: options.method,
+        headers: options.headers,
+        timeout: options.timeout
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            data
+          });
+        });
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => reject(new Error('Request timeout')));
+
+      if (options.body) {
+        req.write(options.body);
+      }
+      req.end();
+    });
+  }
+
+  /**
+   * Get all configured webhooks
+   * @returns {Array} List of webhooks
+   */
+  getWebhooks() {
+    return this.webhooks.map(w => ({
+      id: w.id,
+      url: w.url,
+      events: w.events,
+      severities: w.severities,
+      enabled: w.enabled
+    }));
+  }
+
+  /**
+   * Check HTTP performance metrics
+   * @param {Object} performanceMonitor - Performance monitoring middleware instance
+   */
+  checkHttpPerformance(performanceMonitor) {
+    if (!performanceMonitor) return;
+
+    const metrics = performanceMonitor.getDashboardMetrics();
+    if (!metrics || !metrics.http) return;
+
+    // Check HTTP error rate
+    if (metrics.http.errorRate > this.thresholds.httpErrorRate) {
+      this.triggerAlert({
+        type: 'HTTP_ERROR_RATE_HIGH',
+        severity: metrics.http.errorRate > 10 ? 'CRITICAL' : 'WARNING',
+        metric: 'httpErrorRate',
+        value: metrics.http.errorRate,
+        threshold: this.thresholds.httpErrorRate,
+        message: `HTTP error rate is ${metrics.http.errorRate.toFixed(2)}% (threshold: ${this.thresholds.httpErrorRate}%)`,
+        action: 'Review error logs and investigate failing endpoints'
+      });
+    } else {
+      this.resolveAlert('HTTP_ERROR_RATE_HIGH');
+    }
+
+    // Check response time
+    if (metrics.http.avgResponseTime > this.thresholds.responseTime) {
+      this.triggerAlert({
+        type: 'RESPONSE_TIME_HIGH',
+        severity: 'WARNING',
+        metric: 'avgResponseTime',
+        value: metrics.http.avgResponseTime,
+        threshold: this.thresholds.responseTime,
+        message: `Average response time is ${metrics.http.avgResponseTime.toFixed(0)}ms (threshold: ${this.thresholds.responseTime}ms)`,
+        action: 'Investigate slow endpoints and database queries'
+      });
+    } else {
+      this.resolveAlert('RESPONSE_TIME_HIGH');
+    }
+  }
+
+  /**
+   * Check memory usage
+   */
+  checkMemoryUsage() {
+    const memUsage = process.memoryUsage();
+    const heapUsedPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+
+    if (heapUsedPercent > this.thresholds.memoryUsage) {
+      this.triggerAlert({
+        type: 'MEMORY_USAGE_HIGH',
+        severity: heapUsedPercent > 95 ? 'CRITICAL' : 'WARNING',
+        metric: 'memoryUsage',
+        value: heapUsedPercent,
+        threshold: this.thresholds.memoryUsage,
+        message: `Memory usage is ${heapUsedPercent.toFixed(1)}% (threshold: ${this.thresholds.memoryUsage}%)`,
+        action: 'Consider scaling up or investigating memory leaks'
+      });
+    } else {
+      this.resolveAlert('MEMORY_USAGE_HIGH');
+    }
+  }
+
+  /**
+   * Get alert summary for dashboard
+   * @returns {Object} Alert summary
+   */
+  getAlertSummary() {
+    const activeAlerts = this.getActiveAlerts();
+    const stats = this.getStatistics();
+
+    const bySeverity = {
+      CRITICAL: activeAlerts.filter(a => a.severity === 'CRITICAL').length,
+      WARNING: activeAlerts.filter(a => a.severity === 'WARNING').length,
+      INFO: activeAlerts.filter(a => a.severity === 'INFO').length
+    };
+
+    return {
+      activeCount: activeAlerts.length,
+      bySeverity,
+      stats,
+      recentAlerts: activeAlerts.slice(0, 10),
+      escalatedCount: activeAlerts.filter(a => a.escalationLevel > 0).length
+    };
   }
 }
 

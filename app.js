@@ -272,6 +272,7 @@ const routes = {
   currencyRoutes: safeRequire(path.join(__dirname, 'routes/v1/currencyRoutes')), // Issue #44: Currency Service
   waterfallAnalysisRoutes: safeRequire(path.join(__dirname, 'routes/v1/waterfallAnalysisRoutes')), // Issue #56: Waterfall Analysis Engine
   documentAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentAuditRoutes')), // Issue #102: Document Audit Trail
+  cacheRoutes: safeRequire(path.join(__dirname, 'routes/v1/cacheRoutes')), // Issue #47: Database Optimization and Caching
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -384,6 +385,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1'; // Routes already have /waterfall-analyses prefix
     } else if (key === 'documentAuditRoutes') {
       path = '/api/v1/audit'; // Issue #102: Document Audit Trail
+    } else if (key === 'cacheRoutes') {
+      path = '/api/v1/cache'; // Issue #47: Database Optimization and Caching
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
