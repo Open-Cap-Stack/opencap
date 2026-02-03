@@ -18,7 +18,6 @@ coverage
 startup-love
 frontend
 fundmanager
-services
 docs/
 scripts/quick-start.js
 scripts/run-servers.sh
