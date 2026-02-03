@@ -1,7 +1,14 @@
 /**
  * ZeroDB to MongoDB Bidirectional Sync Service
  *
- * Handles real-time synchronization from ZeroDB to MongoDB
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
+ *
+ * IMPORTANT: This service is OPTIONAL and only used when bidirectional sync is enabled.
+ * MongoDB is NOT required to run OpenCap Stack - ZeroDB is the primary database.
+ *
+ * This service is only active when MIGRATION_MODE requires MongoDB (mongodb-only or parallel).
+ * It handles real-time synchronization from ZeroDB to MongoDB.
+ *
  * Features:
  * - Event stream polling from ZeroDB
  * - Multiple conflict resolution strategies
@@ -12,14 +19,39 @@
  * - Comprehensive audit logging
  */
 
-const mongoose = require('mongoose');
 const zerodbService = require('./zerodbService');
 const databaseAdapter = require('./databaseAdapter');
 
+// Determine if MongoDB is required based on migration mode
+const migrationMode = process.env.MIGRATION_MODE || 'mongodb-only';
+const isMongoDBRequired = migrationMode !== 'zerodb-only';
+
+// Lazy load mongoose only when needed
+let mongoose = null;
+function getMongoose() {
+  if (!mongoose) {
+    if (!isMongoDBRequired) {
+      throw new Error(
+        'ZeroDBSyncService requires MongoDB but MIGRATION_MODE is set to zerodb-only. ' +
+        'This service is only available when MIGRATION_MODE is mongodb-only or parallel.'
+      );
+    }
+    mongoose = require('mongoose');
+  }
+  return mongoose;
+}
+
 /**
  * Sync metadata schema for tracking sync state
+ * Note: Schema is created dynamically when mongoose is available
  */
-const SyncMetadataSchema = new mongoose.Schema({
+let SyncMetadataSchema = null;
+let SyncAuditLogSchema = null;
+
+function getSyncMetadataSchema() {
+  if (!SyncMetadataSchema) {
+    const mongooseInstance = getMongoose();
+    SyncMetadataSchema = new mongooseInstance.Schema({
   // Sync checkpoint tracking
   lastProcessedEventId: {
     type: String,
@@ -78,13 +110,19 @@ const SyncMetadataSchema = new mongoose.Schema({
     stack: String
   }
 }, {
-  timestamps: true
-});
+      timestamps: true
+    });
+  }
+  return SyncMetadataSchema;
+}
 
 /**
  * Sync audit log schema for detailed tracking
  */
-const SyncAuditLogSchema = new mongoose.Schema({
+function getSyncAuditLogSchema() {
+  if (!SyncAuditLogSchema) {
+    const mongooseInstance = getMongoose();
+    SyncAuditLogSchema = new mongooseInstance.Schema({
   tableName: {
     type: String,
     required: true,
@@ -140,13 +178,16 @@ const SyncAuditLogSchema = new mongoose.Schema({
     index: true
   }
 }, {
-  timestamps: true
-});
+      timestamps: true
+    });
 
-// Create indexes for performance
-SyncAuditLogSchema.index({ tableName: 1, timestamp: -1 });
-SyncAuditLogSchema.index({ syncStatus: 1, timestamp: -1 });
-SyncAuditLogSchema.index({ documentId: 1, eventType: 1 });
+    // Create indexes for performance
+    SyncAuditLogSchema.index({ tableName: 1, timestamp: -1 });
+    SyncAuditLogSchema.index({ syncStatus: 1, timestamp: -1 });
+    SyncAuditLogSchema.index({ documentId: 1, eventType: 1 });
+  }
+  return SyncAuditLogSchema;
+}
 
 class ZeroDBSyncService {
   constructor() {
@@ -196,10 +237,17 @@ class ZeroDBSyncService {
       return;
     }
 
+    // Check if MongoDB is available for this mode
+    if (!isMongoDBRequired) {
+      console.log('ZeroDBSyncService is not available in zerodb-only mode');
+      return;
+    }
+
     try {
-      // Initialize models
-      this.SyncMetadata = mongoose.model('SyncMetadata', SyncMetadataSchema);
-      this.SyncAuditLog = mongoose.model('SyncAuditLog', SyncAuditLogSchema);
+      // Initialize models (mongoose is lazy-loaded)
+      const mongooseInstance = getMongoose();
+      this.SyncMetadata = mongooseInstance.model('SyncMetadata', getSyncMetadataSchema());
+      this.SyncAuditLog = mongooseInstance.model('SyncAuditLog', getSyncAuditLogSchema());
 
       // Ensure indexes are created
       await this.SyncMetadata.createIndexes();
@@ -623,7 +671,8 @@ class ZeroDBSyncService {
    */
   async _handleInsert(modelName, documentId, data) {
     try {
-      const Model = mongoose.model(modelName);
+      const mongooseInstance = getMongoose();
+      const Model = mongooseInstance.model(modelName);
 
       // Check if document already exists (idempotency)
       const existing = await Model.findOne({ _id: documentId });
@@ -661,7 +710,8 @@ class ZeroDBSyncService {
    */
   async _handleUpdate(modelName, documentId, zerodbData, conflictStrategy) {
     try {
-      const Model = mongoose.model(modelName);
+      const mongooseInstance = getMongoose();
+      const Model = mongooseInstance.model(modelName);
 
       // Fetch current MongoDB document
       const mongoDoc = await Model.findById(documentId);
@@ -732,7 +782,8 @@ class ZeroDBSyncService {
    */
   async _handleDelete(modelName, documentId) {
     try {
-      const Model = mongoose.model(modelName);
+      const mongooseInstance = getMongoose();
+      const Model = mongooseInstance.model(modelName);
 
       // Check if document exists
       const existing = await Model.findById(documentId);

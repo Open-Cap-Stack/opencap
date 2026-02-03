@@ -1,10 +1,30 @@
 /**
  * SAFE Conversion Service
  * Feature: Issue #68 - SAFE Conversion Engine
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
+ *
+ * This service uses MongoDB transactions when available (mongodb-only or parallel mode).
+ * In zerodb-only mode, transactions are not available but operations still work.
  */
 const SAFE = require('../models/SAFE');
 const SAFEConversion = require('../models/SAFEConversion');
-const mongoose = require('mongoose');
+const databaseAdapter = require('./databaseAdapter');
+
+// Determine if MongoDB is required based on migration mode
+const migrationMode = process.env.MIGRATION_MODE || 'mongodb-only';
+const isMongoDBRequired = migrationMode !== 'zerodb-only';
+
+// Lazy load mongoose only when needed (for transactions)
+let mongoose = null;
+function getMongoose() {
+  if (!mongoose) {
+    if (!isMongoDBRequired) {
+      return null; // Transactions not available in zerodb-only mode
+    }
+    mongoose = require('mongoose');
+  }
+  return mongoose;
+}
 
 class SAFEConversionService {
   /**
@@ -74,10 +94,17 @@ class SAFEConversionService {
 
   /**
    * Create conversion records for a funding round
+   * Uses MongoDB transactions when available, falls back to non-transactional in zerodb-only mode
    */
   static async createRoundConversions(companyId, fundingRoundId, roundTerms, shareClassId, userId) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const mongooseInstance = getMongoose();
+    const useTransactions = mongooseInstance && isMongoDBRequired;
+
+    let session = null;
+    if (useTransactions) {
+      session = await mongooseInstance.startSession();
+      session.startTransaction();
+    }
 
     try {
       // Get preview data
@@ -121,11 +148,17 @@ class SAFEConversionService {
           createdBy: userId
         });
 
-        await conversion.save({ session });
+        if (session) {
+          await conversion.save({ session });
+        } else {
+          await conversion.save();
+        }
         conversions.push(conversion);
       }
 
-      await session.commitTransaction();
+      if (session) {
+        await session.commitTransaction();
+      }
 
       return {
         conversionsCreated: conversions.length,
@@ -134,10 +167,14 @@ class SAFEConversionService {
         conversions
       };
     } catch (error) {
-      await session.abortTransaction();
+      if (session) {
+        await session.abortTransaction();
+      }
       throw error;
     } finally {
-      session.endSession();
+      if (session) {
+        session.endSession();
+      }
     }
   }
 

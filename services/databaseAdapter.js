@@ -2,13 +2,14 @@
  * Database Abstraction Layer
  *
  * [Issue #32] MongoDB Dependency Clarification
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
  *
  * IMPORTANT: This adapter supports multiple database modes for migration scenarios.
  * MongoDB support is OPTIONAL - ZeroDB is the recommended primary database.
  *
  * Provides unified interface for routing operations between MongoDB and ZeroDB
  * Supports three migration modes:
- * - zerodb-only: Use ZeroDB exclusively (RECOMMENDED)
+ * - zerodb-only: Use ZeroDB exclusively (RECOMMENDED) - NO mongoose dependency required
  * - mongodb-only: Use MongoDB exclusively (legacy)
  * - parallel: Write to both, read from MongoDB with ZeroDB fallback (migration mode)
  *
@@ -20,9 +21,62 @@
  * - MIGRATION_MODE=mongodb-only (legacy, not recommended)
  */
 
-const mongoose = require('mongoose');
 const zerodbService = require('./zerodbService');
-const { connectDB } = require('../db');
+
+// Determine migration mode early to decide if mongoose is needed
+const MIGRATION_MODE = process.env.MIGRATION_MODE || 'mongodb-only';
+
+// Lazy-loaded mongoose and db connection - only loaded when needed
+let mongoose = null;
+let connectDB = null;
+
+/**
+ * Get mongoose instance - lazy loads only when needed
+ * @returns {Object} mongoose instance
+ * @throws {Error} if mongoose is not available but required
+ */
+function getMongoose() {
+  if (!mongoose) {
+    try {
+      mongoose = require('mongoose');
+    } catch (error) {
+      throw new Error(
+        'mongoose is required for mongodb-only or parallel mode but is not installed. ' +
+        'Either install mongoose or set MIGRATION_MODE=zerodb-only'
+      );
+    }
+  }
+  return mongoose;
+}
+
+/**
+ * Get connectDB function - lazy loads only when needed
+ * @returns {Function} connectDB function
+ * @throws {Error} if db module is not available but required
+ */
+function getConnectDB() {
+  if (!connectDB) {
+    try {
+      const db = require('../db');
+      connectDB = db.connectDB;
+    } catch (error) {
+      throw new Error(
+        'Database connection module (db.js) is required for mongodb-only or parallel mode. ' +
+        'Either ensure db.js exists or set MIGRATION_MODE=zerodb-only'
+      );
+    }
+  }
+  return connectDB;
+}
+
+/**
+ * Check if MongoDB is required for the current migration mode
+ * @returns {boolean} true if MongoDB is needed
+ */
+function isMongoDBRequired() {
+  const mode = process.env.MIGRATION_MODE || 'mongodb-only';
+  return mode === 'mongodb-only' || mode === 'parallel';
+}
 
 class DatabaseAdapter {
   constructor() {
@@ -35,14 +89,31 @@ class DatabaseAdapter {
   }
 
   /**
+   * Get the current migration mode
+   * @returns {string} Current migration mode ('zerodb-only', 'mongodb-only', or 'parallel')
+   */
+  getMigrationMode() {
+    return process.env.MIGRATION_MODE || 'parallel';
+  }
+
+  /**
+   * Check if MongoDB is required for the current migration mode
+   * @returns {boolean} true if MongoDB is needed
+   */
+  isMongoDBRequired() {
+    return isMongoDBRequired();
+  }
+
+  /**
    * Initialize database connections
    * @param {string} zerodbToken - JWT token for ZeroDB authentication
    */
   async initialize(zerodbToken) {
     try {
-      // Initialize MongoDB if needed
+      // Initialize MongoDB if needed (lazy load mongoose and connectDB only when required)
       if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
-        await connectDB();
+        const connectDBFn = getConnectDB();
+        await connectDBFn();
         console.log('DatabaseAdapter: MongoDB initialized');
       }
 
@@ -79,7 +150,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         const doc = new Model(data);
         results.mongodb = await doc.save();
         this._recordMetric('mongodb', Date.now() - startTime, true);
@@ -126,7 +198,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         let mongoQuery = Model.find(query);
 
         if (options.limit) mongoQuery = mongoQuery.limit(options.limit);
@@ -177,7 +250,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         let mongoQuery = Model.findOne(query);
         if (options.select) mongoQuery = mongoQuery.select(options.select);
         results.mongodb = await mongoQuery.exec();
@@ -225,7 +299,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         let mongoQuery = Model.findById(id);
         if (options.select) mongoQuery = mongoQuery.select(options.select);
         results.mongodb = await mongoQuery.exec();
@@ -274,7 +349,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         results.mongodb = await Model.updateMany(query, update, options).exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
@@ -319,7 +395,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         results.mongodb = await Model.findByIdAndUpdate(id, update, { new: true, ...options }).exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
@@ -363,7 +440,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         results.mongodb = await Model.deleteMany(query).exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
@@ -407,7 +485,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         results.mongodb = await Model.findByIdAndDelete(id).exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
@@ -451,7 +530,8 @@ class DatabaseAdapter {
     if (this.migrationMode === 'mongodb-only' || this.migrationMode === 'parallel') {
       try {
         const startTime = Date.now();
-        const Model = mongoose.model(modelName);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(modelName);
         results.mongodb = await Model.countDocuments(query).exec();
         this._recordMetric('mongodb', Date.now() - startTime, true);
       } catch (error) {
@@ -529,10 +609,11 @@ class DatabaseAdapter {
 
     try {
       const tableName = this._modelToTableName(modelName);
+      const mongooseInstance = getMongoose();
 
       // Fetch from both databases
       const [mongoResults, zerodbResults] = await Promise.all([
-        mongoose.model(modelName).find(query).lean().exec(),
+        mongooseInstance.model(modelName).find(query).lean().exec(),
         this._findInZeroDB(tableName, query, {})
       ]);
 

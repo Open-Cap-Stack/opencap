@@ -3,11 +3,15 @@
  *
  * [Feature] GitHub Issue #14: Continuous sync from MongoDB to ZeroDB
  * [Issue #32] MongoDB Dependency Clarification
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
  *
  * IMPORTANT: This service is OPTIONAL and only used when continuous sync is enabled.
  * MongoDB is NOT required to run OpenCap Stack - ZeroDB is the primary database.
  *
- * This service is only active when SYNC_ENABLED=true in environment variables.
+ * This service is only active when:
+ * - SYNC_ENABLED=true in environment variables
+ * - MIGRATION_MODE is NOT 'zerodb-only'
+ *
  * It enables real-time synchronization from an existing MongoDB database to ZeroDB.
  *
  * Use Case: You have an existing MongoDB database and want to migrate/sync to ZeroDB
@@ -28,13 +32,31 @@
  * @module services/mongoChangeStreamListener
  */
 
-const mongoose = require('mongoose');
 const zerodbService = require('./zerodbService');
 const databaseAdapter = require('./databaseAdapter');
 const { databaseMonitor } = require('../middleware/databaseMonitor');
 const MetricsCollector = require('../utils/metricsCollector');
 const fs = require('fs');
 const path = require('path');
+
+// Determine if MongoDB is required based on migration mode
+const migrationMode = process.env.MIGRATION_MODE || 'mongodb-only';
+const isMongoDBRequired = migrationMode !== 'zerodb-only';
+
+// Lazy load mongoose only when needed
+let mongoose = null;
+function getMongoose() {
+  if (!mongoose) {
+    if (!isMongoDBRequired) {
+      throw new Error(
+        'MongoChangeStreamListener requires MongoDB but MIGRATION_MODE is set to zerodb-only. ' +
+        'This service is only available when MIGRATION_MODE is mongodb-only or parallel.'
+      );
+    }
+    mongoose = require('mongoose');
+  }
+  return mongoose;
+}
 
 /**
  * MongoDB to ZeroDB table name mapping
@@ -136,11 +158,20 @@ class MongoChangeStreamListener {
       return;
     }
 
+    // Check if MongoDB is available for this mode
+    if (!isMongoDBRequired) {
+      console.log('MongoDB Change Stream Listener is not available in zerodb-only mode');
+      return;
+    }
+
     try {
       console.log('Initializing MongoDB Change Stream Listener...');
 
+      // Get mongoose instance (lazy loaded)
+      const mongooseInstance = getMongoose();
+
       // Verify MongoDB connection
-      if (mongoose.connection.readyState !== 1) {
+      if (mongooseInstance.connection.readyState !== 1) {
         throw new Error('MongoDB connection not ready. Ensure MongoDB is connected before initializing change streams.');
       }
 
@@ -199,8 +230,11 @@ class MongoChangeStreamListener {
    * @returns {Promise<void>}
    */
   async startChangeStream(collectionName) {
+    // Get mongoose instance (lazy loaded)
+    const mongooseInstance = getMongoose();
+
     // Check if collection exists in database
-    const collections = await mongoose.connection.db.listCollections({ name: collectionName }).toArray();
+    const collections = await mongooseInstance.connection.db.listCollections({ name: collectionName }).toArray();
     if (collections.length === 0) {
       console.warn(`Collection ${collectionName} does not exist, skipping change stream`);
       this.syncMetrics.streamStatus[collectionName] = 'skipped';
@@ -213,7 +247,7 @@ class MongoChangeStreamListener {
     }
 
     try {
-      const collection = mongoose.connection.collection(collectionName);
+      const collection = mongooseInstance.connection.collection(collectionName);
 
       // Configure change stream options
       const changeStreamOptions = {

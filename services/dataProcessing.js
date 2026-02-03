@@ -1,12 +1,16 @@
 /**
  * Advanced Data Processing Service
- * 
+ *
  * [Feature] OCAE-405: Advanced Data Processing Pipeline
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
+ *
  * Implements comprehensive data processing, transformation, validation,
- * and quality monitoring with Apache Spark integration capabilities
+ * and quality monitoring with Apache Spark integration capabilities.
+ *
+ * MongoDB is only used for the loadFromMongoDB method when MIGRATION_MODE
+ * requires MongoDB (mongodb-only or parallel mode).
  */
 
-const mongoose = require('mongoose');
 const { DataFrame } = require('data-forge');
 const fs = require('fs').promises;
 const path = require('path');
@@ -15,6 +19,26 @@ const { createReadStream, createWriteStream } = require('fs');
 const streamingService = require('./streamingService');
 const memoryService = require('./memoryService');
 const vectorService = require('./vectorService');
+const databaseAdapter = require('./databaseAdapter');
+
+// Determine if MongoDB is required based on migration mode
+const migrationMode = process.env.MIGRATION_MODE || 'mongodb-only';
+const isMongoDBRequired = migrationMode !== 'zerodb-only';
+
+// Lazy load mongoose only when needed
+let mongoose = null;
+function getMongoose() {
+  if (!mongoose) {
+    if (!isMongoDBRequired) {
+      throw new Error(
+        'loadFromMongoDB requires MongoDB but MIGRATION_MODE is set to zerodb-only. ' +
+        'Use a different data source or change MIGRATION_MODE.'
+      );
+    }
+    mongoose = require('mongoose');
+  }
+  return mongoose;
+}
 
 class DataProcessingService {
   constructor() {
@@ -655,9 +679,11 @@ class DataProcessingService {
 
   /**
    * Load data from MongoDB
+   * Note: This method is only available when MIGRATION_MODE is not zerodb-only
    */
   async loadFromMongoDB(collection, query = {}) {
-    const db = mongoose.connection.db;
+    const mongooseInstance = getMongoose();
+    const db = mongooseInstance.connection.db;
     const data = await db.collection(collection).find(query).toArray();
     return DataFrame.fromArray(data);
   }
