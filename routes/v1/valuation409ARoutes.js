@@ -419,4 +419,140 @@ router.post('/:valuationId/cancel', valuation409AController.cancelValuation);
  */
 router.post('/:valuationId/documents', valuation409AController.addDocument);
 
+// ============================================================================
+// AUDIT TRAIL ROUTES (Issue #63)
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/v1/valuations/{valuationId}/audit-trail:
+ *   get:
+ *     summary: Get complete audit trail for a valuation
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: valuationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Complete audit trail with timeline, documents, and status history
+ *       404:
+ *         description: Valuation not found
+ */
+router.get('/:valuationId/audit-trail', valuation409AController.getValuationAuditTrail);
+
+/**
+ * @swagger
+ * /api/v1/valuations/company/{companyId}/compliance/irs:
+ *   get:
+ *     summary: Generate IRS 409A compliance report
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: fiscalYear
+ *         schema:
+ *           type: integer
+ *         description: Fiscal year for the report (defaults to current year)
+ *     responses:
+ *       200:
+ *         description: IRS compliance report with requirement checklist
+ */
+router.get('/company/:companyId/compliance/irs', valuation409AController.generateIRSComplianceReport);
+
+/**
+ * @swagger
+ * /api/v1/valuations/company/{companyId}/compliance/gaap:
+ *   get:
+ *     summary: Generate GAAP ASC 718 compliance report
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: fiscalYear
+ *         schema:
+ *           type: integer
+ *         description: Fiscal year for the report (defaults to current year)
+ *     responses:
+ *       200:
+ *         description: GAAP compliance report
+ */
+router.get('/company/:companyId/compliance/gaap', valuation409AController.generateGAAPComplianceReport);
+
+/**
+ * @swagger
+ * /api/v1/valuations/company/{companyId}/audit-report:
+ *   get:
+ *     summary: Generate comprehensive audit report
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: fiscalYear
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Comprehensive audit report with IRS, GAAP compliance and history
+ */
+router.get('/company/:companyId/audit-report', valuation409AController.generateAuditReport);
+
+/**
+ * @swagger
+ * /api/v1/valuations/company/{companyId}/audit-export:
+ *   get:
+ *     summary: Export audit data for external systems
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [json]
+ *         description: Export format (defaults to json)
+ *     responses:
+ *       200:
+ *         description: Exported audit data
+ */
+router.get('/company/:companyId/audit-export', valuation409AController.exportAuditData);
+
 module.exports = router;

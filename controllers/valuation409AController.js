@@ -475,3 +475,118 @@ exports.processExpiredValuations = async (req, res) => {
     });
   }
 };
+
+// ============================================================================
+// AUDIT TRAIL ENDPOINTS (Issue #63)
+// ============================================================================
+
+const ValuationAuditService = require('../services/valuationAuditService');
+
+// Get audit trail for a specific valuation
+exports.getValuationAuditTrail = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+
+    const auditTrail = await ValuationAuditService.getValuationAuditTrail(valuationId);
+
+    res.json({
+      success: true,
+      data: auditTrail
+    });
+  } catch (error) {
+    res.status(error.message === 'Valuation not found' ? 404 : 500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Generate IRS compliance report
+exports.generateIRSComplianceReport = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { fiscalYear } = req.query;
+
+    const report = await ValuationAuditService.generateIRSComplianceReport(
+      companyId,
+      fiscalYear ? parseInt(fiscalYear) : null
+    );
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Generate GAAP compliance report (ASC 718)
+exports.generateGAAPComplianceReport = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { fiscalYear } = req.query;
+
+    const report = await ValuationAuditService.generateGAAPComplianceReport(
+      companyId,
+      fiscalYear ? parseInt(fiscalYear) : null
+    );
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Generate comprehensive audit report
+exports.generateAuditReport = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { fiscalYear, startDate, endDate } = req.query;
+
+    const report = await ValuationAuditService.generateAuditReport(companyId, {
+      fiscalYear: fiscalYear ? parseInt(fiscalYear) : null,
+      startDate,
+      endDate
+    });
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Export audit data for external systems
+exports.exportAuditData = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { format = 'json' } = req.query;
+
+    const data = await ValuationAuditService.exportAuditData(companyId, format);
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
