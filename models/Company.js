@@ -42,7 +42,19 @@ const Company = {
             data.companyId = `company_${uuidv4()}`;
         }
 
-        return baseModel.create.call(baseModel, data);
+        const createdCompany = await baseModel.create.call(baseModel, data);
+
+        // Create default settings for the company asynchronously (don't wait)
+        // This will not block company creation if settings creation fails
+        try {
+            const Settings = require('./Settings');
+            await Settings.createCompanySettings(createdCompany.companyId);
+        } catch (settingsError) {
+            console.error('Failed to create default company settings:', settingsError);
+            // Continue anyway - settings can be created later if needed
+        }
+
+        return createdCompany;
     },
 
     /**

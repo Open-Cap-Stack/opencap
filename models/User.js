@@ -33,6 +33,9 @@ const userSchema = {
         default: {
             bio: '',
             avatar: null,
+            avatarThumbnail: null,
+            avatarFileId: null,
+            avatarThumbnailFileId: null,
             phoneNumber: null,
             address: {
                 street: null,
@@ -144,6 +147,9 @@ const User = {
             data.profile = {
                 bio: '',
                 avatar: null,
+                avatarThumbnail: null,
+                avatarFileId: null,
+                avatarThumbnailFileId: null,
                 phoneNumber: null,
                 address: {
                     street: null,
@@ -155,7 +161,19 @@ const User = {
             };
         }
 
-        return baseModel.create.call(baseModel, data);
+        const createdUser = await baseModel.create.call(baseModel, data);
+
+        // Create default settings for the user asynchronously (don't wait)
+        // This will not block user creation if settings creation fails
+        try {
+            const Settings = require('./Settings');
+            await Settings.createUserSettings(createdUser.userId);
+        } catch (settingsError) {
+            console.error('Failed to create default user settings:', settingsError);
+            // Continue anyway - settings can be created later if needed
+        }
+
+        return createdUser;
     },
 
     /**

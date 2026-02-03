@@ -10,6 +10,7 @@ const vectorService = require('../services/vectorService');
 const websocketService = require('../services/websocketService');
 const fileStorageService = require('../services/fileStorageService');
 const eventStreamingService = require('../services/eventStreamingService');
+const DocumentFolder = require('../models/DocumentFolder');
 
 const TABLE_NAME = 'documents';
 
@@ -939,5 +940,145 @@ exports.getDocumentAccess = async (req, res) => {
     } catch (error) {
         console.error('Document access error:', error);
         res.status(500).json({ message: 'Failed to get document access info' });
+    }
+};
+
+/**
+ * Folder Management Endpoints
+ * Issue #188: Add Document Folder Management Endpoints
+ */
+
+/**
+ * Create a new folder
+ */
+exports.createFolder = async (req, res) => {
+    try {
+        const folderData = {
+            name: req.body.name,
+            parentId: req.body.parentId || null,
+            description: req.body.description || '',
+            metadata: req.body.metadata || {},
+            ownerCompany: req.user?.companyId,
+            createdBy: req.user?.userId
+        };
+
+        const folder = await DocumentFolder.create(folderData);
+
+        res.status(201).json(folder);
+    } catch (error) {
+        console.error('Create folder error:', error);
+        res.status(400).json({ message: error.message });
+    }
+};
+
+/**
+ * Get all folders for company (optionally filtered by parent)
+ */
+exports.getFolders = async (req, res) => {
+    try {
+        const { parentId } = req.query;
+
+        let folders;
+        if (parentId) {
+            // Get child folders of specific parent
+            folders = await DocumentFolder.findByParentId(parentId);
+        } else {
+            // Get root folders for company
+            folders = await DocumentFolder.findRootFolders(req.user?.companyId);
+        }
+
+        res.status(200).json({ folders });
+    } catch (error) {
+        console.error('Get folders error:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+/**
+ * Get folder by ID with breadcrumbs
+ */
+exports.getFolderById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const folder = await DocumentFolder.findByFolderId(id);
+
+        if (!folder) {
+            return res.status(404).json({ message: 'Folder not found' });
+        }
+
+        // Get breadcrumbs for navigation
+        const breadcrumbs = await DocumentFolder.getBreadcrumbs(folder);
+
+        res.status(200).json({
+            ...folder,
+            breadcrumbs
+        });
+    } catch (error) {
+        console.error('Get folder error:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+/**
+ * Update folder by ID
+ */
+exports.updateFolderById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = {
+            name: req.body.name,
+            parentId: req.body.parentId,
+            description: req.body.description,
+            metadata: req.body.metadata
+        };
+
+        // Remove undefined fields
+        Object.keys(updateData).forEach(key =>
+            updateData[key] === undefined && delete updateData[key]
+        );
+
+        const updatedFolder = await DocumentFolder.update(id, updateData);
+
+        res.status(200).json(updatedFolder);
+    } catch (error) {
+        console.error('Update folder error:', error);
+        res.status(400).json({ message: error.message });
+    }
+};
+
+/**
+ * Delete folder by ID
+ */
+exports.deleteFolderById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await DocumentFolder.delete(id);
+
+        res.status(200).json({ message: 'Folder deleted successfully' });
+    } catch (error) {
+        console.error('Delete folder error:', error);
+        res.status(400).json({ message: error.message });
+    }
+};
+
+/**
+ * Get folder contents (child folders and documents)
+ */
+exports.getFolderContents = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const contents = await DocumentFolder.getContents(id);
+
+        res.status(200).json(contents);
+    } catch (error) {
+        console.error('Get folder contents error:', error);
+        if (error.message === 'Folder not found') {
+            res.status(404).json({ message: error.message });
+        } else {
+            res.status(500).json({ message: error.message });
+        }
     }
 };

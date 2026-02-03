@@ -5,9 +5,12 @@
  * Uses DatabaseAdapter for abstracted database operations.
  *
  * Issue #15: Migrate User controller to ZeroDB
+ * Issue #187: Add Profile Photo Upload Endpoint
  */
 
 const databaseAdapter = require('../services/databaseAdapter');
+const fileStorageService = require('../services/fileStorageService');
+const sharp = require('sharp');
 
 /**
  * Create a new user
@@ -152,11 +155,240 @@ const deleteUserById = async (req, res) => {
   }
 };
 
+/**
+ * Upload profile photo
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const uploadProfilePhoto = async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No photo file provided'
+      });
+    }
+
+    // Get authenticated user ID
+    const userId = req.user.userId || req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    // Verify user exists
+    let user = await databaseAdapter.findOne('User', { userId });
+    if (!user && req.user.id) {
+      user = await databaseAdapter.findById('User', req.user.id);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate thumbnail (200x200px) using sharp
+    const thumbnailBuffer = await sharp(req.file.buffer)
+      .resize(200, 200, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Prepare metadata for file storage
+    const metadata = {
+      userId: userId,
+      fileType: 'profile_photo',
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      uploadedAt: new Date().toISOString()
+    };
+
+    // Upload original photo to ZeroDB
+    const uploadResult = await fileStorageService.uploadFile(
+      req.file.buffer,
+      `profile-${userId}-${Date.now()}${req.file.originalname.substring(req.file.originalname.lastIndexOf('.'))}`,
+      {
+        companyId: user.companyId,
+        uploadedBy: userId,
+        category: 'profile_photos',
+        metadata: metadata
+      }
+    );
+
+    // Upload thumbnail to ZeroDB
+    const thumbnailResult = await fileStorageService.uploadFile(
+      thumbnailBuffer,
+      `profile-thumb-${userId}-${Date.now()}.jpg`,
+      {
+        companyId: user.companyId,
+        uploadedBy: userId,
+        category: 'profile_photos',
+        metadata: { ...metadata, isThumbnail: true }
+      }
+    );
+
+    // Generate presigned URL for the photo (expires in 1 year)
+    const photoUrl = await fileStorageService.getPresignedUrl(
+      uploadResult.id,
+      { expiresIn: 31536000 } // 1 year
+    );
+
+    const thumbnailUrl = await fileStorageService.getPresignedUrl(
+      thumbnailResult.id,
+      { expiresIn: 31536000 } // 1 year
+    );
+
+    // Update user profile with photo URLs
+    const updateData = {
+      'profile.avatar': photoUrl.url,
+      'profile.avatarThumbnail': thumbnailUrl.url,
+      'profile.avatarFileId': uploadResult.id,
+      'profile.avatarThumbnailFileId': thumbnailResult.id
+    };
+
+    const updatedUser = await databaseAdapter.findOneAndUpdate(
+      'User',
+      { userId },
+      { $set: updateData },
+      { new: true, select: '-password' }
+    );
+
+    // If update by userId failed, try by _id
+    if (!updatedUser && user._id) {
+      await databaseAdapter.findByIdAndUpdate(
+        'User',
+        user._id,
+        { $set: updateData },
+        { new: true, select: '-password' }
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      photoUrl: photoUrl.url,
+      thumbnailUrl: thumbnailUrl.url,
+      message: 'Profile photo uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Error uploading profile photo:', error);
+
+    // Handle specific errors
+    if (error.message && error.message.includes('size exceeds')) {
+      return res.status(400).json({
+        success: false,
+        message: 'File size exceeds maximum allowed size'
+      });
+    }
+
+    if (error.message && error.message.includes('not allowed')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only image files are allowed'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile photo',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Delete profile photo
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const deleteProfilePhoto = async (req, res) => {
+  try {
+    // Get authenticated user ID
+    const userId = req.user.userId || req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    // Verify user exists
+    let user = await databaseAdapter.findOne('User', { userId });
+    if (!user && req.user.id) {
+      user = await databaseAdapter.findById('User', req.user.id);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user has a profile photo
+    const avatarFileId = user.profile?.avatarFileId;
+    const avatarThumbnailFileId = user.profile?.avatarThumbnailFileId;
+
+    if (!avatarFileId) {
+      return res.status(404).json({
+        success: false,
+        message: 'No profile photo to delete'
+      });
+    }
+
+    // Delete files from ZeroDB storage
+    try {
+      await fileStorageService.deleteFile(avatarFileId, { soft: false });
+      if (avatarThumbnailFileId) {
+        await fileStorageService.deleteFile(avatarThumbnailFileId, { soft: false });
+      }
+    } catch (deleteError) {
+      console.error('Error deleting files from storage:', deleteError);
+      // Continue to update user profile even if file deletion fails
+    }
+
+    // Update user profile to remove photo URLs
+    const updateData = {
+      'profile.avatar': null,
+      'profile.avatarThumbnail': null,
+      'profile.avatarFileId': null,
+      'profile.avatarThumbnailFileId': null
+    };
+
+    await databaseAdapter.findOneAndUpdate(
+      'User',
+      { userId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile photo deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting profile photo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete profile photo',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   createUser,
   getAllUsers,
   getUserById,
   updateUserById,
   deleteUserById,
-  getProfile
+  getProfile,
+  uploadProfilePhoto,
+  deleteProfilePhoto
 };
