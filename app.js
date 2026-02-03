@@ -618,11 +618,8 @@ if (process.env.NODE_ENV !== 'test') {
         await mongoChangeStreamListener.stopAll();
       }
 
-      // Close database connections
-      if (mongoose.connection.readyState === 1) {
-        console.log('Closing MongoDB connection...');
-        await mongoose.connection.close();
-      }
+      // Note: ZeroDB uses HTTP API, no persistent connection to close
+      console.log('Database connections handled (ZeroDB uses stateless HTTP API)');
 
       console.log('Graceful shutdown complete');
       process.exit(0);

@@ -1,75 +1,129 @@
-// utils/db.js
-const mongoose = require('mongoose');
+/**
+ * Database Connection Module
+ * Migrated: ZeroDB Migration - Issue #175
+ *
+ * This module provides database connection utilities for ZeroDB.
+ * MongoDB support removed in favor of ZeroDB-only architecture.
+ */
 
-// Set strictQuery to true to suppress the deprecation warning and maintain consistent query behavior
-mongoose.set('strictQuery', true);
+const zerodbService = require('./services/zerodbService');
 
+let isConnected = false;
+
+/**
+ * Connect to ZeroDB
+ * @returns {Object} ZeroDB service instance
+ */
 async function connectDB() {
-  try {
-    if (mongoose.connection.readyState === 0) {
-      const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/opencap_test', {
-        // Remove deprecated options that are no longer supported in mongoose 6.x// These options are removed in mongoose 6.x
-        ////// Add timeouts to prevent hanging connections
-        serverSelectionTimeoutMS: 5000,
-        connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000 });
-      console.log('MongoDB Connected...');
-      return conn;
+    try {
+        if (isConnected && zerodbService.projectId) {
+            console.log('ZeroDB already connected...');
+            return zerodbService;
+        }
+
+        const token = process.env.AINATIVE_API_TOKEN;
+        if (!token) {
+            throw new Error('AINATIVE_API_TOKEN is required for ZeroDB connection');
+        }
+
+        const result = await zerodbService.initialize(token);
+        isConnected = true;
+        console.log('ZeroDB Connected...', { projectId: result.projectId });
+        return zerodbService;
+    } catch (err) {
+        console.error('ZeroDB connection error:', err);
+        throw err;
     }
-    return mongoose.connection;
-  } catch (err) {
-    console.error('MongoDB connection error:', err);
-    // Ensure connection is closed on error
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
-    process.exit(1);
-  }
 }
 
+/**
+ * Disconnect from ZeroDB
+ * Note: ZeroDB uses HTTP API so no persistent connection to close
+ */
 async function disconnectDB() {
-  try {
-    if (mongoose.connection.readyState !== 0) {
-      await Promise.race([
-        mongoose.connection.close(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Connection close timeout')), 5000)
-        )
-      ]);
-      console.log('MongoDB Disconnected...');
+    try {
+        isConnected = false;
+        console.log('ZeroDB Disconnected...');
+    } catch (err) {
+        console.error('ZeroDB disconnection error:', err);
     }
-  } catch (err) {
-    console.error('MongoDB disconnection error:', err);
-    // Force close if normal close fails
-    if (mongoose.connection.readyState !== 0) {
-      mongoose.connection.destroy();
-    }
-  }
 }
 
+/**
+ * Clear database tables (for testing)
+ * Warning: This will delete all data in the specified tables
+ */
 async function clearDB() {
-  try {
-    if (process.env.NODE_ENV === 'test') {
-      const collections = mongoose.connection.collections;
-      const clearPromises = Object.values(collections).map(collection => 
-        collection.deleteMany({})
-      );
-      await Promise.all(clearPromises);
+    try {
+        if (process.env.NODE_ENV === 'test') {
+            console.log('Clearing ZeroDB tables for testing...');
+            // Note: ZeroDB table clearing would need to be implemented
+            // based on the specific API capabilities
+            const tables = [
+                'users', 'companies', 'stakeholders', 'securities',
+                'transactions', 'documents', 'valuations',
+                'compliance_events', 'audit_logs'
+            ];
+
+            for (const table of tables) {
+                try {
+                    await zerodbService.deleteRows(table, {});
+                    console.log(`Cleared table: ${table}`);
+                } catch (err) {
+                    // Table might not exist or be empty
+                    console.log(`Could not clear table ${table}: ${err.message}`);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error clearing database:', err);
+        throw err;
     }
-  } catch (err) {
-    console.error('Error clearing database:', err);
-    throw err;
-  }
+}
+
+/**
+ * Check if database is connected
+ * @returns {boolean} Connection status
+ */
+function isDBConnected() {
+    return isConnected && !!zerodbService.projectId;
+}
+
+/**
+ * Get database status
+ * @returns {Object} Database status information
+ */
+async function getDBStatus() {
+    if (!isConnected || !zerodbService.projectId) {
+        return { status: 'disconnected' };
+    }
+
+    try {
+        const status = await zerodbService.getDatabaseStatus();
+        return {
+            status: 'connected',
+            projectId: zerodbService.projectId,
+            ...status
+        };
+    } catch (err) {
+        return {
+            status: 'error',
+            error: err.message
+        };
+    }
 }
 
 // Add cleanup handler for process termination
 process.on('SIGTERM', async () => {
-  await disconnectDB();
-  process.exit(0);
+    await disconnectDB();
+    process.exit(0);
 });
 
 module.exports = {
-  connectDB,
-  disconnectDB,
-  clearDB
+    connectDB,
+    disconnectDB,
+    clearDB,
+    isDBConnected,
+    getDBStatus,
+    zerodbService
 };

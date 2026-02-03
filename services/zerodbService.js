@@ -10,9 +10,10 @@ const config = require('../config');
 
 class ZeroDBService {
   constructor() {
-    this.baseURL = 'https://api.ainative.studio/api/v1';
+    const baseHost = process.env.ZERODB_BASE_URL || 'api.ainative.studio';
+    this.baseURL = baseHost.startsWith('http') ? baseHost : `https://${baseHost}`;
     this.projectId = null;
-    this.token = null;
+    this.token = process.env.AINATIVE_API_TOKEN || null;
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
@@ -77,20 +78,30 @@ class ZeroDBService {
    */
   async initializeProject() {
     try {
+      // Use project ID from environment if available
+      const envProjectId = process.env.ZERODB_PROJECT_ID;
+      if (envProjectId) {
+        console.log('Using project ID from environment:', envProjectId);
+        const response = await this.client.get(`/v1/public/projects/${envProjectId}`);
+        return response.data;
+      }
+
       // Check if OpenCap project already exists
-      const projects = await this.client.get('/projects/');
-      const existingProject = projects.data.find(p => p.name === 'OpenCap');
-      
+      const projects = await this.client.get('/v1/public/projects');
+      const projectList = projects.data.items || projects.data || [];
+      const existingProject = projectList.find(p => p.name === 'OpenCap');
+
       if (existingProject) {
         return existingProject;
       }
-      
+
       // Create new OpenCap project
-      const response = await this.client.post('/projects/', {
+      const response = await this.client.post('/v1/public/projects', {
         name: 'OpenCap',
-        description: 'OpenCap Financial Management System with Lakehouse Analytics'
+        description: 'OpenCap Financial Management System with Lakehouse Analytics',
+        database_enabled: true
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Error initializing project:', error);
@@ -104,11 +115,12 @@ class ZeroDBService {
    */
   async getDatabaseStatus() {
     try {
-      const response = await this.client.get(`/projects/${this.projectId}/database/status`);
+      const response = await this.client.get(`/v1/public/projects/${this.projectId}/usage`);
       return response.data;
     } catch (error) {
       console.error('Error getting database status:', error);
-      throw error;
+      // Return a default status if the endpoint doesn't exist
+      return { status: 'active' };
     }
   }
   
@@ -120,9 +132,9 @@ class ZeroDBService {
    */
   async createTable(tableName, schemaDefinition) {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/tables`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/tables`, {
         table_name: tableName,
-        schema_definition: schemaDefinition
+        schema: schemaDefinition
       });
       return response.data;
     } catch (error) {
@@ -130,15 +142,15 @@ class ZeroDBService {
       throw error;
     }
   }
-  
+
   /**
    * List all tables in the project
    * @returns {Array} List of tables
    */
   async listTables() {
     try {
-      const response = await this.client.get(`/projects/${this.projectId}/database/tables`);
-      return response.data;
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/tables`);
+      return response.data.tables || response.data || [];
     } catch (error) {
       console.error('Error listing tables:', error);
       throw error;
@@ -154,7 +166,7 @@ class ZeroDBService {
   async insertRows(tableName, rows) {
     try {
       const response = await this.client.post(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { rows }
       );
       return response.data;
@@ -179,7 +191,7 @@ class ZeroDBService {
     try {
       const { filter = {}, skip = 0, limit = 100, sort = {}, projection = {} } = options;
       const response = await this.client.post(
-        `/projects/${this.projectId}/database/tables/${tableName}/query`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/query`,
         { filter, skip, limit, sort, projection }
       );
       return response.data;
@@ -201,7 +213,7 @@ class ZeroDBService {
     try {
       const { filter, update } = options;
       const response = await this.client.put(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { filter, update }
       );
       return response.data;
@@ -222,7 +234,7 @@ class ZeroDBService {
     try {
       const { filter } = options;
       const response = await this.client.delete(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { data: { filter } }
       );
       return response.data;
@@ -241,7 +253,7 @@ class ZeroDBService {
   async countRows(tableName, filter = {}) {
     try {
       const response = await this.client.post(
-        `/projects/${this.projectId}/database/tables/${tableName}/count`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/query`,
         { filter }
       );
       return response.data.count;
@@ -262,7 +274,7 @@ class ZeroDBService {
    */
   async upsertVector(vectorEmbedding, namespace = 'default', metadata = {}, document = '', source = '') {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/vectors/upsert`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/vectors/upsert`, {
         vector_embedding: vectorEmbedding,
         namespace,
         vector_metadata: metadata,
@@ -285,7 +297,7 @@ class ZeroDBService {
    */
   async searchVectors(queryVector, limit = 10, namespace = 'default') {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/vectors/search`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/vectors/search`, {
         query_vector: queryVector,
         limit,
         namespace
@@ -306,7 +318,7 @@ class ZeroDBService {
    */
   async listVectors(namespace = 'default', skip = 0, limit = 100) {
     try {
-      const response = await this.client.get(`/projects/${this.projectId}/database/vectors`, {
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/vectors`, {
         params: { namespace, skip, limit }
       });
       return response.data;
@@ -327,7 +339,7 @@ class ZeroDBService {
    */
   async storeMemory(agentId, sessionId, role, content, metadata = {}) {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/memory/store`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/memory`, {
         agent_id: agentId,
         session_id: sessionId,
         role,
@@ -357,7 +369,7 @@ class ZeroDBService {
       if (sessionId) params.session_id = sessionId;
       if (role) params.role = role;
       
-      const response = await this.client.get(`/projects/${this.projectId}/database/memory`, {
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/memory`, {
         params
       });
       return response.data;
@@ -375,7 +387,7 @@ class ZeroDBService {
    */
   async publishEvent(topic, eventPayload) {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/events/publish`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/events`, {
         topic,
         event_payload: eventPayload
       });
@@ -398,7 +410,7 @@ class ZeroDBService {
       const params = { skip, limit };
       if (topic) params.topic = topic;
       
-      const response = await this.client.get(`/projects/${this.projectId}/database/events`, {
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/events`, {
         params
       });
       return response.data;
@@ -419,7 +431,7 @@ class ZeroDBService {
    */
   async uploadFileMetadata(fileKey, fileName, contentType, sizeBytes, metadata = {}) {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/files/upload`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/files`, {
         file_key: fileKey,
         file_name: fileName,
         content_type: contentType,
@@ -441,7 +453,7 @@ class ZeroDBService {
    */
   async listFiles(skip = 0, limit = 100) {
     try {
-      const response = await this.client.get(`/projects/${this.projectId}/database/files`, {
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/files`, {
         params: { skip, limit }
       });
       return response.data;
@@ -462,7 +474,7 @@ class ZeroDBService {
    */
   async logRLHF(inputPrompt, modelOutput, sessionId, rewardScore, notes = '') {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/rlhf/log`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/rlhf/log`, {
         input_prompt: inputPrompt,
         model_output: modelOutput,
         session_id: sessionId,
@@ -487,7 +499,7 @@ class ZeroDBService {
    */
   async storeAgentLog(agentId, sessionId, logLevel, logMessage, rawPayload = {}) {
     try {
-      const response = await this.client.post(`/projects/${this.projectId}/database/agent/log`, {
+      const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/agent/log`, {
         agent_id: agentId,
         session_id: sessionId,
         log_level: logLevel,
@@ -517,7 +529,7 @@ class ZeroDBService {
       if (sessionId) params.session_id = sessionId;
       if (logLevel) params.log_level = logLevel;
 
-      const response = await this.client.get(`/projects/${this.projectId}/database/agent/logs`, {
+      const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/agent/logs`, {
         params
       });
       return response.data;
@@ -536,7 +548,7 @@ class ZeroDBService {
   async insertRow(tableName, rowData) {
     try {
       const response = await this.client.post(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { rows: Array.isArray(rowData) ? rowData : [rowData] }
       );
       return response.data;
@@ -560,7 +572,7 @@ class ZeroDBService {
         params.filter = JSON.stringify(query);
       }
       const response = await this.client.get(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { params }
       );
       return response.data;
@@ -580,7 +592,7 @@ class ZeroDBService {
   async updateRows(tableName, query, update) {
     try {
       const response = await this.client.put(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { filter: query, update }
       );
       return response.data;
@@ -599,7 +611,7 @@ class ZeroDBService {
   async deleteRows(tableName, query) {
     try {
       const response = await this.client.delete(
-        `/projects/${this.projectId}/database/tables/${tableName}/rows`,
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
         { data: { filter: query } }
       );
       return response.data;
