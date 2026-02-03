@@ -245,6 +245,7 @@ const routes = {
   securityAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityAuditRoutes')),
   financialDataRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialDataRoutes')),
   semanticSearchRoutes: safeRequire(path.join(__dirname, 'routes/v1/semanticSearchRoutes')),
+  searchRoutes: safeRequire(path.join(__dirname, 'routes/v1/searchRoutes')), // Issue #190: Global multi-entity search
   agentMemoryRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentMemoryRoutes')), // Issue #27: Agent memory
   rlhfRoutes: safeRequire(path.join(__dirname, 'routes/v1/rlhfRoutes')), // Issue #29: RLHF data collection
   advancedAnalyticsRoutes: safeRequire(path.join(__dirname, 'routes/v1/advancedAnalyticsRoutes')), // Issue #31: Analytics
@@ -273,6 +274,8 @@ const routes = {
   waterfallAnalysisRoutes: safeRequire(path.join(__dirname, 'routes/v1/waterfallAnalysisRoutes')), // Issue #56: Waterfall Analysis Engine
   documentAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentAuditRoutes')), // Issue #102: Document Audit Trail
   cacheRoutes: safeRequire(path.join(__dirname, 'routes/v1/cacheRoutes')), // Issue #47: Database Optimization and Caching
+  fundraiseModelRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraiseModelRoutes')), // Issue #195: Interactive Fundraising Modeling Engine
+  customReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/customReportRoutes')), // Issue #197: Custom Report Builder Engine
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -331,6 +334,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/financial-data';
     } else if (key === 'semanticSearchRoutes') {
       path = '/api/v1/documents/search';
+    } else if (key === 'searchRoutes') {
+      path = '/api/v1/search';
     } else if (key === 'agentMemoryRoutes') {
       path = '/api/v1/agent-memory';
     } else if (key === 'rlhfRoutes') {
@@ -387,6 +392,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/audit'; // Issue #102: Document Audit Trail
     } else if (key === 'cacheRoutes') {
       path = '/api/v1/cache'; // Issue #47: Database Optimization and Caching
+    } else if (key === 'customReportRoutes') {
+      path = '/api/v1/reports/custom'; // Issue #197: Custom Report Builder Engine
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
