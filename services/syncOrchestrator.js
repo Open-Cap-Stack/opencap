@@ -3,11 +3,14 @@
  *
  * [Feature] GitHub Issue #14: Continuous data sync implementation
  * [Issue #32] MongoDB Dependency Clarification
+ * [Issue #175] ZeroDB Migration - Conditional MongoDB Loading
  *
  * IMPORTANT: This service is OPTIONAL and only used when continuous sync is enabled.
  * MongoDB is NOT required to run OpenCap Stack - ZeroDB is the primary database.
  *
- * This orchestrator is only active when SYNC_ENABLED=true in environment variables.
+ * This orchestrator is only active when:
+ * - ENABLE_SYNC=true in environment variables
+ * - MIGRATION_MODE is NOT 'zerodb-only'
  *
  * Coordinates bidirectional synchronization between MongoDB and ZeroDB:
  * - MongoDB → ZeroDB via change streams
@@ -19,16 +22,35 @@
  */
 
 const EventEmitter = require('events');
-const mongoose = require('mongoose');
 const MetricsCollector = require('../utils/metricsCollector');
+
+// Determine if MongoDB is required based on migration mode
+const migrationMode = process.env.MIGRATION_MODE || 'mongodb-only';
+const isMongoDBRequired = migrationMode !== 'zerodb-only';
+
+// Lazy load mongoose only when needed
+let mongoose = null;
+function getMongoose() {
+  if (!mongoose) {
+    if (!isMongoDBRequired) {
+      throw new Error(
+        'SyncOrchestrator requires MongoDB but MIGRATION_MODE is set to zerodb-only. ' +
+        'This service is only available when MIGRATION_MODE is mongodb-only or parallel.'
+      );
+    }
+    mongoose = require('mongoose');
+  }
+  return mongoose;
+}
 
 class SyncOrchestrator extends EventEmitter {
   constructor() {
     super();
 
     // Configuration from environment
+    // Sync is only enabled if ENABLE_SYNC=true AND MongoDB is available
     this.config = {
-      enabled: process.env.ENABLE_SYNC === 'true',
+      enabled: process.env.ENABLE_SYNC === 'true' && isMongoDBRequired,
       direction: process.env.SYNC_DIRECTION || 'bidirectional', // 'bidirectional', 'mongo-to-zerodb', 'zerodb-to-mongo'
       batchSize: parseInt(process.env.SYNC_BATCH_SIZE) || 100,
       syncInterval: parseInt(process.env.SYNC_INTERVAL_MS) || 5000,
@@ -313,7 +335,8 @@ class SyncOrchestrator extends EventEmitter {
 
       if (direction === 'mongo-to-zerodb') {
         // Full sync from MongoDB to ZeroDB
-        const Model = mongoose.model(collection);
+        const mongooseInstance = getMongoose();
+        const Model = mongooseInstance.model(collection);
         const documents = await Model.find({}).lean().exec();
 
         result = await this._batchSyncToZerodb(collection, documents);
@@ -346,6 +369,17 @@ class SyncOrchestrator extends EventEmitter {
    * @returns {Object} Sync status
    */
   getStatus() {
+    // Check MongoDB connection status only if MongoDB is required
+    let mongodbConnected = false;
+    if (isMongoDBRequired) {
+      try {
+        const mongooseInstance = getMongoose();
+        mongodbConnected = mongooseInstance.connection.readyState === 1;
+      } catch (error) {
+        mongodbConnected = false;
+      }
+    }
+
     return {
       orchestrator: {
         status: this.state.status,
@@ -366,7 +400,7 @@ class SyncOrchestrator extends EventEmitter {
         syncLag: this._calculateSyncLag('zerodbToMongo'),
       },
       connections: {
-        mongodb: mongoose.connection.readyState === 1,
+        mongodb: mongodbConnected,
         zerodb: this.zerodbSyncService?.isConnected?.() || false,
       },
     };
@@ -420,6 +454,20 @@ class SyncOrchestrator extends EventEmitter {
         ? 'unhealthy'
         : 'degraded';
 
+    // Check MongoDB connection status only if MongoDB is required
+    let mongodbConnection = { connected: false, state: 'unavailable' };
+    if (isMongoDBRequired) {
+      try {
+        const mongooseInstance = getMongoose();
+        mongodbConnection = {
+          connected: mongooseInstance.connection.readyState === 1,
+          state: mongooseInstance.connection.states[mongooseInstance.connection.readyState],
+        };
+      } catch (error) {
+        mongodbConnection = { connected: false, state: 'not_required' };
+      }
+    }
+
     return {
       overall: overallHealth,
       mongoToZerodb: {
@@ -437,10 +485,7 @@ class SyncOrchestrator extends EventEmitter {
         circuitBreakerState: this.circuitBreaker.zerodbToMongo.state,
       },
       connections: {
-        mongodb: {
-          connected: mongoose.connection.readyState === 1,
-          state: mongoose.connection.states[mongoose.connection.readyState],
-        },
+        mongodb: mongodbConnection,
         zerodb: {
           connected: this.zerodbSyncService?.isConnected?.() || false,
         },
