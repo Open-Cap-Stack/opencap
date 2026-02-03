@@ -1,265 +1,416 @@
 /**
  * TaxWithholding Model
  * Feature: Issue #72 - Tax Withholding Calculator
+ * Migrated: ZeroDB Migration - Issue #175
  */
-const mongoose = require('mongoose');
+const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 
-const witholdingBreakdownSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ['federal', 'state', 'local', 'social_security', 'medicare', 'amt'],
-    required: true
-  },
-  jurisdiction: { type: String }, // State/local code
-  rate: { type: Number, required: true },
-  baseAmount: { type: Number, required: true },
-  withholdingAmount: { type: Number, required: true },
-  notes: { type: String }
-}, { _id: false });
+// Constants
+const EVENT_TYPES = ['iso_exercise', 'nso_exercise', 'rsu_vest', 'stock_sale', 'bonus_payment'];
+const SOURCE_TYPES = ['OptionExercise', 'RSUVest', 'StockSale', 'BonusPayment'];
+const FILING_STATUSES = ['single', 'married_filing_jointly', 'married_filing_separately', 'head_of_household'];
+const WITHHOLDING_TYPES = ['federal', 'state', 'local', 'social_security', 'medicare', 'amt'];
+const WITHHOLDING_METHODS = ['flat_rate', 'supplemental', 'aggregate', 'percentage'];
+const STATUSES = ['calculated', 'approved', 'processed', 'remitted', 'corrected'];
 
-const TaxWithholdingSchema = new mongoose.Schema({
-  // Unique identifier
-  withholdingId: {
-    type: String,
-    unique: true,
-    default: () => `twh_${uuidv4()}`,
-    index: true
-  },
-
-  // References
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: true,
-    index: true
-  },
-  employeeId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Stakeholder',
-    required: true,
-    index: true
-  },
-
-  // Event type
-  eventType: {
-    type: String,
-    enum: ['iso_exercise', 'nso_exercise', 'rsu_vest', 'stock_sale', 'bonus_payment'],
-    required: true
-  },
-
-  // Source reference
-  sourceType: {
-    type: String,
-    enum: ['OptionExercise', 'RSUVest', 'StockSale', 'BonusPayment']
-  },
-  sourceId: { type: mongoose.Schema.Types.ObjectId },
-
-  // Tax year and period
-  taxYear: {
-    type: Number,
-    required: true,
-    index: true
-  },
-  eventDate: { type: Date, required: true },
-
-  // Income details
-  income: {
-    grossAmount: { type: Number, required: true },
-    ordinaryIncome: { type: Number, default: 0 },
-    capitalGains: {
-      shortTerm: { type: Number, default: 0 },
-      longTerm: { type: Number, default: 0 }
+// Schema definition (for documentation)
+const schema = {
+    _id: { type: 'string', required: true },
+    withholdingId: { type: 'string', unique: true },
+    companyId: { type: 'string', required: true },
+    employeeId: { type: 'string', required: true },
+    eventType: { type: 'string', enum: EVENT_TYPES, required: true },
+    sourceType: { type: 'string', enum: SOURCE_TYPES },
+    sourceId: { type: 'string' },
+    taxYear: { type: 'number', required: true },
+    eventDate: { type: 'date', required: true },
+    income: {
+        grossAmount: { type: 'number', required: true },
+        ordinaryIncome: { type: 'number', default: 0 },
+        capitalGains: {
+            shortTerm: { type: 'number', default: 0 },
+            longTerm: { type: 'number', default: 0 }
+        },
+        amtIncome: { type: 'number', default: 0 }
     },
-    amtIncome: { type: Number, default: 0 }
-  },
-
-  // Employee tax profile
-  employeeProfile: {
-    filingStatus: {
-      type: String,
-      enum: ['single', 'married_filing_jointly', 'married_filing_separately', 'head_of_household'],
-      required: true
+    employeeProfile: {
+        filingStatus: { type: 'string', enum: FILING_STATUSES, required: true },
+        federalAllowances: { type: 'number', default: 0 },
+        stateCode: { type: 'string', required: true },
+        stateAllowances: { type: 'number', default: 0 },
+        additionalWithholding: { type: 'number', default: 0 },
+        isSubjectToAMT: { type: 'boolean', default: false }
     },
-    federalAllowances: { type: Number, default: 0 },
-    stateCode: { type: String, required: true },
-    stateAllowances: { type: Number, default: 0 },
-    additionalWithholding: { type: Number, default: 0 },
-    isSubjectToAMT: { type: Boolean, default: false }
-  },
-
-  // Withholding breakdown
-  withholdings: [witholdingBreakdownSchema],
-
-  // Summary
-  summary: {
-    totalWithholding: { type: Number, required: true },
-    federalWithholding: { type: Number, default: 0 },
-    stateWithholding: { type: Number, default: 0 },
-    localWithholding: { type: Number, default: 0 },
-    socialSecurityWithholding: { type: Number, default: 0 },
-    medicareWithholding: { type: Number, default: 0 },
-    additionalMedicare: { type: Number, default: 0 },
-    netAmount: { type: Number }
-  },
-
-  // Withholding method
-  method: {
-    type: String,
-    enum: ['flat_rate', 'supplemental', 'aggregate', 'percentage'],
-    default: 'supplemental'
-  },
-
-  // Status
-  status: {
-    type: String,
-    enum: ['calculated', 'approved', 'processed', 'remitted', 'corrected'],
-    default: 'calculated',
-    index: true
-  },
-
-  // Payment tracking
-  payment: {
-    processedDate: { type: Date },
-    processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    remittedDate: { type: Date },
-    remittanceConfirmation: { type: String }
-  },
-
-  // Audit
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  approvedAt: { type: Date },
-
-  notes: { type: String },
-  metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Indexes
-TaxWithholdingSchema.index({ companyId: 1, taxYear: 1 });
-TaxWithholdingSchema.index({ employeeId: 1, taxYear: 1 });
-TaxWithholdingSchema.index({ eventDate: 1 });
-TaxWithholdingSchema.index({ sourceType: 1, sourceId: 1 });
-
-// Pre-save: calculate net amount
-TaxWithholdingSchema.pre('save', function(next) {
-  this.summary.netAmount = this.income.grossAmount - this.summary.totalWithholding;
-  next();
-});
-
-// Instance methods
-TaxWithholdingSchema.methods.approve = async function(userId) {
-  if (this.status !== 'calculated') {
-    throw new Error('Can only approve calculated withholdings');
-  }
-
-  this.status = 'approved';
-  this.approvedBy = userId;
-  this.approvedAt = new Date();
-  this.updatedBy = userId;
-
-  return this.save();
+    withholdings: { type: 'array', default: [] },
+    summary: {
+        totalWithholding: { type: 'number', required: true },
+        federalWithholding: { type: 'number', default: 0 },
+        stateWithholding: { type: 'number', default: 0 },
+        localWithholding: { type: 'number', default: 0 },
+        socialSecurityWithholding: { type: 'number', default: 0 },
+        medicareWithholding: { type: 'number', default: 0 },
+        additionalMedicare: { type: 'number', default: 0 },
+        netAmount: { type: 'number' }
+    },
+    method: { type: 'string', enum: WITHHOLDING_METHODS, default: 'supplemental' },
+    status: { type: 'string', enum: STATUSES, default: 'calculated' },
+    payment: {
+        processedDate: { type: 'date' },
+        processedBy: { type: 'string' },
+        remittedDate: { type: 'date' },
+        remittanceConfirmation: { type: 'string' }
+    },
+    createdBy: { type: 'string', required: true },
+    updatedBy: { type: 'string' },
+    approvedBy: { type: 'string' },
+    approvedAt: { type: 'date' },
+    notes: { type: 'string' },
+    metadata: { type: 'object', default: {} },
+    createdAt: { type: 'date' },
+    updatedAt: { type: 'date' }
 };
 
-TaxWithholdingSchema.methods.markProcessed = async function(userId) {
-  if (this.status !== 'approved') {
-    throw new Error('Must be approved before processing');
-  }
+// Create base model
+const baseModel = createModel('tax_withholdings', schema);
 
-  this.status = 'processed';
-  this.payment.processedDate = new Date();
-  this.payment.processedBy = userId;
-  this.updatedBy = userId;
+// Extended model with custom methods
+const TaxWithholding = {
+    ...baseModel,
 
-  return this.save();
-};
+    // Expose constants
+    EVENT_TYPES,
+    SOURCE_TYPES,
+    FILING_STATUSES,
+    WITHHOLDING_TYPES,
+    WITHHOLDING_METHODS,
+    STATUSES,
 
-TaxWithholdingSchema.methods.markRemitted = async function(userId, confirmation) {
-  if (this.status !== 'processed') {
-    throw new Error('Must be processed before remittance');
-  }
+    /**
+     * Create a new tax withholding record
+     * @param {Object} data - Withholding data
+     * @returns {Object} Created withholding
+     */
+    async create(data) {
+        const withholdingId = data.withholdingId || `twh_${uuidv4()}`;
 
-  this.status = 'remitted';
-  this.payment.remittedDate = new Date();
-  this.payment.remittanceConfirmation = confirmation;
-  this.updatedBy = userId;
+        // Calculate net amount
+        const grossAmount = data.income?.grossAmount || 0;
+        const totalWithholding = data.summary?.totalWithholding || 0;
+        const netAmount = grossAmount - totalWithholding;
 
-  return this.save();
-};
+        // Prepare document
+        const withholdingData = {
+            ...data,
+            withholdingId,
+            income: {
+                grossAmount: 0,
+                ordinaryIncome: 0,
+                capitalGains: {
+                    shortTerm: 0,
+                    longTerm: 0
+                },
+                amtIncome: 0,
+                ...data.income
+            },
+            summary: {
+                ...data.summary,
+                netAmount
+            },
+            withholdings: data.withholdings || [],
+            payment: data.payment || {},
+            status: data.status || 'calculated',
+            method: data.method || 'supplemental',
+            metadata: data.metadata || {},
+            eventDate: data.eventDate instanceof Date
+                ? data.eventDate.toISOString()
+                : data.eventDate,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
 
-// Static methods
-TaxWithholdingSchema.statics.findByEmployee = function(employeeId, taxYear = null) {
-  const query = { employeeId };
-  if (taxYear) query.taxYear = taxYear;
-  return this.find(query).sort({ eventDate: -1 });
-};
+        return baseModel.create(withholdingData);
+    },
 
-TaxWithholdingSchema.statics.findByCompany = function(companyId, taxYear = null) {
-  const query = { companyId };
-  if (taxYear) query.taxYear = taxYear;
-  return this.find(query).sort({ eventDate: -1 });
-};
+    /**
+     * Update with recalculated net amount
+     * @param {Object} query - Query filter
+     * @param {Object} update - Update data
+     * @param {Object} options - Update options
+     * @returns {Object} Update result
+     */
+    async findOneAndUpdate(query, update, options = {}) {
+        const updateData = update.$set || update;
+        const existingDoc = await baseModel.findOne(query);
 
-TaxWithholdingSchema.statics.getEmployeeYearSummary = async function(employeeId, taxYear) {
-  const result = await this.aggregate([
-    { $match: { employeeId: new mongoose.Types.ObjectId(employeeId), taxYear } },
-    {
-      $group: {
-        _id: null,
-        totalGrossIncome: { $sum: '$income.grossAmount' },
-        totalWithholding: { $sum: '$summary.totalWithholding' },
-        totalFederal: { $sum: '$summary.federalWithholding' },
-        totalState: { $sum: '$summary.stateWithholding' },
-        totalSocialSecurity: { $sum: '$summary.socialSecurityWithholding' },
-        totalMedicare: { $sum: '$summary.medicareWithholding' },
-        transactionCount: { $sum: 1 }
-      }
+        if (existingDoc) {
+            // Recalculate net amount if income or withholding changed
+            const income = updateData.income
+                ? { ...existingDoc.income, ...updateData.income }
+                : existingDoc.income;
+
+            const summary = updateData.summary
+                ? { ...existingDoc.summary, ...updateData.summary }
+                : existingDoc.summary;
+
+            summary.netAmount = income.grossAmount - summary.totalWithholding;
+            updateData.summary = summary;
+        }
+
+        updateData.updatedAt = new Date().toISOString();
+
+        return baseModel.findOneAndUpdate(query, { $set: updateData }, options);
+    },
+
+    /**
+     * Approve a withholding
+     * @param {string} withholdingId - Withholding ID or _id
+     * @param {string} userId - Approving user ID
+     * @returns {Object} Updated withholding
+     */
+    async approve(withholdingId, userId) {
+        const doc = await baseModel.findOne({
+            $or: [{ _id: withholdingId }, { withholdingId }]
+        });
+
+        if (!doc) {
+            throw new Error('Withholding not found');
+        }
+
+        if (doc.status !== 'calculated') {
+            throw new Error('Can only approve calculated withholdings');
+        }
+
+        const updateData = {
+            status: 'approved',
+            approvedBy: userId,
+            approvedAt: new Date().toISOString(),
+            updatedBy: userId,
+            updatedAt: new Date().toISOString()
+        };
+
+        await baseModel.updateOne({ _id: doc._id }, { $set: updateData });
+
+        return { ...doc, ...updateData };
+    },
+
+    /**
+     * Mark withholding as processed
+     * @param {string} withholdingId - Withholding ID or _id
+     * @param {string} userId - Processing user ID
+     * @returns {Object} Updated withholding
+     */
+    async markProcessed(withholdingId, userId) {
+        const doc = await baseModel.findOne({
+            $or: [{ _id: withholdingId }, { withholdingId }]
+        });
+
+        if (!doc) {
+            throw new Error('Withholding not found');
+        }
+
+        if (doc.status !== 'approved') {
+            throw new Error('Must be approved before processing');
+        }
+
+        const updateData = {
+            status: 'processed',
+            payment: {
+                ...doc.payment,
+                processedDate: new Date().toISOString(),
+                processedBy: userId
+            },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString()
+        };
+
+        await baseModel.updateOne({ _id: doc._id }, { $set: updateData });
+
+        return { ...doc, ...updateData };
+    },
+
+    /**
+     * Mark withholding as remitted
+     * @param {string} withholdingId - Withholding ID or _id
+     * @param {string} userId - User marking remittance
+     * @param {string} confirmation - Remittance confirmation number
+     * @returns {Object} Updated withholding
+     */
+    async markRemitted(withholdingId, userId, confirmation) {
+        const doc = await baseModel.findOne({
+            $or: [{ _id: withholdingId }, { withholdingId }]
+        });
+
+        if (!doc) {
+            throw new Error('Withholding not found');
+        }
+
+        if (doc.status !== 'processed') {
+            throw new Error('Must be processed before remittance');
+        }
+
+        const updateData = {
+            status: 'remitted',
+            payment: {
+                ...doc.payment,
+                remittedDate: new Date().toISOString(),
+                remittanceConfirmation: confirmation
+            },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString()
+        };
+
+        await baseModel.updateOne({ _id: doc._id }, { $set: updateData });
+
+        return { ...doc, ...updateData };
+    },
+
+    /**
+     * Find withholdings by employee
+     * @param {string} employeeId - Employee ID
+     * @param {number} taxYear - Optional tax year filter
+     * @returns {Array} Withholdings for the employee
+     */
+    async findByEmployee(employeeId, taxYear = null) {
+        const query = { employeeId };
+        if (taxYear) query.taxYear = taxYear;
+
+        const results = await baseModel.find(query);
+        return results.sort((a, b) => {
+            const dateA = new Date(a.eventDate || 0);
+            const dateB = new Date(b.eventDate || 0);
+            return dateB - dateA;
+        });
+    },
+
+    /**
+     * Find withholdings by company
+     * @param {string} companyId - Company ID
+     * @param {number} taxYear - Optional tax year filter
+     * @returns {Array} Withholdings for the company
+     */
+    async findByCompany(companyId, taxYear = null) {
+        const query = { companyId };
+        if (taxYear) query.taxYear = taxYear;
+
+        const results = await baseModel.find(query);
+        return results.sort((a, b) => {
+            const dateA = new Date(a.eventDate || 0);
+            const dateB = new Date(b.eventDate || 0);
+            return dateB - dateA;
+        });
+    },
+
+    /**
+     * Get employee year summary
+     * @param {string} employeeId - Employee ID
+     * @param {number} taxYear - Tax year
+     * @returns {Object} Employee year summary
+     */
+    async getEmployeeYearSummary(employeeId, taxYear) {
+        const results = await baseModel.find({ employeeId, taxYear });
+
+        if (results.length === 0) {
+            return {
+                totalGrossIncome: 0,
+                totalWithholding: 0,
+                totalFederal: 0,
+                totalState: 0,
+                totalSocialSecurity: 0,
+                totalMedicare: 0,
+                transactionCount: 0
+            };
+        }
+
+        return {
+            totalGrossIncome: results.reduce((sum, r) => sum + (r.income?.grossAmount || 0), 0),
+            totalWithholding: results.reduce((sum, r) => sum + (r.summary?.totalWithholding || 0), 0),
+            totalFederal: results.reduce((sum, r) => sum + (r.summary?.federalWithholding || 0), 0),
+            totalState: results.reduce((sum, r) => sum + (r.summary?.stateWithholding || 0), 0),
+            totalSocialSecurity: results.reduce((sum, r) => sum + (r.summary?.socialSecurityWithholding || 0), 0),
+            totalMedicare: results.reduce((sum, r) => sum + (r.summary?.medicareWithholding || 0), 0),
+            transactionCount: results.length
+        };
+    },
+
+    /**
+     * Get company quarter summary
+     * @param {string} companyId - Company ID
+     * @param {number} taxYear - Tax year
+     * @param {number} quarter - Quarter (1-4)
+     * @returns {Array} Summary by event type
+     */
+    async getCompanyQuarterSummary(companyId, taxYear, quarter) {
+        const quarterMonths = {
+            1: [1, 2, 3],
+            2: [4, 5, 6],
+            3: [7, 8, 9],
+            4: [10, 11, 12]
+        };
+
+        const months = quarterMonths[quarter];
+        if (!months) {
+            throw new Error('Invalid quarter. Must be 1-4.');
+        }
+
+        const startDate = new Date(taxYear, months[0] - 1, 1);
+        const endDate = new Date(taxYear, months[2], 0, 23, 59, 59);
+
+        const startDateStr = startDate.toISOString();
+        const endDateStr = endDate.toISOString();
+
+        const results = await baseModel.find({ companyId });
+
+        // Filter by date range
+        const filteredResults = results.filter(r => {
+            const eventDate = r.eventDate;
+            return eventDate >= startDateStr && eventDate <= endDateStr;
+        });
+
+        // Group by event type
+        const byEventType = {};
+        for (const r of filteredResults) {
+            if (!byEventType[r.eventType]) {
+                byEventType[r.eventType] = {
+                    _id: r.eventType,
+                    totalWithholding: 0,
+                    count: 0
+                };
+            }
+            byEventType[r.eventType].totalWithholding += r.summary?.totalWithholding || 0;
+            byEventType[r.eventType].count++;
+        }
+
+        return Object.values(byEventType);
+    },
+
+    /**
+     * Find by source
+     * @param {string} sourceType - Source type
+     * @param {string} sourceId - Source ID
+     * @returns {Object|null} Withholding for the source
+     */
+    async findBySource(sourceType, sourceId) {
+        return baseModel.findOne({ sourceType, sourceId });
+    },
+
+    /**
+     * Get pending withholdings (calculated but not approved)
+     * @param {string} companyId - Company ID
+     * @returns {Array} Pending withholdings
+     */
+    async getPending(companyId) {
+        return baseModel.find({ companyId, status: 'calculated' });
+    },
+
+    /**
+     * Get withholdings awaiting remittance
+     * @param {string} companyId - Company ID
+     * @returns {Array} Processed withholdings awaiting remittance
+     */
+    async getAwaitingRemittance(companyId) {
+        return baseModel.find({ companyId, status: 'processed' });
     }
-  ]);
-
-  return result[0] || {
-    totalGrossIncome: 0,
-    totalWithholding: 0,
-    totalFederal: 0,
-    totalState: 0,
-    totalSocialSecurity: 0,
-    totalMedicare: 0,
-    transactionCount: 0
-  };
 };
 
-TaxWithholdingSchema.statics.getCompanyQuarterSummary = async function(companyId, taxYear, quarter) {
-  const quarterMonths = {
-    1: [1, 2, 3],
-    2: [4, 5, 6],
-    3: [7, 8, 9],
-    4: [10, 11, 12]
-  };
-
-  const months = quarterMonths[quarter];
-  const startDate = new Date(taxYear, months[0] - 1, 1);
-  const endDate = new Date(taxYear, months[2], 0);
-
-  return this.aggregate([
-    {
-      $match: {
-        companyId: new mongoose.Types.ObjectId(companyId),
-        eventDate: { $gte: startDate, $lte: endDate }
-      }
-    },
-    {
-      $group: {
-        _id: '$eventType',
-        totalWithholding: { $sum: '$summary.totalWithholding' },
-        count: { $sum: 1 }
-      }
-    }
-  ]);
-};
-
-module.exports = mongoose.model('TaxWithholding', TaxWithholdingSchema);
+module.exports = TaxWithholding;

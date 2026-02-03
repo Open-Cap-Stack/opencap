@@ -1,639 +1,467 @@
 /**
  * Financial Metrics Model
- * 
+ *
+ * Migrated: ZeroDB Migration - Issue #175
+ *
  * [Feature] OCDI-202: Create financial reporting database models
- * 
+ *
  * Comprehensive model for storing calculated financial metrics, ratios, and KPIs
  * derived from financial statements for analytical and reporting purposes.
  */
 
-const mongoose = require('mongoose');
-const { Schema } = mongoose;
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
 /**
- * Liquidity Ratios Schema
+ * Schema definition for Financial Metrics
  */
-const liquidityRatiosSchema = new Schema({
-  currentRatio: {
-    type: Number,
-    description: 'Current Assets / Current Liabilities'
-  },
-  quickRatio: {
-    type: Number,
-    description: 'Quick Assets / Current Liabilities'
-  },
-  cashRatio: {
-    type: Number,
-    description: 'Cash and Cash Equivalents / Current Liabilities'
-  },
-  workingCapital: {
-    type: Number,
-    description: 'Current Assets - Current Liabilities'
-  },
-  operatingCashFlowRatio: {
-    type: Number,
-    description: 'Operating Cash Flow / Current Liabilities'
-  }
-}, { _id: false });
+const financialMetricsSchema = {
+    // Primary identifiers
+    _id: { type: 'string', required: true },
+    companyId: { type: 'string', required: true, index: true },
 
-/**
- * Activity/Efficiency Ratios Schema
- */
-const activityRatiosSchema = new Schema({
-  assetTurnover: {
-    type: Number,
-    description: 'Revenue / Average Total Assets'
-  },
-  inventoryTurnover: {
-    type: Number,
-    description: 'Cost of Goods Sold / Average Inventory'
-  },
-  receivablesTurnover: {
-    type: Number,
-    description: 'Revenue / Average Accounts Receivable'
-  },
-  payablesTurnover: {
-    type: Number,
-    description: 'Cost of Goods Sold / Average Accounts Payable'
-  },
-  daysInInventory: {
-    type: Number,
-    description: '365 / Inventory Turnover'
-  },
-  daysInReceivables: {
-    type: Number,
-    description: '365 / Receivables Turnover'
-  },
-  daysInPayables: {
-    type: Number,
-    description: '365 / Payables Turnover'
-  },
-  cashConversionCycle: {
-    type: Number,
-    description: 'Days in Inventory + Days in Receivables - Days in Payables'
-  }
-}, { _id: false });
+    // Reporting period
+    reportingPeriod: { type: 'string', required: true, trim: true },
+    reportingDate: { type: 'date', required: true, index: true },
 
-/**
- * Leverage/Debt Ratios Schema
- */
-const leverageRatiosSchema = new Schema({
-  debtToAssets: {
-    type: Number,
-    description: 'Total Debt / Total Assets'
-  },
-  debtToEquity: {
-    type: Number,
-    description: 'Total Debt / Total Equity'
-  },
-  equityMultiplier: {
-    type: Number,
-    description: 'Total Assets / Total Equity'
-  },
-  timesInterestEarned: {
-    type: Number,
-    description: 'EBIT / Interest Expense'
-  },
-  cashCoverageRatio: {
-    type: Number,
-    description: '(EBIT + Depreciation) / Interest Expense'
-  },
-  debtServiceCoverageRatio: {
-    type: Number,
-    description: 'Operating Cash Flow / Total Debt Service'
-  },
-  longTermDebtToEquity: {
-    type: Number,
-    description: 'Long-term Debt / Total Equity'
-  }
-}, { _id: false });
+    // Source data references
+    sourceBalanceSheetId: { type: 'string' },
+    sourceIncomeStatementId: { type: 'string' },
+    sourceCashFlowId: { type: 'string' },
 
-/**
- * Profitability Ratios Schema
- */
-const profitabilityRatiosSchema = new Schema({
-  grossProfitMargin: {
-    type: Number,
-    description: 'Gross Profit / Revenue'
-  },
-  operatingProfitMargin: {
-    type: Number,
-    description: 'Operating Income / Revenue'
-  },
-  netProfitMargin: {
-    type: Number,
-    description: 'Net Income / Revenue'
-  },
-  returnOnAssets: {
-    type: Number,
-    description: 'Net Income / Average Total Assets'
-  },
-  returnOnEquity: {
-    type: Number,
-    description: 'Net Income / Average Total Equity'
-  },
-  returnOnInvestedCapital: {
-    type: Number,
-    description: 'NOPAT / Invested Capital'
-  },
-  earningsBeforeInterestTaxes: {
-    type: Number,
-    description: 'EBIT'
-  },
-  earningsBeforeInterestTaxesDepreciationAmortization: {
-    type: Number,
-    description: 'EBITDA'
-  }
-}, { _id: false });
+    // Liquidity Ratios
+    liquidityRatios: {
+        currentRatio: { type: 'number' },
+        quickRatio: { type: 'number' },
+        cashRatio: { type: 'number' },
+        workingCapital: { type: 'number' },
+        operatingCashFlowRatio: { type: 'number' }
+    },
 
-/**
- * Market/Valuation Ratios Schema
- */
-const marketRatiosSchema = new Schema({
-  priceToEarnings: {
-    type: Number,
-    description: 'Market Price per Share / Earnings per Share'
-  },
-  priceToBook: {
-    type: Number,
-    description: 'Market Price per Share / Book Value per Share'
-  },
-  priceToSales: {
-    type: Number,
-    description: 'Market Capitalization / Revenue'
-  },
-  earningsPerShare: {
-    type: Number,
-    description: 'Net Income / Weighted Average Shares Outstanding'
-  },
-  bookValuePerShare: {
-    type: Number,
-    description: 'Total Equity / Shares Outstanding'
-  },
-  dividendYield: {
-    type: Number,
-    description: 'Annual Dividends per Share / Market Price per Share'
-  },
-  dividendPayoutRatio: {
-    type: Number,
-    description: 'Dividends per Share / Earnings per Share'
-  }
-}, { _id: false });
+    // Activity/Efficiency Ratios
+    activityRatios: {
+        assetTurnover: { type: 'number' },
+        inventoryTurnover: { type: 'number' },
+        receivablesTurnover: { type: 'number' },
+        payablesTurnover: { type: 'number' },
+        daysInInventory: { type: 'number' },
+        daysInReceivables: { type: 'number' },
+        daysInPayables: { type: 'number' },
+        cashConversionCycle: { type: 'number' }
+    },
 
-/**
- * Cash Flow Metrics Schema
- */
-const cashFlowMetricsSchema = new Schema({
-  operatingCashFlow: {
-    type: Number,
-    description: 'Net cash from operating activities'
-  },
-  freeCashFlow: {
-    type: Number,
-    description: 'Operating Cash Flow - Capital Expenditures'
-  },
-  freeCashFlowYield: {
-    type: Number,
-    description: 'Free Cash Flow / Market Capitalization'
-  },
-  cashFlowToDebt: {
-    type: Number,
-    description: 'Operating Cash Flow / Total Debt'
-  },
-  cashFlowPerShare: {
-    type: Number,
-    description: 'Operating Cash Flow / Shares Outstanding'
-  },
-  capexToSales: {
-    type: Number,
-    description: 'Capital Expenditures / Revenue'
-  },
-  cashConversionRatio: {
-    type: Number,
-    description: 'Operating Cash Flow / Net Income'
-  }
-}, { _id: false });
+    // Leverage/Debt Ratios
+    leverageRatios: {
+        debtToAssets: { type: 'number' },
+        debtToEquity: { type: 'number' },
+        equityMultiplier: { type: 'number' },
+        timesInterestEarned: { type: 'number' },
+        cashCoverageRatio: { type: 'number' },
+        debtServiceCoverageRatio: { type: 'number' },
+        longTermDebtToEquity: { type: 'number' }
+    },
 
-/**
- * Growth Metrics Schema
- */
-const growthMetricsSchema = new Schema({
-  revenueGrowthRate: {
-    type: Number,
-    description: 'YoY Revenue Growth Rate'
-  },
-  netIncomeGrowthRate: {
-    type: Number,
-    description: 'YoY Net Income Growth Rate'
-  },
-  assetGrowthRate: {
-    type: Number,
-    description: 'YoY Total Assets Growth Rate'
-  },
-  equityGrowthRate: {
-    type: Number,
-    description: 'YoY Total Equity Growth Rate'
-  },
-  earningsGrowthRate: {
-    type: Number,
-    description: 'YoY Earnings per Share Growth Rate'
-  },
-  dividendGrowthRate: {
-    type: Number,
-    description: 'YoY Dividend per Share Growth Rate'
-  },
-  sustainableGrowthRate: {
-    type: Number,
-    description: 'ROE × (1 - Dividend Payout Ratio)'
-  }
-}, { _id: false });
+    // Profitability Ratios
+    profitabilityRatios: {
+        grossProfitMargin: { type: 'number' },
+        operatingProfitMargin: { type: 'number' },
+        netProfitMargin: { type: 'number' },
+        returnOnAssets: { type: 'number' },
+        returnOnEquity: { type: 'number' },
+        returnOnInvestedCapital: { type: 'number' },
+        earningsBeforeInterestTaxes: { type: 'number' },
+        earningsBeforeInterestTaxesDepreciationAmortization: { type: 'number' }
+    },
 
-/**
- * Main Financial Metrics Schema
- */
-const financialMetricsSchema = new Schema({
-  companyId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Company',
-    required: true,
-    index: true
-  },
-  
-  reportingPeriod: {
-    type: String,
-    required: true,
-    trim: true,
-    description: 'e.g., 2024-Q1, 2024'
-  },
-  
-  reportingDate: {
-    type: Date,
-    required: true,
-    index: true
-  },
-  
-  // Source data references
-  sourceBalanceSheetId: {
-    type: Schema.Types.ObjectId,
-    ref: 'BalanceSheet'
-  },
-  
-  sourceIncomeStatementId: {
-    type: Schema.Types.ObjectId,
-    ref: 'FinancialReport'
-  },
-  
-  sourceCashFlowId: {
-    type: Schema.Types.ObjectId,
-    ref: 'CashFlowStatement'
-  },
-  
-  // Metric categories
-  liquidityRatios: {
-    type: liquidityRatiosSchema,
-    default: {}
-  },
-  
-  activityRatios: {
-    type: activityRatiosSchema,
-    default: {}
-  },
-  
-  leverageRatios: {
-    type: leverageRatiosSchema,
-    default: {}
-  },
-  
-  profitabilityRatios: {
-    type: profitabilityRatiosSchema,
-    default: {}
-  },
-  
-  marketRatios: {
-    type: marketRatiosSchema,
-    default: {}
-  },
-  
-  cashFlowMetrics: {
-    type: cashFlowMetricsSchema,
-    default: {}
-  },
-  
-  growthMetrics: {
-    type: growthMetricsSchema,
-    default: {}
-  },
-  
-  // Summary scores
-  financialStrengthScore: {
-    type: Number,
-    min: 0,
-    max: 100,
-    description: 'Overall financial strength score (0-100)'
-  },
-  
-  liquidityScore: {
-    type: Number,
-    min: 0,
-    max: 100,
-    description: 'Liquidity strength score (0-100)'
-  },
-  
-  profitabilityScore: {
-    type: Number,
-    min: 0,
-    max: 100,
-    description: 'Profitability strength score (0-100)'
-  },
-  
-  leverageScore: {
-    type: Number,
-    min: 0,
-    max: 100,
-    description: 'Leverage/stability score (0-100)'
-  },
-  
-  // Metadata
-  calculationMethod: {
-    type: String,
-    enum: ['automatic', 'manual', 'hybrid'],
-    default: 'automatic',
-    description: 'How the metrics were calculated'
-  },
-  
-  calculatedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  
-  calculatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  reviewedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  
-  approvedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  
-  status: {
-    type: String,
-    enum: ['draft', 'calculated', 'reviewed', 'approved', 'published'],
-    default: 'calculated'
-  },
-  
-  notes: {
-    type: String,
-    trim: true,
-    description: 'Additional notes about the calculations'
-  },
-  
-  warnings: [{
-    type: String,
-    description: 'Calculation warnings or data quality issues'
-  }],
-  
-  isComparative: {
-    type: Boolean,
-    default: false,
-    description: 'Whether this includes comparative period data'
-  },
-  
-  basePeriod: {
-    type: String,
-    description: 'Base period for growth calculations'
-  }
-  
-}, {
-  timestamps: true,
-  collection: 'financialmetrics'
-});
+    // Market/Valuation Ratios
+    marketRatios: {
+        priceToEarnings: { type: 'number' },
+        priceToBook: { type: 'number' },
+        priceToSales: { type: 'number' },
+        earningsPerShare: { type: 'number' },
+        bookValuePerShare: { type: 'number' },
+        dividendYield: { type: 'number' },
+        dividendPayoutRatio: { type: 'number' }
+    },
 
-// Indexes
-financialMetricsSchema.index({ companyId: 1, reportingDate: -1 });
-financialMetricsSchema.index({ reportingPeriod: 1 });
-financialMetricsSchema.index({ status: 1 });
-financialMetricsSchema.index({ companyId: 1, reportingPeriod: 1 }, { unique: true });
+    // Cash Flow Metrics
+    cashFlowMetrics: {
+        operatingCashFlow: { type: 'number' },
+        freeCashFlow: { type: 'number' },
+        freeCashFlowYield: { type: 'number' },
+        cashFlowToDebt: { type: 'number' },
+        cashFlowPerShare: { type: 'number' },
+        capexToSales: { type: 'number' },
+        cashConversionRatio: { type: 'number' }
+    },
+
+    // Growth Metrics
+    growthMetrics: {
+        revenueGrowthRate: { type: 'number' },
+        netIncomeGrowthRate: { type: 'number' },
+        assetGrowthRate: { type: 'number' },
+        equityGrowthRate: { type: 'number' },
+        earningsGrowthRate: { type: 'number' },
+        dividendGrowthRate: { type: 'number' },
+        sustainableGrowthRate: { type: 'number' }
+    },
+
+    // Summary scores
+    financialStrengthScore: { type: 'number', min: 0, max: 100 },
+    liquidityScore: { type: 'number', min: 0, max: 100 },
+    profitabilityScore: { type: 'number', min: 0, max: 100 },
+    leverageScore: { type: 'number', min: 0, max: 100 },
+
+    // Metadata
+    calculationMethod: { type: 'string', enum: ['automatic', 'manual', 'hybrid'], default: 'automatic' },
+    calculatedBy: { type: 'string', required: true },
+    calculatedAt: { type: 'date', default: () => new Date().toISOString() },
+    reviewedBy: { type: 'string' },
+    approvedBy: { type: 'string' },
+    status: { type: 'string', enum: ['draft', 'calculated', 'reviewed', 'approved', 'published'], default: 'calculated' },
+    notes: { type: 'string', trim: true },
+    warnings: { type: 'array', default: [] },
+    isComparative: { type: 'boolean', default: false },
+    basePeriod: { type: 'string' },
+
+    // Timestamps
+    createdAt: { type: 'date' },
+    updatedAt: { type: 'date' }
+};
+
+// Create the base model
+const baseModel = createModel('financial_reports', financialMetricsSchema);
 
 /**
  * Calculate financial strength scores
+ * @param {Object} doc - Financial metrics document
+ * @returns {Object} Document with calculated scores
  */
-financialMetricsSchema.methods.calculateScores = function() {
-  let liquidityScore = 0;
-  let profitabilityScore = 0;
-  let leverageScore = 0;
-  
-  // Liquidity score (0-100)
-  if (this.liquidityRatios) {
-    const { currentRatio, quickRatio, operatingCashFlowRatio } = this.liquidityRatios;
-    
-    // Current ratio scoring (ideal: 1.5-3.0)
-    if (currentRatio >= 1.5 && currentRatio <= 3.0) liquidityScore += 35;
-    else if (currentRatio >= 1.0) liquidityScore += 20;
-    else if (currentRatio >= 0.8) liquidityScore += 10;
-    
-    // Quick ratio scoring (ideal: 1.0-2.0)
-    if (quickRatio >= 1.0 && quickRatio <= 2.0) liquidityScore += 35;
-    else if (quickRatio >= 0.7) liquidityScore += 20;
-    else if (quickRatio >= 0.5) liquidityScore += 10;
-    
-    // Operating cash flow ratio scoring
-    if (operatingCashFlowRatio >= 0.4) liquidityScore += 30;
-    else if (operatingCashFlowRatio >= 0.2) liquidityScore += 20;
-    else if (operatingCashFlowRatio >= 0.1) liquidityScore += 10;
-  }
-  
-  // Profitability score (0-100)
-  if (this.profitabilityRatios) {
-    const { netProfitMargin, returnOnAssets, returnOnEquity } = this.profitabilityRatios;
-    
-    // Net profit margin scoring
-    if (netProfitMargin >= 0.15) profitabilityScore += 35;
-    else if (netProfitMargin >= 0.10) profitabilityScore += 25;
-    else if (netProfitMargin >= 0.05) profitabilityScore += 15;
-    else if (netProfitMargin >= 0.02) profitabilityScore += 5;
-    
-    // ROA scoring
-    if (returnOnAssets >= 0.15) profitabilityScore += 30;
-    else if (returnOnAssets >= 0.10) profitabilityScore += 20;
-    else if (returnOnAssets >= 0.05) profitabilityScore += 10;
-    else if (returnOnAssets >= 0.02) profitabilityScore += 5;
-    
-    // ROE scoring
-    if (returnOnEquity >= 0.20) profitabilityScore += 35;
-    else if (returnOnEquity >= 0.15) profitabilityScore += 25;
-    else if (returnOnEquity >= 0.10) profitabilityScore += 15;
-    else if (returnOnEquity >= 0.05) profitabilityScore += 5;
-  }
-  
-  // Leverage score (0-100, higher debt = lower score)
-  if (this.leverageRatios) {
-    const { debtToAssets, debtToEquity, timesInterestEarned } = this.leverageRatios;
-    
-    // Debt to assets scoring (lower is better)
-    if (debtToAssets <= 0.3) leverageScore += 40;
-    else if (debtToAssets <= 0.5) leverageScore += 30;
-    else if (debtToAssets <= 0.7) leverageScore += 15;
-    else if (debtToAssets <= 0.9) leverageScore += 5;
-    
-    // Debt to equity scoring
-    if (debtToEquity <= 0.5) leverageScore += 30;
-    else if (debtToEquity <= 1.0) leverageScore += 20;
-    else if (debtToEquity <= 2.0) leverageScore += 10;
-    else if (debtToEquity <= 3.0) leverageScore += 5;
-    
-    // Interest coverage scoring
-    if (timesInterestEarned >= 5.0) leverageScore += 30;
-    else if (timesInterestEarned >= 3.0) leverageScore += 20;
-    else if (timesInterestEarned >= 2.0) leverageScore += 10;
-    else if (timesInterestEarned >= 1.5) leverageScore += 5;
-  }
-  
-  // Update scores
-  this.liquidityScore = Math.min(liquidityScore, 100);
-  this.profitabilityScore = Math.min(profitabilityScore, 100);
-  this.leverageScore = Math.min(leverageScore, 100);
-  
-  // Overall financial strength score (weighted average)
-  this.financialStrengthScore = Math.round(
-    (this.liquidityScore * 0.3) +
-    (this.profitabilityScore * 0.4) +
-    (this.leverageScore * 0.3)
-  );
-  
-  return this;
-};
+function calculateScores(doc) {
+    let liquidityScore = 0;
+    let profitabilityScore = 0;
+    let leverageScore = 0;
+
+    // Liquidity score (0-100)
+    if (doc.liquidityRatios) {
+        const { currentRatio, quickRatio, operatingCashFlowRatio } = doc.liquidityRatios;
+
+        // Current ratio scoring (ideal: 1.5-3.0)
+        if (currentRatio >= 1.5 && currentRatio <= 3.0) liquidityScore += 35;
+        else if (currentRatio >= 1.0) liquidityScore += 20;
+        else if (currentRatio >= 0.8) liquidityScore += 10;
+
+        // Quick ratio scoring (ideal: 1.0-2.0)
+        if (quickRatio >= 1.0 && quickRatio <= 2.0) liquidityScore += 35;
+        else if (quickRatio >= 0.7) liquidityScore += 20;
+        else if (quickRatio >= 0.5) liquidityScore += 10;
+
+        // Operating cash flow ratio scoring
+        if (operatingCashFlowRatio >= 0.4) liquidityScore += 30;
+        else if (operatingCashFlowRatio >= 0.2) liquidityScore += 20;
+        else if (operatingCashFlowRatio >= 0.1) liquidityScore += 10;
+    }
+
+    // Profitability score (0-100)
+    if (doc.profitabilityRatios) {
+        const { netProfitMargin, returnOnAssets, returnOnEquity } = doc.profitabilityRatios;
+
+        // Net profit margin scoring
+        if (netProfitMargin >= 0.15) profitabilityScore += 35;
+        else if (netProfitMargin >= 0.10) profitabilityScore += 25;
+        else if (netProfitMargin >= 0.05) profitabilityScore += 15;
+        else if (netProfitMargin >= 0.02) profitabilityScore += 5;
+
+        // ROA scoring
+        if (returnOnAssets >= 0.15) profitabilityScore += 30;
+        else if (returnOnAssets >= 0.10) profitabilityScore += 20;
+        else if (returnOnAssets >= 0.05) profitabilityScore += 10;
+        else if (returnOnAssets >= 0.02) profitabilityScore += 5;
+
+        // ROE scoring
+        if (returnOnEquity >= 0.20) profitabilityScore += 35;
+        else if (returnOnEquity >= 0.15) profitabilityScore += 25;
+        else if (returnOnEquity >= 0.10) profitabilityScore += 15;
+        else if (returnOnEquity >= 0.05) profitabilityScore += 5;
+    }
+
+    // Leverage score (0-100, higher debt = lower score)
+    if (doc.leverageRatios) {
+        const { debtToAssets, debtToEquity, timesInterestEarned } = doc.leverageRatios;
+
+        // Debt to assets scoring (lower is better)
+        if (debtToAssets <= 0.3) leverageScore += 40;
+        else if (debtToAssets <= 0.5) leverageScore += 30;
+        else if (debtToAssets <= 0.7) leverageScore += 15;
+        else if (debtToAssets <= 0.9) leverageScore += 5;
+
+        // Debt to equity scoring
+        if (debtToEquity <= 0.5) leverageScore += 30;
+        else if (debtToEquity <= 1.0) leverageScore += 20;
+        else if (debtToEquity <= 2.0) leverageScore += 10;
+        else if (debtToEquity <= 3.0) leverageScore += 5;
+
+        // Interest coverage scoring
+        if (timesInterestEarned >= 5.0) leverageScore += 30;
+        else if (timesInterestEarned >= 3.0) leverageScore += 20;
+        else if (timesInterestEarned >= 2.0) leverageScore += 10;
+        else if (timesInterestEarned >= 1.5) leverageScore += 5;
+    }
+
+    // Update scores
+    doc.liquidityScore = Math.min(liquidityScore, 100);
+    doc.profitabilityScore = Math.min(profitabilityScore, 100);
+    doc.leverageScore = Math.min(leverageScore, 100);
+
+    // Overall financial strength score (weighted average)
+    doc.financialStrengthScore = Math.round(
+        (doc.liquidityScore * 0.3) +
+        (doc.profitabilityScore * 0.4) +
+        (doc.leverageScore * 0.3)
+    );
+
+    return doc;
+}
 
 /**
  * Get industry benchmarks (placeholder - would need industry data)
+ * @param {string} industry - Industry identifier
+ * @returns {Object} Industry benchmarks
  */
-financialMetricsSchema.methods.getIndustryBenchmarks = function(industry) {
-  // This would typically fetch from an industry benchmarks database
-  // For now, return generic benchmarks
-  return {
-    currentRatio: { median: 2.0, q1: 1.5, q3: 2.5 },
-    quickRatio: { median: 1.2, q1: 0.8, q3: 1.6 },
-    debtToEquity: { median: 0.6, q1: 0.3, q3: 1.0 },
-    netProfitMargin: { median: 0.08, q1: 0.05, q3: 0.12 },
-    returnOnAssets: { median: 0.07, q1: 0.04, q3: 0.11 },
-    returnOnEquity: { median: 0.12, q1: 0.08, q3: 0.18 }
-  };
-};
-
-/**
- * Compare metrics to benchmarks
- */
-financialMetricsSchema.methods.compareToBenchmarks = function(benchmarks) {
-  const comparison = {};
-  
-  if (this.liquidityRatios && benchmarks.currentRatio) {
-    comparison.currentRatio = {
-      value: this.liquidityRatios.currentRatio,
-      percentile: this.calculatePercentile(this.liquidityRatios.currentRatio, benchmarks.currentRatio),
-      status: this.liquidityRatios.currentRatio >= benchmarks.currentRatio.median ? 'above' : 'below'
+function getIndustryBenchmarks(industry) {
+    // This would typically fetch from an industry benchmarks database
+    // For now, return generic benchmarks
+    return {
+        currentRatio: { median: 2.0, q1: 1.5, q3: 2.5 },
+        quickRatio: { median: 1.2, q1: 0.8, q3: 1.6 },
+        debtToEquity: { median: 0.6, q1: 0.3, q3: 1.0 },
+        netProfitMargin: { median: 0.08, q1: 0.05, q3: 0.12 },
+        returnOnAssets: { median: 0.07, q1: 0.04, q3: 0.11 },
+        returnOnEquity: { median: 0.12, q1: 0.08, q3: 0.18 }
     };
-  }
-  
-  // Add similar comparisons for other metrics...
-  
-  return comparison;
-};
+}
 
 /**
  * Calculate percentile rank
+ * @param {number} value - Value to rank
+ * @param {Object} benchmark - Benchmark with q1, median, q3
+ * @returns {number} Percentile rank
  */
-financialMetricsSchema.methods.calculatePercentile = function(value, benchmark) {
-  if (value >= benchmark.q3) return 75;
-  if (value >= benchmark.median) return 50;
-  if (value >= benchmark.q1) return 25;
-  return 10;
-};
+function calculatePercentile(value, benchmark) {
+    if (value >= benchmark.q3) return 75;
+    if (value >= benchmark.median) return 50;
+    if (value >= benchmark.q1) return 25;
+    return 10;
+}
+
+/**
+ * Compare metrics to benchmarks
+ * @param {Object} doc - Financial metrics document
+ * @param {Object} benchmarks - Industry benchmarks
+ * @returns {Object} Comparison results
+ */
+function compareToBenchmarks(doc, benchmarks) {
+    const comparison = {};
+
+    if (doc.liquidityRatios && benchmarks.currentRatio) {
+        comparison.currentRatio = {
+            value: doc.liquidityRatios.currentRatio,
+            percentile: calculatePercentile(doc.liquidityRatios.currentRatio, benchmarks.currentRatio),
+            status: doc.liquidityRatios.currentRatio >= benchmarks.currentRatio.median ? 'above' : 'below'
+        };
+    }
+
+    // Add similar comparisons for other metrics...
+
+    return comparison;
+}
 
 /**
  * Identify potential red flags
+ * @param {Object} doc - Financial metrics document
+ * @returns {Array} Array of red flag messages
  */
-financialMetricsSchema.methods.identifyRedFlags = function() {
-  const redFlags = [];
-  
-  if (this.liquidityRatios?.currentRatio < 1.0) {
-    redFlags.push('Current ratio below 1.0 indicates potential liquidity issues');
-  }
-  
-  if (this.leverageRatios?.debtToEquity > 2.0) {
-    redFlags.push('High debt-to-equity ratio indicates high financial leverage');
-  }
-  
-  if (this.profitabilityRatios?.netProfitMargin < 0) {
-    redFlags.push('Negative profit margin indicates losses');
-  }
-  
-  if (this.cashFlowMetrics?.freeCashFlow < 0) {
-    redFlags.push('Negative free cash flow indicates cash generation issues');
-  }
-  
-  if (this.leverageRatios?.timesInterestEarned < 2.0) {
-    redFlags.push('Low interest coverage ratio indicates difficulty servicing debt');
-  }
-  
-  return redFlags;
-};
+function identifyRedFlags(doc) {
+    const redFlags = [];
 
-/**
- * Pre-save hook to calculate scores
- */
-financialMetricsSchema.pre('save', function(next) {
-  this.calculateScores();
-  next();
-});
-
-/**
- * Static method to get metrics history
- */
-financialMetricsSchema.statics.getHistory = async function(companyId, periods = 8) {
-  return this.find({ companyId })
-    .sort({ reportingDate: -1 })
-    .limit(periods);
-};
-
-/**
- * Static method to calculate trend analysis
- */
-financialMetricsSchema.statics.getTrendAnalysis = async function(companyId, metric, periods = 4) {
-  const metrics = await this.find({ companyId })
-    .sort({ reportingDate: -1 })
-    .limit(periods)
-    .select(`reportingDate reportingPeriod ${metric}`);
-  
-  if (metrics.length < 2) return null;
-  
-  const values = metrics.reverse().map(m => {
-    const keys = metric.split('.');
-    let value = m;
-    for (const key of keys) {
-      value = value[key];
-      if (value === undefined) return null;
+    if (doc.liquidityRatios?.currentRatio < 1.0) {
+        redFlags.push('Current ratio below 1.0 indicates potential liquidity issues');
     }
-    return value;
-  }).filter(v => v !== null);
-  
-  if (values.length < 2) return null;
-  
-  // Calculate trend
-  const firstValue = values[0];
-  const lastValue = values[values.length - 1];
-  const growthRate = (lastValue - firstValue) / firstValue;
-  
-  return {
-    values,
-    growthRate,
-    trend: growthRate > 0.05 ? 'increasing' : growthRate < -0.05 ? 'decreasing' : 'stable'
-  };
+
+    if (doc.leverageRatios?.debtToEquity > 2.0) {
+        redFlags.push('High debt-to-equity ratio indicates high financial leverage');
+    }
+
+    if (doc.profitabilityRatios?.netProfitMargin < 0) {
+        redFlags.push('Negative profit margin indicates losses');
+    }
+
+    if (doc.cashFlowMetrics?.freeCashFlow < 0) {
+        redFlags.push('Negative free cash flow indicates cash generation issues');
+    }
+
+    if (doc.leverageRatios?.timesInterestEarned < 2.0) {
+        redFlags.push('Low interest coverage ratio indicates difficulty servicing debt');
+    }
+
+    return redFlags;
+}
+
+// Extended model with custom methods
+const FinancialMetrics = {
+    ...baseModel,
+
+    /**
+     * Create new financial metrics with score calculation
+     * @param {Object} data - Financial metrics data
+     * @returns {Object} Created financial metrics
+     */
+    async create(data) {
+        // Set document type for identification in shared table
+        data.documentType = 'financial_metrics';
+
+        // Calculate scores before saving
+        calculateScores(data);
+
+        // Set calculation timestamp if not provided
+        if (!data.calculatedAt) {
+            data.calculatedAt = new Date().toISOString();
+        }
+
+        return baseModel.create(data);
+    },
+
+    /**
+     * Update financial metrics with score recalculation
+     * @param {Object} query - Query filter
+     * @param {Object} update - Update data
+     * @param {Object} options - Update options
+     * @returns {Object} Updated financial metrics
+     */
+    async findOneAndUpdate(query, update, options = {}) {
+        const updateData = update.$set || update;
+
+        // If updating ratio data, recalculate scores
+        if (updateData.liquidityRatios || updateData.profitabilityRatios ||
+            updateData.leverageRatios) {
+
+            // Fetch current document to merge with updates
+            const existing = await baseModel.findOne(query);
+            if (existing) {
+                const merged = { ...existing, ...updateData };
+                calculateScores(merged);
+
+                // Copy calculated fields to update
+                updateData.liquidityScore = merged.liquidityScore;
+                updateData.profitabilityScore = merged.profitabilityScore;
+                updateData.leverageScore = merged.leverageScore;
+                updateData.financialStrengthScore = merged.financialStrengthScore;
+            }
+        }
+
+        return baseModel.findOneAndUpdate(query, { $set: updateData }, options);
+    },
+
+    /**
+     * Get financial metrics with red flags and benchmarks
+     * @param {string} id - Financial metrics ID
+     * @param {string} industry - Industry for benchmarks (optional)
+     * @returns {Object} Financial metrics with analysis
+     */
+    async findByIdWithAnalysis(id, industry = null) {
+        const doc = await baseModel.findById(id);
+        if (!doc) return null;
+
+        const benchmarks = getIndustryBenchmarks(industry);
+
+        return {
+            ...doc,
+            redFlags: identifyRedFlags(doc),
+            benchmarkComparison: compareToBenchmarks(doc, benchmarks),
+            benchmarks
+        };
+    },
+
+    /**
+     * Get metrics history for a company
+     * @param {string} companyId - Company ID
+     * @param {number} periods - Number of periods to retrieve
+     * @returns {Array} Financial metrics history
+     */
+    async getHistory(companyId, periods = 8) {
+        return baseModel.find(
+            { companyId, documentType: 'financial_metrics' },
+            { sort: { reportingDate: -1 }, limit: periods }
+        );
+    },
+
+    /**
+     * Calculate trend analysis for a specific metric
+     * @param {string} companyId - Company ID
+     * @param {string} metric - Metric path (e.g., 'liquidityRatios.currentRatio')
+     * @param {number} periods - Number of periods to analyze
+     * @returns {Object} Trend analysis results
+     */
+    async getTrendAnalysis(companyId, metric, periods = 4) {
+        const metrics = await baseModel.find(
+            { companyId, documentType: 'financial_metrics' },
+            { sort: { reportingDate: -1 }, limit: periods }
+        );
+
+        if (metrics.length < 2) return null;
+
+        const values = metrics.reverse().map(m => {
+            const keys = metric.split('.');
+            let value = m;
+            for (const key of keys) {
+                value = value?.[key];
+                if (value === undefined) return null;
+            }
+            return value;
+        }).filter(v => v !== null);
+
+        if (values.length < 2) return null;
+
+        // Calculate trend
+        const firstValue = values[0];
+        const lastValue = values[values.length - 1];
+        const growthRate = (lastValue - firstValue) / firstValue;
+
+        return {
+            values,
+            growthRate,
+            trend: growthRate > 0.05 ? 'increasing' : growthRate < -0.05 ? 'decreasing' : 'stable'
+        };
+    },
+
+    /**
+     * Find financial metrics by company
+     * @param {Object} query - Query filter
+     * @param {Object} options - Query options
+     * @returns {Array} Financial metrics
+     */
+    async find(query = {}, options = {}) {
+        query.documentType = 'financial_metrics';
+        return baseModel.find(query, options);
+    },
+
+    /**
+     * Find one financial metrics document
+     * @param {Object} query - Query filter
+     * @param {Object} options - Query options
+     * @returns {Object} Financial metrics
+     */
+    async findOne(query = {}, options = {}) {
+        query.documentType = 'financial_metrics';
+        return baseModel.findOne(query, options);
+    },
+
+    // Expose utility functions
+    calculateScores,
+    getIndustryBenchmarks,
+    compareToBenchmarks,
+    calculatePercentile,
+    identifyRedFlags
 };
 
-module.exports = mongoose.model('FinancialMetrics', financialMetricsSchema);
+module.exports = FinancialMetrics;

@@ -2,7 +2,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const fs = require("fs");
-const { connectToMongoDB, closeMongoDBConnection, getMongoose } = require('./db/mongoConnection');
+const { connectToMongoDB } = require('./db/mongoConnection');
 const zerodbService = require('./services/zerodbService');
 const { addVersionHeaders, createVersionedRoutes, validateApiVersion } = require('./middleware/apiVersioning');
 const compression = require('compression');
@@ -602,7 +602,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
   });
 
-  // Graceful shutdown handler (GitHub Issue #14, Issue #175)
+  // Graceful shutdown handler (GitHub Issue #14)
   const gracefulShutdown = async (signal) => {
     console.log(`\n${signal} received, starting graceful shutdown...`);
 
@@ -618,12 +618,8 @@ if (process.env.NODE_ENV !== 'test') {
         await mongoChangeStreamListener.stopAll();
       }
 
-      // Close database connections (Issue #175: Use conditional mongoose access)
-      const mongoose = getMongoose();
-      if (mongoose && mongoose.connection.readyState === 1) {
-        console.log('Closing MongoDB connection...');
-        await closeMongoDBConnection();
-      }
+      // Note: ZeroDB uses HTTP API, no persistent connection to close
+      console.log('Database connections handled (ZeroDB uses stateless HTTP API)');
 
       console.log('Graceful shutdown complete');
       process.exit(0);
