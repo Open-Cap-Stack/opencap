@@ -20,6 +20,7 @@ router.delete('/vesting-schedules/:id', vestingScheduleController.deleteVestingS
 router.get('/vesting-schedules/:id/calculate', vestingScheduleController.calculateVesting);
 router.get('/vesting-schedules/:id/timeline', vestingScheduleController.getVestingTimeline);
 router.get('/vesting-schedules/:id/visualization', vestingScheduleController.getVisualizationData);
+router.get('/vesting-schedules/:id/upcoming', vestingScheduleController.getUpcomingVestingEvents);
 
 // Acceleration
 router.post('/vesting-schedules/:id/accelerate', vestingScheduleController.applyAcceleration);

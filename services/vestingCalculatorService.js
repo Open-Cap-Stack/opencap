@@ -406,6 +406,200 @@ class VestingCalculatorService {
     };
   }
 
+  /**
+   * Get the next N upcoming vesting events from a given date
+   * @param {Object} schedule - Vesting schedule object
+   * @param {Date} fromDate - Date to calculate events from
+   * @param {number} count - Number of events to return (default: 10)
+   * @returns {Array} Array of upcoming vesting events
+   */
+  static getUpcomingVestingEvents(schedule, fromDate = new Date(), count = 10) {
+    const events = [];
+    let currentDate = new Date(fromDate);
+
+    // Get the first event
+    let nextEvent = this.getNextVestingEvent(schedule, currentDate);
+
+    while (nextEvent && events.length < count) {
+      events.push(nextEvent);
+      // Move to the day after the event to find the next one
+      currentDate = new Date(nextEvent.eventDate);
+      currentDate.setDate(currentDate.getDate() + 1);
+      nextEvent = this.getNextVestingEvent(schedule, currentDate);
+    }
+
+    return events;
+  }
+
+  /**
+   * Process a vesting event and calculate updated share counts
+   * @param {Object} schedule - Vesting schedule object
+   * @param {Date} eventDate - Date of the vesting event
+   * @returns {Object} Processed event result
+   */
+  static processVestingEvent(schedule, eventDate = new Date()) {
+    const previousVestedShares = schedule.vestedShares || 0;
+    const vestingResult = this.calculateVestedShares(schedule, eventDate);
+
+    const newVestedShares = vestingResult.vestedShares;
+    const sharesVestedInEvent = newVestedShares - previousVestedShares;
+
+    // Determine event type
+    let eventType = 'periodic';
+    if (!vestingResult.cliffReached) {
+      eventType = 'none'; // Before cliff
+    } else if (previousVestedShares === 0 && newVestedShares > 0) {
+      eventType = 'cliff';
+    }
+
+    return {
+      scheduleId: schedule.scheduleId,
+      eventDate,
+      eventType,
+      previousVestedShares,
+      newVestedShares,
+      sharesVestedInEvent,
+      unvestedShares: schedule.totalShares - newVestedShares,
+      vestingPercentage: vestingResult.vestingPercentage,
+      isComplete: newVestedShares >= schedule.totalShares
+    };
+  }
+
+  /**
+   * Handle acceleration triggers for a vesting schedule
+   * @param {Object} schedule - Vesting schedule object
+   * @param {Object} triggerData - Acceleration trigger data
+   * @returns {Object} Acceleration result
+   */
+  static handleAcceleration(schedule, triggerData) {
+    const { triggerType, event, effectiveDate, changeOfControlDate, terminationDate, terminationType } = triggerData;
+    const { accelerationTerms, totalShares, vestedShares = 0 } = schedule;
+
+    // Check if acceleration terms exist
+    if (!accelerationTerms) {
+      return {
+        accelerated: false,
+        reason: 'No acceleration terms defined',
+        scheduleId: schedule.scheduleId
+      };
+    }
+
+    const currentVesting = this.calculateVestedShares(schedule, effectiveDate);
+    const currentVestedShares = currentVesting.vestedShares;
+    const unvestedShares = totalShares - currentVestedShares;
+
+    // Handle single trigger acceleration
+    if (triggerType === 'single_trigger') {
+      if (!accelerationTerms.singleTrigger?.enabled) {
+        return {
+          accelerated: false,
+          reason: 'Single trigger acceleration not enabled',
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      const allowedEvents = accelerationTerms.singleTrigger.events || ['change_of_control', 'ipo', 'merger', 'acquisition'];
+      if (!allowedEvents.includes(event)) {
+        return {
+          accelerated: false,
+          reason: `Event '${event}' not eligible for single trigger acceleration`,
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      const accelerationPercentage = accelerationTerms.singleTrigger.accelerationPercentage || 100;
+      const acceleratedShares = Math.floor((accelerationPercentage / 100) * unvestedShares);
+      const newTotalVested = currentVestedShares + acceleratedShares;
+
+      return {
+        accelerated: true,
+        accelerationType: 'single_trigger',
+        event,
+        effectiveDate,
+        previousVestedShares: currentVestedShares,
+        acceleratedShares,
+        newTotalVested,
+        remainingUnvested: totalShares - newTotalVested,
+        accelerationPercentage,
+        scheduleId: schedule.scheduleId
+      };
+    }
+
+    // Handle double trigger acceleration
+    if (triggerType === 'double_trigger') {
+      if (!accelerationTerms.doubleTrigger?.enabled) {
+        return {
+          accelerated: false,
+          reason: 'Double trigger acceleration not enabled',
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      // Verify both conditions are met
+      if (!changeOfControlDate || !terminationDate || !terminationType) {
+        return {
+          accelerated: false,
+          reason: 'Double trigger requires change of control date, termination date, and termination type',
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      // Check if termination type qualifies
+      const qualifyingTerminations = accelerationTerms.doubleTrigger.terminationTypes || [
+        'involuntary_without_cause',
+        'constructive_termination',
+        'good_reason'
+      ];
+      if (!qualifyingTerminations.includes(terminationType)) {
+        return {
+          accelerated: false,
+          reason: `Termination type '${terminationType}' does not qualify for double trigger acceleration`,
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      // Check if termination is within the window period
+      const windowMonths = accelerationTerms.doubleTrigger.windowPeriodMonths || 12;
+      const cocDate = new Date(changeOfControlDate);
+      const termDate = new Date(terminationDate);
+      const monthsDiff = this._calculateMonthsElapsed(cocDate, termDate);
+
+      if (monthsDiff > windowMonths) {
+        return {
+          accelerated: false,
+          reason: `Termination occurred ${monthsDiff} months after change of control, outside ${windowMonths} month window`,
+          scheduleId: schedule.scheduleId
+        };
+      }
+
+      const accelerationPercentage = accelerationTerms.doubleTrigger.accelerationPercentage || 100;
+      const acceleratedShares = Math.floor((accelerationPercentage / 100) * unvestedShares);
+      const newTotalVested = currentVestedShares + acceleratedShares;
+
+      return {
+        accelerated: true,
+        accelerationType: 'double_trigger',
+        event,
+        changeOfControlDate,
+        terminationDate,
+        terminationType,
+        effectiveDate,
+        previousVestedShares: currentVestedShares,
+        acceleratedShares,
+        newTotalVested,
+        remainingUnvested: totalShares - newTotalVested,
+        accelerationPercentage,
+        scheduleId: schedule.scheduleId
+      };
+    }
+
+    return {
+      accelerated: false,
+      reason: `Unknown trigger type: ${triggerType}`,
+      scheduleId: schedule.scheduleId
+    };
+  }
+
   // Private helper methods
 
   /**

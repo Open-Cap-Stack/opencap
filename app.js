@@ -265,6 +265,13 @@ const routes = {
   investorCommunicationRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorCommunicationRoutes')), // Issue #91: Investor Communication System
   messageTriggerRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageTriggerRoutes')), // Issue #88: Automated Triggered Messages
   securityIssuanceRoutes: safeRequire(path.join(__dirname, 'routes/v1/securityIssuanceRoutes')), // Issue #76: Security Issuances Register
+  vestingScheduleRoutes: safeRequire(path.join(__dirname, 'routes/v1/vestingScheduleRoutes')), // Issue #78: Automated Vesting Schedules
+  equityPlanReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/equityPlanReportRoutes')), // Issue #110: Equity Plan Reports
+  financialAnalyticsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialAnalyticsRoutes')), // Issue #44: Financial Analytics
+  riskAssessmentRoutes: safeRequire(path.join(__dirname, 'routes/v1/riskAssessmentRoutes')), // Issue #44: Risk Assessment
+  currencyRoutes: safeRequire(path.join(__dirname, 'routes/v1/currencyRoutes')), // Issue #44: Currency Service
+  waterfallAnalysisRoutes: safeRequire(path.join(__dirname, 'routes/v1/waterfallAnalysisRoutes')), // Issue #56: Waterfall Analysis Engine
+  documentAuditRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentAuditRoutes')), // Issue #102: Document Audit Trail
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -363,6 +370,20 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/message-triggers';
     } else if (key === 'securityIssuanceRoutes') {
       path = '/api/v1/security-issuances';
+    } else if (key === 'vestingScheduleRoutes') {
+      path = '/api/v1';
+    } else if (key === 'equityPlanReportRoutes') {
+      path = '/api/v1/equity-plan-reports';
+    } else if (key === 'financialAnalyticsRoutes') {
+      path = '/api/v1/financial-analytics';
+    } else if (key === 'riskAssessmentRoutes') {
+      path = '/api/v1/risk-assessment';
+    } else if (key === 'currencyRoutes') {
+      path = '/api/v1/currency';
+    } else if (key === 'waterfallAnalysisRoutes') {
+      path = '/api/v1'; // Routes already have /waterfall-analyses prefix
+    } else if (key === 'documentAuditRoutes') {
+      path = '/api/v1/audit'; // Issue #102: Document Audit Trail
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

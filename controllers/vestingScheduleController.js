@@ -356,3 +356,33 @@ exports.getSchedulesDueForVesting = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+/**
+ * Get upcoming vesting events for a schedule
+ */
+exports.getUpcomingVestingEvents = async (req, res) => {
+  try {
+    const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
+    if (!schedule) {
+      return res.status(404).json({ message: 'Vesting schedule not found' });
+    }
+
+    const count = req.query.count ? parseInt(req.query.count, 10) : 10;
+    const fromDate = req.query.from ? new Date(req.query.from) : new Date();
+
+    const upcomingEvents = VestingCalculatorService.getUpcomingVestingEvents(
+      schedule,
+      fromDate,
+      count
+    );
+
+    res.status(200).json({
+      scheduleId: schedule.scheduleId,
+      fromDate: fromDate.toISOString(),
+      count,
+      upcomingEvents
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

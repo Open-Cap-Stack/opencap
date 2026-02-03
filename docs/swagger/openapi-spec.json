@@ -398,6 +398,128 @@
           }
         }
       },
+      "SecurityIssuance": {
+        "type": "object",
+        "required": [
+          "issuanceId",
+          "companyId",
+          "securityType",
+          "stakeholderId",
+          "numberOfShares",
+          "pricePerShare",
+          "issuanceDate"
+        ],
+        "properties": {
+          "issuanceId": {
+            "type": "string",
+            "description": "Unique identifier for the issuance"
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Company ID"
+          },
+          "securityType": {
+            "type": "string",
+            "enum": [
+              "common_stock",
+              "preferred_stock",
+              "convertible_note",
+              "safe",
+              "warrant",
+              "option",
+              "restricted_stock",
+              "rsu"
+            ]
+          },
+          "shareClassId": {
+            "type": "string",
+            "description": "Share class ID"
+          },
+          "stakeholderId": {
+            "type": "string",
+            "description": "Stakeholder receiving the securities"
+          },
+          "numberOfShares": {
+            "type": "number",
+            "description": "Number of shares issued"
+          },
+          "pricePerShare": {
+            "type": "number",
+            "description": "Price per share"
+          },
+          "issuanceDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of issuance"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "issued",
+              "cancelled",
+              "transferred",
+              "exercised",
+              "converted"
+            ]
+          },
+          "exemptionType": {
+            "type": "string",
+            "enum": [
+              "rule_701",
+              "regulation_d_506b",
+              "regulation_d_506c",
+              "regulation_a",
+              "regulation_cf",
+              "section_4a2",
+              "intrastate",
+              "other"
+            ]
+          },
+          "complianceStatus": {
+            "type": "string",
+            "enum": [
+              "compliant",
+              "pending_review",
+              "non_compliant",
+              "remediation_required"
+            ]
+          }
+        }
+      },
+      "StateFiling": {
+        "type": "object",
+        "required": [
+          "stateCode"
+        ],
+        "properties": {
+          "stateCode": {
+            "type": "string",
+            "description": "Two-letter state code (e.g., CA, NY)"
+          },
+          "filingStatus": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "filed",
+              "overdue",
+              "exempt"
+            ]
+          },
+          "filingDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "filingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "exemptionClaimed": {
+            "type": "string"
+          }
+        }
+      },
       "Document": {
         "type": "object",
         "properties": {
@@ -1824,6 +1946,439 @@
         }
       }
     },
+    "/api/v1/email-tracking": {
+      "post": {
+        "summary": "Create email tracking record",
+        "tags": [
+          "Email Tracking"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "messageId",
+                  "recipientEmail",
+                  "senderEmail",
+                  "subject"
+                ],
+                "properties": {
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "recipientEmail": {
+                    "type": "string"
+                  },
+                  "senderEmail": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "templateId": {
+                    "type": "string"
+                  },
+                  "companyId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tracking record created"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      },
+      "get": {
+        "summary": "List email tracking records",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "sent",
+                "delivered",
+                "opened",
+                "clicked",
+                "bounced",
+                "failed",
+                "spam",
+                "unsubscribed"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "templateId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tracking records"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/analytics": {
+      "get": {
+        "summary": "Get email analytics",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "template",
+                "date"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email analytics data"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/engagement": {
+      "get": {
+        "summary": "Get engagement report",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Engagement report"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/bounced": {
+      "get": {
+        "summary": "Get bounced emails",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of bounced emails"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/suppressed": {
+      "get": {
+        "summary": "Get suppressed emails",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of suppressed emails"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/suppression/{email}": {
+      "get": {
+        "summary": "Check if email is suppressed",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suppression status"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove email from suppression list",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suppression removed"
+          },
+          "404": {
+            "description": "Email not found in suppression list"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/pixel/{trackingId}": {
+      "get": {
+        "summary": "Tracking pixel endpoint (records email open)",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trackingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns 1x1 transparent GIF",
+            "content": {
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/click/{trackingId}": {
+      "get": {
+        "summary": "Click tracking endpoint (records click and redirects)",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trackingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "url",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to original URL"
+          },
+          "400": {
+            "description": "Missing URL parameter"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/webhook/{provider}": {
+      "post": {
+        "summary": "Webhook endpoint for email providers",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sendgrid",
+                "mailgun",
+                "ses",
+                "postmark",
+                "sparkpost"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed"
+          },
+          "400": {
+            "description": "Unsupported provider"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/message/{messageId}": {
+      "get": {
+        "summary": "Get tracking record by message ID",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking record"
+          },
+          "404": {
+            "description": "Record not found"
+          }
+        }
+      }
+    },
+    "/api/v1/email-tracking/{id}": {
+      "get": {
+        "summary": "Get tracking record by ID",
+        "tags": [
+          "Email Tracking"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking record"
+          },
+          "404": {
+            "description": "Record not found"
+          }
+        }
+      }
+    },
     "/api/v1/files": {
       "post": {
         "summary": "Upload a file",
@@ -2921,6 +3476,676 @@
         }
       }
     },
+    "/api/v1/material-events": {
+      "post": {
+        "summary": "Create a new material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId",
+                  "eventType",
+                  "description"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "eventType": {
+                    "type": "string",
+                    "enum": [
+                      "fundraising_round",
+                      "significant_transaction",
+                      "key_employee_departure",
+                      "key_employee_hire",
+                      "acquisition_offer",
+                      "merger_discussion",
+                      "major_customer_change",
+                      "major_product_launch",
+                      "significant_revenue_change",
+                      "litigation",
+                      "regulatory_change",
+                      "market_condition_change",
+                      "ipo_preparation",
+                      "secondary_transaction",
+                      "other"
+                    ]
+                  },
+                  "eventDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "triggersValuation": {
+                    "type": "boolean"
+                  },
+                  "impactSeverity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high",
+                      "critical"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/action-required": {
+      "get": {
+        "summary": "Get events requiring action",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by company (optional)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of events requiring action"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/valuation-triggers": {
+      "get": {
+        "summary": "Get events that trigger 409A valuation",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by company (optional)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of valuation trigger events"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/detect/fundraising-round": {
+      "post": {
+        "summary": "Auto-detect material event from fundraising round",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "closedDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event detected and created"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/detect/employee-change": {
+      "post": {
+        "summary": "Auto-detect material event from employee change",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "employeeData",
+                  "changeType"
+                ],
+                "properties": {
+                  "employeeData": {
+                    "type": "object",
+                    "properties": {
+                      "companyId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "changeType": {
+                    "type": "string",
+                    "enum": [
+                      "departure",
+                      "hire"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event detected and created"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/company/{companyId}": {
+      "get": {
+        "summary": "Get all material events for a company",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eventType",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "triggersValuation",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of material events"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/company/{companyId}/summary": {
+      "get": {
+        "summary": "Get material event summary for a company",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event summary"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/company/{companyId}/compliance-dashboard": {
+      "get": {
+        "summary": "Get compliance dashboard data for a company",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compliance dashboard data"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}": {
+      "get": {
+        "summary": "Get a specific material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event details"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event updated"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/acknowledge": {
+      "post": {
+        "summary": "Acknowledge a material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event acknowledged"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/action-required": {
+      "post": {
+        "summary": "Mark event as action required",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "assignedTo": {
+                          "type": "string"
+                        },
+                        "dueDate": {
+                          "type": "string",
+                          "format": "date"
+                        }
+                      }
+                    }
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event marked as action required"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/resolve": {
+      "post": {
+        "summary": "Resolve a material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "notes": {
+                    "type": "string"
+                  },
+                  "valuationRequestId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event resolved"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/dismiss": {
+      "post": {
+        "summary": "Dismiss a material event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event dismissed"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/action-items": {
+      "post": {
+        "summary": "Add action item to event",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "assignedTo": {
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action item added"
+          }
+        }
+      }
+    },
+    "/api/v1/material-events/{eventId}/action-items/{actionItemId}/complete": {
+      "post": {
+        "summary": "Complete an action item",
+        "tags": [
+          "Material Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "actionItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action item completed"
+          }
+        }
+      }
+    },
     "/api/v1/security-audits": {
       "get": {
         "tags": [
@@ -3199,6 +4424,370 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances": {
+      "get": {
+        "summary": "Get all security issuances",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by company ID"
+          },
+          {
+            "in": "query",
+            "name": "securityType",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by security type"
+          },
+          {
+            "in": "query",
+            "name": "exemptionType",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by exemption type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of security issuances"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new security issuance",
+        "tags": [
+          "Security Issuances"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityIssuance"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Security issuance created successfully"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/compliance": {
+      "get": {
+        "summary": "Get compliance status for a company's issuances",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compliance status summary"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/overdue": {
+      "get": {
+        "summary": "Get overdue filings",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of overdue filings"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/deadlines": {
+      "get": {
+        "summary": "Get upcoming filing deadlines",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "daysAhead",
+            "schema": {
+              "type": "integer",
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of upcoming deadlines"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/exemption/{exemptionType}": {
+      "get": {
+        "summary": "Get issuances by exemption type",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "exemptionType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of issuances"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/state-requirements": {
+      "get": {
+        "summary": "Get state filing requirements",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "exemptionType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "states",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated list of state codes"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State filing requirements"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/{id}": {
+      "get": {
+        "summary": "Get security issuance by ID",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Security issuance details"
+          },
+          "404": {
+            "description": "Security issuance not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update security issuance",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityIssuance"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Security issuance updated"
+          },
+          "404": {
+            "description": "Security issuance not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete security issuance",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Security issuance deleted"
+          },
+          "404": {
+            "description": "Security issuance not found"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/{id}/state-filings": {
+      "post": {
+        "summary": "Add state filing to an issuance",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateFiling"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "State filing added"
+          },
+          "404": {
+            "description": "Security issuance not found"
+          }
+        }
+      }
+    },
+    "/api/v1/security-issuances/{id}/state-filings/{stateCode}": {
+      "put": {
+        "summary": "Update state filing",
+        "tags": [
+          "Security Issuances"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stateCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateFiling"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "State filing updated"
+          },
+          "404": {
+            "description": "Security issuance or state filing not found"
           }
         }
       }
@@ -3809,6 +5398,1885 @@
           },
           "500": {
             "description": "Server error"
+          }
+        }
+      }
+    },
+    "/terminations": {
+      "post": {
+        "summary": "Create a new termination record",
+        "tags": [
+          "Terminations"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "employeeId",
+                  "companyId",
+                  "terminationDate",
+                  "terminationType"
+                ],
+                "properties": {
+                  "employeeId": {
+                    "type": "string"
+                  },
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "terminationDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "terminationType": {
+                    "type": "string",
+                    "enum": [
+                      "voluntary",
+                      "involuntary",
+                      "for_cause",
+                      "layoff",
+                      "retirement",
+                      "death",
+                      "disability"
+                    ]
+                  },
+                  "grants": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Termination created successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get all terminations for a company",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "terminationType",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of terminations"
+          }
+        }
+      }
+    },
+    "/terminations/calculate-vesting": {
+      "post": {
+        "summary": "Calculate vesting for given parameters (preview)",
+        "tags": [
+          "Terminations"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grantDate",
+                  "terminationDate",
+                  "totalGrantedShares",
+                  "vestingSchedule"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vesting calculation result"
+          }
+        }
+      }
+    },
+    "/terminations/expiring-windows": {
+      "get": {
+        "summary": "Get terminations with expiring exercise windows",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "daysUntilExpiry",
+            "schema": {
+              "type": "integer",
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of terminations with expiring windows"
+          }
+        }
+      }
+    },
+    "/terminations/{id}": {
+      "get": {
+        "summary": "Get a termination by ID",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Termination details"
+          },
+          "404": {
+            "description": "Termination not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a termination record",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Termination updated"
+          },
+          "404": {
+            "description": "Termination not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a termination record",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Termination deleted"
+          },
+          "404": {
+            "description": "Termination not found"
+          }
+        }
+      }
+    },
+    "/terminations/{id}/exercise-window": {
+      "get": {
+        "summary": "Get exercise window status",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exercise window status"
+          }
+        }
+      }
+    },
+    "/terminations/{id}/extend-window": {
+      "post": {
+        "summary": "Extend exercise window",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "additionalDays"
+                ],
+                "properties": {
+                  "additionalDays": {
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "approvedBy": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exercise window extended"
+          },
+          "400": {
+            "description": "Cannot extend expired window"
+          }
+        }
+      }
+    },
+    "/terminations/{id}/exercise": {
+      "post": {
+        "summary": "Record share exercise",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "shares",
+                  "exercisePrice"
+                ],
+                "properties": {
+                  "shares": {
+                    "type": "integer"
+                  },
+                  "exercisePrice": {
+                    "type": "number"
+                  },
+                  "fmvAtExercise": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exercise recorded"
+          },
+          "400": {
+            "description": "Exercise window expired or insufficient shares"
+          }
+        }
+      }
+    },
+    "/terminations/{id}/documents": {
+      "post": {
+        "summary": "Generate termination documents",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documents generated"
+          },
+          "404": {
+            "description": "Termination not found"
+          }
+        }
+      }
+    },
+    "/terminations/{id}/update-status": {
+      "post": {
+        "summary": "Update termination status (check for expired windows)",
+        "tags": [
+          "Terminations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          },
+          "404": {
+            "description": "Termination not found"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations": {
+      "post": {
+        "summary": "Create a new 409A valuation request",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId",
+                  "reason"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "annual_valuation",
+                      "fundraising_round",
+                      "material_event",
+                      "option_grant",
+                      "board_request",
+                      "audit_requirement",
+                      "other"
+                    ]
+                  },
+                  "reasonDetails": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Valuation request created"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/expiring": {
+      "get": {
+        "summary": "Get valuations expiring soon",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "type": "integer",
+              "default": 60
+            },
+            "description": "Number of days threshold"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of expiring valuations"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/process-expired": {
+      "post": {
+        "summary": "Process and mark expired valuations",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expired valuations processed"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}": {
+      "get": {
+        "summary": "Get all valuations for a company",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of valuations"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/current": {
+      "get": {
+        "summary": "Get current active valuation for a company",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current valuation"
+          },
+          "404": {
+            "description": "No current valuation found"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/history": {
+      "get": {
+        "summary": "Get valuation history for a company",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation history"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/summary": {
+      "get": {
+        "summary": "Get valuation summary for a company",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation summary"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}": {
+      "get": {
+        "summary": "Get a specific valuation",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation details"
+          },
+          "404": {
+            "description": "Valuation not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a valuation request",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Valuation updated"
+          },
+          "400": {
+            "description": "Cannot update valuation in current status"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/assign-firm": {
+      "post": {
+        "summary": "Assign a valuation firm",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "contactName": {
+                    "type": "string"
+                  },
+                  "contactEmail": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Firm assigned"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/receive-draft": {
+      "post": {
+        "summary": "Record receipt of draft valuation report",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fairMarketValue": {
+                    "type": "number"
+                  },
+                  "valuationMethod": {
+                    "type": "string",
+                    "enum": [
+                      "income",
+                      "market",
+                      "asset",
+                      "hybrid",
+                      "other"
+                    ]
+                  },
+                  "effectiveDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Draft received"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/start-review": {
+      "post": {
+        "summary": "Start review of draft valuation",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review started"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/approve": {
+      "post": {
+        "summary": "Approve a valuation",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Valuation approved"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/cancel": {
+      "post": {
+        "summary": "Cancel a valuation request",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Valuation cancelled"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/documents": {
+      "post": {
+        "summary": "Add a document to a valuation",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "documentId",
+                  "type"
+                ],
+                "properties": {
+                  "documentId": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "valuation_report",
+                      "draft_report",
+                      "supporting_data",
+                      "board_approval",
+                      "other"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document added"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/{valuationId}/audit-trail": {
+      "get": {
+        "summary": "Get complete audit trail for a valuation",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "valuationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete audit trail with timeline, documents, and status history"
+          },
+          "404": {
+            "description": "Valuation not found"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/compliance/irs": {
+      "get": {
+        "summary": "Generate IRS 409A compliance report",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalYear",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Fiscal year for the report (defaults to current year)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IRS compliance report with requirement checklist"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/compliance/gaap": {
+      "get": {
+        "summary": "Generate GAAP ASC 718 compliance report",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalYear",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Fiscal year for the report (defaults to current year)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GAAP compliance report"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/audit-report": {
+      "get": {
+        "summary": "Generate comprehensive audit report",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalYear",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comprehensive audit report with IRS, GAAP compliance and history"
+          }
+        }
+      }
+    },
+    "/api/v1/valuations/company/{companyId}/audit-export": {
+      "get": {
+        "summary": "Export audit data for external systems",
+        "tags": [
+          "409A Valuations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json"
+              ]
+            },
+            "description": "Export format (defaults to json)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exported audit data"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners": {
+      "post": {
+        "summary": "Create a new valuation partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "valuation_firm",
+                      "accounting_firm",
+                      "independent_appraiser",
+                      "consulting_firm"
+                    ]
+                  },
+                  "contacts": {
+                    "type": "array"
+                  },
+                  "qualifications": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Partner created"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get all valuation partners",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of partners"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/search": {
+      "get": {
+        "summary": "Search valuation partners",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "minRating",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "specialization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxTurnaround",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/company/{companyId}/active": {
+      "get": {
+        "summary": "Get active partners for a company",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of active partners"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}": {
+      "get": {
+        "summary": "Get a specific partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partner details"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partner updated"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/summary": {
+      "get": {
+        "summary": "Get partner summary with metrics",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partner summary"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/activate": {
+      "post": {
+        "summary": "Activate a partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partner activated"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/deactivate": {
+      "post": {
+        "summary": "Deactivate a partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Partner deactivated"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/contacts": {
+      "post": {
+        "summary": "Add contact to partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact added"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/contacts/{contactId}/primary": {
+      "post": {
+        "summary": "Set primary contact",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "contactId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Primary contact set"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/calls": {
+      "post": {
+        "summary": "Schedule a call with partner",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "scheduledAt"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "duration": {
+                    "type": "integer"
+                  },
+                  "participants": {
+                    "type": "array"
+                  },
+                  "agenda": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Call scheduled"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/calls/upcoming": {
+      "get": {
+        "summary": "Get upcoming calls",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of upcoming calls"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/calls/{callId}/status": {
+      "put": {
+        "summary": "Update call status",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "callId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "confirmed",
+                      "completed",
+                      "cancelled",
+                      "rescheduled"
+                    ]
+                  },
+                  "meetingLink": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "newTime": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Call status updated"
+          }
+        }
+      }
+    },
+    "/api/v1/valuation-partners/{partnerId}/communications": {
+      "post": {
+        "summary": "Add communication record",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "call",
+                      "meeting",
+                      "message",
+                      "document_shared"
+                    ]
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Communication added"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get communication history",
+        "tags": [
+          "Valuation Partners"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partnerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Communication history"
           }
         }
       }
@@ -16725,8 +20193,28 @@
   },
   "tags": [
     {
+      "name": "Email Tracking",
+      "description": "Email delivery tracking and analytics"
+    },
+    {
+      "name": "Material Events",
+      "description": "Material event detection and tracking for 409A compliance"
+    },
+    {
       "name": "Sync Admin",
       "description": "Bidirectional sync management between MongoDB and ZeroDB"
+    },
+    {
+      "name": "Terminations",
+      "description": "Employee termination and equity management"
+    },
+    {
+      "name": "409A Valuations",
+      "description": "409A valuation request and management"
+    },
+    {
+      "name": "Valuation Partners",
+      "description": "Valuation specialist/firm integration and management"
     }
   ]
 }

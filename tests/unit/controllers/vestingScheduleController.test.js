@@ -418,4 +418,99 @@ describe('VestingSchedule Controller', () => {
       expect(res.statusCode).toBe(200);
     });
   });
+
+  describe('getUpcomingVestingEvents', () => {
+    it('should return upcoming vesting events', async () => {
+      req.params = { id: 'schedule123' };
+      const mockSchedule = {
+        _id: 'schedule123',
+        scheduleId: 'VS-001',
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 12,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'monthly'
+      };
+      databaseAdapter.findById.mockResolvedValue(mockSchedule);
+      VestingCalculatorService.getUpcomingVestingEvents = jest.fn().mockReturnValue([
+        { eventDate: new Date('2024-02-01'), eventType: 'periodic', sharesToVest: 208 },
+        { eventDate: new Date('2024-03-01'), eventType: 'periodic', sharesToVest: 208 }
+      ]);
+
+      await vestingScheduleController.getUpcomingVestingEvents(req, res);
+
+      expect(VestingCalculatorService.getUpcomingVestingEvents).toHaveBeenCalled();
+      expect(res.statusCode).toBe(200);
+      const response = JSON.parse(res._getData());
+      expect(response).toHaveProperty('scheduleId', 'VS-001');
+      expect(response).toHaveProperty('upcomingEvents');
+      expect(response.upcomingEvents.length).toBe(2);
+    });
+
+    it('should respect count query parameter', async () => {
+      req.params = { id: 'schedule123' };
+      req.query = { count: '5' };
+      const mockSchedule = { _id: 'schedule123', scheduleId: 'VS-001', totalShares: 10000 };
+      databaseAdapter.findById.mockResolvedValue(mockSchedule);
+      VestingCalculatorService.getUpcomingVestingEvents = jest.fn().mockReturnValue([]);
+
+      await vestingScheduleController.getUpcomingVestingEvents(req, res);
+
+      expect(VestingCalculatorService.getUpcomingVestingEvents).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Date),
+        5
+      );
+    });
+
+    it('should return 404 when schedule not found', async () => {
+      req.params = { id: 'nonexistent' };
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await vestingScheduleController.getUpcomingVestingEvents(req, res);
+
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Vesting schedule not found');
+    });
+  });
+
+  describe('terminateVestingSchedule', () => {
+    it('should terminate vesting schedule successfully', async () => {
+      req.params = { id: 'schedule123' };
+      req.body = { terminationType: 'voluntary' };
+      const mockSchedule = { _id: 'schedule123', totalShares: 10000, status: 'active' };
+      databaseAdapter.findById.mockResolvedValue(mockSchedule);
+      VestingCalculatorService.calculateVestedShares.mockReturnValue({
+        vestedShares: 2500,
+        unvestedShares: 7500
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
+        ...mockSchedule,
+        status: 'terminated'
+      });
+
+      await vestingScheduleController.terminateVestingSchedule(req, res);
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'VestingSchedule',
+        'schedule123',
+        expect.objectContaining({
+          status: 'terminated',
+          terminationType: 'voluntary'
+        }),
+        { new: true }
+      );
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should return 400 if already terminated', async () => {
+      req.params = { id: 'schedule123' };
+      const mockSchedule = { _id: 'schedule123', status: 'terminated' };
+      databaseAdapter.findById.mockResolvedValue(mockSchedule);
+
+      await vestingScheduleController.terminateVestingSchedule(req, res);
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
 });
