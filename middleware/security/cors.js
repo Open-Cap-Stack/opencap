@@ -29,9 +29,16 @@ const corsOptions = {
     const allowedOrigins = [
       // Development origins
       'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5000',
+      'http://localhost:5173',
       'http://localhost:8080',
       'http://example.com', // Used in tests
-      // Production origins - these should be set in environment variables in production
+      // Production origins
+      'https://opencapstack.com',
+      'https://www.opencapstack.com',
+      'https://app.opencapstack.com',
+      // Additional origins from environment variables
       ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
     ];
     
