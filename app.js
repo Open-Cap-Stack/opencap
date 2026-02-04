@@ -282,6 +282,7 @@ const routes = {
   documentTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentTemplateRoutes')), // Issue #193: Document Template System
   fundraisingAnalyticsRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraisingAnalyticsRoutes')), // Issue #196: Fundraising Analytics Service
   billingRoutes: safeRequire(path.join(__dirname, 'routes/v1/billingRoutes')), // Issue #201: Billing Dashboard APIs
+  stakeholderReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/stakeholderReportRoutes')), // Issue #198: Stakeholder Report Generation
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -412,6 +413,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/fundraising'; // Issue #196: Fundraising Analytics Service
     } else if (key === 'billingRoutes') {
       path = '/api/v1/billing'; // Issue #201: Billing Dashboard APIs
+    } else if (key === 'stakeholderReportRoutes') {
+      path = '/api/v1/stakeholders'; // Issue #198: Stakeholder Report Generation
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
