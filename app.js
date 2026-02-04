@@ -278,6 +278,7 @@ const routes = {
   customReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/customReportRoutes')), // Issue #197: Custom Report Builder Engine
   reportLibraryRoutes: safeRequire(path.join(__dirname, 'routes/v1/reportLibraryRoutes')), // Issue #199: Report Library Categorization
   integrationMarketplaceRoutes: safeRequire(path.join(__dirname, 'routes/v1/integrationMarketplaceRoutes')), // Issue #202: Integration Marketplace
+  documentTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentTemplateRoutes')), // Issue #193: Document Template System
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -400,6 +401,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/reports'; // Issue #199: Report Library Categorization
     } else if (key === 'integrationMarketplaceRoutes') {
       path = '/api/v1/integrations'; // Issue #202: Integration Marketplace
+    } else if (key === 'documentTemplateRoutes') {
+      path = '/api/v1/templates'; // Issue #193: Document Template System
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
