@@ -7281,333 +7281,59 @@
         }
       }
     },
-    "/api/v1/sync/status": {
+    "/api/v1/stakeholders/{id}/reports": {
       "get": {
-        "summary": "Get overall sync health and status",
+        "summary": "Get all reports for a stakeholder",
         "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sync status retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "orchestrator": {
-                          "type": "object"
-                        },
-                        "mongoToZerodb": {
-                          "type": "object"
-                        },
-                        "zerodbToMongo": {
-                          "type": "object"
-                        },
-                        "connections": {
-                          "type": "object"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/health": {
-      "get": {
-        "summary": "Get comprehensive health status for both sync directions",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Health status retrieved successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/metrics": {
-      "get": {
-        "summary": "Get detailed sync metrics",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Metrics retrieved successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/start": {
-      "post": {
-        "summary": "Start sync services",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sync services started successfully"
-          },
-          "400": {
-            "description": "Sync already running or disabled"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/stop": {
-      "post": {
-        "summary": "Stop sync services",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sync services stopped successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/pause": {
-      "post": {
-        "summary": "Temporarily pause sync services",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sync services paused successfully"
-          },
-          "400": {
-            "description": "Sync not running"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/resume": {
-      "post": {
-        "summary": "Resume paused sync services",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sync services resumed successfully"
-          },
-          "400": {
-            "description": "Sync not paused"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/resync/{collection}": {
-      "post": {
-        "summary": "Trigger full resync for a collection",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
+          "StakeholderReports"
         ],
         "parameters": [
           {
             "in": "path",
-            "name": "collection",
+            "name": "id",
             "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Collection name to resync"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "direction": {
-                    "type": "string",
-                    "enum": [
-                      "mongo-to-zerodb",
-                      "zerodb-to-mongo"
-                    ],
-                    "default": "mongo-to-zerodb"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Resync completed successfully"
+            "description": "Stakeholder ID"
           },
-          "400": {
-            "description": "Invalid collection or direction"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/queues": {
-      "get": {
-        "summary": "Get sync queue depths and pending items",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Queue information retrieved successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/circuit-breakers": {
-      "get": {
-        "summary": "Get circuit breaker status for both sync directions",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Circuit breaker status retrieved successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/change-stream/stats": {
-      "get": {
-        "summary": "Get MongoDB change stream statistics",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Change stream statistics retrieved successfully"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/api/v1/sync/change-stream/dead-letter-queue": {
-      "get": {
-        "summary": "Get dead letter queue entries from change stream",
-        "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
           {
             "in": "query",
-            "name": "limit",
+            "name": "reportType",
             "schema": {
-              "type": "integer",
-              "default": 100
+              "type": "string",
+              "enum": [
+                "holdings",
+                "transactions",
+                "valuations",
+                "tax",
+                "summary"
+              ]
             },
-            "description": "Maximum number of entries to return"
+            "description": "Filter by report type"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "generating",
+                "completed",
+                "failed",
+                "delivered"
+              ]
+            },
+            "description": "Filter by status"
           }
         ],
         "responses": {
           "200": {
-            "description": "Dead letter queue entries retrieved successfully"
+            "description": "List of reports"
+          },
+          "400": {
+            "description": "Invalid request"
           },
           "500": {
             "description": "Server error"
@@ -7615,26 +7341,46 @@
         }
       }
     },
-    "/api/v1/sync/change-stream/dead-letter-queue/reprocess": {
+    "/api/v1/stakeholders/{id}/reports/holdings": {
       "post": {
-        "summary": "Reprocess dead letter queue entries",
+        "summary": "Generate holdings report for a stakeholder",
         "tags": [
-          "Sync Admin"
+          "StakeholderReports"
         ],
-        "security": [
+        "parameters": [
           {
-            "bearerAuth": []
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "companyId"
+                ],
                 "properties": {
-                  "limit": {
-                    "type": "integer",
-                    "default": 10
+                  "companyId": {
+                    "type": "string",
+                    "description": "Company ID"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "excel",
+                      "csv",
+                      "json"
+                    ],
+                    "default": "pdf"
                   }
                 }
               }
@@ -7642,8 +7388,14 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Dead letter queue entries reprocessed"
+          "201": {
+            "description": "Report generated successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Stakeholder not found"
           },
           "500": {
             "description": "Server error"
@@ -7651,31 +7403,71 @@
         }
       }
     },
-    "/api/v1/sync/change-stream/restart/{collection}": {
+    "/api/v1/stakeholders/{id}/reports/transactions": {
       "post": {
-        "summary": "Restart change stream for a specific collection",
+        "summary": "Generate transaction history report for a stakeholder",
         "tags": [
-          "Sync Admin"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
+          "StakeholderReports"
         ],
         "parameters": [
           {
             "in": "path",
-            "name": "collection",
+            "name": "id",
             "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Collection name"
+            "description": "Stakeholder ID"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string",
+                    "description": "Company ID"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Start date filter"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "End date filter"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "excel",
+                      "csv",
+                      "json"
+                    ],
+                    "default": "pdf"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Change stream restarted successfully"
+          "201": {
+            "description": "Report generated successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Stakeholder not found"
           },
           "500": {
             "description": "Server error"
@@ -7683,20 +7475,297 @@
         }
       }
     },
-    "/api/v1/sync/config": {
-      "get": {
-        "summary": "Get current sync configuration",
+    "/api/v1/stakeholders/{id}/reports/valuations": {
+      "post": {
+        "summary": "Generate valuation report for a stakeholder",
         "tags": [
-          "Sync Admin"
+          "StakeholderReports"
         ],
-        "security": [
+        "parameters": [
           {
-            "bearerAuth": []
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string",
+                    "description": "Company ID"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "excel",
+                      "csv",
+                      "json"
+                    ],
+                    "default": "pdf"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report generated successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Stakeholder not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/{id}/reports/tax": {
+      "post": {
+        "summary": "Generate tax document report for a stakeholder",
+        "tags": [
+          "StakeholderReports"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId",
+                  "taxYear"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string",
+                    "description": "Company ID"
+                  },
+                  "taxYear": {
+                    "type": "integer",
+                    "description": "Tax year (e.g., 2023)"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "excel",
+                      "csv",
+                      "json"
+                    ],
+                    "default": "pdf"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report generated successfully"
+          },
+          "400": {
+            "description": "Invalid request or invalid tax year"
+          },
+          "404": {
+            "description": "Stakeholder not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/{id}/reports/schedule": {
+      "post": {
+        "summary": "Schedule automated report delivery",
+        "tags": [
+          "StakeholderReports"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyId",
+                  "reportType",
+                  "schedule",
+                  "recipients"
+                ],
+                "properties": {
+                  "companyId": {
+                    "type": "string",
+                    "description": "Company ID"
+                  },
+                  "reportType": {
+                    "type": "string",
+                    "enum": [
+                      "holdings",
+                      "transactions",
+                      "valuations",
+                      "tax",
+                      "summary"
+                    ],
+                    "description": "Type of report to schedule"
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "description": "Cron expression (e.g., \"0 9 1 * *\" for first of month at 9 AM)"
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "description": "Email recipients for automated delivery"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "excel",
+                      "csv",
+                      "json"
+                    ],
+                    "default": "pdf"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Schedule created successfully"
+          },
+          "400": {
+            "description": "Invalid request, schedule format, or email format"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/{id}/reports/{reportId}": {
+      "get": {
+        "summary": "Get a specific report by ID",
+        "tags": [
+          "StakeholderReports"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          },
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Report ID"
           }
         ],
         "responses": {
           "200": {
-            "description": "Configuration retrieved successfully"
+            "description": "Report details"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/{id}/reports/{reportId}/download": {
+      "get": {
+        "summary": "Download a report",
+        "tags": [
+          "StakeholderReports"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          },
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Report ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download URL"
+          },
+          "400": {
+            "description": "Report not ready for download"
+          },
+          "404": {
+            "description": "Report not found"
           },
           "500": {
             "description": "Server error"
@@ -22668,8 +22737,8 @@
       "description": "Material event detection and tracking for 409A compliance"
     },
     {
-      "name": "Sync Admin",
-      "description": "Bidirectional sync management between MongoDB and ZeroDB"
+      "name": "StakeholderReports",
+      "description": "Stakeholder report generation and management"
     },
     {
       "name": "Terminations",
