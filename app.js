@@ -276,6 +276,7 @@ const routes = {
   cacheRoutes: safeRequire(path.join(__dirname, 'routes/v1/cacheRoutes')), // Issue #47: Database Optimization and Caching
   fundraiseModelRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraiseModelRoutes')), // Issue #195: Interactive Fundraising Modeling Engine
   customReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/customReportRoutes')), // Issue #197: Custom Report Builder Engine
+  dataRoomRoutes: safeRequire(path.join(__dirname, 'routes/v1/dataRoomRoutes')), // Issue #194: Data Room Backend Infrastructure
   reportLibraryRoutes: safeRequire(path.join(__dirname, 'routes/v1/reportLibraryRoutes')), // Issue #199: Report Library Categorization
   integrationMarketplaceRoutes: safeRequire(path.join(__dirname, 'routes/v1/integrationMarketplaceRoutes')), // Issue #202: Integration Marketplace
   documentTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentTemplateRoutes')), // Issue #193: Document Template System
@@ -397,6 +398,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/cache'; // Issue #47: Database Optimization and Caching
     } else if (key === 'customReportRoutes') {
       path = '/api/v1/reports/custom'; // Issue #197: Custom Report Builder Engine
+    } else if (key === 'dataRoomRoutes') {
+      path = '/api/v1/data-rooms'; // Issue #194: Data Room Backend Infrastructure
     } else if (key === 'reportLibraryRoutes') {
       path = '/api/v1/reports'; // Issue #199: Report Library Categorization
     } else if (key === 'integrationMarketplaceRoutes') {
