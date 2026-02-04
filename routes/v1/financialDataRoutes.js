@@ -13,7 +13,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const financialDataService = require('../../services/financialDataService');
-const { authenticateJWT } = require('../../middleware/jwtAuth');
+const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
 const { requireRole } = require('../../middleware/rbacMiddleware');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
 

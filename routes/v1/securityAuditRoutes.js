@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const SecurityAudit = require('../../models/SecurityAudit');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
-const { authenticateJWT } = require('../../middleware/jwtAuth');
+const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
 const { requireRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
