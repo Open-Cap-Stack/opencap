@@ -12,15 +12,15 @@
 const RateLimitConfig = {
   roles: {
     admin: {
-      maxRequests: 1000,
+      maxRequests: 2000,
       windowMs: 15 * 60 * 1000 // 15 minutes
     },
     user: {
-      maxRequests: 500,
+      maxRequests: 1000,
       windowMs: 15 * 60 * 1000
     },
     guest: {
-      maxRequests: 100,
+      maxRequests: 500,
       windowMs: 15 * 60 * 1000
     }
   },

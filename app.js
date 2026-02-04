@@ -61,8 +61,9 @@ app.use(cookieParser());
 app.use(includeAdvancedHeaders());
 
 // Create route-specific rate limiters
-const apiRateLimiter = createRouteRateLimit('api', 100, 15 * 60 * 1000);
-const adminRateLimiter = createRouteRateLimit('admin', 50, 15 * 60 * 1000);
+// Increased limits to support SPA with multiple concurrent API calls
+const apiRateLimiter = createRouteRateLimit('api', 1000, 15 * 60 * 1000);
+const adminRateLimiter = createRouteRateLimit('admin', 500, 15 * 60 * 1000);
 
 // Apply default rate limiting
 app.use(rateLimiter);
