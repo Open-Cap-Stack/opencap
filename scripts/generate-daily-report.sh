@@ -3,6 +3,9 @@
 # Daily Report Generator Script for OpenCap Stack
 # Fixed version - works without jq dependency
 # Correctly counts PRs, issues, and commits
+#
+# SCHEDULE: Runs at 11:59 PM Karachi time (PKT)
+# WINDOW: Covers 24 hours from 11:59 PM previous day to 11:59 PM current day
 
 set -e
 
@@ -13,14 +16,29 @@ PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 REPORT_DIR="$PROJECT_DIR/docs/reports/daily"
 LOG_DIR="$PROJECT_DIR/logs"
 
-# Get current user info from git/gh
-GH_USERNAME=$(gh api user --jq '.login' 2>/dev/null || echo "unknown")
+# Get current user info from git/gh with better fallbacks
+GH_USERNAME=$(gh api user --jq '.login' 2>/dev/null || echo "")
+if [ -z "$GH_USERNAME" ]; then
+    # Try to get from git remote
+    GH_USERNAME=$(git config --get remote.origin.url 2>/dev/null | sed -n 's/.*github.com[:/]\([^/]*\)\/.*/\1/p' || echo "")
+fi
+if [ -z "$GH_USERNAME" ]; then
+    GH_USERNAME="juweriya1"  # Default fallback
+fi
+
 GIT_EMAIL=$(git config user.email 2>/dev/null || echo "unknown")
 GIT_NAME=$(git config user.name 2>/dev/null || echo "$GH_USERNAME")
 
 # Date configuration
+# Report is for TODAY, covering 23:59 PM yesterday to 23:59 PM today
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Calculate the time window: yesterday 23:59:00 to today 23:59:00
+# This ensures we capture a full 24-hour period ending at 11:59 PM
+YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null)
+REPORT_START="${YESTERDAY} 23:59:00"
+REPORT_END="${DATE} 23:59:00"
 
 # ============================================================================
 # SETUP
@@ -47,19 +65,19 @@ cd "$PROJECT_DIR"
 # COLLECT METRICS
 # ============================================================================
 
-# Get commit counts
+# Get commit counts using the 23:59 PM to 23:59 PM window
 log "Collecting commit data..."
-TODAY_COMMITS=$(git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
-# Also check by username in case email doesn't match
-TODAY_COMMITS_BY_NAME=$(git log --author="$GIT_NAME" --since="$DATE 00:00" --until="$DATE 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
-# Use the higher of the two
-if [ "$TODAY_COMMITS_BY_NAME" -gt "$TODAY_COMMITS" ]; then
-    TODAY_COMMITS=$TODAY_COMMITS_BY_NAME
-fi
+log "Report window: $REPORT_START to $REPORT_END"
 
-YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null || echo "")
-if [ -n "$YESTERDAY" ]; then
-    YESTERDAY_COMMITS=$(git log --author="$GIT_EMAIL" --since="$YESTERDAY 00:00" --until="$YESTERDAY 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
+# Count all commits in the reporting period (deduped)
+TODAY_COMMITS=$(git log --since="$REPORT_START" --until="$REPORT_END" --oneline 2>/dev/null | wc -l | tr -d ' ')
+
+# Get previous day's commits (for comparison) using same window
+PREV_DAY=$(date -v-2d +%Y-%m-%d 2>/dev/null || date -d "2 days ago" +%Y-%m-%d 2>/dev/null || echo "")
+if [ -n "$PREV_DAY" ]; then
+    PREV_REPORT_START="${PREV_DAY} 23:59:00"
+    PREV_REPORT_END="${YESTERDAY} 23:59:00"
+    YESTERDAY_COMMITS=$(git log --since="$PREV_REPORT_START" --until="$PREV_REPORT_END" --oneline 2>/dev/null | wc -l | tr -d ' ')
 else
     YESTERDAY_COMMITS=0
 fi
@@ -127,6 +145,7 @@ cat > "$REPORT_FILE" << EOF
 
 **Developer:** $GH_USERNAME
 **Generated:** $TIMESTAMP
+**Reporting Period:** $REPORT_START to $REPORT_END (PKT)
 
 ---
 
@@ -169,14 +188,12 @@ cat > "$REPORT_FILE" << EOF
 
 EOF
 
-# Add commit list
+# Add commit list (all commits in the reporting window, no duplicates)
 if [ "$TODAY_COMMITS" -gt 0 ]; then
-    git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty=format:"- \`%h\` %s" 2>/dev/null >> "$REPORT_FILE"
-    # Also add commits by name if different
-    git log --author="$GIT_NAME" --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty=format:"- \`%h\` %s" 2>/dev/null | grep -v "^$" >> "$REPORT_FILE" 2>/dev/null || true
+    git log --since="$REPORT_START" --until="$REPORT_END" --pretty=format:"- \`%h\` %s" 2>/dev/null >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
 else
-    echo "No commits today." >> "$REPORT_FILE"
+    echo "No commits in this reporting period." >> "$REPORT_FILE"
 fi
 
 # Add PRs merged section
@@ -233,14 +250,14 @@ echo "## 📁 Files Modified" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$TODAY_COMMITS" -gt 0 ]; then
-    FILES_CHANGED=$(git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | wc -l | tr -d ' ')
+    FILES_CHANGED=$(git log --since="$REPORT_START" --until="$REPORT_END" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | wc -l | tr -d ' ')
     echo "**Total files changed:** $FILES_CHANGED" >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
     echo "\`\`\`" >> "$REPORT_FILE"
-    git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | head -50 >> "$REPORT_FILE"
+    git log --since="$REPORT_START" --until="$REPORT_END" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | head -50 >> "$REPORT_FILE"
     echo "\`\`\`" >> "$REPORT_FILE"
 else
-    echo "No files modified today." >> "$REPORT_FILE"
+    echo "No files modified in this reporting period." >> "$REPORT_FILE"
 fi
 
 # Footer
