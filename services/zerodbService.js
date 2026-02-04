@@ -232,11 +232,33 @@ class ZeroDBService {
   async updateRows(tableName, options) {
     try {
       const { filter, update } = options;
-      const response = await this.client.put(
-        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { filter, update }
-      );
-      return response.data;
+
+      // First, find matching rows to get their row_ids
+      const queryResult = await this.queryTable(tableName, { filter });
+      const rows = queryResult.data || queryResult || [];
+
+      if (rows.length === 0) {
+        return { modified_count: 0, matched_count: 0 };
+      }
+
+      // Update each matching row by row_id
+      let modifiedCount = 0;
+      for (const row of rows) {
+        const rowId = row.row_id;
+        if (rowId) {
+          // Merge existing row_data with updates
+          const updateData = update.$set || update;
+          const newRowData = { ...row.row_data, ...updateData };
+
+          await this.client.put(
+            `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows/${rowId}`,
+            { row_data: newRowData }
+          );
+          modifiedCount++;
+        }
+      }
+
+      return { modified_count: modifiedCount, matched_count: rows.length };
     } catch (error) {
       console.error('Error updating rows:', error);
       throw error;
@@ -253,11 +275,28 @@ class ZeroDBService {
   async deleteRows(tableName, options) {
     try {
       const { filter } = options;
-      const response = await this.client.delete(
-        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { data: { filter } }
-      );
-      return response.data;
+
+      // First, find matching rows to get their row_ids
+      const queryResult = await this.queryTable(tableName, { filter });
+      const rows = queryResult.data || queryResult || [];
+
+      if (rows.length === 0) {
+        return { deleted_count: 0 };
+      }
+
+      // Delete each matching row by row_id
+      let deletedCount = 0;
+      for (const row of rows) {
+        const rowId = row.row_id;
+        if (rowId) {
+          await this.client.delete(
+            `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows/${rowId}`
+          );
+          deletedCount++;
+        }
+      }
+
+      return { deleted_count: deletedCount };
     } catch (error) {
       console.error('Error deleting rows:', error);
       throw error;
@@ -617,42 +656,26 @@ class ZeroDBService {
   }
 
   /**
-   * Update rows in a table
+   * Update rows in a table (alternate signature)
    * @param {string} tableName - Name of the table
    * @param {Object} query - Query filter to match rows
    * @param {Object} update - Update operations (MongoDB-style update object)
    * @returns {Object} Update result with count of modified rows
    */
-  async updateRows(tableName, query, update) {
-    try {
-      const response = await this.client.put(
-        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { filter: query, update }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error updating rows:', error);
-      throw error;
-    }
+  async updateRowsByQuery(tableName, query, update) {
+    // Delegate to the main updateRows method
+    return this.updateRows(tableName, { filter: query, update });
   }
 
   /**
-   * Delete rows from a table
+   * Delete rows from a table (alternate signature)
    * @param {string} tableName - Name of the table
    * @param {Object} query - Query filter to match rows
    * @returns {Object} Delete result with count of deleted rows
    */
-  async deleteRows(tableName, query) {
-    try {
-      const response = await this.client.delete(
-        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { data: { filter: query } }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error deleting rows:', error);
-      throw error;
-    }
+  async deleteRowsByQuery(tableName, query) {
+    // Delegate to the main deleteRows method
+    return this.deleteRows(tableName, { filter: query });
   }
 }
 
