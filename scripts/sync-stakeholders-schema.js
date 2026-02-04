@@ -10,6 +10,7 @@ require('dotenv').config();
 const zerodbService = require('../services/zerodbService');
 
 const stakeholderSchema = {
+  _id: { type: 'string', required: true, unique: true },
   stakeholderId: { type: 'string', required: true, unique: true },
   name: { type: 'string', required: true },
   email: { type: 'string', required: true },

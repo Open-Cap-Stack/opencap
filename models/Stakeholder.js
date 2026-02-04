@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // Schema definition for documentation and validation
 const stakeholderSchema = {
+    _id: { type: 'string', required: true, unique: true },
     stakeholderId: { type: 'string', required: true, unique: true },
     name: { type: 'string', required: true },
     email: { type: 'string', required: true },
@@ -26,8 +27,8 @@ const stakeholderSchema = {
     projectId: { type: 'string' },
     userId: { type: 'string' },
     documents: { type: 'number' },
-    createdAt: { type: 'date' },
-    updatedAt: { type: 'date' }
+    createdAt: { type: 'string' },
+    updatedAt: { type: 'string' }
 };
 
 // Create the base model

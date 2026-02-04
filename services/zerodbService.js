@@ -180,11 +180,16 @@ class ZeroDBService {
    */
   async insertRows(tableName, rows) {
     try {
-      const response = await this.client.post(
-        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { rows }
-      );
-      return response.data;
+      // Insert each row individually using row_data format
+      const results = [];
+      for (const row of rows) {
+        const response = await this.client.post(
+          `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
+          { row_data: row }
+        );
+        results.push(response.data);
+      }
+      return { data: results };
     } catch (error) {
       console.error('Error inserting rows:', error);
       throw error;
@@ -562,11 +567,25 @@ class ZeroDBService {
    */
   async insertRow(tableName, rowData) {
     try {
+      // If array, insert each row individually
+      if (Array.isArray(rowData)) {
+        const results = [];
+        for (const row of rowData) {
+          const response = await this.client.post(
+            `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
+            { row_data: row }
+          );
+          results.push(response.data);
+        }
+        return { data: results };
+      }
+
+      // Single row insert
       const response = await this.client.post(
         `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows`,
-        { rows: Array.isArray(rowData) ? rowData : [rowData] }
+        { row_data: rowData }
       );
-      return response.data;
+      return { data: [response.data] };
     } catch (error) {
       console.error('Error inserting row:', error);
       throw error;
