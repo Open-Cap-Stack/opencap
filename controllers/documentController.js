@@ -189,6 +189,23 @@ exports.getDocuments = async (req, res) => {
         // Filter out deleted documents in JS
         documents = documents.filter(doc => doc.status !== 'deleted');
 
+        // CRITICAL: Apply user-level access control filtering
+        // Users should only see documents they have access to
+        if (req.user?.role !== 'admin') {
+            documents = documents.filter(doc => {
+                // Public documents are visible to everyone
+                if (doc.accessLevel === 'public') return true;
+                // Document owner has access
+                if (doc.uploadedBy === req.user?.userId) return true;
+                // Users in sharedWith array have access
+                if (doc.sharedWith && doc.sharedWith.includes(req.user?.userId)) return true;
+                // Company-level documents are accessible to users in same company
+                if (doc.accessLevel === 'company' && doc.companyId === req.user?.companyId) return true;
+                // Default: no access
+                return false;
+            });
+        }
+
         // Apply search filter in JS if provided
         if (search) {
             const searchLower = search.toLowerCase();
@@ -646,6 +663,17 @@ exports.getGeneralAnalytics = async (req, res) => {
 
         // Filter out deleted documents in JavaScript
         docs = docs.filter(d => d.status !== 'deleted');
+
+        // Apply user-level access control filtering for non-admin users
+        if (req.user?.role !== 'admin') {
+            docs = docs.filter(doc => {
+                if (doc.accessLevel === 'public') return true;
+                if (doc.uploadedBy === req.user?.userId) return true;
+                if (doc.sharedWith && doc.sharedWith.includes(req.user?.userId)) return true;
+                if (doc.accessLevel === 'company' && doc.companyId === req.user?.companyId) return true;
+                return false;
+            });
+        }
 
         // Calculate analytics
         const totalDocuments = docs.length;
