@@ -28,28 +28,35 @@ const getLoggingMiddleware = () => {
     // Skip logging in test environment unless explicitly enabled
     return (req, res, next) => next();
   }
-  
+
   if (process.env.NODE_ENV === 'production') {
-    // In production, log to both console and file
-    // Create logs directory if it doesn't exist
-    const logsDir = path.join(__dirname, '../logs');
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
+    // In production, try to log to both console and file
+    // Use /tmp/logs for containers or fall back to console-only
+    const logsDir = process.env.LOG_DIR || '/tmp/logs';
+
+    try {
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+
+      // Create a write stream for access logs
+      const accessLogStream = fs.createWriteStream(
+        path.join(logsDir, 'access.log'),
+        { flags: 'a' }
+      );
+
+      // Setup console and file logging
+      return [
+        morgan(logFormat, { stream: accessLogStream }),
+        morgan(logFormat)
+      ];
+    } catch (err) {
+      // If we can't create logs directory, fall back to console-only logging
+      console.warn(`Warning: Could not create logs directory at ${logsDir}: ${err.message}. Using console-only logging.`);
+      return morgan(logFormat);
     }
-    
-    // Create a write stream for access logs
-    const accessLogStream = fs.createWriteStream(
-      path.join(logsDir, 'access.log'),
-      { flags: 'a' }
-    );
-    
-    // Setup console and file logging
-    return [
-      morgan(logFormat, { stream: accessLogStream }),
-      morgan(logFormat)
-    ];
   }
-  
+
   // For development and other environments, just log to console
   return morgan(logFormat);
 };
