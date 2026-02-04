@@ -22,6 +22,23 @@ router.post('/password/reset', authController.resetPassword);
 router.get('/profile', authenticateToken, authController.getUserProfile);
 router.put('/profile', authenticateToken, authController.updateUserProfile);
 
+// GET /api/v1/auth/me - Get current user (provisions on first call)
+// Frontend should call this immediately after AINative login
+router.get('/me', authenticateToken, (req, res) => {
+  // User is already provisioned by authenticateToken middleware
+  res.status(200).json({
+    user: {
+      userId: req.user.userId,
+      email: req.user.email,
+      name: req.user.name,
+      role: req.user.role,
+      permissions: req.user.permissions,
+      companyId: req.user.companyId
+    },
+    provisioned: true
+  });
+});
+
 // Email verification
 router.post('/verify/send', authenticateToken, authController.sendVerificationEmail);
 router.get('/verify/:token', authController.verifyEmail);
