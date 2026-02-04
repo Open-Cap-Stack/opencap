@@ -137,26 +137,27 @@ class FileStorageService {
     const fileKey = `opencap/files/${Date.now()}-${fileName}`;
 
     try {
-      // Create form data for file upload
+      // Create form data for file upload - simplified to match API docs
       const FormData = require('form-data');
       const form = new FormData();
       form.append('file', fileBuffer, {
         filename: fileName,
         contentType: contentType
       });
-      form.append('file_key', fileKey);
-      form.append('file_name', fileName);
-      form.append('content_type', contentType);
-      form.append('size_bytes', fileBuffer.length.toString());
 
+      // Only append metadata if we have any
       if (Object.keys(metadata).length > 0 || companyId || uploadedBy || category) {
         const fullMetadata = {
           ...metadata,
           companyId,
           uploadedBy,
-          category
+          category,
+          file_key: fileKey,
+          original_name: fileName,
+          content_type: contentType,
+          size_bytes: fileBuffer.length
         };
-        form.append('file_metadata', JSON.stringify(fullMetadata));
+        form.append('metadata', JSON.stringify(fullMetadata));
       }
 
       const response = await zerodbService.client.post(
