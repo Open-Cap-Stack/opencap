@@ -5,8 +5,7 @@
  * Issue #28: Implement event streaming for real-time updates
  */
 
-const EventStreamingService = require('../services/eventStreamingService');
-const eventStreamingService = new EventStreamingService();
+const eventStreamingService = require('../services/eventStreamingService');
 
 exports.publishEvent = async (req, res) => {
   try {
