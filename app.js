@@ -276,6 +276,7 @@ const routes = {
   cacheRoutes: safeRequire(path.join(__dirname, 'routes/v1/cacheRoutes')), // Issue #47: Database Optimization and Caching
   fundraiseModelRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraiseModelRoutes')), // Issue #195: Interactive Fundraising Modeling Engine
   customReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/customReportRoutes')), // Issue #197: Custom Report Builder Engine
+  reportLibraryRoutes: safeRequire(path.join(__dirname, 'routes/v1/reportLibraryRoutes')), // Issue #199: Report Library Categorization
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: (() => {
     const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
@@ -394,6 +395,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/cache'; // Issue #47: Database Optimization and Caching
     } else if (key === 'customReportRoutes') {
       path = '/api/v1/reports/custom'; // Issue #197: Custom Report Builder Engine
+    } else if (key === 'reportLibraryRoutes') {
+      path = '/api/v1/reports'; // Issue #199: Report Library Categorization
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

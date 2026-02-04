@@ -94,22 +94,22 @@ VELOCITY_SCORE=$((TODAY_COMMITS * 1 + ISSUES_CLOSED_TODAY * 3 + PRS_MERGED_TODAY
 
 # Determine velocity trend
 if [ "$(echo "$TODAY_COMMITS > $SEVEN_DAY_AVG" | bc 2>/dev/null || echo 0)" -eq 1 ]; then
-    VELOCITY_TREND="Above Average"
+    VELOCITY_TREND="📈 Above Average"
 elif [ "$(echo "$TODAY_COMMITS < $SEVEN_DAY_AVG" | bc 2>/dev/null || echo 0)" -eq 1 ]; then
-    VELOCITY_TREND="Below Average"
+    VELOCITY_TREND="📉 Below Average"
 else
-    VELOCITY_TREND="On Track"
+    VELOCITY_TREND="➡️ On Track"
 fi
 
 # Productivity rating based on velocity score
 if [ "$VELOCITY_SCORE" -ge 50 ]; then
-    PRODUCTIVITY_RATING="Exceptional"
+    PRODUCTIVITY_RATING="🔥 Exceptional"
 elif [ "$VELOCITY_SCORE" -ge 30 ]; then
-    PRODUCTIVITY_RATING="Strong"
+    PRODUCTIVITY_RATING="⭐ Strong"
 elif [ "$VELOCITY_SCORE" -ge 15 ]; then
-    PRODUCTIVITY_RATING="Good"
+    PRODUCTIVITY_RATING="✅ Good"
 else
-    PRODUCTIVITY_RATING="Light"
+    PRODUCTIVITY_RATING="⚠️ Light"
 fi
 
 log "Velocity score: $VELOCITY_SCORE"
@@ -123,14 +123,14 @@ REPORT_FILE="$REPORT_DIR/DAILY_REPORT_${DATE}_${GH_USERNAME}.md"
 log "Generating report: $REPORT_FILE"
 
 cat > "$REPORT_FILE" << EOF
-# Daily Report - $DATE
+# 📊 Daily Progress Report - $DATE
 
 **Developer:** $GH_USERNAME
 **Generated:** $TIMESTAMP
 
 ---
 
-## Summary
+## 📈 Summary
 
 | Metric | Value |
 |--------|-------|
@@ -142,7 +142,7 @@ cat > "$REPORT_FILE" << EOF
 
 ---
 
-## Developer Velocity
+## 🚀 Developer Velocity
 
 | Metric | Value |
 |--------|-------|
@@ -158,14 +158,14 @@ cat > "$REPORT_FILE" << EOF
 - **Total: $VELOCITY_SCORE points**
 
 **Rating Scale:**
-- Exceptional: 50+ points
-- Strong: 30-49 points
-- Good: 15-29 points
-- Light: <15 points
+- 🔥 Exceptional: 50+ points
+- ⭐ Strong: 30-49 points
+- ✅ Good: 15-29 points
+- ⚠️ Light: <15 points
 
 ---
 
-## Commits Today
+## 💻 Commits Today
 
 EOF
 
@@ -183,7 +183,7 @@ fi
 echo "" >> "$REPORT_FILE"
 echo "---" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
-echo "## PRs Merged Today" >> "$REPORT_FILE"
+echo "## 🔀 PRs Merged Today" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$PRS_MERGED_TODAY" -gt 0 ]; then
@@ -215,7 +215,7 @@ fi
 echo "" >> "$REPORT_FILE"
 echo "---" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
-echo "## Issues Closed Today" >> "$REPORT_FILE"
+echo "## ✅ Issues Closed Today" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$ISSUES_CLOSED_TODAY" -gt 0 ]; then
@@ -229,7 +229,7 @@ fi
 echo "" >> "$REPORT_FILE"
 echo "---" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
-echo "## Files Modified" >> "$REPORT_FILE"
+echo "## 📁 Files Modified" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$TODAY_COMMITS" -gt 0 ]; then
@@ -248,7 +248,7 @@ cat >> "$REPORT_FILE" << EOF
 
 ---
 
-## Next Steps
+## 📋 Next Steps
 
 - Review remaining open issues
 - Continue with backlog priorities
