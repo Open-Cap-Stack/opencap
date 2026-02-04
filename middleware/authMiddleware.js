@@ -12,8 +12,12 @@
  */
 
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 const User = require('../models/User');
 const { promisify } = require('util');
+
+// AINative API configuration for token validation
+const AINATIVE_API_URL = process.env.AINATIVE_API_URL || process.env.ZERODB_BASE_URL || 'https://api.ainative.studio';
 
 // Configuration constants
 const JWT_VERIFICATION_TIMEOUT_MS = 5000; // 5 seconds timeout for JWT verification
@@ -136,6 +140,35 @@ const authenticateToken = async (req, res, next) => {
     // Continue with the request
     next();
   } catch (error) {
+    // If local JWT verification fails, try AINative token validation
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      try {
+        // Extract token again for AINative validation
+        const authHeader = req.headers.authorization;
+        const token = authHeader ? authHeader.split(' ')[1] : null;
+
+        if (token) {
+          const ainativeUser = await validateAINativeToken(token);
+
+          // Set user from AINative validation
+          req.user = {
+            userId: ainativeUser.userId,
+            email: ainativeUser.email,
+            name: ainativeUser.name,
+            role: ainativeUser.role,
+            permissions: ainativeUser.permissions,
+            isAINativeUser: true
+          };
+
+          req.token = token;
+          return next();
+        }
+      } catch (ainativeError) {
+        // AINative validation also failed, return original error
+        console.error('AINative token validation failed:', ainativeError.message);
+      }
+    }
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
     }
@@ -145,15 +178,52 @@ const authenticateToken = async (req, res, next) => {
     if (error.name === 'TokenVerificationTimeoutError') {
       return res.status(401).json({ message: 'Token verification timed out' });
     }
-    
+
     console.error('Authentication error:', error);
     res.status(500).json({ message: 'Authentication error' });
   }
 };
 
 /**
+ * Validate token against AINative API
+ * Used when local JWT verification fails (for tokens issued by AINative)
+ *
+ * @param {string} token - JWT token to validate
+ * @returns {Promise<Object>} - User data from AINative
+ * @throws {Error} - On validation failure
+ */
+const validateAINativeToken = async (token) => {
+  try {
+    const response = await axios.get(`${AINATIVE_API_URL}/v1/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000
+    });
+
+    // AINative returns user object with id, email, name, etc.
+    const ainativeUser = response.data;
+
+    return {
+      userId: ainativeUser.id,
+      email: ainativeUser.email,
+      name: ainativeUser.name,
+      role: 'user', // Default role for AINative users
+      permissions: [],
+      isAINativeUser: true
+    };
+  } catch (error) {
+    const ainativeError = new Error('AINative token validation failed');
+    ainativeError.name = 'AINativeValidationError';
+    ainativeError.originalError = error;
+    throw ainativeError;
+  }
+};
+
+/**
  * Promise-based JWT verify with timeout
- * 
+ *
  * @param {string} token - JWT token to verify
  * @param {string} secret - Secret to use for verification
  * @param {number} timeoutMs - Timeout in milliseconds
@@ -254,11 +324,12 @@ const blacklistToken = async (token) => {
 };
 
 // Export all functions
-module.exports = { 
+module.exports = {
   authenticateToken,
   authenticate,
   checkTokenBlacklist,
   isTokenBlacklisted,
   blacklistToken,
-  verifyTokenWithTimeout
+  verifyTokenWithTimeout,
+  validateAINativeToken
 };
