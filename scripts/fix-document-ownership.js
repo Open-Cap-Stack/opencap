@@ -40,10 +40,12 @@ async function queryDocuments() {
     return response.data.data || [];
 }
 
-async function updateDocument(rowId, updateData) {
-    const response = await client.patch(
+async function updateDocument(rowId, existingRowData, updateData) {
+    // Merge existing data with updates
+    const newRowData = { ...existingRowData, ...updateData };
+    const response = await client.put(
         `/v1/public/zerodb/${ZERODB_PROJECT_ID}/database/tables/documents/rows/${rowId}`,
-        { row_data: updateData }
+        { row_data: newRowData }
     );
     return response.data;
 }
@@ -138,6 +140,7 @@ async function main() {
             if (!hasOwner || !hasAccessLevel) {
                 needsUpdate.push({
                     rowId: doc.row_id,
+                    rowData: rowData,
                     id: rowData.id || rowData._id,
                     name: rowData.name || rowData.title || rowData.fileName || 'Unnamed',
                     currentOwner: rowData.uploadedBy || 'NOT SET',
@@ -191,7 +194,7 @@ async function main() {
                     updatedAt: new Date().toISOString()
                 };
 
-                await updateDocument(doc.rowId, updateData);
+                await updateDocument(doc.rowId, doc.rowData, updateData);
                 console.log(`  ✅ Updated: ${doc.name}`);
                 successCount++;
             } catch (error) {
