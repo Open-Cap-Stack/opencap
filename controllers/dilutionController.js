@@ -7,7 +7,7 @@
 
 const DilutionScenario = require('../models/DilutionScenario');
 const DilutionCalculation = require('../models/DilutionCalculation');
-const DilutionCalculatorService = require('../services/dilutionCalculatorService');
+const DilutionCalculatorService = require('../services/dilutionCalculationService');
 const SAFEDilutionService = require('../services/safeDilutionService');
 const OptionPoolCalculatorService = require('../services/optionPoolCalculatorService');
 

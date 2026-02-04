@@ -12,13 +12,13 @@ const router = express.Router();
 const SecurityAudit = require('../../models/SecurityAudit');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
 const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
-const { requireRole } = require('../../middleware/rbacMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticateJWT);
 
 // Apply admin/security role requirement to all routes
-router.use(requireRole(['admin', 'security_analyst']));
+router.use(hasRole(['admin', 'security_analyst']));
 
 /**
  * @swagger

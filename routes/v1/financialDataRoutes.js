@@ -14,7 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const financialDataService = require('../../services/financialDataService');
 const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
-const { requireRole } = require('../../middleware/rbacMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
 
 // Configure multer for file uploads
@@ -110,7 +110,7 @@ router.use(authenticateJWT);
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/import', requireRole(['admin', 'financial_manager']), upload.single('file'), async (req, res) => {
+router.post('/import', hasRole(['admin', 'financial_manager']), upload.single('file'), async (req, res) => {
   let filePath = null;
   
   try {
@@ -234,7 +234,7 @@ router.post('/import', requireRole(['admin', 'financial_manager']), upload.singl
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/export', requireRole(['admin', 'financial_manager', 'analyst']), async (req, res) => {
+router.get('/export', hasRole(['admin', 'financial_manager', 'analyst']), async (req, res) => {
   try {
     const { exportType, format, companyId, startDate, endDate, limit } = req.query;
     
