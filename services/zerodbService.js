@@ -67,7 +67,7 @@ class ZeroDBService {
         databaseStatus: dbStatus
       };
     } catch (error) {
-      console.error('Failed to initialize ZeroDB:', error);
+      console.error('Failed to initialize ZeroDB:', error.message);
       throw error;
     }
   }
@@ -104,7 +104,7 @@ class ZeroDBService {
 
       return response.data;
     } catch (error) {
-      console.error('Error initializing project:', error);
+      console.error('Error initializing project:', error.message);
       throw error;
     }
   }
@@ -118,7 +118,7 @@ class ZeroDBService {
       const response = await this.client.get(`/v1/public/projects/${this.projectId}/usage`);
       return response.data;
     } catch (error) {
-      console.error('Error getting database status:', error);
+      console.error('Error getting database status:', error.message);
       // Return a default status if the endpoint doesn't exist
       return { status: 'active' };
     }
@@ -138,7 +138,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error creating table:', error);
+      console.error('Error creating table:', error.message);
       throw error;
     }
   }
@@ -153,7 +153,7 @@ class ZeroDBService {
       const response = await this.client.delete(`/v1/public/zerodb/${this.projectId}/database/tables/${tableName}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting table:', error);
+      console.error('Error deleting table:', error.message);
       throw error;
     }
   }
@@ -167,7 +167,7 @@ class ZeroDBService {
       const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/tables`);
       return response.data.tables || response.data || [];
     } catch (error) {
-      console.error('Error listing tables:', error);
+      console.error('Error listing tables:', error.message);
       throw error;
     }
   }
@@ -191,7 +191,7 @@ class ZeroDBService {
       }
       return { data: results };
     } catch (error) {
-      console.error('Error inserting rows:', error);
+      console.error('Error inserting rows:', error.message);
       throw error;
     }
   }
@@ -216,7 +216,7 @@ class ZeroDBService {
       );
       return response.data;
     } catch (error) {
-      console.error('Error querying table:', error);
+      console.error('Error querying table:', error.message);
       throw error;
     }
   }
@@ -260,7 +260,7 @@ class ZeroDBService {
 
       return { modified_count: modifiedCount, matched_count: rows.length };
     } catch (error) {
-      console.error('Error updating rows:', error);
+      console.error('Error updating rows:', error.message);
       throw error;
     }
   }
@@ -298,7 +298,7 @@ class ZeroDBService {
 
       return { deleted_count: deletedCount };
     } catch (error) {
-      console.error('Error deleting rows:', error);
+      console.error('Error deleting rows:', error.message);
       throw error;
     }
   }
@@ -317,7 +317,7 @@ class ZeroDBService {
       );
       return response.data.count;
     } catch (error) {
-      console.error('Error counting rows:', error);
+      console.error('Error counting rows:', error.message);
       throw error;
     }
   }
@@ -342,7 +342,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error upserting vector:', error);
+      console.error('Error upserting vector:', error.message);
       throw error;
     }
   }
@@ -363,7 +363,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error searching vectors:', error);
+      console.error('Error searching vectors:', error.message);
       throw error;
     }
   }
@@ -382,7 +382,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error listing vectors:', error);
+      console.error('Error listing vectors:', error.message);
       throw error;
     }
   }
@@ -407,7 +407,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error storing memory:', error);
+      console.error('Error storing memory:', error.message);
       throw error;
     }
   }
@@ -433,7 +433,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error listing memory:', error);
+      console.error('Error listing memory:', error.message);
       throw error;
     }
   }
@@ -452,7 +452,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error publishing event:', error);
+      console.error('Error publishing event:', error.message);
       throw error;
     }
   }
@@ -474,7 +474,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error listing events:', error);
+      console.error('Error listing events:', error.message);
       throw error;
     }
   }
@@ -499,7 +499,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error uploading file metadata:', error);
+      console.error('Error uploading file metadata:', error.message);
       throw error;
     }
   }
@@ -517,7 +517,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error listing files:', error);
+      console.error('Error listing files:', error.message);
       throw error;
     }
   }
@@ -542,7 +542,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error logging RLHF:', error);
+      console.error('Error logging RLHF:', error.message);
       throw error;
     }
   }
@@ -567,7 +567,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error storing agent log:', error);
+      console.error('Error storing agent log:', error.message);
       throw error;
     }
   }
@@ -593,7 +593,7 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error listing agent logs:', error);
+      console.error('Error listing agent logs:', error.message);
       throw error;
     }
   }
@@ -626,7 +626,7 @@ class ZeroDBService {
       );
       return { data: [response.data] };
     } catch (error) {
-      console.error('Error inserting row:', error);
+      console.error('Error inserting row:', error.message);
       throw error;
     }
   }
@@ -650,7 +650,7 @@ class ZeroDBService {
       );
       return response.data;
     } catch (error) {
-      console.error('Error querying rows:', error);
+      console.error('Error querying rows:', error.message);
       throw error;
     }
   }
@@ -694,7 +694,7 @@ class ZeroDBService {
       if (error.response?.status === 404) {
         return { deleted_count: 0 };
       }
-      console.error('Error deleting row by ID:', error);
+      console.error('Error deleting row by ID:', error.message);
       throw error;
     }
   }

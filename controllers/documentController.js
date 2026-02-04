@@ -265,7 +265,7 @@ exports.getDocuments = async (req, res) => {
             searchPerformed: !!search
         });
     } catch (error) {
-        console.error('Error getting documents:', error);
+        console.error('Error getting documents:', error.message);
         res.status(500).json({ message: error.message });
     }
 };
@@ -508,7 +508,7 @@ exports.searchDocuments = async (req, res) => {
             searchPerformed: true
         });
     } catch (error) {
-        console.error('Document search error:', error);
+        console.error('Document search error:', error.message);
         res.status(500).json({ message: 'Search failed', error: error.message });
     }
 };
@@ -604,7 +604,7 @@ exports.findSimilarDocuments = async (req, res) => {
             count: results.length
         });
     } catch (error) {
-        console.error('Similar documents error:', error);
+        console.error('Similar documents error:', error.message);
         res.status(500).json({ message: 'Failed to find similar documents', error: error.message });
     }
 };
@@ -652,7 +652,7 @@ exports.getDocumentAnalytics = async (req, res) => {
             analytics
         });
     } catch (error) {
-        console.error('Document analytics error:', error);
+        console.error('Document analytics error:', error.message);
         res.status(500).json({ message: 'Failed to get document analytics', error: error.message });
     }
 };
@@ -712,7 +712,7 @@ exports.getGeneralAnalytics = async (req, res) => {
             document_types: documentTypes
         });
     } catch (error) {
-        console.error('General analytics error:', error);
+        console.error('General analytics error:', error.message);
         res.status(500).json({ message: 'Failed to get document analytics', error: error.message });
     }
 };
@@ -788,7 +788,7 @@ exports.bulkIndexDocuments = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Bulk indexing error:', error);
+        console.error('Bulk indexing error:', error.message);
         res.status(500).json({ message: 'Bulk indexing failed', error: error.message });
     }
 };
@@ -938,7 +938,7 @@ exports.downloadDocument = async (req, res) => {
                 includeMetadata: true
             });
         } catch (fileError) {
-            console.error('File download error:', fileError);
+            console.error('File download error:', fileError.message);
             return res.status(500).json({ message: 'Failed to download file' });
         }
 
@@ -974,7 +974,7 @@ exports.downloadDocument = async (req, res) => {
         // Send the file data
         res.status(200).send(fileData.data);
     } catch (error) {
-        console.error('Document download error:', error);
+        console.error('Document download error:', error.message);
         res.status(500).json({ message: 'Failed to download document', error: error.message });
     }
 };
@@ -1025,7 +1025,7 @@ exports.getDocumentPreview = async (req, res) => {
                 fileSize = fileSize || fileMetadata.size;
                 fileName = fileName || fileMetadata.fileName;
             } catch (metadataError) {
-                console.error('File metadata error:', metadataError);
+                console.error('File metadata error:', metadataError.message);
                 // Continue with document metadata only
             }
         }
@@ -1048,7 +1048,7 @@ exports.getDocumentPreview = async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
-        console.error('Document preview error:', error);
+        console.error('Document preview error:', error.message);
         res.status(500).json({ message: 'Failed to get document preview', error: error.message });
     }
 };
@@ -1105,7 +1105,7 @@ exports.getDocumentAccess = async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
-        console.error('Document access error:', error);
+        console.error('Document access error:', error.message);
         res.status(500).json({ message: 'Failed to get document access info' });
     }
 };
@@ -1182,7 +1182,7 @@ exports.logDocumentAccess = async (req, res) => {
 
         res.status(201).json(accessLog);
     } catch (error) {
-        console.error('Log document access error:', error);
+        console.error('Log document access error:', error.message);
         res.status(500).json({ message: 'Failed to log document access' });
     }
 };
@@ -1210,7 +1210,7 @@ exports.createFolder = async (req, res) => {
 
         res.status(201).json(folder);
     } catch (error) {
-        console.error('Create folder error:', error);
+        console.error('Create folder error:', error.message);
         res.status(400).json({ message: error.message });
     }
 };
@@ -1233,7 +1233,7 @@ exports.getFolders = async (req, res) => {
 
         res.status(200).json({ folders });
     } catch (error) {
-        console.error('Get folders error:', error);
+        console.error('Get folders error:', error.message);
         res.status(500).json({ message: error.message });
     }
 };
@@ -1259,7 +1259,7 @@ exports.getFolderById = async (req, res) => {
             breadcrumbs
         });
     } catch (error) {
-        console.error('Get folder error:', error);
+        console.error('Get folder error:', error.message);
         res.status(500).json({ message: error.message });
     }
 };
@@ -1286,7 +1286,7 @@ exports.updateFolderById = async (req, res) => {
 
         res.status(200).json(updatedFolder);
     } catch (error) {
-        console.error('Update folder error:', error);
+        console.error('Update folder error:', error.message);
         res.status(400).json({ message: error.message });
     }
 };
@@ -1302,7 +1302,7 @@ exports.deleteFolderById = async (req, res) => {
 
         res.status(200).json({ message: 'Folder deleted successfully' });
     } catch (error) {
-        console.error('Delete folder error:', error);
+        console.error('Delete folder error:', error.message);
         res.status(400).json({ message: error.message });
     }
 };
@@ -1318,7 +1318,7 @@ exports.getFolderContents = async (req, res) => {
 
         res.status(200).json(contents);
     } catch (error) {
-        console.error('Get folder contents error:', error);
+        console.error('Get folder contents error:', error.message);
         if (error.message === 'Folder not found') {
             res.status(404).json({ message: error.message });
         } else {
