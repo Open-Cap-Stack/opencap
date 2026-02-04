@@ -13,6 +13,10 @@ const multer = require('multer');
 const path = require('path');
 const os = require('os');
 const documentController = require('../../controllers/documentController');
+const { authenticateToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication to all document routes
+router.use(authenticateToken);
 
 // Determine upload directory based on environment
 const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME;

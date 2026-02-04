@@ -6,6 +6,10 @@
 const express = require('express');
 const router = express.Router();
 const Stakeholder = require('../../models/Stakeholder');
+const { authenticateToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication to all stakeholder routes
+router.use(authenticateToken);
 
 /**
  * GET /api/v1/stakeholders
