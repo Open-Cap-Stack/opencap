@@ -118,4 +118,15 @@ router.post('/downgrade', billingController.downgradePlan);
  */
 router.get('/payment-history', billingController.getPaymentHistory);
 
+/**
+ * @route POST /api/v1/billing/stripe-checkout
+ * @desc Create a Stripe Checkout session
+ * @access Private
+ * @body price_id - Stripe Price ID
+ * @body success_url - URL to redirect on success
+ * @body cancel_url - URL to redirect on cancel
+ * @body mode - Checkout mode (subscription or payment)
+ */
+router.post('/stripe-checkout', billingController.createStripeCheckout);
+
 module.exports = router;

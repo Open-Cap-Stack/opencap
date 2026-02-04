@@ -12,6 +12,12 @@
 
 const BillingService = require('../services/billingService');
 
+// Initialize Stripe if configured
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+}
+
 /**
  * Determine appropriate HTTP status code based on error message
  * @param {Error} error - The error object
@@ -372,6 +378,66 @@ async function getPaymentHistory(req, res) {
   }
 }
 
+/**
+ * Create Stripe Checkout Session
+ * POST /api/v1/billing/stripe-checkout
+ */
+async function createStripeCheckout(req, res) {
+  try {
+    if (!stripe) {
+      return res.status(503).json({
+        error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.'
+      });
+    }
+
+    const { price_id, success_url, cancel_url, mode } = req.body;
+
+    if (!price_id) {
+      return res.status(400).json({ error: 'price_id is required' });
+    }
+
+    if (!success_url || !cancel_url) {
+      return res.status(400).json({ error: 'success_url and cancel_url are required' });
+    }
+
+    const sessionConfig = {
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: price_id,
+          quantity: 1,
+        },
+      ],
+      mode: mode || 'subscription',
+      success_url,
+      cancel_url,
+    };
+
+    // Add customer email if user is authenticated
+    if (req.user?.email) {
+      sessionConfig.customer_email = req.user.email;
+    }
+
+    // Add metadata
+    sessionConfig.metadata = {
+      userId: req.user?.userId || 'anonymous',
+      companyId: req.user?.companyId || 'unknown',
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    return res.status(200).json({ url: session.url });
+  } catch (error) {
+    console.error('Error creating Stripe checkout session:', error);
+
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+}
+
 module.exports = {
   getCurrentPlan,
   getUsageMetrics,
@@ -385,5 +451,6 @@ module.exports = {
   removePaymentMethod,
   upgradePlan,
   downgradePlan,
-  getPaymentHistory
+  getPaymentHistory,
+  createStripeCheckout
 };
