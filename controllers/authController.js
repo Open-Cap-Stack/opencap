@@ -1,10 +1,10 @@
 /**
  * Authentication Controller
- * 
+ *
  * [Feature] OCAE-202: Implement user registration endpoint
  * [Feature] OCAE-303: Implement password reset functionality
  * [Bug] OCDI-302: Fix User Authentication Test Failures
- * 
+ *
  * Contains methods for user registration, authentication, and profile management.
  */
 
@@ -14,9 +14,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
-const mongoose = require('mongoose');
 const { blacklistToken } = require('../middleware/authMiddleware');
-const mongoDbConnection = require('../utils/mongoDbConnection');
 
 // Initialize Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
