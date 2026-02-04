@@ -236,6 +236,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/equity-plans';
     } else if (key === 'shareClassRoutes') {
       path = '/api/v1/share-classes';
+    } else if (key === 'stakeholderRoutes') {
+      path = '/api/v1/stakeholders';
+    } else if (key === 'documentRoutes') {
+      path = '/api/v1/documents';
     } else if (key === 'spvAssetRoutes') {
       path = '/api/v1/spv-assets';
     } else if (key === 'complianceCheckRoutes') {
