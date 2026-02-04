@@ -144,6 +144,21 @@ class ZeroDBService {
   }
 
   /**
+   * Delete a table from ZeroDB
+   * @param {string} tableName - Name of the table to delete
+   * @returns {Object} Deletion result
+   */
+  async deleteTable(tableName) {
+    try {
+      const response = await this.client.delete(`/v1/public/zerodb/${this.projectId}/database/tables/${tableName}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      throw error;
+    }
+  }
+
+  /**
    * List all tables in the project
    * @returns {Array} List of tables
    */

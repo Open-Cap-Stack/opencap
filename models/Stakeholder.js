@@ -10,8 +10,22 @@ const { v4: uuidv4 } = require('uuid');
 const stakeholderSchema = {
     stakeholderId: { type: 'string', required: true, unique: true },
     name: { type: 'string', required: true },
+    email: { type: 'string', required: true },
+    phone: { type: 'string' },
     role: { type: 'string', required: true },
-    projectId: { type: 'string', required: true },
+    equity: { type: 'string' },
+    shares: { type: 'string' },
+    type: { type: 'string' },  // Common, Preferred, Option
+    status: { type: 'string' },  // Active, Inactive, Pending
+    location: { type: 'string' },
+    department: { type: 'string' },
+    vestingSchedule: { type: 'string' },
+    joinDate: { type: 'string' },
+    lastActivity: { type: 'string' },
+    companyId: { type: 'string' },
+    projectId: { type: 'string' },
+    userId: { type: 'string' },
+    documents: { type: 'number' },
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
 };
