@@ -6,7 +6,7 @@
  * Converts report configurations into safe database queries.
  */
 
-const zeroDbService = require('./zeroDbService');
+const zeroDbService = require('./zerodbService');
 const ReportFilter = require('../models/ReportFilter');
 const CustomReportField = require('../models/CustomReportField');
 

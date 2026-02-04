@@ -6,7 +6,7 @@
  * Supports SUM, AVG, COUNT, MIN, MAX, and GROUP BY operations.
  */
 
-const zeroDbService = require('./zeroDbService');
+const zeroDbService = require('./zerodbService');
 const queryBuilderService = require('./queryBuilderService');
 
 class ReportAggregationService {

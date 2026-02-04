@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const dataProcessingController = require('../../controllers/dataProcessingController');
-const { authenticateToken } = require('../../middleware/auth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticateToken);

@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const eventStreamingController = require('../../controllers/eventStreamingController');
-const { authenticateToken } = require('../../middleware/auth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 router.get('/topics', eventStreamingController.getTopics);
 

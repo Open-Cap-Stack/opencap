@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../../controllers/paymentController');
-const { authenticateJWT } = require('../../middleware/auth');
+const { authenticateJWT } = require('../../middleware/authMiddleware');
 
 /**
  * Payment Intent Routes

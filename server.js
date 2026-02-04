@@ -1,11 +1,10 @@
 // server.js
-const { app, connectDB } = require('./app');
+const app = require('./app');
 
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
-    await connectDB();
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
@@ -16,7 +15,8 @@ const startServer = async () => {
       await new Promise((resolve) => {
         server.close(resolve);
       });
-      await mongoose.connection.close();
+      // ZeroDB uses HTTP API, no persistent connection to close
+      console.log('Server shutdown complete');
       process.exit(0);
     };
 

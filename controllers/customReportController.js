@@ -11,7 +11,7 @@ const CustomReportField = require('../models/CustomReportField');
 const ReportFilter = require('../models/ReportFilter');
 const queryBuilderService = require('../services/queryBuilderService');
 const reportAggregationService = require('../services/reportAggregationService');
-const zeroDbService = require('../services/zeroDbService');
+const zeroDbService = require('../services/zerodbService');
 const { v4: uuidv4 } = require('uuid');
 
 class CustomReportController {

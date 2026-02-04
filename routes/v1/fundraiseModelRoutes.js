@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const fundraiseModelController = require('../../controllers/fundraiseModelController');
-const { authenticate } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/authMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticate);

@@ -5,7 +5,6 @@
  * Provides comprehensive health check endpoints for:
  * - Basic server health
  * - ZeroDB connectivity
- * - Sync status
  * - Production readiness
  * - Kubernetes-style probes
  */
@@ -14,14 +13,6 @@ const express = require('express');
 const router = express.Router();
 const zerodbService = require('../../services/zerodbService');
 const os = require('os');
-
-// Try to load optional services
-let mongoChangeStreamListener;
-try {
-  mongoChangeStreamListener = require('../../services/mongoChangeStreamListener');
-} catch {
-  mongoChangeStreamListener = null;
-}
 
 /**
  * GET /api/v1/health
@@ -71,43 +62,14 @@ router.get('/zerodb', async (req, res) => {
 
 /**
  * GET /api/v1/health/sync
- * MongoDB to ZeroDB sync health check
+ * Sync health check (deprecated - now using ZeroDB only)
  */
 router.get('/sync', async (req, res) => {
-  try {
-    if (process.env.SYNC_ENABLED !== 'true') {
-      return res.status(200).json({
-        status: 'disabled',
-        message: 'MongoDB to ZeroDB sync is not enabled',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    if (!mongoChangeStreamListener) {
-      return res.status(503).json({
-        status: 'error',
-        message: 'Sync service not available',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    const health = mongoChangeStreamListener.healthCheck();
-    const allStreamsHealthy = Object.values(health.streamStatuses || {})
-      .every(s => s === 'active' || s === 'skipped');
-    const status = health.isRunning && allStreamsHealthy ? 'ok' : 'degraded';
-
-    res.status(status === 'ok' ? 200 : 503).json({
-      status,
-      sync: health,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
+  res.status(200).json({
+    status: 'not_applicable',
+    message: 'OpenCap Stack uses ZeroDB as the primary database. Sync service is not needed.',
+    timestamp: new Date().toISOString()
+  });
 });
 
 /**
@@ -197,33 +159,6 @@ router.get('/ready', async (req, res) => {
       message: `High heap usage: ${heapPercentage}%`
     });
     hasWarnings = true;
-  }
-
-  // Check 5: Sync status (if enabled)
-  if (process.env.SYNC_ENABLED === 'true' && mongoChangeStreamListener) {
-    try {
-      const syncHealth = mongoChangeStreamListener.healthCheck();
-      if (syncHealth.isRunning) {
-        checks.push({
-          name: 'sync',
-          status: 'pass',
-          message: 'Sync service is running'
-        });
-      } else {
-        checks.push({
-          name: 'sync',
-          status: 'warn',
-          message: 'Sync service is not running'
-        });
-        hasWarnings = true;
-      }
-    } catch {
-      checks.push({
-        name: 'sync',
-        status: 'skip',
-        reason: 'Sync health check failed'
-      });
-    }
   }
 
   const overallStatus = allHealthy ? (hasWarnings ? 'ready_with_warnings' : 'ready') : 'not_ready';

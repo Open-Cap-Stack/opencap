@@ -1,32 +1,24 @@
 /**
  * Database Monitoring Middleware
  *
- * [Feature] GitHub Issue #8: Setup parallel database monitoring
+ * [Feature] GitHub Issue #8: Setup database monitoring
  *
- * Monitors both MongoDB and ZeroDB operations including:
+ * Monitors ZeroDB operations including:
  * - Query execution times
  * - Operation success/failure rates
  * - Error logging with context
  * - Performance metrics (avg, p95, p99)
- * - Data sync status
  * - ZeroDB API rate limits
  */
 
 const fs = require('fs');
 const path = require('path');
-const mongoose = require('mongoose');
 
 class DatabaseMonitor {
   constructor() {
     this.enabled = false;
     this.logStream = null;
     this.metrics = {
-      mongodb: {
-        operations: [],
-        errors: [],
-        totalOps: 0,
-        totalErrors: 0
-      },
       zerodb: {
         operations: [],
         errors: [],
@@ -46,7 +38,6 @@ class DatabaseMonitor {
     // Performance metrics calculation interval
     this.metricsInterval = null;
     this.currentMetrics = {
-      mongodb: { avg: 0, p95: 0, p99: 0, errorRate: 0 },
       zerodb: { avg: 0, p95: 0, p99: 0, errorRate: 0 }
     };
   }
@@ -67,164 +58,26 @@ class DatabaseMonitor {
 
     // Setup log file in production
     if (process.env.NODE_ENV === 'production') {
-      const logsDir = path.join(__dirname, '../logs');
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
+      const logsDir = process.env.LOG_DIR || '/tmp/logs';
+      try {
+        if (!fs.existsSync(logsDir)) {
+          fs.mkdirSync(logsDir, { recursive: true });
+        }
+        this.logStream = fs.createWriteStream(
+          path.join(logsDir, 'database-operations.log'),
+          { flags: 'a' }
+        );
+      } catch (err) {
+        console.warn(`Could not create logs directory: ${err.message}. Using console-only logging.`);
       }
-
-      this.logStream = fs.createWriteStream(
-        path.join(logsDir, 'database-operations.log'),
-        { flags: 'a' }
-      );
     }
-
-    // Setup MongoDB monitoring
-    this.setupMongoDBMonitoring();
 
     // Calculate metrics every 60 seconds
     this.metricsInterval = setInterval(() => {
       this.calculateMetrics();
     }, 60000);
 
-    console.log('✅ Database monitoring initialized');
-  }
-
-  /**
-   * Setup MongoDB query monitoring using Mongoose plugins
-   */
-  setupMongoDBMonitoring() {
-    const self = this;
-
-    // Global plugin to monitor all queries
-    mongoose.plugin(function(schema) {
-      // Hook into all query operations
-      const operations = [
-        'count', 'countDocuments', 'deleteMany', 'deleteOne',
-        'find', 'findOne', 'findOneAndDelete', 'findOneAndRemove',
-        'findOneAndUpdate', 'remove', 'update', 'updateOne', 'updateMany'
-      ];
-
-      operations.forEach(operation => {
-        schema.pre(operation, function() {
-          this._startTime = process.hrtime.bigint();
-          this._operation = operation;
-        });
-
-        schema.post(operation, function(result) {
-          if (self.enabled && this._startTime) {
-            const endTime = process.hrtime.bigint();
-            const duration = Number(endTime - this._startTime) / 1000000; // Convert to milliseconds
-
-            self.logOperation('mongodb', {
-              operation: this._operation,
-              model: this.model ? this.model.modelName : 'unknown',
-              conditions: self.sanitizeQuery(this.getQuery ? this.getQuery() : {}),
-              duration,
-              success: true,
-              timestamp: new Date().toISOString()
-            });
-          }
-        });
-
-        schema.post(operation, function(error) {
-          if (error && self.enabled && this._startTime) {
-            const endTime = process.hrtime.bigint();
-            const duration = Number(endTime - this._startTime) / 1000000;
-
-            self.logOperation('mongodb', {
-              operation: this._operation,
-              model: this.model ? this.model.modelName : 'unknown',
-              conditions: self.sanitizeQuery(this.getQuery ? this.getQuery() : {}),
-              duration,
-              success: false,
-              error: {
-                name: error.name,
-                message: error.message,
-                code: error.code
-              },
-              timestamp: new Date().toISOString()
-            });
-
-            self.logError('mongodb', error, {
-              operation: this._operation,
-              model: this.model ? this.model.modelName : 'unknown'
-            });
-          }
-        });
-      });
-
-      // Hook into save operations
-      schema.pre('save', function() {
-        this._saveStartTime = process.hrtime.bigint();
-      });
-
-      schema.post('save', function(doc) {
-        if (self.enabled && this._saveStartTime) {
-          const endTime = process.hrtime.bigint();
-          const duration = Number(endTime - this._saveStartTime) / 1000000;
-
-          self.logOperation('mongodb', {
-            operation: 'save',
-            model: this.constructor.modelName,
-            duration,
-            success: true,
-            timestamp: new Date().toISOString()
-          });
-        }
-      });
-
-      schema.post('save', function(error, doc, next) {
-        if (error && self.enabled && this._saveStartTime) {
-          const endTime = process.hrtime.bigint();
-          const duration = Number(endTime - this._saveStartTime) / 1000000;
-
-          self.logOperation('mongodb', {
-            operation: 'save',
-            model: this.constructor.modelName,
-            duration,
-            success: false,
-            error: {
-              name: error.name,
-              message: error.message,
-              code: error.code
-            },
-            timestamp: new Date().toISOString()
-          });
-
-          self.logError('mongodb', error, {
-            operation: 'save',
-            model: this.constructor.modelName
-          });
-        }
-        next();
-      });
-    });
-
-    // Monitor connection events
-    const db = mongoose.connection;
-
-    db.on('error', (err) => {
-      this.logError('mongodb', err, {
-        operation: 'connection',
-        context: 'MongoDB connection error'
-      });
-    });
-
-    db.on('disconnected', () => {
-      this.logOperation('mongodb', {
-        operation: 'disconnected',
-        success: false,
-        timestamp: new Date().toISOString()
-      });
-    });
-
-    db.on('reconnected', () => {
-      this.logOperation('mongodb', {
-        operation: 'reconnected',
-        success: true,
-        timestamp: new Date().toISOString()
-      });
-    });
+    console.log('Database monitoring initialized');
   }
 
   /**
@@ -315,12 +168,12 @@ class DatabaseMonitor {
       }
     );
 
-    console.log('✅ ZeroDB monitoring configured');
+    console.log('ZeroDB monitoring configured');
   }
 
   /**
    * Log database operation
-   * @param {string} database - 'mongodb' or 'zerodb'
+   * @param {string} database - 'zerodb'
    * @param {Object} operationData - Operation details
    */
   logOperation(database, operationData) {
@@ -347,7 +200,7 @@ class DatabaseMonitor {
 
     // Console log in development
     if (process.env.NODE_ENV === 'development') {
-      const status = logEntry.success ? '✓' : '✗';
+      const status = logEntry.success ? '?' : '?';
       const duration = logEntry.duration ? `${logEntry.duration.toFixed(2)}ms` : 'N/A';
       console.log(`[DB Monitor] ${status} ${database.toUpperCase()}: ${logEntry.operation} (${duration})`);
     }
@@ -355,7 +208,7 @@ class DatabaseMonitor {
 
   /**
    * Log database error with context
-   * @param {string} database - 'mongodb' or 'zerodb'
+   * @param {string} database - 'zerodb'
    * @param {Error} error - Error object
    * @param {Object} context - Additional context
    */
@@ -395,54 +248,45 @@ class DatabaseMonitor {
    * Calculate performance metrics (avg, p95, p99, error rate)
    */
   calculateMetrics() {
-    ['mongodb', 'zerodb'].forEach(db => {
-      const operations = this.metrics[db].operations.filter(op => op.duration);
+    const operations = this.metrics.zerodb.operations.filter(op => op.duration);
 
-      if (operations.length === 0) {
-        this.currentMetrics[db] = { avg: 0, p95: 0, p99: 0, errorRate: 0 };
-        return;
-      }
+    if (operations.length === 0) {
+      this.currentMetrics.zerodb = { avg: 0, p95: 0, p99: 0, errorRate: 0 };
+      return;
+    }
 
-      // Extract durations and sort
-      const durations = operations.map(op => op.duration).sort((a, b) => a - b);
+    // Extract durations and sort
+    const durations = operations.map(op => op.duration).sort((a, b) => a - b);
 
-      // Calculate average
-      const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+    // Calculate average
+    const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
 
-      // Calculate percentiles
-      const p95Index = Math.floor(durations.length * 0.95);
-      const p99Index = Math.floor(durations.length * 0.99);
-      const p95 = durations[p95Index] || 0;
-      const p99 = durations[p99Index] || 0;
+    // Calculate percentiles
+    const p95Index = Math.floor(durations.length * 0.95);
+    const p99Index = Math.floor(durations.length * 0.99);
+    const p95 = durations[p95Index] || 0;
+    const p99 = durations[p99Index] || 0;
 
-      // Calculate error rate
-      const failedOps = operations.filter(op => !op.success).length;
-      const errorRate = operations.length > 0 ? (failedOps / operations.length) * 100 : 0;
+    // Calculate error rate
+    const failedOps = operations.filter(op => !op.success).length;
+    const errorRate = operations.length > 0 ? (failedOps / operations.length) * 100 : 0;
 
-      this.currentMetrics[db] = {
-        avg: parseFloat(avg.toFixed(2)),
-        p95: parseFloat(p95.toFixed(2)),
-        p99: parseFloat(p99.toFixed(2)),
-        errorRate: parseFloat(errorRate.toFixed(2))
-      };
-    });
+    this.currentMetrics.zerodb = {
+      avg: parseFloat(avg.toFixed(2)),
+      p95: parseFloat(p95.toFixed(2)),
+      p99: parseFloat(p99.toFixed(2)),
+      errorRate: parseFloat(errorRate.toFixed(2))
+    };
   }
 
   /**
-   * Get current metrics for both databases
+   * Get current metrics for ZeroDB
    * @returns {Object} Current performance metrics
    */
   getMetrics() {
     this.calculateMetrics();
 
     return {
-      mongodb: {
-        ...this.currentMetrics.mongodb,
-        totalOperations: this.metrics.mongodb.totalOps,
-        totalErrors: this.metrics.mongodb.totalErrors,
-        recentOperations: this.metrics.mongodb.operations.length,
-        recentErrors: this.metrics.mongodb.errors.length
-      },
       zerodb: {
         ...this.currentMetrics.zerodb,
         totalOperations: this.metrics.zerodb.totalOps,
@@ -455,23 +299,23 @@ class DatabaseMonitor {
   }
 
   /**
-   * Get recent operations for a database
-   * @param {string} database - 'mongodb' or 'zerodb'
+   * Get recent operations
+   * @param {string} database - 'zerodb'
    * @param {number} limit - Number of operations to return
    * @returns {Array} Recent operations
    */
   getRecentOperations(database, limit = 50) {
-    return this.metrics[database].operations.slice(-limit);
+    return this.metrics[database]?.operations.slice(-limit) || [];
   }
 
   /**
-   * Get recent errors for a database
-   * @param {string} database - 'mongodb' or 'zerodb'
+   * Get recent errors
+   * @param {string} database - 'zerodb'
    * @param {number} limit - Number of errors to return
    * @returns {Array} Recent errors
    */
   getRecentErrors(database, limit = 50) {
-    return this.metrics[database].errors.slice(-limit);
+    return this.metrics[database]?.errors.slice(-limit) || [];
   }
 
   /**

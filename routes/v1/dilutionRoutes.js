@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const dilutionController = require('../../controllers/dilutionController');
-const { authenticate } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticate);

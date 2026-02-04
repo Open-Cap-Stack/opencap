@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const safeController = require('../../controllers/safeController');
-const { authenticateToken } = require('../../middleware/auth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticateToken);
