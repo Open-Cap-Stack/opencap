@@ -105,7 +105,12 @@ class ZeroDBModel {
             projection: projection || {}
         });
 
-        return result.data || result || [];
+        // ZeroDB returns data nested in row_data - unwrap it
+        const rawData = result.data || result || [];
+        if (Array.isArray(rawData)) {
+            return rawData.map(item => item.row_data || item);
+        }
+        return rawData;
     }
 
     /**
