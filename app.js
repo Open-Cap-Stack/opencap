@@ -110,41 +110,30 @@ if (!isTestEnv && process.env.ENABLE_ZERODB === 'true') {
   if (process.env.AINATIVE_API_TOKEN) {
     zerodbService.initialize(process.env.AINATIVE_API_TOKEN)
       .then(async result => {
-        console.log('✅ ZeroDB initialized:', result);
-        // GitHub Issue #8: Setup ZeroDB monitoring after initialization
+        console.log(`✅ ZeroDB initialized (project: ${result.projectId}, tables: ${result.databaseStatus?.tables || 0})`);
         databaseMonitor.setupZeroDBMonitoring(zerodbService);
       })
-      .catch(err => console.error('❌ ZeroDB initialization failed:', err));
+      .catch(err => console.error('❌ ZeroDB initialization failed:', err.message));
   } else {
     console.warn('⚠️  ZeroDB enabled but AINATIVE_API_TOKEN not set');
   }
 }
 
 // Function to safely require routes
-const safeRequire = (path) => {
+const safeRequire = (routePath) => {
   try {
-    // Ensure the path has a .js extension
-    const fullPath = path.endsWith('.js') ? path : `${path}.js`;
-    
-    console.log(`Checking if file exists: ${fullPath}`);
+    const fullPath = routePath.endsWith('.js') ? routePath : `${routePath}.js`;
+
     if (!fs.existsSync(fullPath)) {
-      console.warn(`Warning: Route file does not exist: ${fullPath}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Route file not found: ${fullPath}`);
+      }
       return null;
     }
-    
-    console.log(`Attempting to require: ${fullPath}`);
-    const module = require(fullPath);
-    console.log(`Successfully loaded route module: ${fullPath}`);
-    console.log(`Module exports:`, Object.keys(module || {}));
-    return module;
+
+    return require(fullPath);
   } catch (err) {
-    console.error(`Error loading route file ${path}:`, err.message);
-    console.error('Error details:', {
-      code: err.code,
-      path: err.path || path,
-      requireStack: err.requireStack || []
-    });
-    console.error('Error stack:', err.stack);
+    console.error(`Error loading route ${routePath}:`, err.message);
     return null;
   }
 };
@@ -219,24 +208,13 @@ const routes = {
   billingRoutes: safeRequire(path.join(__dirname, 'routes/v1/billingRoutes')), // Issue #201: Billing Dashboard APIs
   stakeholderReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/stakeholderReportRoutes')), // Issue #198: Stakeholder Report Generation
   // Optional routes that may not exist in all environments
-  financialMetricsRoutes: (() => {
-    const fullPath = path.join(__dirname, 'routes/v1/financialMetricsRoutes.js');
-    console.log(`Attempting to load financial metrics routes from: ${fullPath}`);
-    console.log(`File exists: ${fs.existsSync(fullPath) ? 'yes' : 'no'}`);
-    const result = safeRequire(fullPath);
-    console.log(`Financial metrics routes loaded: ${result ? 'success' : 'failed'}`);
-    return result;
-  })(),
+  financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
 
 // Mount routes with correct paths
 Object.entries(routes).forEach(([key, route]) => {
   // Skip if route is null or undefined
   if (!route) {
-    console.log(`Skipping null/undefined route: ${key}`);
-    if (key === 'financialMetricsRoutes') {
-      console.log('Financial metrics routes failed to load. Check previous logs for details.');
-    }
     return;
   }
   if (route) {
@@ -357,14 +335,9 @@ Object.entries(routes).forEach(([key, route]) => {
     // Ensure the route is a function before mounting
     if (typeof route === 'function') {
       app.use(path, route);
-      console.log(`Registered custom v1 route: ${path} -> ${key}`);
     } else {
-      console.error(`Error: Route ${key} is not a valid middleware function`);
+      console.error(`Route ${key} is not a valid middleware function`);
     }
-  } else if (route) {
-    console.log(`Route not mounted (not a function): ${key} (type: ${typeof route})`);
-  } else {
-    console.log(`Route not found: ${key}`);
   }
 });
 
