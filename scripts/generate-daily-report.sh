@@ -1,131 +1,169 @@
 #!/bin/bash
 
 # Daily Report Generator Script for OpenCap Stack
-# Runs automatically at 11:59 PM Pacific Time
-# Author: Urban Tech (utventures@gmail.com)
+# Fixed version - works without jq dependency
+# Correctly counts PRs, issues, and commits
 
 set -e
 
-# Configuration
-PROJECT_DIR="/Users/aideveloper/opencapstack"
+# ============================================================================
+# CONFIGURATION - Update these for your setup
+# ============================================================================
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 REPORT_DIR="$PROJECT_DIR/docs/reports/daily"
 LOG_DIR="$PROJECT_DIR/logs"
+
+# Get current user info from git/gh
+GH_USERNAME=$(gh api user --jq '.login' 2>/dev/null || echo "unknown")
+GIT_EMAIL=$(git config user.email 2>/dev/null || echo "unknown")
+GIT_NAME=$(git config user.name 2>/dev/null || echo "$GH_USERNAME")
+
+# Date configuration
 DATE=$(date +%Y-%m-%d)
-TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S %Z")
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
-# Email configuration
-EMAIL_TO="toby@ainative.studio"
-AINATIVE_API_TOKEN="kLPiP0bzgKJ0CnNYVt1wq3qxbs2QgDeF2XwyUnxBEOM"
-SEND_EMAIL=false  # Disabled until email endpoint is configured
-
-# Create directories if they don't exist
+# ============================================================================
+# SETUP
+# ============================================================================
 mkdir -p "$REPORT_DIR"
 mkdir -p "$LOG_DIR"
 
-# Log file
 LOG_FILE="$LOG_DIR/daily-report-$DATE.log"
 
-echo "========================================" >> "$LOG_FILE"
-echo "Daily Report Generator Started" >> "$LOG_FILE"
-echo "Timestamp: $TIMESTAMP" >> "$LOG_FILE"
-echo "========================================" >> "$LOG_FILE"
+log() {
+    echo "[$(date +"%H:%M:%S")] $1" >> "$LOG_FILE"
+    echo "$1"
+}
 
-# Change to project directory
+log "========================================"
+log "Daily Report Generator Started"
+log "User: $GH_USERNAME ($GIT_EMAIL)"
+log "Date: $DATE"
+log "========================================"
+
 cd "$PROJECT_DIR"
 
-# Load user identities
-GIT_EMAILS="utventures@gmail.com|toby@rely.ventures|developer@ainative.studio|admin@ainative.studio"
-PRIMARY_NAME="Urban Tech"
-GH_USERNAME="urbantech"
+# ============================================================================
+# COLLECT METRICS
+# ============================================================================
 
-echo "Generating report for: $PRIMARY_NAME" >> "$LOG_FILE"
-echo "Tracking emails: $GIT_EMAILS" >> "$LOG_FILE"
+# Get commit counts
+log "Collecting commit data..."
+TODAY_COMMITS=$(git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
+# Also check by username in case email doesn't match
+TODAY_COMMITS_BY_NAME=$(git log --author="$GIT_NAME" --since="$DATE 00:00" --until="$DATE 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
+# Use the higher of the two
+if [ "$TODAY_COMMITS_BY_NAME" -gt "$TODAY_COMMITS" ]; then
+    TODAY_COMMITS=$TODAY_COMMITS_BY_NAME
+fi
 
-# Build author filter for all emails
-AUTHOR_ARGS=""
-IFS='|' read -ra EMAILS <<< "$GIT_EMAILS"
-for email in "${EMAILS[@]}"; do
-    AUTHOR_ARGS="$AUTHOR_ARGS --author=$email"
-done
+YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null || echo "")
+if [ -n "$YESTERDAY" ]; then
+    YESTERDAY_COMMITS=$(git log --author="$GIT_EMAIL" --since="$YESTERDAY 00:00" --until="$YESTERDAY 23:59:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
+else
+    YESTERDAY_COMMITS=0
+fi
 
-# Get today's commits
-TODAY_COMMITS=$(git log $AUTHOR_ARGS --since="today 00:00" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
-YESTERDAY_COMMITS=$(git log $AUTHOR_ARGS --since="yesterday 00:00" --until="today 00:00" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
-WEEK_COMMITS=$(git log $AUTHOR_ARGS --since="7 days ago" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
-SEVEN_DAY_AVG=$(echo "scale=1; $WEEK_COMMITS / 7" | bc)
+WEEK_COMMITS=$(git log --author="$GIT_EMAIL" --since="7 days ago" --oneline 2>/dev/null | wc -l | tr -d ' ')
+if [ "$WEEK_COMMITS" -gt 0 ]; then
+    SEVEN_DAY_AVG=$(echo "scale=1; $WEEK_COMMITS / 7" | bc 2>/dev/null || echo "0")
+else
+    SEVEN_DAY_AVG="0"
+fi
 
-echo "Today's commits: $TODAY_COMMITS" >> "$LOG_FILE"
-echo "Yesterday's commits: $YESTERDAY_COMMITS" >> "$LOG_FILE"
-echo "7-day average: $SEVEN_DAY_AVG" >> "$LOG_FILE"
+log "Today's commits: $TODAY_COMMITS"
+log "Yesterday's commits: $YESTERDAY_COMMITS"
+log "7-day average: $SEVEN_DAY_AVG"
 
-# Get GitHub stats
-ISSUES_CLOSED_TODAY=$(gh issue list --assignee="@me" --state closed --search "closed:$DATE" --json number --jq 'length' 2>/dev/null || echo "0")
-PRS_MERGED_TODAY=$(gh pr list --author="@me" --state merged --search "merged:$DATE" --json number --jq 'length' 2>/dev/null || echo "0")
+# Get PRs merged today (without jq - using grep)
+log "Collecting PR data..."
+PRS_JSON=$(gh pr list --author "$GH_USERNAME" --state merged --limit 100 --json number,title,mergedAt 2>/dev/null || echo "[]")
+PRS_MERGED_TODAY=$(echo "$PRS_JSON" | grep -o "\"mergedAt\":\"${DATE}T[^\"]*\"" | wc -l | tr -d ' ')
+log "PRs merged today: $PRS_MERGED_TODAY"
 
-echo "Issues closed: $ISSUES_CLOSED_TODAY" >> "$LOG_FILE"
-echo "PRs merged: $PRS_MERGED_TODAY" >> "$LOG_FILE"
+# Get issues closed today
+log "Collecting issue data..."
+# Use search API for issues closed on specific date
+ISSUES_CLOSED_TODAY=$(gh search issues --repo Open-Cap-Stack/opencapstack --closed "$DATE" --limit 200 2>/dev/null | wc -l | tr -d ' ')
+log "Issues closed today: $ISSUES_CLOSED_TODAY"
 
-# Calculate velocity
-VELOCITY_SCORE=$(echo "$TODAY_COMMITS * 1 + $ISSUES_CLOSED_TODAY * 3 + $PRS_MERGED_TODAY * 5" | bc)
+# ============================================================================
+# CALCULATE VELOCITY
+# ============================================================================
+VELOCITY_SCORE=$((TODAY_COMMITS * 1 + ISSUES_CLOSED_TODAY * 3 + PRS_MERGED_TODAY * 5))
 
 # Determine velocity trend
-if [ $(echo "$TODAY_COMMITS > $SEVEN_DAY_AVG" | bc) -eq 1 ]; then
-  VELOCITY_TREND="📈 Above Average"
-elif [ $(echo "$TODAY_COMMITS < $SEVEN_DAY_AVG" | bc) -eq 1 ]; then
-  VELOCITY_TREND="📉 Below Average"
+if [ "$(echo "$TODAY_COMMITS > $SEVEN_DAY_AVG" | bc 2>/dev/null || echo 0)" -eq 1 ]; then
+    VELOCITY_TREND="Above Average"
+elif [ "$(echo "$TODAY_COMMITS < $SEVEN_DAY_AVG" | bc 2>/dev/null || echo 0)" -eq 1 ]; then
+    VELOCITY_TREND="Below Average"
 else
-  VELOCITY_TREND="➡️ On Track"
+    VELOCITY_TREND="On Track"
 fi
 
-# Productivity rating
-if [ $(echo "$VELOCITY_SCORE >= 50" | bc) -eq 1 ] && [ "$TODAY_COMMITS" -ge 19 ]; then
-  PRODUCTIVITY_RATING="🔥 Exceptional (top 10%)"
-elif [ $(echo "$VELOCITY_SCORE >= 30" | bc) -eq 1 ] && [ "$TODAY_COMMITS" -ge 15 ]; then
-  PRODUCTIVITY_RATING="⭐ Strong (top 25%)"
-elif [ $(echo "$VELOCITY_SCORE >= 15" | bc) -eq 1 ] && [ "$TODAY_COMMITS" -ge 3 ]; then
-  PRODUCTIVITY_RATING="✅ Good (above median)"
+# Productivity rating based on velocity score
+if [ "$VELOCITY_SCORE" -ge 50 ]; then
+    PRODUCTIVITY_RATING="Exceptional"
+elif [ "$VELOCITY_SCORE" -ge 30 ]; then
+    PRODUCTIVITY_RATING="Strong"
+elif [ "$VELOCITY_SCORE" -ge 15 ]; then
+    PRODUCTIVITY_RATING="Good"
 else
-  PRODUCTIVITY_RATING="⚠️ Light (below median)"
+    PRODUCTIVITY_RATING="Light"
 fi
 
-# Generate report file
-REPORT_FILE="$REPORT_DIR/DAILY_REPORT_${DATE}_urbantech.md"
+log "Velocity score: $VELOCITY_SCORE"
+log "Rating: $PRODUCTIVITY_RATING"
+
+# ============================================================================
+# GENERATE REPORT
+# ============================================================================
+REPORT_FILE="$REPORT_DIR/DAILY_REPORT_${DATE}_${GH_USERNAME}.md"
+
+log "Generating report: $REPORT_FILE"
 
 cat > "$REPORT_FILE" << EOF
-# Daily Progress Report - $(date +"%B %d, %Y")
+# Daily Report - $DATE
 
-**Developer**: Urban Tech
-**Git Identities Tracked**:
-- utventures@gmail.com (@urbantech)
-- toby@rely.ventures (@relycapital)
-- developer@ainative.studio (@developer-ainative)
-- admin@ainative.studio
+**Developer:** $GH_USERNAME
+**Generated:** $TIMESTAMP
 
-**Total Commits**: $TODAY_COMMITS (across all your identities)
-**Issues Closed**: $ISSUES_CLOSED_TODAY
-**PRs Merged**: $PRS_MERGED_TODAY
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Commits Today | $TODAY_COMMITS |
+| PRs Merged Today | $PRS_MERGED_TODAY |
+| Issues Closed Today | $ISSUES_CLOSED_TODAY |
+| Velocity Score | $VELOCITY_SCORE |
+| Rating | $PRODUCTIVITY_RATING |
 
 ---
 
 ## Developer Velocity
 
-**Today's Productivity**:
-- Commits: $TODAY_COMMITS
-- Issues Closed: $ISSUES_CLOSED_TODAY
-- PRs Merged: $PRS_MERGED_TODAY
-- Velocity Score: $VELOCITY_SCORE points (commits×1 + issues×3 + PRs×5)
-- Productivity Rating: $PRODUCTIVITY_RATING
+| Metric | Value |
+|--------|-------|
+| Today's Commits | $TODAY_COMMITS |
+| Yesterday's Commits | $YESTERDAY_COMMITS |
+| 7-Day Average | $SEVEN_DAY_AVG commits/day |
+| Trend | $VELOCITY_TREND |
 
-**Comparison**:
-- Yesterday: $YESTERDAY_COMMITS commits
-- 7-Day Average: $SEVEN_DAY_AVG commits/day
-- Trend: $VELOCITY_TREND
+**Velocity Score Calculation:**
+- Commits × 1 = $TODAY_COMMITS
+- Issues × 3 = $((ISSUES_CLOSED_TODAY * 3))
+- PRs × 5 = $((PRS_MERGED_TODAY * 5))
+- **Total: $VELOCITY_SCORE points**
 
-**Velocity Benchmarks**:
-- 🔥 Exceptional: 19+ commits/day, 50+ velocity points (top 10%)
-- ⭐ Strong: 15+ commits/day, 30+ velocity points (top 25%)
-- ✅ Good: 3+ commits/day, 15+ velocity points (above median)
-- ⚠️ Light: <3 commits/day, <15 velocity points (below median)
+**Rating Scale:**
+- Exceptional: 50+ points
+- Strong: 30-49 points
+- Good: 15-29 points
+- Light: <15 points
+
+---
 
 ## Commits Today
 
@@ -133,41 +171,76 @@ EOF
 
 # Add commit list
 if [ "$TODAY_COMMITS" -gt 0 ]; then
-    echo "### All Commits" >> "$REPORT_FILE"
-    echo "" >> "$REPORT_FILE"
-    git log $AUTHOR_ARGS --since="today 00:00" --pretty=format:"- \`%h\` %s" --no-merges >> "$REPORT_FILE"
+    git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty=format:"- \`%h\` %s" 2>/dev/null >> "$REPORT_FILE"
+    # Also add commits by name if different
+    git log --author="$GIT_NAME" --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty=format:"- \`%h\` %s" 2>/dev/null | grep -v "^$" >> "$REPORT_FILE" 2>/dev/null || true
     echo "" >> "$REPORT_FILE"
 else
     echo "No commits today." >> "$REPORT_FILE"
 fi
 
-# Add files modified
+# Add PRs merged section
+echo "" >> "$REPORT_FILE"
+echo "---" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## PRs Merged Today" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ "$PRS_MERGED_TODAY" -gt 0 ]; then
+    # Extract PR numbers and titles for today
+    echo "$PRS_JSON" | grep -E "\"number\":|\"title\":|\"mergedAt\":\"${DATE}" | \
+    while read -r line; do
+        if echo "$line" | grep -q "\"number\":"; then
+            NUM=$(echo "$line" | grep -o '"number":[0-9]*' | grep -o '[0-9]*')
+        elif echo "$line" | grep -q "\"title\":"; then
+            TITLE=$(echo "$line" | sed 's/.*"title":"\([^"]*\)".*/\1/')
+        elif echo "$line" | grep -q "\"mergedAt\":\"${DATE}"; then
+            if [ -n "$NUM" ] && [ -n "$TITLE" ]; then
+                echo "- #$NUM - $TITLE" >> "$REPORT_FILE"
+            fi
+            NUM=""
+            TITLE=""
+        fi
+    done
+
+    # Simpler approach - just list the PRs
+    gh pr list --author "$GH_USERNAME" --state merged --limit 50 --json number,title,mergedAt 2>/dev/null | \
+    grep -B2 "\"mergedAt\":\"${DATE}" | grep -E "number|title" | \
+    sed 'N;s/\n/ /' | sed 's/.*"number":\([0-9]*\).*"title":"\([^"]*\)".*/- #\1 - \2/' >> "$REPORT_FILE" 2>/dev/null || true
+else
+    echo "No PRs merged today." >> "$REPORT_FILE"
+fi
+
+# Add issues section
+echo "" >> "$REPORT_FILE"
+echo "---" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## Issues Closed Today" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ "$ISSUES_CLOSED_TODAY" -gt 0 ]; then
+    gh search issues --repo Open-Cap-Stack/opencapstack --closed "$DATE" --limit 50 2>/dev/null | \
+    awk '{print "- #"$2" - "$4" "$5" "$6" "$7" "$8}' >> "$REPORT_FILE" || echo "Unable to fetch issue details" >> "$REPORT_FILE"
+else
+    echo "No issues closed today." >> "$REPORT_FILE"
+fi
+
+# Add files modified section
+echo "" >> "$REPORT_FILE"
+echo "---" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 echo "## Files Modified" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
+
 if [ "$TODAY_COMMITS" -gt 0 ]; then
-    FILES_CHANGED=$(git log $AUTHOR_ARGS --since="today 00:00" --name-only --pretty=format: | sort -u | grep -v "^$" | wc -l | tr -d ' ')
-    echo "**Total files changed**: $FILES_CHANGED" >> "$REPORT_FILE"
+    FILES_CHANGED=$(git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | wc -l | tr -d ' ')
+    echo "**Total files changed:** $FILES_CHANGED" >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
     echo "\`\`\`" >> "$REPORT_FILE"
-    git log $AUTHOR_ARGS --since="today 00:00" --name-only --pretty=format: | sort -u | grep -v "^$" >> "$REPORT_FILE"
+    git log --author="$GIT_EMAIL" --since="$DATE 00:00" --until="$DATE 23:59:59" --name-only --pretty=format: 2>/dev/null | sort -u | grep -v "^$" | head -50 >> "$REPORT_FILE"
     echo "\`\`\`" >> "$REPORT_FILE"
 else
     echo "No files modified today." >> "$REPORT_FILE"
-fi
-
-# Add GitHub issues
-echo "" >> "$REPORT_FILE"
-echo "## GitHub Activity" >> "$REPORT_FILE"
-echo "" >> "$REPORT_FILE"
-if [ "$ISSUES_CLOSED_TODAY" -gt 0 ]; then
-    echo "### Issues Closed Today" >> "$REPORT_FILE"
-    gh issue list --assignee="@me" --state closed --search "closed:$DATE" --json number,title --jq '.[] | "- #\(.number) - \(.title)"' >> "$REPORT_FILE" 2>/dev/null || echo "- Unable to fetch issues" >> "$REPORT_FILE"
-fi
-if [ "$PRS_MERGED_TODAY" -gt 0 ]; then
-    echo "" >> "$REPORT_FILE"
-    echo "### PRs Merged Today" >> "$REPORT_FILE"
-    gh pr list --author="@me" --state merged --search "merged:$DATE" --json number,title --jq '.[] | "- #\(.number) - \(.title)"' >> "$REPORT_FILE" 2>/dev/null || echo "- Unable to fetch PRs" >> "$REPORT_FILE"
 fi
 
 # Footer
@@ -175,31 +248,21 @@ cat >> "$REPORT_FILE" << EOF
 
 ---
 
-**Report Generated**: $(date +"%Y-%m-%d %H:%M:%S %Z")
-**Automated**: Yes (runs daily at 11:59 PM Pacific)
+## Next Steps
+
+- Review remaining open issues
+- Continue with backlog priorities
+- Address any code review feedback
+
+---
+
+*Report generated automatically at $(date +"%H:%M %p")*
 EOF
 
-echo "Report generated successfully: $REPORT_FILE" >> "$LOG_FILE"
+log "========================================"
+log "Report generated successfully!"
+log "Location: $REPORT_FILE"
+log "========================================"
 
-# Send email if enabled
-if [ "$SEND_EMAIL" = true ]; then
-    echo "Sending email to $EMAIL_TO..." >> "$LOG_FILE"
-
-    # Send email using Node.js script
-    EMAIL_RESULT=$(node "$PROJECT_DIR/scripts/send-email-report.js" "$REPORT_FILE" "$EMAIL_TO" 2>&1)
-    EMAIL_EXIT_CODE=$?
-
-    if [ $EMAIL_EXIT_CODE -eq 0 ]; then
-        echo "$EMAIL_RESULT" >> "$LOG_FILE"
-        echo "$EMAIL_RESULT"
-    else
-        echo "❌ Failed to send email" >> "$LOG_FILE"
-        echo "$EMAIL_RESULT" >> "$LOG_FILE"
-        echo "❌ Failed to send email: $EMAIL_RESULT"
-    fi
-fi
-
-echo "========================================" >> "$LOG_FILE"
-
-# Output result
+echo ""
 echo "Daily report generated: $REPORT_FILE"
