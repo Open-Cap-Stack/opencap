@@ -33,6 +33,9 @@ router.delete('/folders/:id', documentController.deleteFolderById);
 router.get('/folders/:id/contents', documentController.getFolderContents);
 
 // Search and Analytics (specific routes before :id)
+// GET /api/v1/documents/analytics - Get general document analytics
+router.get('/analytics', documentController.getGeneralAnalytics);
+
 // POST /api/v1/documents/search - Semantic search for documents
 router.post('/search', documentController.searchDocuments);
 

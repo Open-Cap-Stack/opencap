@@ -15,6 +15,18 @@ const DocumentFolder = require('../models/DocumentFolder');
 const TABLE_NAME = 'documents';
 
 /**
+ * Helper to unwrap ZeroDB response data
+ * ZeroDB returns { data: [{ row_data: {...}, row_id: ... }] }
+ */
+function unwrapZeroDBResponse(result) {
+    const rawData = result.data || result.rows || result || [];
+    if (Array.isArray(rawData)) {
+        return rawData.map(item => item.row_data || item);
+    }
+    return rawData;
+}
+
+/**
  * Create a new document with vector indexing
  */
 exports.createDocument = async (req, res) => {
@@ -157,7 +169,7 @@ exports.getDocuments = async (req, res) => {
                         sort: { [sortBy]: sortDirection }
                     });
 
-                    documents = result.rows || result;
+                    documents = unwrapZeroDBResponse(result);
 
                     // Add relevance scores from vector search
                     documents = documents.map(doc => {
@@ -192,7 +204,7 @@ exports.getDocuments = async (req, res) => {
                     sort: { [sortBy]: sortDirection }
                 });
 
-                documents = result.rows || result;
+                documents = unwrapZeroDBResponse(result);
             }
         } else {
             // No search query, use regular filtering
@@ -203,7 +215,7 @@ exports.getDocuments = async (req, res) => {
                 sort: { [sortBy]: sortDirection }
             });
 
-            documents = result.rows || result;
+            documents = unwrapZeroDBResponse(result);
         }
 
         // Get total count for pagination
@@ -234,7 +246,7 @@ exports.getDocumentById = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -269,7 +281,7 @@ exports.updateDocumentById = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -324,7 +336,7 @@ exports.deleteDocumentById = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -405,7 +417,7 @@ exports.searchDocuments = async (req, res) => {
         }
 
         const result = await zerodbService.queryTable(TABLE_NAME, { filter: accessFilter });
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
 
         // Combine documents with relevance scores
         const results = documents.map(doc => {
@@ -447,7 +459,7 @@ exports.findSimilarDocuments = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const referenceDoc = documents[0];
 
         if (!referenceDoc) {
@@ -536,7 +548,7 @@ exports.getDocumentAnalytics = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -572,6 +584,55 @@ exports.getDocumentAnalytics = async (req, res) => {
 };
 
 /**
+ * Get general document analytics (not specific to a document)
+ */
+exports.getGeneralAnalytics = async (req, res) => {
+    try {
+        const { companyId } = req.query;
+
+        // Build filter
+        const filter = { status: { $ne: 'deleted' } };
+        if (companyId) {
+            filter.ownerCompany = companyId;
+        }
+
+        // Get all documents
+        const result = await zerodbService.queryTable(TABLE_NAME, { filter });
+        const documents = result.data || result.rows || result || [];
+
+        // Unwrap row_data if needed
+        const docs = documents.map(d => d.row_data || d);
+
+        // Calculate analytics
+        const totalDocuments = docs.length;
+        const pendingSignatures = docs.filter(d => d.status === 'pending_signature').length;
+        const sharedDocuments = docs.filter(d => d.accessControl?.isPublic || d.accessLevel === 'public').length;
+
+        // Calculate total storage (sum of file sizes)
+        const totalStorageBytes = docs.reduce((sum, d) => sum + (d.size || 0), 0);
+        const totalStorageGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(1);
+
+        // Document types breakdown
+        const documentTypes = {};
+        docs.forEach(d => {
+            const type = d.category || d.documentType || 'Other';
+            documentTypes[type] = (documentTypes[type] || 0) + 1;
+        });
+
+        res.status(200).json({
+            total_documents: totalDocuments,
+            pending_signatures: pendingSignatures,
+            shared_documents: sharedDocuments,
+            total_storage_gb: parseFloat(totalStorageGB),
+            document_types: documentTypes
+        });
+    } catch (error) {
+        console.error('General analytics error:', error);
+        res.status(500).json({ message: 'Failed to get document analytics', error: error.message });
+    }
+};
+
+/**
  * Bulk index documents for vector search
  */
 exports.bulkIndexDocuments = async (req, res) => {
@@ -593,7 +654,7 @@ exports.bulkIndexDocuments = async (req, res) => {
         }
 
         const result = await zerodbService.queryTable(TABLE_NAME, { filter });
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
 
         let indexed = 0;
         let failed = 0;
@@ -733,7 +794,7 @@ exports.downloadDocument = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -815,7 +876,7 @@ exports.getDocumentPreview = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
@@ -894,7 +955,7 @@ exports.getDocumentAccess = async (req, res) => {
             limit: 1
         });
 
-        const documents = result.rows || result;
+        const documents = unwrapZeroDBResponse(result);
         const document = documents[0];
 
         if (!document) {
