@@ -7,10 +7,10 @@
 const express = require('express');
 const router = express.Router();
 const materialEventController = require('../../controllers/materialEventController');
-const authMiddleware = require('../../middleware/authMiddleware');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply auth middleware to all routes
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 /**
  * @swagger

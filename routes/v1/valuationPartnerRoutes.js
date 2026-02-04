@@ -7,10 +7,10 @@
 const express = require('express');
 const router = express.Router();
 const valuationPartnerController = require('../../controllers/valuationPartnerController');
-const authMiddleware = require('../../middleware/authMiddleware');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply auth middleware
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 /**
  * @swagger

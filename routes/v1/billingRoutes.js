@@ -13,10 +13,10 @@
 const express = require('express');
 const router = express.Router();
 const billingController = require('../../controllers/billingController');
-const authMiddleware = require('../../middleware/authMiddleware');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication to all routes
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 /**
  * @route GET /api/v1/billing/current-plan
