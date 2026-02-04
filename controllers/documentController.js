@@ -85,6 +85,7 @@ exports.createDocument = async (req, res) => {
 
 /**
  * Get all documents with search and filtering
+ * Simplified for ZeroDB compatibility (no MongoDB operators)
  */
 exports.getDocuments = async (req, res) => {
     try {
@@ -100,26 +101,12 @@ exports.getDocuments = async (req, res) => {
             sortOrder = 'desc'
         } = req.query;
 
-        // Build filter object
+        // Build simple filter object (ZeroDB only supports basic equality)
         let filter = {};
 
-        // Add user's company filter by default (unless admin)
-        if (req.user?.role !== 'admin' && req.user?.companyId) {
-            filter.companyId = req.user.companyId;
-        }
-
-        // Override with specific companyId if provided and user has permission
-        if (companyId && req.user?.role === 'admin') {
-            filter.companyId = companyId;
-        }
-
-        // Apply access level filtering based on user permissions
-        if (req.user?.role !== 'admin') {
-            filter.$or = [
-                { accessLevel: 'public' },
-                { uploadedBy: req.user?.userId },
-                { sharedWith: { $in: [req.user?.userId] } }
-            ];
+        // Add companyId filter if provided
+        if (companyId) {
+            filter.ownerCompany = companyId;
         }
 
         // Add category filter
@@ -127,99 +114,56 @@ exports.getDocuments = async (req, res) => {
             filter.category = category;
         }
 
-        // Add tags filter
-        if (tags) {
-            const tagArray = Array.isArray(tags) ? tags : tags.split(',');
-            filter.tags = { $in: tagArray };
-        }
-
         // Add access level filter
         if (accessLevel) {
             filter.accessLevel = accessLevel;
         }
 
-        // Add status filter (only show active documents by default)
-        filter.status = { $ne: 'deleted' };
+        // Get all documents with basic filter
+        const result = await zerodbService.queryTable(TABLE_NAME, {
+            filter,
+            limit: 1000 // Get more documents for JS filtering
+        });
 
-        let documents;
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const sortDirection = sortOrder === 'desc' ? -1 : 1;
+        let documents = unwrapZeroDBResponse(result);
 
-        // If search query provided, use vector search
+        // Filter out deleted documents in JS
+        documents = documents.filter(doc => doc.status !== 'deleted');
+
+        // Apply search filter in JS if provided
         if (search) {
-            try {
-                // Get similar documents using vector search
-                const searchResults = await vectorService.searchSimilarDocuments(search, {
-                    limit: parseInt(limit),
-                    threshold: 0.1,
-                    namespace: 'documents'
-                });
-
-                // Get document IDs from search results
-                const documentIds = searchResults.map(result => result.metadata.id);
-
-                if (documentIds.length > 0) {
-                    // Apply additional filters to search results
-                    filter.id = { $in: documentIds };
-
-                    const result = await zerodbService.queryTable(TABLE_NAME, {
-                        filter,
-                        skip,
-                        limit: parseInt(limit),
-                        sort: { [sortBy]: sortDirection }
-                    });
-
-                    documents = unwrapZeroDBResponse(result);
-
-                    // Add relevance scores from vector search
-                    documents = documents.map(doc => {
-                        const docId = doc.id || doc._id;
-                        const searchResult = searchResults.find(r => r.metadata.id === docId);
-                        return {
-                            ...doc,
-                            relevanceScore: searchResult?.score || 0
-                        };
-                    });
-
-                    // Sort by relevance score if search was performed
-                    documents.sort((a, b) => b.relevanceScore - a.relevanceScore);
-                } else {
-                    documents = [];
-                }
-            } catch (vectorError) {
-                console.warn('Vector search failed, falling back to text search:', vectorError.message);
-
-                // Fallback to traditional text search
-                filter.$or = [
-                    { title: { $regex: search, $options: 'i' } },
-                    { description: { $regex: search, $options: 'i' } },
-                    { content: { $regex: search, $options: 'i' } },
-                    { tags: { $regex: search, $options: 'i' } }
-                ];
-
-                const result = await zerodbService.queryTable(TABLE_NAME, {
-                    filter,
-                    skip,
-                    limit: parseInt(limit),
-                    sort: { [sortBy]: sortDirection }
-                });
-
-                documents = unwrapZeroDBResponse(result);
-            }
-        } else {
-            // No search query, use regular filtering
-            const result = await zerodbService.queryTable(TABLE_NAME, {
-                filter,
-                skip,
-                limit: parseInt(limit),
-                sort: { [sortBy]: sortDirection }
-            });
-
-            documents = unwrapZeroDBResponse(result);
+            const searchLower = search.toLowerCase();
+            documents = documents.filter(doc =>
+                (doc.name && doc.name.toLowerCase().includes(searchLower)) ||
+                (doc.title && doc.title.toLowerCase().includes(searchLower)) ||
+                (doc.description && doc.description.toLowerCase().includes(searchLower)) ||
+                (doc.category && doc.category.toLowerCase().includes(searchLower)) ||
+                (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchLower)))
+            );
         }
 
-        // Get total count for pagination
-        const total = await zerodbService.countRows(TABLE_NAME, filter);
+        // Apply tags filter in JS
+        if (tags) {
+            const tagArray = Array.isArray(tags) ? tags : tags.split(',');
+            documents = documents.filter(doc =>
+                doc.tags && doc.tags.some(tag => tagArray.includes(tag))
+            );
+        }
+
+        // Sort documents
+        const sortMultiplier = sortOrder === 'desc' ? -1 : 1;
+        documents.sort((a, b) => {
+            const aVal = a[sortBy] || '';
+            const bVal = b[sortBy] || '';
+            if (aVal < bVal) return -1 * sortMultiplier;
+            if (aVal > bVal) return 1 * sortMultiplier;
+            return 0;
+        });
+
+        // Apply pagination
+        const total = documents.length;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        documents = documents.slice(skip, skip + parseInt(limit));
 
         res.status(200).json({
             documents,
@@ -232,6 +176,7 @@ exports.getDocuments = async (req, res) => {
             searchPerformed: !!search
         });
     } catch (error) {
+        console.error('Error getting documents:', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -270,10 +215,10 @@ exports.updateDocumentById = async (req, res) => {
         };
 
         // Update in ZeroDB
-        await zerodbService.updateRows(TABLE_NAME,
-            { id: req.params.id },
-            { $set: updateData }
-        );
+        await zerodbService.updateRows(TABLE_NAME, {
+            filter: { id: req.params.id },
+            update: updateData
+        });
 
         // Fetch the updated document
         const result = await zerodbService.queryTable(TABLE_NAME, {
@@ -344,7 +289,7 @@ exports.deleteDocumentById = async (req, res) => {
         }
 
         // Delete from ZeroDB
-        await zerodbService.deleteRows(TABLE_NAME, { id: req.params.id });
+        await zerodbService.deleteRows(TABLE_NAME, { filter: { id: req.params.id } });
 
         // Remove from vector index
         try {
@@ -399,25 +344,33 @@ exports.searchDocuments = async (req, res) => {
             });
         }
 
-        // Build access filter
-        let accessFilter = { id: { $in: documentIds } };
+        // Get all documents from ZeroDB (no complex filters)
+        const result = await zerodbService.queryTable(TABLE_NAME, { filter: {}, limit: 1000 });
+        let documents = unwrapZeroDBResponse(result);
 
-        // Apply access level filtering based on user permissions
+        // Filter to only include documents from search results
+        documents = documents.filter(doc => {
+            const docId = doc.id || doc._id;
+            return documentIds.includes(docId);
+        });
+
+        // Apply access level filtering in JavaScript
         if (req.user?.role !== 'admin') {
-            accessFilter.$or = [
-                { accessLevel: 'public' },
-                { uploadedBy: req.user?.userId },
-                { sharedWith: { $in: [req.user?.userId] } }
-            ];
+            documents = documents.filter(doc => {
+                // Public documents
+                if (doc.accessLevel === 'public') return true;
+                // Owner access
+                if (doc.uploadedBy === req.user?.userId) return true;
+                // Shared with user
+                if (doc.sharedWith && doc.sharedWith.includes(req.user?.userId)) return true;
+                return false;
+            });
         }
 
         // Add company filter
         if (req.user?.companyId && req.user?.role !== 'admin') {
-            accessFilter.companyId = req.user.companyId;
+            documents = documents.filter(doc => doc.companyId === req.user.companyId);
         }
-
-        const result = await zerodbService.queryTable(TABLE_NAME, { filter: accessFilter });
-        const documents = unwrapZeroDBResponse(result);
 
         // Combine documents with relevance scores
         const results = documents.map(doc => {
@@ -494,23 +447,29 @@ exports.findSimilarDocuments = async (req, res) => {
             });
         }
 
-        // Apply access filtering
-        let accessFilter = { id: { $in: documentIds } };
+        // Get all documents from ZeroDB (no complex filters)
+        const docsResult = await zerodbService.queryTable(TABLE_NAME, { filter: {}, limit: 1000 });
+        let docsData = unwrapZeroDBResponse(docsResult);
 
+        // Filter to only include documents from similar results
+        docsData = docsData.filter(doc => {
+            const docId = doc.id || doc._id;
+            return documentIds.includes(docId);
+        });
+
+        // Apply access filtering in JavaScript
         if (req.user?.role !== 'admin') {
-            accessFilter.$or = [
-                { accessLevel: 'public' },
-                { uploadedBy: req.user?.userId },
-                { sharedWith: { $in: [req.user?.userId] } }
-            ];
+            docsData = docsData.filter(doc => {
+                if (doc.accessLevel === 'public') return true;
+                if (doc.uploadedBy === req.user?.userId) return true;
+                if (doc.sharedWith && doc.sharedWith.includes(req.user?.userId)) return true;
+                return false;
+            });
         }
 
         if (req.user?.companyId && req.user?.role !== 'admin') {
-            accessFilter.companyId = req.user.companyId;
+            docsData = docsData.filter(doc => doc.companyId === req.user.companyId);
         }
-
-        const docsResult = await zerodbService.queryTable(TABLE_NAME, { filter: accessFilter });
-        const docsData = docsResult.rows || docsResult;
 
         // Combine with similarity scores
         const results = docsData.map(doc => {
@@ -590,18 +549,18 @@ exports.getGeneralAnalytics = async (req, res) => {
     try {
         const { companyId } = req.query;
 
-        // Build filter
-        const filter = { status: { $ne: 'deleted' } };
+        // Build simple filter (ZeroDB only supports basic equality)
+        const filter = {};
         if (companyId) {
             filter.ownerCompany = companyId;
         }
 
         // Get all documents
-        const result = await zerodbService.queryTable(TABLE_NAME, { filter });
-        const documents = result.data || result.rows || result || [];
+        const result = await zerodbService.queryTable(TABLE_NAME, { filter, limit: 1000 });
+        let docs = unwrapZeroDBResponse(result);
 
-        // Unwrap row_data if needed
-        const docs = documents.map(d => d.row_data || d);
+        // Filter out deleted documents in JavaScript
+        docs = docs.filter(d => d.status !== 'deleted');
 
         // Calculate analytics
         const totalDocuments = docs.length;
@@ -645,16 +604,17 @@ exports.bulkIndexDocuments = async (req, res) => {
         const { force = 'false' } = req.query;
         const forceIndex = force === 'true';
 
-        // Get all documents that need indexing
-        let filter = { status: { $ne: 'deleted' } };
+        // Get all documents (ZeroDB only supports basic equality filters)
+        const result = await zerodbService.queryTable(TABLE_NAME, { filter: {}, limit: 1000 });
+        let documents = unwrapZeroDBResponse(result);
 
+        // Filter out deleted documents in JavaScript
+        documents = documents.filter(doc => doc.status !== 'deleted');
+
+        // If not forcing, only index documents that haven't been indexed yet
         if (!forceIndex) {
-            // Only index documents that haven't been indexed yet
-            filter.vectorIndexed = { $ne: true };
+            documents = documents.filter(doc => doc.vectorIndexed !== true);
         }
-
-        const result = await zerodbService.queryTable(TABLE_NAME, { filter });
-        const documents = unwrapZeroDBResponse(result);
 
         let indexed = 0;
         let failed = 0;
@@ -677,10 +637,10 @@ exports.bulkIndexDocuments = async (req, res) => {
                     });
 
                     // Mark as indexed
-                    await zerodbService.updateRows(TABLE_NAME,
-                        { id: doc.id || doc._id },
-                        { $set: { vectorIndexed: true } }
-                    );
+                    await zerodbService.updateRows(TABLE_NAME, {
+                        filter: { id: doc.id || doc._id },
+                        update: { vectorIndexed: true }
+                    });
                     indexed++;
                 }
             } catch (error) {
