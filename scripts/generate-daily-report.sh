@@ -93,16 +93,53 @@ log "Today's commits: $TODAY_COMMITS"
 log "Yesterday's commits: $YESTERDAY_COMMITS"
 log "7-day average: $SEVEN_DAY_AVG"
 
-# Get PRs merged today (without jq - using grep)
+# Get PRs merged in reporting window (timezone-aware: PKT = UTC+5)
+# Convert PKT window to UTC for GitHub API comparison
 log "Collecting PR data..."
-PRS_JSON=$(gh pr list --author "$GH_USERNAME" --state merged --limit 100 --json number,title,mergedAt 2>/dev/null || echo "[]")
-PRS_MERGED_TODAY=$(echo "$PRS_JSON" | grep -o "\"mergedAt\":\"${DATE}T[^\"]*\"" | wc -l | tr -d ' ')
+# PKT 23:59 = UTC 18:59 (subtract 5 hours)
+UTC_START_DATE=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d)
+UTC_END_DATE=$DATE
+
+PRS_MERGED_TODAY=$(gh pr list --state merged --limit 200 --json number,title,mergedAt 2>/dev/null | \
+  python3 -c "
+import json, sys
+from datetime import datetime
+try:
+    data = json.load(sys.stdin)
+    # PKT window converted to UTC (PKT = UTC+5, so subtract 5 hours)
+    start = datetime(${YESTERDAY:0:4}, ${YESTERDAY:5:2}, ${YESTERDAY:8:2}, 18, 59)
+    end = datetime(${DATE:0:4}, ${DATE:5:2}, ${DATE:8:2}, 18, 59)
+    count = 0
+    for pr in data:
+        merged = datetime.fromisoformat(pr['mergedAt'].replace('Z', ''))
+        if start <= merged <= end:
+            count += 1
+    print(count)
+except:
+    print(0)
+" 2>/dev/null || echo "0")
 log "PRs merged today: $PRS_MERGED_TODAY"
 
-# Get issues closed today
+# Get issues closed in reporting window (timezone-aware)
 log "Collecting issue data..."
-# Use search API for issues closed on specific date
-ISSUES_CLOSED_TODAY=$(gh search issues --repo Open-Cap-Stack/opencapstack --closed "$DATE" --limit 200 2>/dev/null | wc -l | tr -d ' ')
+ISSUES_CLOSED_TODAY=$(gh issue list --state closed --limit 200 --json number,title,closedAt 2>/dev/null | \
+  python3 -c "
+import json, sys
+from datetime import datetime
+try:
+    data = json.load(sys.stdin)
+    start = datetime(${YESTERDAY:0:4}, ${YESTERDAY:5:2}, ${YESTERDAY:8:2}, 18, 59)
+    end = datetime(${DATE:0:4}, ${DATE:5:2}, ${DATE:8:2}, 18, 59)
+    count = 0
+    for issue in data:
+        if issue.get('closedAt'):
+            closed = datetime.fromisoformat(issue['closedAt'].replace('Z', ''))
+            if start <= closed <= end:
+                count += 1
+    print(count)
+except:
+    print(0)
+" 2>/dev/null || echo "0")
 log "Issues closed today: $ISSUES_CLOSED_TODAY"
 
 # ============================================================================
