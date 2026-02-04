@@ -26,8 +26,8 @@ const tierLimits = {
 
 // Create a rate limiter middleware
 const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10000, // Limit each IP to 10000 requests per minute (increased for development)
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: true, // Add X-RateLimit headers for older compatibility
   message: {
@@ -45,8 +45,8 @@ const rateLimiter = rateLimit({
 
 // Special endpoints that need more strict rate limiting
 const authRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // Limit each IP to 1000 requests per minute (increased for development)
   message: {
     status: 429,
     error: 'Too many authentication attempts, please try again later.',

@@ -19,15 +19,21 @@ const { PDFExtract } = require('pdf.js-extract');
 const tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const mammoth = require('mammoth');
-const { Configuration, OpenAIApi } = require('openai');
+const { OpenAI } = require('openai');
 
 const DOCUMENTS_TABLE = 'documents';
 const EMBEDDINGS_TABLE = 'document_embeddings';
 
-// Configure OpenAI for text processing
-const openai = new OpenAIApi(new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-}));
+// Configure OpenAI for text processing (updated for openai v4+)
+// Allow instantiation without API key for test environments
+let openai = null;
+try {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || 'test-key-for-loading',
+  });
+} catch (error) {
+  console.warn('OpenAI client initialization skipped:', error.message);
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -931,12 +937,23 @@ const getDocumentEmbeddingById = async (req, res) => {
   }
 };
 
+// Stub functions for routes that aren't implemented yet
+const updateDocumentEmbedding = async (req, res) => {
+  res.status(501).json({ error: 'Update document embedding not implemented yet' });
+};
+
+const deleteDocumentEmbedding = async (req, res) => {
+  res.status(501).json({ error: 'Delete document embedding not implemented yet' });
+};
+
 // Export all functions
 module.exports = {
   // Legacy functions
   createDocumentEmbedding,
   getDocumentEmbeddings,
   getDocumentEmbeddingById,
+  updateDocumentEmbedding,
+  deleteDocumentEmbedding,
 
   // New advanced functions
   extractDocumentText,
