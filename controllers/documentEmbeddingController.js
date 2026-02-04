@@ -37,7 +37,7 @@ try {
 
 // Configure multer for file uploads (use /tmp for Railway compatibility)
 const upload = multer({
-  dest: process.env.NODE_ENV === 'production' ? '/tmp/uploads/processing/' : 'uploads/processing/',
+  dest: process.env.RAILWAY_ENVIRONMENT ? '/tmp/uploads/processing/' : 'uploads/processing/',
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
