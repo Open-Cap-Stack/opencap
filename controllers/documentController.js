@@ -17,11 +17,23 @@ const TABLE_NAME = 'documents';
 /**
  * Helper to unwrap ZeroDB response data
  * ZeroDB returns { data: [{ row_data: {...}, row_id: ... }] }
+ * This function extracts row_data and adds row_id as id/_id
  */
 function unwrapZeroDBResponse(result) {
     const rawData = result.data || result.rows || result || [];
     if (Array.isArray(rawData)) {
-        return rawData.map(item => item.row_data || item);
+        return rawData.map(item => {
+            if (item.row_data) {
+                // ZeroDB format: merge row_data with row_id as id
+                return {
+                    ...item.row_data,
+                    id: item.row_id || item.row_data.id,
+                    _id: item.row_id || item.row_data._id || item.row_data.id,
+                    row_id: item.row_id
+                };
+            }
+            return item;
+        });
     }
     return rawData;
 }
@@ -43,7 +55,17 @@ exports.createDocument = async (req, res) => {
 
         // Insert into ZeroDB
         const result = await zerodbService.insertRow(TABLE_NAME, documentData);
-        const savedDocument = result.rows ? result.rows[0] : result;
+
+        // Extract the saved document from ZeroDB response
+        // ZeroDB returns { data: [{ row_id, row_data, ... }] }
+        const insertedRow = result.data?.[0] || result.rows?.[0] || result;
+        const savedDocument = {
+            ...documentData,
+            ...insertedRow.row_data,
+            id: insertedRow.row_id || insertedRow.id,
+            _id: insertedRow.row_id || insertedRow.id,
+            row_id: insertedRow.row_id
+        };
 
         // Index document for vector search if content is provided
         if (savedDocument.content || savedDocument.description) {
