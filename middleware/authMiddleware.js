@@ -96,8 +96,17 @@ const authenticateToken = async (req, res, next) => {
       JWT_VERIFICATION_TIMEOUT_MS
     );
     
-    // Handle case where token already contains role and permissions (e.g., in tests)
-    if (decoded.role) {
+    // Try to find or provision user in our database
+    let user = await User.findOne({ userId: decoded.userId });
+
+    // If user not found but token has user info, provision them
+    if (!user && decoded.userId && decoded.email) {
+      console.log(`Provisioning user from JWT: ${decoded.email}`);
+      user = await provisionUserFromToken(decoded);
+    }
+
+    // If still no user, check if token has role (test/admin tokens)
+    if (!user && decoded.role) {
       req.user = {
         userId: decoded.userId,
         email: decoded.email,
@@ -105,26 +114,19 @@ const authenticateToken = async (req, res, next) => {
         permissions: decoded.permissions || [],
         companyId: decoded.companyId
       };
-      
-      // Attach token to request for potential blacklisting on logout
       req.token = token;
-      
-      // Continue with the request
       return next();
     }
-    
-    // Use ZeroDB for user lookup
-    const user = await User.findOne({ userId: decoded.userId });
-    
+
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
-    
+
     // Check if user is active
     if (user.status !== 'active') {
       return res.status(403).json({ message: 'Account is not active' });
     }
-    
+
     // Add user data to request
     req.user = {
       userId: user.userId,
@@ -222,6 +224,53 @@ const validateAINativeToken = async (token) => {
     ainativeError.name = 'AINativeValidationError';
     ainativeError.originalError = error;
     throw ainativeError;
+  }
+};
+
+/**
+ * Provision user from decoded JWT token
+ * Creates a local user record for users authenticated via JWT
+ *
+ * @param {Object} decoded - Decoded JWT payload
+ * @returns {Promise<Object>} - Local user record
+ */
+const provisionUserFromToken = async (decoded) => {
+  try {
+    // Check if user already exists
+    let localUser = await User.findByEmail(decoded.email);
+    if (localUser) {
+      await User.updateLastLogin(localUser.userId);
+      return localUser;
+    }
+
+    console.log(`Creating new user from JWT: ${decoded.email}`);
+
+    // Parse name
+    const name = decoded.name || decoded.displayName || decoded.email.split('@')[0];
+    const nameParts = name.split(' ');
+    const firstName = nameParts[0] || 'User';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const newUser = await User.create({
+      userId: decoded.userId,
+      email: decoded.email,
+      firstName: firstName,
+      lastName: lastName,
+      displayName: name,
+      password: `sso_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      role: decoded.role || 'user',
+      status: 'active',
+      permissions: User.getPermissionsForRole(decoded.role || 'user'),
+      companyId: decoded.companyId || null,
+      lastLogin: new Date().toISOString(),
+      authProvider: 'jwt'
+    });
+
+    console.log(`User provisioned: ${newUser.email} (${newUser.userId})`);
+    return newUser;
+  } catch (error) {
+    console.error('Failed to provision user from token:', error.message);
+    return null;
   }
 };
 
@@ -401,5 +450,6 @@ module.exports = {
   blacklistToken,
   verifyTokenWithTimeout,
   validateAINativeToken,
-  provisionAINativeUser
+  provisionAINativeUser,
+  provisionUserFromToken
 };
