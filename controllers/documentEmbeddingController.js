@@ -35,9 +35,9 @@ try {
   console.warn('OpenAI client initialization skipped:', error.message);
 }
 
-// Configure multer for file uploads
+// Configure multer for file uploads (use /tmp for Railway compatibility)
 const upload = multer({
-  dest: 'uploads/processing/',
+  dest: process.env.NODE_ENV === 'production' ? '/tmp/uploads/processing/' : 'uploads/processing/',
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },

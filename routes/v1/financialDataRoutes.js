@@ -17,10 +17,12 @@ const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
 
-// Configure multer for file uploads
+// Configure multer for file uploads (use /tmp for Railway compatibility)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/imports');
+    const uploadDir = process.env.NODE_ENV === 'production'
+      ? '/tmp/uploads/imports'
+      : path.join(__dirname, '../../uploads/imports');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
