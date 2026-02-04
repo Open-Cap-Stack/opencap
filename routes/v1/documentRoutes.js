@@ -9,7 +9,36 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const os = require('os');
 const documentController = require('../../controllers/documentController');
+
+// Determine upload directory based on environment
+const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME;
+const uploadDir = isRailway ? '/tmp/uploads' : path.join(__dirname, '../../uploads');
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const fs = require('fs');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB limit
+  }
+});
 
 // Folder Management Routes (MUST BE FIRST - before :id routes)
 // Issue #188: Add Document Folder Management Endpoints
@@ -46,8 +75,8 @@ router.post('/bulk-index', documentController.bulkIndexDocuments);
 // GET /api/v1/documents - Get all documents with search and filtering
 router.get('/', documentController.getDocuments);
 
-// POST /api/v1/documents - Create a new document
-router.post('/', documentController.createDocument);
+// POST /api/v1/documents - Create a new document (with file upload)
+router.post('/', upload.single('file'), documentController.createDocument);
 
 // GET /api/v1/documents/:id - Get a document by ID
 router.get('/:id', documentController.getDocumentById);
@@ -73,5 +102,8 @@ router.get('/:id/preview', documentController.getDocumentPreview);
 
 // GET /api/v1/documents/:id/access - Get document access permissions
 router.get('/:id/access', documentController.getDocumentAccess);
+
+// POST /api/v1/documents/:id/access - Log document access
+router.post('/:id/access', documentController.logDocumentAccess);
 
 module.exports = router;

@@ -57,8 +57,30 @@ exports.createDocument = async (req, res) => {
         const now = new Date().toISOString();
         // Generate ID upfront so it's stored in row_data and can be queried
         const documentId = generateUUID();
+
+        // Extract file metadata from multer upload (req.file)
+        const file = req.file;
+        let fileMetadata = {};
+
+        if (file) {
+            fileMetadata = {
+                fileName: file.originalname,
+                name: file.originalname,
+                title: req.body.name || req.body.title || file.originalname,
+                originalFilename: file.originalname,
+                size: file.size,
+                fileSize: file.size,
+                contentType: file.mimetype,
+                mimeType: file.mimetype,
+                storagePath: file.path,
+                filePath: file.path
+            };
+            console.log('File uploaded:', { name: file.originalname, size: file.size, type: file.mimetype });
+        }
+
         const documentData = {
             ...req.body,
+            ...fileMetadata,
             id: documentId,
             _id: documentId,
             uploadedBy: req.user?.userId,
@@ -811,14 +833,8 @@ exports.downloadDocument = async (req, res) => {
         const { id } = req.params;
         const { attachment = 'true' } = req.query;
 
-        // Get document from ZeroDB
-        const result = await zerodbService.queryTable(TABLE_NAME, {
-            filter: { id },
-            limit: 1
-        });
-
-        const documents = unwrapZeroDBResponse(result);
-        const document = documents[0];
+        // Get document from ZeroDB using findDocumentById helper
+        const document = await findDocumentById(id);
 
         if (!document) {
             return res.status(404).json({ message: 'Document not found' });
@@ -829,9 +845,49 @@ exports.downloadDocument = async (req, res) => {
             return res.status(403).json({ message: 'Access denied' });
         }
 
-        // Check if document has a file attached
-        if (!document.fileId) {
+        // Check if document has a file attached (local path or fileId)
+        const localFilePath = document.storagePath || document.filePath;
+        const hasLocalFile = localFilePath && require('fs').existsSync(localFilePath);
+        const hasRemoteFile = document.fileId;
+
+        if (!hasLocalFile && !hasRemoteFile) {
             return res.status(404).json({ message: 'No file attached to document' });
+        }
+
+        const contentType = document.contentType || document.mimeType || 'application/octet-stream';
+        const fileName = document.fileName || document.originalFilename || document.name || 'document';
+        const disposition = attachment === 'true' ? 'attachment' : 'inline';
+
+        // If file is stored locally (via multer), serve it directly
+        if (hasLocalFile) {
+            const fs = require('fs');
+            const stat = fs.statSync(localFilePath);
+
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+            res.setHeader('Content-Length', stat.size);
+
+            // Log download in audit trail
+            try {
+                await eventStreamingService.publishEvent({
+                    topic: 'document.downloaded',
+                    payload: {
+                        documentId: document.id || document._id,
+                        fileName: fileName,
+                        userId: req.user?.userId,
+                        timestamp: new Date().toISOString()
+                    },
+                    metadata: {
+                        actorId: req.user?.userId,
+                        action: 'download'
+                    }
+                });
+            } catch (auditError) {
+                console.warn('Audit logging failed:', auditError.message);
+            }
+
+            const fileStream = fs.createReadStream(localFilePath);
+            return fileStream.pipe(res);
         }
 
         // Download file from storage service
@@ -846,9 +902,6 @@ exports.downloadDocument = async (req, res) => {
         }
 
         // Set response headers
-        const contentType = document.contentType || fileData.contentType || 'application/octet-stream';
-        const fileName = document.fileName || 'document';
-        const disposition = attachment === 'true' ? 'attachment' : 'inline';
 
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
@@ -893,14 +946,8 @@ exports.getDocumentPreview = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get document from ZeroDB
-        const result = await zerodbService.queryTable(TABLE_NAME, {
-            filter: { id },
-            limit: 1
-        });
-
-        const documents = unwrapZeroDBResponse(result);
-        const document = documents[0];
+        // Get document from ZeroDB using findDocumentById helper
+        const document = await findDocumentById(id);
 
         if (!document) {
             return res.status(404).json({ message: 'Document not found' });
@@ -911,46 +958,47 @@ exports.getDocumentPreview = async (req, res) => {
             return res.status(403).json({ message: 'Access denied' });
         }
 
-        // Check if document has a file attached
-        if (!document.fileId) {
+        // Check if document has a file attached (local path or fileId)
+        const localFilePath = document.storagePath || document.filePath;
+        const hasLocalFile = localFilePath && require('fs').existsSync(localFilePath);
+        const hasRemoteFile = document.fileId;
+
+        if (!hasLocalFile && !hasRemoteFile) {
             return res.status(404).json({ message: 'No file attached to document' });
         }
 
-        // Get file metadata from storage service
-        let fileMetadata;
-        try {
-            fileMetadata = await fileStorageService.getFileMetadata(document.fileId);
-        } catch (metadataError) {
-            console.error('File metadata error:', metadataError);
-            return res.status(500).json({ message: 'Failed to get preview metadata' });
+        let contentType = document.contentType || document.mimeType;
+        let fileSize = document.fileSize || document.size;
+        let fileName = document.fileName || document.originalFilename || document.name;
+
+        // If file is stored locally, get metadata from the file
+        if (hasLocalFile) {
+            const fs = require('fs');
+            const stat = fs.statSync(localFilePath);
+            fileSize = fileSize || stat.size;
+        } else if (hasRemoteFile) {
+            // Get file metadata from storage service
+            try {
+                const fileMetadata = await fileStorageService.getFileMetadata(document.fileId);
+                contentType = contentType || fileMetadata.contentType;
+                fileSize = fileSize || fileMetadata.size;
+                fileName = fileName || fileMetadata.fileName;
+            } catch (metadataError) {
+                console.error('File metadata error:', metadataError);
+                // Continue with document metadata only
+            }
         }
 
-        const contentType = document.contentType || fileMetadata.contentType;
         const previewInfo = getPreviewInfo(contentType);
 
         // Build response
         const response = {
             documentId: document.id || document._id,
-            fileName: document.fileName || fileMetadata.fileName,
-            contentType: contentType,
-            fileSize: document.fileSize || fileMetadata.size,
+            fileName: fileName || 'document',
+            contentType: contentType || 'application/octet-stream',
+            fileSize: fileSize || 0,
             ...previewInfo
         };
-
-        // Add dimensions for images
-        if (previewInfo.previewType === 'image' && fileMetadata.metadata) {
-            if (fileMetadata.metadata.width && fileMetadata.metadata.height) {
-                response.dimensions = {
-                    width: fileMetadata.metadata.width,
-                    height: fileMetadata.metadata.height
-                };
-            }
-        }
-
-        // Add page count for PDFs
-        if (previewInfo.previewType === 'pdf' && fileMetadata.metadata?.pageCount) {
-            response.pageCount = fileMetadata.metadata.pageCount;
-        }
 
         // Add message for unsupported types
         if (!previewInfo.previewAvailable) {
@@ -972,14 +1020,8 @@ exports.getDocumentAccess = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get document from ZeroDB
-        const result = await zerodbService.queryTable(TABLE_NAME, {
-            filter: { id },
-            limit: 1
-        });
-
-        const documents = unwrapZeroDBResponse(result);
-        const document = documents[0];
+        // Get document from ZeroDB using findDocumentById helper
+        const document = await findDocumentById(id);
 
         if (!document) {
             return res.status(404).json({ message: 'Document not found' });
@@ -1024,6 +1066,83 @@ exports.getDocumentAccess = async (req, res) => {
     } catch (error) {
         console.error('Document access error:', error);
         res.status(500).json({ message: 'Failed to get document access info' });
+    }
+};
+
+/**
+ * Log document access (view, download, edit)
+ * Issue #122: Document access logging endpoint
+ */
+exports.logDocumentAccess = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { accessType, accessedAt } = req.body;
+
+        // Validate access type
+        const validAccessTypes = ['view', 'download', 'edit'];
+        if (!accessType || !validAccessTypes.includes(accessType)) {
+            return res.status(400).json({
+                message: 'Invalid access type. Must be one of: view, download, edit'
+            });
+        }
+
+        // Get document from ZeroDB using findDocumentById helper
+        const document = await findDocumentById(id);
+
+        if (!document) {
+            return res.status(404).json({ message: 'Document not found' });
+        }
+
+        // Check if user has access to the document
+        if (!checkDocumentAccess(document, req.user)) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Create access log entry
+        const accessLogId = generateUUID();
+        const accessLog = {
+            id: accessLogId,
+            _id: accessLogId,
+            documentId: document.id || document._id,
+            userId: req.user?.userId,
+            accessType: accessType,
+            accessedAt: accessedAt || new Date().toISOString(),
+            ipAddress: req.ip || req.connection?.remoteAddress,
+            userAgent: req.get('User-Agent')
+        };
+
+        // Store access log in a separate table (or append to document)
+        try {
+            await zerodbService.insertRow('document_access_logs', accessLog);
+        } catch (logError) {
+            console.warn('Failed to store access log:', logError.message);
+            // Don't fail the request if logging fails
+        }
+
+        // Publish access event
+        try {
+            await eventStreamingService.publishEvent({
+                topic: `document.${accessType}`,
+                payload: {
+                    documentId: document.id || document._id,
+                    fileName: document.fileName || document.name,
+                    userId: req.user?.userId,
+                    accessType: accessType,
+                    timestamp: accessLog.accessedAt
+                },
+                metadata: {
+                    actorId: req.user?.userId,
+                    action: accessType
+                }
+            });
+        } catch (eventError) {
+            console.warn('Failed to publish access event:', eventError.message);
+        }
+
+        res.status(201).json(accessLog);
+    } catch (error) {
+        console.error('Log document access error:', error);
+        res.status(500).json({ message: 'Failed to log document access' });
     }
 };
 
