@@ -15,6 +15,30 @@ const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 const zerodbService = require('../services/zerodbService');
 
+/**
+ * Helper to unwrap ZeroDB response data
+ * ZeroDB returns { data: [{ row_data: {...}, row_id: ... }] }
+ * This function extracts row_data and adds row_id as id/_id
+ */
+function unwrapZeroDBResponse(result) {
+    const rawData = result.data || result.rows || result || [];
+    if (Array.isArray(rawData)) {
+        return rawData.map(item => {
+            if (item.row_data) {
+                // ZeroDB format: merge row_data with row_id as id
+                return {
+                    ...item.row_data,
+                    id: item.row_id || item.row_data.id,
+                    _id: item.row_id || item.row_data._id || item.row_data.id,
+                    row_id: item.row_id
+                };
+            }
+            return item;
+        });
+    }
+    return Array.isArray(rawData) ? rawData : [];
+}
+
 // Schema definition for documentation and validation
 const documentFolderSchema = {
     folderId: { type: 'string', unique: true },
@@ -146,7 +170,7 @@ const DocumentFolder = {
             filter: { folderId },
             limit: 1
         });
-        const folders = result.rows || result;
+        const folders = unwrapZeroDBResponse(result);
         return folders[0] || null;
     },
 
@@ -159,7 +183,7 @@ const DocumentFolder = {
         const result = await zerodbService.queryTable(this.tableName, {
             filter: { parentId }
         });
-        return result.rows || result;
+        return unwrapZeroDBResponse(result);
     },
 
     /**
@@ -173,7 +197,7 @@ const DocumentFolder = {
             filter: ownerCompany ? { ownerCompany } : {},
             limit: 1000
         });
-        const folders = result.rows || result || [];
+        const folders = unwrapZeroDBResponse(result);
         // Filter for root folders (parentId is null, undefined, or empty string)
         return folders.filter(folder => !folder.parentId);
     },
@@ -399,7 +423,7 @@ const DocumentFolder = {
         const documentsResult = await zerodbService.queryTable('documents', {
             filter: { folderId }
         });
-        const documents = documentsResult.rows || documentsResult;
+        const documents = unwrapZeroDBResponse(documentsResult);
 
         return {
             folder,

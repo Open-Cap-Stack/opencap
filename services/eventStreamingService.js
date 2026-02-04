@@ -24,7 +24,10 @@ class EventStreamingService {
       TRANSACTION_CREATED: 'transaction.created',
       TRANSACTION_COMPLETED: 'transaction.completed',
       DOCUMENT_UPLOADED: 'document.uploaded',
-      DOCUMENT_SIGNED: 'document.signed'
+      DOCUMENT_SIGNED: 'document.signed',
+      DOCUMENT_DOWNLOADED: 'document.downloaded',
+      DOCUMENT_VIEW: 'document.view',
+      DOCUMENT_EDIT: 'document.edit'
     };
 
     this.validTopics = new Set(Object.values(this.topics));
@@ -393,4 +396,5 @@ class EventStreamingService {
   }
 }
 
-module.exports = EventStreamingService;
+// Export a singleton instance
+module.exports = new EventStreamingService();
