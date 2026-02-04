@@ -65,6 +65,7 @@ const documentSchema = {
     isLocked: { type: 'boolean', default: false },
     lockedBy: { type: 'string' },
     lockedUntil: { type: 'date' },
+    folderId: { type: 'string', default: null },
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
 };

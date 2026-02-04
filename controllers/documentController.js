@@ -87,7 +87,8 @@ exports.createDocument = async (req, res) => {
             uploadedAt: now,
             createdAt: now,
             updatedAt: now,
-            status: req.body.status || 'active'
+            status: req.body.status || 'active',
+            folderId: req.body.folderId || null
         };
 
         // Insert into ZeroDB
@@ -154,6 +155,7 @@ exports.getDocuments = async (req, res) => {
             tags,
             accessLevel,
             companyId,
+            folderId,
             page = 1,
             limit = 10,
             sortBy = 'uploadedAt',
@@ -188,6 +190,17 @@ exports.getDocuments = async (req, res) => {
 
         // Filter out deleted documents in JS
         documents = documents.filter(doc => doc.status !== 'deleted');
+
+        // Apply folder filter if provided
+        if (folderId !== undefined) {
+            if (folderId === '' || folderId === 'null' || folderId === 'root') {
+                // Get documents in root (no folder)
+                documents = documents.filter(doc => !doc.folderId);
+            } else {
+                // Get documents in specific folder
+                documents = documents.filter(doc => doc.folderId === folderId);
+            }
+        }
 
         // CRITICAL: Apply user-level access control filtering
         // Users should only see documents they have access to
