@@ -168,16 +168,14 @@ const DocumentFolder = {
      * @returns {Array} Root folders
      */
     async findRootFolders(ownerCompany) {
+        // ZeroDB doesn't support $or or $exists, so fetch all and filter in JS
         const result = await zerodbService.queryTable(this.tableName, {
-            filter: {
-                ownerCompany,
-                $or: [
-                    { parentId: null },
-                    { parentId: { $exists: false } }
-                ]
-            }
+            filter: ownerCompany ? { ownerCompany } : {},
+            limit: 1000
         });
-        return result.rows || result;
+        const folders = result.rows || result || [];
+        // Filter for root folders (parentId is null, undefined, or empty string)
+        return folders.filter(folder => !folder.parentId);
     },
 
     /**
