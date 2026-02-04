@@ -160,7 +160,7 @@ class FileStorageService {
       }
 
       const response = await zerodbService.client.post(
-        `/projects/${zerodbService.projectId}/database/files`,
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files`,
         form,
         {
           headers: form.getHeaders ? form.getHeaders() : { 'Content-Type': 'multipart/form-data' }
@@ -238,7 +238,7 @@ class FileStorageService {
 
     try {
       const response = await zerodbService.client.get(
-        `/projects/${zerodbService.projectId}/database/files/${fileId}`,
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}`,
         { responseType: stream ? 'stream' : 'arraybuffer' }
       );
 
@@ -299,7 +299,7 @@ class FileStorageService {
 
     try {
       const response = await zerodbService.client.get(
-        `/projects/${zerodbService.projectId}/database/files/${fileId}/url`,
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/url`,
         { params: { expires_in: expiresIn } }
       );
 
@@ -329,7 +329,7 @@ class FileStorageService {
     const { contentType, maxSize, expiresIn = 900 } = options;
 
     const response = await zerodbService.client.post(
-      `/projects/${zerodbService.projectId}/database/files/presigned-upload`,
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/presigned-upload`,
       {
         file_name: fileName,
         content_type: contentType || this.getContentType(fileName),
@@ -352,7 +352,7 @@ class FileStorageService {
    */
   async getFileMetadata(fileId) {
     const response = await zerodbService.client.get(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}/metadata`
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/metadata`
     );
 
     return {
@@ -380,13 +380,13 @@ class FileStorageService {
 
     if (merge) {
       const existing = await zerodbService.client.get(
-        `/projects/${zerodbService.projectId}/database/files/${fileId}/metadata`
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/metadata`
       );
       finalMetadata = { ...existing.data.file_metadata, ...metadata };
     }
 
     const response = await zerodbService.client.patch(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}/metadata`,
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/metadata`,
       { file_metadata: finalMetadata }
     );
 
@@ -434,7 +434,7 @@ class FileStorageService {
 
     // Get original file info
     const original = await zerodbService.client.get(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}/metadata`
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/metadata`
     );
 
     const originalData = original.data;
@@ -447,7 +447,7 @@ class FileStorageService {
     }
 
     const response = await zerodbService.client.post(
-      `/projects/${zerodbService.projectId}/database/files`,
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files`,
       {
         file: newContent,
         file_name: originalData.file_name,
@@ -474,7 +474,7 @@ class FileStorageService {
    */
   async getVersionHistory(fileId) {
     const response = await zerodbService.client.get(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}/versions`
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/versions`
     );
 
     const versions = response.data.versions.sort((a, b) => a.version - b.version);
@@ -495,7 +495,7 @@ class FileStorageService {
    */
   async restoreVersion(fileId, versionNumber) {
     const response = await zerodbService.client.post(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}/restore`,
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/restore`,
       { version: versionNumber }
     );
 
@@ -519,7 +519,7 @@ class FileStorageService {
     if (soft) {
       // Soft delete - mark as deleted but don't remove
       const response = await zerodbService.client.patch(
-        `/projects/${zerodbService.projectId}/database/files/${fileId}`,
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}`,
         { status: 'deleted', deleted_at: new Date().toISOString() }
       );
 
@@ -532,7 +532,7 @@ class FileStorageService {
 
     // Hard delete
     const response = await zerodbService.client.delete(
-      `/projects/${zerodbService.projectId}/database/files/${fileId}`
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}`
     );
 
     return {
@@ -576,7 +576,7 @@ class FileStorageService {
     const params = companyId ? { company_id: companyId } : {};
 
     const response = await zerodbService.client.get(
-      `/projects/${zerodbService.projectId}/database/files/usage`,
+      `/v1/public/zerodb/${zerodbService.projectId}/database/files/usage`,
       { params }
     );
 
