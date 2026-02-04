@@ -39,13 +39,28 @@ function unwrapZeroDBResponse(result) {
 }
 
 /**
+ * Generate a UUID v4
+ */
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+/**
  * Create a new document with vector indexing
  */
 exports.createDocument = async (req, res) => {
     try {
         const now = new Date().toISOString();
+        // Generate ID upfront so it's stored in row_data and can be queried
+        const documentId = generateUUID();
         const documentData = {
             ...req.body,
+            id: documentId,
+            _id: documentId,
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
@@ -62,8 +77,8 @@ exports.createDocument = async (req, res) => {
         const savedDocument = {
             ...documentData,
             ...insertedRow.row_data,
-            id: insertedRow.row_id || insertedRow.id,
-            _id: insertedRow.row_id || insertedRow.id,
+            id: documentData.id,
+            _id: documentData.id,
             row_id: insertedRow.row_id
         };
 
@@ -204,17 +219,43 @@ exports.getDocuments = async (req, res) => {
 };
 
 /**
+ * Helper to find document by ID (handles both stored id and row_id)
+ */
+async function findDocumentById(documentId) {
+    // First try to find by stored id field
+    let result = await zerodbService.queryTable(TABLE_NAME, {
+        filter: { id: documentId },
+        limit: 1
+    });
+
+    let documents = unwrapZeroDBResponse(result);
+    if (documents.length > 0) {
+        return documents[0];
+    }
+
+    // If not found, search all documents and match by row_id
+    const allResult = await zerodbService.queryTable(TABLE_NAME, { limit: 1000 });
+    const rawData = allResult.data || allResult.rows || allResult || [];
+
+    const matchingRow = rawData.find(item => item.row_id === documentId);
+    if (matchingRow) {
+        return {
+            ...matchingRow.row_data,
+            id: matchingRow.row_id,
+            _id: matchingRow.row_id,
+            row_id: matchingRow.row_id
+        };
+    }
+
+    return null;
+}
+
+/**
  * Get a document by ID
  */
 exports.getDocumentById = async (req, res) => {
     try {
-        const result = await zerodbService.queryTable(TABLE_NAME, {
-            filter: { id: req.params.id },
-            limit: 1
-        });
-
-        const documents = unwrapZeroDBResponse(result);
-        const document = documents[0];
+        const document = await findDocumentById(req.params.id);
 
         if (!document) {
             return res.status(404).json({ message: 'Document not found' });
@@ -297,21 +338,21 @@ exports.updateDocumentById = async (req, res) => {
  */
 exports.deleteDocumentById = async (req, res) => {
     try {
-        // First get the document to return info about it
-        const result = await zerodbService.queryTable(TABLE_NAME, {
-            filter: { id: req.params.id },
-            limit: 1
-        });
-
-        const documents = unwrapZeroDBResponse(result);
-        const document = documents[0];
+        // Find the document first
+        const document = await findDocumentById(req.params.id);
 
         if (!document) {
             return res.status(404).json({ message: 'Document not found' });
         }
 
-        // Delete from ZeroDB
-        await zerodbService.deleteRows(TABLE_NAME, { filter: { id: req.params.id } });
+        // Delete from ZeroDB - use row_id if available for direct deletion
+        if (document.row_id) {
+            // Direct delete by row_id (most reliable)
+            await zerodbService.deleteRowById(TABLE_NAME, document.row_id);
+        } else {
+            // Fallback to filter-based delete
+            await zerodbService.deleteRows(TABLE_NAME, { filter: { id: req.params.id } });
+        }
 
         // Remove from vector index
         try {

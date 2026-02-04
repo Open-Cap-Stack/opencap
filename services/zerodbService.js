@@ -677,6 +677,27 @@ class ZeroDBService {
     // Delegate to the main deleteRows method
     return this.deleteRows(tableName, { filter: query });
   }
+
+  /**
+   * Delete a specific row by its row_id directly
+   * @param {string} tableName - Name of the table
+   * @param {string} rowId - The row_id to delete
+   * @returns {Object} Delete result
+   */
+  async deleteRowById(tableName, rowId) {
+    try {
+      await this.client.delete(
+        `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows/${rowId}`
+      );
+      return { deleted_count: 1 };
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return { deleted_count: 0 };
+      }
+      console.error('Error deleting row by ID:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
