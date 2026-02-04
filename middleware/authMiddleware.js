@@ -150,13 +150,17 @@ const authenticateToken = async (req, res, next) => {
         if (token) {
           const ainativeUser = await validateAINativeToken(token);
 
-          // Set user from AINative validation
+          // Provision or retrieve local user record
+          const localUser = await provisionAINativeUser(ainativeUser);
+
+          // Set user from local record (with AINative fallback)
           req.user = {
-            userId: ainativeUser.userId,
-            email: ainativeUser.email,
-            name: ainativeUser.name,
-            role: ainativeUser.role,
-            permissions: ainativeUser.permissions,
+            userId: localUser.userId,
+            email: localUser.email,
+            name: localUser.displayName || localUser.name || ainativeUser.name,
+            role: localUser.role || 'user',
+            permissions: localUser.permissions || [],
+            companyId: localUser.companyId,
             isAINativeUser: true
           };
 
@@ -218,6 +222,71 @@ const validateAINativeToken = async (token) => {
     ainativeError.name = 'AINativeValidationError';
     ainativeError.originalError = error;
     throw ainativeError;
+  }
+};
+
+/**
+ * Provision user on first AINative login
+ * Creates a local user record for AINative authenticated users
+ *
+ * @param {Object} ainativeUser - User data from AINative validation
+ * @returns {Promise<Object>} - Local user record
+ */
+const provisionAINativeUser = async (ainativeUser) => {
+  try {
+    // Check if user already exists by email
+    let localUser = await User.findByEmail(ainativeUser.email);
+
+    if (localUser) {
+      // Existing user - update last login
+      await User.updateLastLogin(localUser.userId);
+      return localUser;
+    }
+
+    // First-time login - create new user record
+    console.log(`Provisioning new user for AINative login: ${ainativeUser.email}`);
+
+    // Parse name into first/last
+    const nameParts = (ainativeUser.name || ainativeUser.email.split('@')[0]).split(' ');
+    const firstName = nameParts[0] || 'User';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const newUser = await User.create({
+      userId: ainativeUser.userId,
+      email: ainativeUser.email,
+      firstName: firstName,
+      lastName: lastName,
+      displayName: ainativeUser.name || ainativeUser.email.split('@')[0],
+      password: `ainative_sso_${Date.now()}`, // Placeholder - SSO users don't use password
+      role: 'user',
+      status: 'active',
+      permissions: User.getPermissionsForRole('user'),
+      profile: {
+        bio: '',
+        avatar: null,
+        avatarThumbnail: null,
+        phoneNumber: null,
+        address: {}
+      },
+      lastLogin: new Date().toISOString(),
+      authProvider: 'ainative',
+      ainativeId: ainativeUser.userId
+    });
+
+    console.log(`Successfully provisioned user: ${newUser.email} (${newUser.userId})`);
+    return newUser;
+  } catch (error) {
+    console.error('Failed to provision AINative user:', error.message);
+    // Return basic user data if provisioning fails - don't block login
+    return {
+      userId: ainativeUser.userId,
+      email: ainativeUser.email,
+      name: ainativeUser.name,
+      role: 'user',
+      permissions: [],
+      isAINativeUser: true,
+      provisioningFailed: true
+    };
   }
 };
 
@@ -331,5 +400,6 @@ module.exports = {
   isTokenBlacklisted,
   blacklistToken,
   verifyTokenWithTimeout,
-  validateAINativeToken
+  validateAINativeToken,
+  provisionAINativeUser
 };
