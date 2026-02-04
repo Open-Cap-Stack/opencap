@@ -61,6 +61,7 @@ exports.createDocument = async (req, res) => {
         // Extract file metadata from multer upload (req.file)
         const file = req.file;
         let fileMetadata = {};
+        let persistentFileId = null;
 
         if (file) {
             fileMetadata = {
@@ -75,7 +76,32 @@ exports.createDocument = async (req, res) => {
                 storagePath: file.path,
                 filePath: file.path
             };
-            console.log('File uploaded:', { name: file.originalname, size: file.size, type: file.mimetype });
+            console.log('File uploaded locally:', { name: file.originalname, size: file.size, type: file.mimetype });
+
+            // Upload file to persistent storage (ZeroDB file storage)
+            try {
+                const uploadResult = await fileStorageService.uploadFileFromPath(file.path, {
+                    companyId: req.user?.companyId,
+                    uploadedBy: req.user?.userId,
+                    category: req.body.category,
+                    metadata: {
+                        documentId: documentId,
+                        originalName: file.originalname
+                    }
+                });
+                persistentFileId = uploadResult.id || uploadResult.fileKey;
+                fileMetadata.fileId = persistentFileId;
+                console.log('File uploaded to persistent storage:', { fileId: persistentFileId });
+
+                // Clean up local temp file after successful upload
+                const fs = require('fs');
+                fs.unlink(file.path, (err) => {
+                    if (err) console.warn('Failed to clean up temp file:', err.message);
+                });
+            } catch (uploadError) {
+                console.warn('Failed to upload to persistent storage, keeping local file:', uploadError.message);
+                // Continue with local file path as fallback
+            }
         }
 
         const documentData = {
@@ -83,6 +109,7 @@ exports.createDocument = async (req, res) => {
             ...fileMetadata,
             id: documentId,
             _id: documentId,
+            fileId: persistentFileId,
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
