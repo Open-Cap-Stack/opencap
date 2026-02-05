@@ -17,7 +17,8 @@ const VALID_ASSET_TYPES = ['Real Estate', 'Financial Instrument'];
 const validators = {
     isValidAssetID: (id) => {
         if (!id) return false;
-        return /^[A-Za-z0-9\-]+$/.test(id);
+        // Allow alphanumeric, hyphens, and underscores (for auto-generated IDs like asset_uuid)
+        return /^[A-Za-z0-9\-_]+$/.test(id);
     },
 
     isValidNumber: (value) => {
