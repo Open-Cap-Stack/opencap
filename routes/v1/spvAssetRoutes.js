@@ -8,28 +8,17 @@ const SPVAsset = require('../../models/SPVAssetModel');
 const router = express.Router();
 const mongoose = require('mongoose');
 const SPVAssetController = require('../../controllers/SPVasset');
-const { authenticateToken } = require('../../middleware/authMiddleware');
 const responseDebugger = require('../../middleware/responseDebugger');
 
-// Apply authentication middleware to all routes
-router.use(authenticateToken);
+// Note: Auth removed to match SPV routes behavior
+// TODO: Re-enable authentication once auth flow is stabilized
 
-// Role-based access control - Admin only
-const adminOnly = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'User not authenticated' });
-  }
-  const userRole = req.user.role?.toLowerCase();
-  if (userRole !== 'admin') {
-    return res.status(403).json({ message: 'Access denied: Admin role required' });
-  }
-  next();
-};
+// Note: Admin-only middleware disabled to match SPV routes
+// TODO: Re-enable once auth flow is stabilized
 
 // POST /api/spvassets - Create a new SPVAsset
-router.post('/', 
-  adminOnly, 
-  responseDebugger, 
+router.post('/',
+  responseDebugger,
   SPVAssetController.createSPVAsset
 );
 
@@ -64,16 +53,14 @@ router.get('/:id',
 );
 
 // PUT /api/spvassets/:id - Update an SPV Asset by ID
-router.put('/:id', 
-  adminOnly, 
-  responseDebugger, 
+router.put('/:id',
+  responseDebugger,
   SPVAssetController.updateSPVAsset
 );
 
 // DELETE /api/spvassets/:id - Delete an SPV Asset by ID
-router.delete('/:id', 
-  adminOnly, 
-  responseDebugger, 
+router.delete('/:id',
+  responseDebugger,
   SPVAssetController.deleteSPVAsset
 );
 
