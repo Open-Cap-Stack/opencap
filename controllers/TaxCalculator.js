@@ -1,20 +1,17 @@
 /**
  * TaxCalculator Controller - ZeroDB Migration
  * Issue #20 - Batch 3 Controllers
- * Uses DatabaseAdapter for database-agnostic operations
+ * Uses TaxCalculator model directly for database operations
  */
 
-const mongoose = require('mongoose');
-const databaseAdapter = require('../services/databaseAdapter');
-
-const MODEL_NAME = 'TaxCalculator';
+const TaxCalculator = require('../models/TaxCalculator');
 
 // Calculate tax and create a new tax calculation record
 exports.calculateTax = async (req, res) => {
   try {
     const { calculationId, SaleScenario, ShareClassInvolved, SaleAmount, TaxRate, TaxImplication, TaxDueDate } = req.body;
 
-    if (!calculationId || !SaleScenario || !ShareClassInvolved || !SaleAmount || !TaxRate || !TaxImplication || !TaxDueDate) {
+    if (!SaleScenario || !ShareClassInvolved || !SaleAmount || !TaxRate || !TaxImplication || !TaxDueDate) {
       return res.status(400).json({ message: 'Invalid tax calculation data' });
     }
 
@@ -31,9 +28,16 @@ exports.calculateTax = async (req, res) => {
       TaxDueDate,
     };
 
-    const savedCalculation = await databaseAdapter.create(MODEL_NAME, taxData);
+    const savedCalculation = await TaxCalculator.create(taxData);
     return res.status(201).json(savedCalculation);
   } catch (error) {
+    console.error('Tax calculation error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    if (error.name === 'DuplicateError') {
+      return res.status(409).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -41,12 +45,11 @@ exports.calculateTax = async (req, res) => {
 // Get all tax calculations
 exports.getTaxCalculations = async (req, res) => {
   try {
-    const taxCalculations = await databaseAdapter.find(MODEL_NAME, {});
-    if (taxCalculations.length === 0) {
-      return res.status(404).json({ message: 'No tax calculations found' });
-    }
-    res.status(200).json({ taxCalculations });
+    const taxCalculations = await TaxCalculator.find({});
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ taxCalculations: taxCalculations || [] });
   } catch (error) {
+    console.error('Error fetching tax calculations:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -54,16 +57,13 @@ exports.getTaxCalculations = async (req, res) => {
 // Get a tax calculation by ID
 exports.getTaxCalculationById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid tax calculation ID format' });
-    }
-
-    const taxCalculation = await databaseAdapter.findById(MODEL_NAME, req.params.id);
+    const taxCalculation = await TaxCalculator.findById(req.params.id);
     if (!taxCalculation) {
       return res.status(404).json({ message: 'Tax calculation not found' });
     }
     res.status(200).json({ taxCalculation });
   } catch (error) {
+    console.error('Error fetching tax calculation:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -71,16 +71,13 @@ exports.getTaxCalculationById = async (req, res) => {
 // Delete a tax calculation by ID
 exports.deleteTaxCalculation = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid tax calculation ID format' });
-    }
-
-    const taxCalculation = await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
+    const taxCalculation = await TaxCalculator.findByIdAndDelete(req.params.id);
     if (!taxCalculation) {
       return res.status(404).json({ message: 'Tax calculation not found' });
     }
     res.status(200).json({ message: 'Tax calculation deleted' });
   } catch (error) {
+    console.error('Error deleting tax calculation:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -89,18 +86,12 @@ exports.deleteTaxCalculation = async (req, res) => {
 exports.updateTaxCalculation = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Validate ID format first
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid tax calculation ID format' });
-    }
-
     const { SaleAmount, TaxRate } = req.body;
 
     // If updating SaleAmount or TaxRate, recalculate CalculatedTax
     if ((SaleAmount !== undefined || TaxRate !== undefined) && !req.body.CalculatedTax) {
       // Get current calculation if needed
-      const currentCalculation = await databaseAdapter.findById(MODEL_NAME, id);
+      const currentCalculation = await TaxCalculator.findById(id);
       if (!currentCalculation) {
         return res.status(404).json({ message: 'Tax calculation not found' });
       }
@@ -124,11 +115,10 @@ exports.updateTaxCalculation = async (req, res) => {
       delete req.body.calculationId;
     }
 
-    const updatedCalculation = await databaseAdapter.findByIdAndUpdate(
-      MODEL_NAME,
+    const updatedCalculation = await TaxCalculator.findByIdAndUpdate(
       id,
       req.body,
-      { new: true, runValidators: true }
+      { new: true }
     );
 
     if (!updatedCalculation) {

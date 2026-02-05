@@ -1,7 +1,6 @@
 const express = require('express');
 const Communication = require('../../models/Communication');
 const router = express.Router();
-const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/communications - Create a new communication
@@ -14,19 +13,20 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Invalid communication data: missing required fields' });
     }
 
-    const communication = new Communication({ 
-      communicationId, 
-      MessageType, 
-      Sender, 
-      Recipient, 
-      Timestamp: Timestamp || new Date(), 
+    // Use ZeroDB create method instead of Mongoose constructor
+    const savedCommunication = await Communication.create({
+      communicationId,
+      MessageType,
+      Sender,
+      Recipient,
+      Timestamp: Timestamp || new Date().toISOString(),
       Content,
       ThreadId
     });
-    const savedCommunication = await communication.save();
+
     res.status(201).json(savedCommunication);
   } catch (error) {
-    if (error.name === 'ValidationError') {
+    if (error.message.includes('Validation failed')) {
       res.status(400).json({ message: 'Invalid communication data', error: error.message });
     } else {
       res.status(500).json({ message: 'Server error', error: error.message });
@@ -46,24 +46,24 @@ router.post('/thread', async (req, res) => {
 
     // Generate a unique communication ID
     const communicationId = `COM-${uuidv4().substring(0, 8)}`;
-    
+
     // Create a new thread ID if not provided
     const threadId = ThreadId || `THREAD-${uuidv4().substring(0, 8)}`;
 
-    const communication = new Communication({ 
-      communicationId, 
-      MessageType, 
-      Sender, 
-      Recipient, 
-      Timestamp: new Date(), 
+    // Use ZeroDB create method instead of Mongoose constructor
+    const savedCommunication = await Communication.create({
+      communicationId,
+      MessageType,
+      Sender,
+      Recipient,
+      Timestamp: new Date().toISOString(),
       Content,
       ThreadId: threadId
     });
-    
-    const savedCommunication = await communication.save();
+
     res.status(201).json(savedCommunication);
   } catch (error) {
-    if (error.name === 'ValidationError') {
+    if (error.message.includes('Validation failed')) {
       res.status(400).json({ message: 'Invalid communication data', error: error.message });
     } else {
       res.status(500).json({ message: 'Server error', error: error.message });
@@ -74,11 +74,9 @@ router.post('/thread', async (req, res) => {
 // GET /api/communications - Get all communications
 router.get('/', async (req, res) => {
   try {
-    const communications = await Communication.find();
-    if (communications.length === 0) {
-      return res.status(404).json({ message: 'No communications found' });
-    }
-    res.status(200).json(communications);
+    const communications = await Communication.find({});
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ communications: communications || [] });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -88,14 +86,10 @@ router.get('/', async (req, res) => {
 router.get('/thread/:threadId', async (req, res) => {
   try {
     const threadId = req.params.threadId;
-    const messages = await Communication.find({ ThreadId: threadId })
-      .sort({ Timestamp: 1 });
-    
-    if (messages.length === 0) {
-      return res.status(404).json({ message: 'No messages found in this thread' });
-    }
-    
-    res.status(200).json({ messages });
+    const messages = await Communication.findByThread(threadId);
+
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ messages: messages || [] });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -105,23 +99,24 @@ router.get('/thread/:threadId', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
-    
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format' });
-    }
-    
-    const messages = await Communication.find({
-      $or: [
-        { Sender: userId },
-        { Recipient: userId }
-      ]
-    }).sort({ Timestamp: -1 });
-    
-    if (messages.length === 0) {
-      return res.status(404).json({ message: 'No messages found for this user' });
-    }
-    
-    res.status(200).json({ messages });
+
+    // Get messages where user is sender or recipient
+    const sentMessages = await Communication.findBySender(userId);
+    const receivedMessages = await Communication.findByRecipient(userId);
+
+    // Combine and deduplicate
+    const messageMap = new Map();
+    [...sentMessages, ...receivedMessages].forEach(msg => {
+      const id = msg._id || msg.communicationId;
+      if (!messageMap.has(id)) {
+        messageMap.set(id, msg);
+      }
+    });
+
+    const messages = Array.from(messageMap.values());
+
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ messages: messages || [] });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -130,7 +125,7 @@ router.get('/user/:userId', async (req, res) => {
 // GET /api/communications/:id - Get communication by ID
 router.get('/:id', async (req, res) => {
   try {
-    const communication = await Communication.findById(req.params.id);
+    const communication = await Communication.findOne({ communicationId: req.params.id });
     if (!communication) {
       return res.status(404).json({ message: 'Communication not found' });
     }
@@ -143,19 +138,19 @@ router.get('/:id', async (req, res) => {
 // PUT /api/communications/:id - Update communication by ID
 router.put('/:id', async (req, res) => {
   try {
-    const communication = await Communication.findByIdAndUpdate(
-      req.params.id,
+    const communication = await Communication.findOneAndUpdate(
+      { communicationId: req.params.id },
       req.body,
-      { new: true, runValidators: true }
+      { new: true }
     );
-    
+
     if (!communication) {
       return res.status(404).json({ message: 'Communication not found' });
     }
-    
+
     res.status(200).json(communication);
   } catch (error) {
-    if (error.name === 'ValidationError') {
+    if (error.message.includes('Validation failed')) {
       res.status(400).json({ message: 'Invalid communication data', error: error.message });
     } else {
       res.status(500).json({ message: 'Server error', error: error.message });
@@ -166,12 +161,12 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/communications/:id - Delete communication by ID
 router.delete('/:id', async (req, res) => {
   try {
-    const communication = await Communication.findByIdAndDelete(req.params.id);
-    
+    const communication = await Communication.findOneAndDelete({ communicationId: req.params.id });
+
     if (!communication) {
       return res.status(404).json({ message: 'Communication not found' });
     }
-    
+
     res.status(200).json({ message: 'Communication deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

@@ -1,14 +1,14 @@
 /**
  * User Controller
  *
- * Handles user management operations with ZeroDB migration support.
- * Uses DatabaseAdapter for abstracted database operations.
+ * Handles user management operations with ZeroDB.
+ * Uses User model directly for database operations.
  *
  * Issue #15: Migrate User controller to ZeroDB
  * Issue #187: Add Profile Photo Upload Endpoint
  */
 
-const databaseAdapter = require('../services/databaseAdapter');
+const User = require('../models/User');
 const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
 
@@ -25,14 +25,14 @@ const createUser = async (req, res) => {
   }
 
   try {
-    // Check if email already exists using databaseAdapter
-    const existingUser = await databaseAdapter.findOne('User', { email });
+    // Check if email already exists
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Create user using databaseAdapter
-    const user = await databaseAdapter.create('User', {
+    // Create user
+    const user = await User.create({
       userId,
       name,
       username,
@@ -54,9 +54,21 @@ const createUser = async (req, res) => {
  */
 const getAllUsers = async (req, res) => {
   try {
-    // Use databaseAdapter.find for fetching all users
-    const users = await databaseAdapter.find('User', {}, {});
-    res.status(200).json(users);
+    // Build filter from query params
+    const filter = {};
+    if (req.query.companyId) {
+      filter.companyId = req.query.companyId;
+    }
+    if (req.query.role) {
+      filter.role = req.query.role;
+    }
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+
+    const users = await User.find(filter);
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ users: users || [] });
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Error fetching users' });
@@ -70,8 +82,7 @@ const getAllUsers = async (req, res) => {
  */
 const getUserById = async (req, res) => {
   try {
-    // Use databaseAdapter.findById for fetching user by ID
-    const user = await databaseAdapter.findById('User', req.params.id);
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -94,18 +105,24 @@ const getProfile = async (req, res) => {
 
     // Try to find by userId first (new format)
     if (req.user.userId) {
-      user = await databaseAdapter.findOne('User', { userId: req.user.userId }, { select: '-password' });
+      user = await User.findOne({ userId: req.user.userId });
     }
     // Fall back to _id if userId not found
     if (!user && req.user.id) {
-      user = await databaseAdapter.findById('User', req.user.id, { select: '-password' });
+      user = await User.findById(req.user.id);
     }
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.status(200).json(user);
+    // Remove sensitive fields
+    const sanitizedUser = User.toJSON ? User.toJSON(user) : { ...user };
+    delete sanitizedUser.password;
+    delete sanitizedUser.passwordResetToken;
+    delete sanitizedUser.passwordResetExpires;
+
+    res.status(200).json(sanitizedUser);
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ error: 'Error fetching user profile' });
@@ -119,12 +136,10 @@ const getProfile = async (req, res) => {
  */
 const updateUserById = async (req, res) => {
   try {
-    // Use databaseAdapter.findByIdAndUpdate for updating user
-    const updatedUser = await databaseAdapter.findByIdAndUpdate(
-      'User',
+    const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
+      { new: true }
     );
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -143,8 +158,7 @@ const updateUserById = async (req, res) => {
  */
 const deleteUserById = async (req, res) => {
   try {
-    // Use databaseAdapter.findByIdAndDelete for deleting user
-    const deletedUser = await databaseAdapter.findByIdAndDelete('User', req.params.id);
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
     if (!deletedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -180,9 +194,9 @@ const uploadProfilePhoto = async (req, res) => {
     }
 
     // Verify user exists
-    let user = await databaseAdapter.findOne('User', { userId });
+    let user = await User.findOne({ userId });
     if (!user && req.user.id) {
-      user = await databaseAdapter.findById('User', req.user.id);
+      user = await User.findById(req.user.id);
     }
 
     if (!user) {
@@ -253,20 +267,18 @@ const uploadProfilePhoto = async (req, res) => {
       'profile.avatarThumbnailFileId': thumbnailResult.id
     };
 
-    const updatedUser = await databaseAdapter.findOneAndUpdate(
-      'User',
+    const updatedUser = await User.findOneAndUpdate(
       { userId },
       { $set: updateData },
-      { new: true, select: '-password' }
+      { new: true }
     );
 
     // If update by userId failed, try by _id
     if (!updatedUser && user._id) {
-      await databaseAdapter.findByIdAndUpdate(
-        'User',
+      await User.findByIdAndUpdate(
         user._id,
         { $set: updateData },
-        { new: true, select: '-password' }
+        { new: true }
       );
     }
 
@@ -319,9 +331,9 @@ const deleteProfilePhoto = async (req, res) => {
     }
 
     // Verify user exists
-    let user = await databaseAdapter.findOne('User', { userId });
+    let user = await User.findOne({ userId });
     if (!user && req.user.id) {
-      user = await databaseAdapter.findById('User', req.user.id);
+      user = await User.findById(req.user.id);
     }
 
     if (!user) {
@@ -361,8 +373,7 @@ const deleteProfilePhoto = async (req, res) => {
       'profile.avatarThumbnailFileId': null
     };
 
-    await databaseAdapter.findOneAndUpdate(
-      'User',
+    await User.findOneAndUpdate(
       { userId },
       { $set: updateData },
       { new: true }

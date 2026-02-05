@@ -335,6 +335,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/billing'; // Issue #201: Billing Dashboard APIs
     } else if (key === 'stakeholderReportRoutes') {
       path = '/api/v1/stakeholders'; // Issue #198: Stakeholder Report Generation
+    } else if (key === 'userRoutes') {
+      path = '/api/v1/users';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

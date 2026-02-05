@@ -3,12 +3,11 @@
  *
  * Issue #121: Create Task Management API
  *
- * Handles CRUD operations for tasks using DatabaseAdapter
- * for ZeroDB migration support. Includes task comments and analytics.
+ * Handles CRUD operations for tasks using Task model
+ * which is backed by ZeroDB.
  */
 
-const databaseAdapter = require('../services/databaseAdapter');
-const { v4: uuidv4 } = require('uuid');
+const Task = require('../models/Task');
 
 /**
  * Create a new task
@@ -17,18 +16,14 @@ const { v4: uuidv4 } = require('uuid');
  */
 exports.createTask = async (req, res) => {
   try {
-    const taskData = {
-      ...req.body,
-      status: req.body.status || 'pending',
-      priority: req.body.priority || 'medium',
-      comments: req.body.comments || [],
-      tags: req.body.tags || []
-    };
-
-    const task = await databaseAdapter.create('Task', taskData);
-    res.status(201).send(task);
+    const task = await Task.create(req.body);
+    res.status(201).json(task);
   } catch (error) {
-    res.status(400).send({ error: error.message });
+    if (error.message.includes('Validation failed')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
@@ -39,10 +34,6 @@ exports.createTask = async (req, res) => {
  */
 exports.getTasks = async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.max(parseInt(req.query.limit) || 100, 1);
-    const skip = (page - 1) * limit;
-
     // Build filter object from query parameters
     const filter = {};
 
@@ -62,14 +53,12 @@ exports.getTasks = async (req, res) => {
       filter.companyId = req.query.companyId;
     }
 
-    if (req.query.tags) {
-      const tagList = req.query.tags.split(',').map(tag => tag.trim());
-      filter.tags = { $in: tagList };
-    }
+    const tasks = await Task.find(filter);
 
-    const tasks = await databaseAdapter.find('Task', filter, { skip, limit });
-    res.send(tasks);
+    // Return 200 with empty array for consistent REST API behavior
+    res.status(200).json({ tasks: tasks || [] });
   } catch (error) {
+    console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Error fetching tasks' });
   }
 };
@@ -81,12 +70,11 @@ exports.getTasks = async (req, res) => {
  */
 exports.getTaskById = async (req, res) => {
   try {
-    const task = await databaseAdapter.findById('Task', req.params.id);
+    const task = await Task.findById(req.params.id);
     if (!task) {
-      res.status(404).send({ message: 'Task not found' });
-    } else {
-      res.send(task);
+      return res.status(404).json({ message: 'Task not found' });
     }
+    res.status(200).json(task);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching task' });
   }
@@ -99,19 +87,21 @@ exports.getTaskById = async (req, res) => {
  */
 exports.updateTask = async (req, res) => {
   try {
-    const task = await databaseAdapter.findByIdAndUpdate(
-      'Task',
+    const task = await Task.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
     if (!task) {
-      res.status(404).send({ message: 'Task not found' });
-    } else {
-      res.send(task);
+      return res.status(404).json({ message: 'Task not found' });
     }
+    res.status(200).json(task);
   } catch (error) {
-    res.status(400).send({ error: error.message });
+    if (error.message.includes('Invalid') || error.message.includes('cannot exceed')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
@@ -122,14 +112,13 @@ exports.updateTask = async (req, res) => {
  */
 exports.deleteTask = async (req, res) => {
   try {
-    const task = await databaseAdapter.findByIdAndDelete('Task', req.params.id);
+    const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) {
-      res.status(404).send({ message: 'Task not found' });
-    } else {
-      res.send({ message: 'Task deleted successfully' });
+      return res.status(404).json({ message: 'Task not found' });
     }
+    res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -144,41 +133,23 @@ exports.addComment = async (req, res) => {
 
     // Validate required fields
     if (!text) {
-      return res.status(400).send({ error: 'Comment text is required' });
+      return res.status(400).json({ error: 'Comment text is required' });
     }
 
     if (!authorId) {
-      return res.status(400).send({ error: 'Author ID is required' });
+      return res.status(400).json({ error: 'Author ID is required' });
     }
 
-    // Find the task first
-    const task = await databaseAdapter.findById('Task', req.params.id);
-    if (!task) {
-      return res.status(404).send({ message: 'Task not found' });
-    }
-
-    // Create the comment
-    const comment = {
-      _id: uuidv4(),
-      text,
-      authorId,
-      createdAt: new Date().toISOString()
-    };
-
-    // Add comment to the task's comments array
-    const comments = task.comments || [];
-    comments.push(comment);
-
-    const updatedTask = await databaseAdapter.findByIdAndUpdate(
-      'Task',
-      req.params.id,
-      { comments },
-      { new: true }
-    );
-
-    res.status(201).send(updatedTask);
+    const task = await Task.addComment(req.params.id, { text, authorId });
+    res.status(201).json(task);
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    if (error.message.includes('not found')) {
+      res.status(404).json({ message: 'Task not found' });
+    } else if (error.message.includes('Validation failed')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
@@ -201,7 +172,7 @@ exports.getAnalytics = async (req, res) => {
     }
 
     // Fetch all tasks matching the filter
-    const tasks = await databaseAdapter.find('Task', filter, {});
+    const tasks = await Task.find(filter);
 
     // Calculate analytics
     const analytics = {
@@ -234,15 +205,16 @@ exports.getAnalytics = async (req, res) => {
         analytics.byPriority[task.priority]++;
       }
 
-      // Count overdue tasks
-      if (task.dueDate && new Date(task.dueDate) < now &&
-          task.status !== 'completed' && task.status !== 'cancelled') {
+      // Count overdue tasks (or use the computed isOverdue field)
+      if (task.isOverdue || (task.dueDate && new Date(task.dueDate) < now &&
+          task.status !== 'completed' && task.status !== 'cancelled')) {
         analytics.overdue++;
       }
     });
 
-    res.send(analytics);
+    res.status(200).json(analytics);
   } catch (error) {
+    console.error('Error fetching analytics:', error);
     res.status(500).json({ error: 'Error fetching analytics' });
   }
 };

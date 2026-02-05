@@ -406,7 +406,9 @@ class DatabaseAdapter {
       'DocumentFolder': 'document_folders',
       'DocumentAccessLog': 'document_access_logs',
       'UserSettings': 'user_settings',
-      'EventAuditLog': 'event_audit_log'
+      'EventAuditLog': 'event_audit_log',
+      'Task': 'tasks',
+      'Communication': 'communications'
     };
 
     // Check for direct mapping first
