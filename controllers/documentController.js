@@ -58,6 +58,15 @@ exports.createDocument = async (req, res) => {
         // Generate ID upfront so it's stored in row_data and can be queried
         const documentId = generateUUID();
 
+        // Validate folder exists if folderId is provided
+        if (req.body.folderId) {
+            const folder = await DocumentFolder.findByFolderId(req.body.folderId);
+            if (!folder) {
+                return res.status(400).json({ message: 'Folder not found' });
+            }
+            console.log('Document will be saved to folder:', { folderId: folder.folderId, folderName: folder.name });
+        }
+
         // Extract file metadata from multer upload (req.file)
         const file = req.file;
         let fileMetadata = {};
