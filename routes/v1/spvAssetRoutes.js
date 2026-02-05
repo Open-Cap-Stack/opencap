@@ -8,14 +8,23 @@ const SPVAsset = require('../../models/SPVAssetModel');
 const router = express.Router();
 const mongoose = require('mongoose');
 const SPVAssetController = require('../../controllers/SPVasset');
-const jwtAuth = require('../../middleware/jwtAuth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const responseDebugger = require('../../middleware/responseDebugger');
 
 // Apply authentication middleware to all routes
-router.use(jwtAuth.authenticate);
+router.use(authenticateToken);
 
 // Role-based access control - Admin only
-const adminOnly = jwtAuth.authenticateRole(['Admin']);
+const adminOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'User not authenticated' });
+  }
+  const userRole = req.user.role?.toLowerCase();
+  if (userRole !== 'admin') {
+    return res.status(403).json({ message: 'Access denied: Admin role required' });
+  }
+  next();
+};
 
 // POST /api/spvassets - Create a new SPVAsset
 router.post('/', 
