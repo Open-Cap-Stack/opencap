@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const documentAccessController = require('../../controllers/documentAccessController');
 
-router.post('/document-accesses', documentAccessController.createDocumentAccess);
-router.get('/document-accesses', documentAccessController.getDocumentAccesses);
-router.get('/document-accesses/:id', documentAccessController.getDocumentAccessById);
-router.put('/document-accesses/:id', documentAccessController.updateDocumentAccess);
-router.delete('/document-accesses/:id', documentAccessController.deleteDocumentAccess);
+// Routes are mounted at /api/v1/document-accesses in app.js
+router.post('/', documentAccessController.createDocumentAccess);
+router.get('/', documentAccessController.getDocumentAccesses);
+router.get('/:id', documentAccessController.getDocumentAccessById);
+router.put('/:id', documentAccessController.updateDocumentAccess);
+router.delete('/:id', documentAccessController.deleteDocumentAccess);
 
 module.exports = router;
