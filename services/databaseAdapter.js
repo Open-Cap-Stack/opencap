@@ -256,6 +256,83 @@ class DatabaseAdapter {
   }
 
   /**
+   * Perform aggregation operations
+   * @param {string} modelName - Name of the model
+   * @param {Array} pipeline - Aggregation pipeline
+   * @returns {Array} Aggregation result
+   */
+  async aggregate(modelName, pipeline) {
+    this._checkInitialized();
+
+    try {
+      const startTime = Date.now();
+      const tableName = this._modelToTableName(modelName);
+
+      // Since ZeroDB may not support MongoDB-style aggregation,
+      // we implement basic aggregation manually
+      let results = [];
+
+      // Process pipeline stages
+      for (const stage of pipeline) {
+        if (stage.$match) {
+          // $match stage - filter documents
+          results = await this._findInZeroDB(tableName, stage.$match, {});
+        } else if (stage.$group) {
+          // $group stage - group and aggregate
+          const groupKey = stage.$group._id;
+          const groups = {};
+
+          for (const doc of results) {
+            // Get the group key value (handle $fieldName syntax)
+            const keyField = groupKey?.startsWith('$') ? groupKey.slice(1) : groupKey;
+            const keyValue = keyField ? doc[keyField] : null;
+
+            if (!groups[keyValue]) {
+              groups[keyValue] = { _id: keyValue, docs: [] };
+            }
+            groups[keyValue].docs.push(doc);
+          }
+
+          // Apply aggregation operators
+          results = Object.values(groups).map(group => {
+            const result = { _id: group._id };
+
+            for (const [outputField, operator] of Object.entries(stage.$group)) {
+              if (outputField === '_id') continue;
+
+              if (operator.$sum) {
+                const sumField = operator.$sum.startsWith('$') ? operator.$sum.slice(1) : operator.$sum;
+                result[outputField] = group.docs.reduce((sum, doc) => sum + (doc[sumField] || 0), 0);
+              } else if (operator.$avg) {
+                const avgField = operator.$avg.startsWith('$') ? operator.$avg.slice(1) : operator.$avg;
+                const values = group.docs.map(doc => doc[avgField] || 0);
+                result[outputField] = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+              } else if (operator.$count) {
+                result[outputField] = group.docs.length;
+              } else if (operator.$max) {
+                const maxField = operator.$max.startsWith('$') ? operator.$max.slice(1) : operator.$max;
+                result[outputField] = Math.max(...group.docs.map(doc => doc[maxField] || 0));
+              } else if (operator.$min) {
+                const minField = operator.$min.startsWith('$') ? operator.$min.slice(1) : operator.$min;
+                result[outputField] = Math.min(...group.docs.map(doc => doc[minField] || 0));
+              }
+            }
+
+            return result;
+          });
+        }
+      }
+
+      this._recordMetric(Date.now() - startTime, true);
+      return results;
+    } catch (error) {
+      this._recordMetric(0, false);
+      console.error(`ZeroDB aggregate error for ${modelName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Get metrics for ZeroDB
    * @returns {Object} Metrics data
    */
@@ -310,11 +387,39 @@ class DatabaseAdapter {
   _modelToTableName(modelName) {
     // Convert model name to ZeroDB table name
     // Convention: lowercase with underscores
-    // e.g., "ShareClass" -> "share_class", "FinancialReport" -> "financial_report"
+    // Handle special cases like "SPV" -> "spv" (not "s_p_v")
+    // e.g., "ShareClass" -> "share_classes", "SPVAsset" -> "spv_assets"
+
+    // Special model to table mappings
+    const tableNameMap = {
+      'SPV': 'spvs',
+      'SPVAsset': 'spv_assets',
+      'User': 'users',
+      'Document': 'documents',
+      'Company': 'companies',
+      'Stakeholder': 'stakeholders',
+      'Transaction': 'transactions',
+      'Security': 'securities',
+      'Valuation': 'valuations',
+      'AuditLog': 'audit_logs',
+      'ComplianceEvent': 'compliance_events',
+      'DocumentFolder': 'document_folders',
+      'DocumentAccessLog': 'document_access_logs',
+      'UserSettings': 'user_settings',
+      'EventAuditLog': 'event_audit_log'
+    };
+
+    // Check for direct mapping first
+    if (tableNameMap[modelName]) {
+      return tableNameMap[modelName];
+    }
+
+    // Fall back to conversion algorithm that handles consecutive uppercase
+    // "SPVAsset" -> handled above, "ShareClass" -> "share_class"
     return modelName
-      .replace(/([A-Z])/g, '_$1')  // Add underscore before uppercase letters
-      .toLowerCase()               // Convert to lowercase
-      .replace(/^_/, '');          // Remove leading underscore
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')  // Handle consecutive uppercase followed by lowercase
+      .replace(/([a-z])([A-Z])/g, '$1_$2')        // Handle lowercase followed by uppercase
+      .toLowerCase();
   }
 
   // ZeroDB-specific operations
