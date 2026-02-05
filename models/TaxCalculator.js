@@ -70,6 +70,54 @@ const TaxCalculator = {
     ...baseModel,
 
     /**
+     * Find all tax calculations
+     * @param {Object} query - Query filter
+     * @param {Object} options - Query options
+     * @returns {Array} Tax calculations
+     */
+    async find(query = {}, options = {}) {
+        return baseModel.find(query, options);
+    },
+
+    /**
+     * Find one tax calculation
+     * @param {Object} query - Query filter
+     * @returns {Object|null} Tax calculation or null
+     */
+    async findOne(query = {}) {
+        return baseModel.findOne(query);
+    },
+
+    /**
+     * Find tax calculation by ID
+     * @param {string} id - The ID
+     * @returns {Object|null} Tax calculation or null
+     */
+    async findById(id) {
+        return baseModel.findById(id);
+    },
+
+    /**
+     * Find and delete tax calculation by ID
+     * @param {string} id - The ID
+     * @returns {Object|null} Deleted tax calculation or null
+     */
+    async findByIdAndDelete(id) {
+        return baseModel.findByIdAndDelete(id);
+    },
+
+    /**
+     * Find and update tax calculation by ID
+     * @param {string} id - The ID
+     * @param {Object} update - Update data
+     * @param {Object} options - Update options
+     * @returns {Object|null} Updated tax calculation or null
+     */
+    async findByIdAndUpdate(id, update, options = {}) {
+        return baseModel.findByIdAndUpdate(id, update, options);
+    },
+
+    /**
      * Create a new tax calculation with validation
      * @param {Object} data - Tax calculation data
      * @returns {Object} Created tax calculation

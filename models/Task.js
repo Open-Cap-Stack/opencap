@@ -25,7 +25,7 @@ const taskSchema = {
     comments: { type: 'array' }
 };
 
-const baseModel = createModel('companies', taskSchema);
+const baseModel = createModel('tasks', taskSchema);
 
 /**
  * Validate task data

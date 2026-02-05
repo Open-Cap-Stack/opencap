@@ -25,7 +25,7 @@ const communicationSchema = {
     ThreadId: { type: 'string', required: false }
 };
 
-const baseModel = createModel('companies', communicationSchema);
+const baseModel = createModel('communications', communicationSchema);
 
 /**
  * Validate communication data
