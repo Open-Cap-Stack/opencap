@@ -137,7 +137,9 @@ class FileStorageService {
     const fileKey = `opencap/files/${Date.now()}-${fileName}`;
 
     try {
-      // Create form data for file upload - simplified to match API docs
+      // Create form data for file upload
+      // Use /database/storage/upload endpoint (not /database/files which is metadata-only)
+      // See: https://github.com/AINative-Studio/core/issues/1077
       const FormData = require('form-data');
       const form = new FormData();
       form.append('file', fileBuffer, {
@@ -145,43 +147,44 @@ class FileStorageService {
         contentType: contentType
       });
 
-      // Only append metadata if we have any
-      if (Object.keys(metadata).length > 0 || companyId || uploadedBy || category) {
-        const fullMetadata = {
-          ...metadata,
-          companyId,
-          uploadedBy,
-          category,
-          file_key: fileKey,
-          original_name: fileName,
-          content_type: contentType,
-          size_bytes: fileBuffer.length
-        };
-        form.append('metadata', JSON.stringify(fullMetadata));
-      }
+      // Add file key for storage path
+      form.append('key', fileKey);
+
+      // Add metadata
+      const fullMetadata = {
+        ...metadata,
+        companyId,
+        uploadedBy,
+        category,
+        original_name: fileName,
+        content_type: contentType
+      };
+      form.append('metadata', JSON.stringify(fullMetadata));
 
       const response = await zerodbService.client.post(
-        `/v1/public/zerodb/${zerodbService.projectId}/database/files`,
+        `/v1/public/zerodb/${zerodbService.projectId}/database/storage/upload`,
         form,
         {
-          headers: form.getHeaders ? form.getHeaders() : { 'Content-Type': 'multipart/form-data' }
+          headers: form.getHeaders ? form.getHeaders() : { 'Content-Type': 'multipart/form-data' },
+          timeout: 60000 // 60 second timeout for uploads
         }
       );
 
       return {
-        id: response.data.id,
+        id: response.data.file_id,
         fileKey: response.data.file_key,
-        fileName: response.data.file_name || fileName,
+        fileName: fileName,
         size: response.data.size_bytes || fileBuffer.length,
-        contentType: response.data.content_type || contentType,
-        metadata: response.data.file_metadata || metadata,
-        createdAt: response.data.created_at
+        contentType: contentType,
+        metadata: fullMetadata,
+        createdAt: new Date().toISOString()
       };
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
         throw new Error('Upload timeout: Connection timed out');
       }
-      throw new Error(`Failed to upload file: ${error.message}`);
+      const errorDetail = error.response?.data?.detail || error.response?.data?.message || error.message;
+      throw new Error(`Failed to upload file: ${errorDetail}`);
     }
   }
 
@@ -232,46 +235,67 @@ class FileStorageService {
    * Download a file from ZeroDB
    * @param {string} fileId - File ID
    * @param {Object} options - Download options
-   * @returns {Promise<Object>} - Download result with file data
+   * @returns {Promise<Object>} - Download result with file data or presigned URL
    */
   async downloadFile(fileId, options = {}) {
-    const { includeMetadata = false, stream = false } = options;
+    const { includeMetadata = false, stream = false, returnUrl = false } = options;
+    const axios = require('axios');
 
     try {
-      const response = await zerodbService.client.get(
-        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}`,
-        { responseType: stream ? 'stream' : 'arraybuffer' }
+      // Step 1: Get presigned download URL from ZeroDB
+      const urlResponse = await zerodbService.client.get(
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/download`
       );
 
+      const { download_url, file_name, content_type, size_bytes, expires_at } = urlResponse.data;
+
+      // If caller just wants the URL, return it
+      if (returnUrl) {
+        return {
+          url: download_url,
+          fileName: file_name,
+          contentType: content_type,
+          size: size_bytes,
+          expiresAt: expires_at
+        };
+      }
+
+      // Step 2: Fetch actual file content from presigned URL
+      const fileResponse = await axios.get(download_url, {
+        responseType: stream ? 'stream' : 'arraybuffer',
+        timeout: 60000
+      });
+
       const result = {
-        data: stream ? null : response.data,
-        contentType: response.headers['content-type'],
-        size: parseInt(response.headers['content-length'] || '0', 10)
+        data: stream ? null : fileResponse.data,
+        contentType: content_type || fileResponse.headers['content-type'],
+        size: size_bytes || parseInt(fileResponse.headers['content-length'] || '0', 10),
+        fileName: file_name
       };
 
       if (stream) {
-        result.stream = response.data;
+        result.stream = fileResponse.data;
       }
 
       if (includeMetadata) {
-        const metadataHeader = response.headers['x-file-metadata'];
-        result.metadata = metadataHeader ? JSON.parse(metadataHeader) : {};
-        result.fileName = response.headers['x-file-name'];
+        result.metadata = { fileName: file_name, contentType: content_type, size: size_bytes };
       }
 
       return result;
     } catch (error) {
       if (error.response) {
-        switch (error.response.status) {
-          case 404:
-            throw new Error('File not found');
-          case 401:
-            throw new Error('Authentication required');
-          case 503:
-            throw new Error('Service temporarily unavailable');
-          default:
-            throw new Error(`Failed to download file: ${error.response.data?.message || error.message}`);
+        const status = error.response.status;
+        const detail = error.response.data?.detail || error.response.data?.message;
+        if (status === 404 || (detail && detail.includes('not found'))) {
+          throw new Error('File not found');
         }
+        if (status === 401) {
+          throw new Error('Authentication required');
+        }
+        if (status === 503) {
+          throw new Error('Service temporarily unavailable');
+        }
+        throw new Error(`Failed to download file: ${detail || error.message}`);
       }
       throw new Error(`Failed to download file: ${error.message}`);
     }
