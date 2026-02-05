@@ -1,17 +1,20 @@
 /**
  * SPV Management API Controller
  * Feature: OCAE-211: Implement SPV Management API
+ * Updated: ZeroDB Migration - Uses ZeroDB model methods
  */
 const SPV = require('../models/SPV');
-const mongoose = require('mongoose');
 
 /**
- * Helper function to validate MongoDB ID format
+ * Helper function to check if ID looks like a UUID or ZeroDB row_id
  * @param {string} id - The ID to validate
- * @returns {boolean} - True if the ID is valid, false otherwise
+ * @returns {boolean} - True if the ID looks like a valid ID format
  */
-const isValidMongoId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
+const isValidId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  // UUID format or numeric row_id
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id) || /^\d+$/.test(id);
 };
 
 /**
@@ -22,7 +25,7 @@ const isValidMongoId = (id) => {
  * @param {string} req.body.Name - Name of the SPV
  * @param {string} req.body.Purpose - Purpose of the SPV
  * @param {Date} req.body.CreationDate - Date when SPV was created
- * @param {string} req.body.Status - Current status ('Active', 'Pending', 'Closed')
+ * @param {string} req.body.Status - Current status ('active', 'pending', 'closed', 'draft', 'liquidated')
  * @param {string} req.body.ParentCompanyID - ID of parent company
  * @param {string} req.body.ComplianceStatus - Compliance status ('Compliant', 'NonCompliant', 'PendingReview')
  * @returns {Object} JSON response with created SPV or error message
@@ -32,38 +35,45 @@ exports.createSPV = async (req, res) => {
     const { SPVID, Name, Purpose, CreationDate, Status, ParentCompanyID, ComplianceStatus } = req.body;
 
     // Validate required fields
-    if (!SPVID || !Name || !Purpose || !CreationDate || !Status || !ParentCompanyID || !ComplianceStatus) {
-      return res.status(400).json({ message: 'Missing required fields' });
+    if (!Name || !Purpose || !ParentCompanyID) {
+      return res.status(400).json({ message: 'Missing required fields: Name, Purpose, and ParentCompanyID are required' });
     }
 
-    // Validate enum values
-    if (!['Active', 'Pending', 'Closed'].includes(Status)) {
-      return res.status(400).json({ message: 'Invalid status. Status must be Active, Pending, or Closed' });
-    }
+    // Normalize status to lowercase for ZeroDB model
+    const normalizedStatus = Status ? Status.toLowerCase() : 'active';
 
-    if (!['Compliant', 'NonCompliant', 'PendingReview'].includes(ComplianceStatus)) {
-      return res.status(400).json({ 
-        message: 'Invalid compliance status. Status must be Compliant, NonCompliant, or PendingReview' 
+    // Validate enum values using model's valid statuses
+    if (!SPV.VALID_STATUSES.includes(normalizedStatus)) {
+      return res.status(400).json({
+        message: `Invalid status. Status must be one of: ${SPV.VALID_STATUSES.join(', ')}`
       });
     }
 
-    // Check if SPV with same SPVID already exists
-    const existingSPV = await SPV.findOne({ SPVID });
-    if (existingSPV) {
-      return res.status(409).json({ message: 'An SPV with this ID already exists' });
+    if (ComplianceStatus && !SPV.VALID_COMPLIANCE_STATUSES.includes(ComplianceStatus)) {
+      return res.status(400).json({
+        message: `Invalid compliance status. Status must be one of: ${SPV.VALID_COMPLIANCE_STATUSES.join(', ')}`
+      });
     }
 
-    const newSPV = new SPV({
+    // Check if SPV with same SPVID already exists (if SPVID provided)
+    if (SPVID) {
+      const existingSPV = await SPV.findOne({ SPVID });
+      if (existingSPV) {
+        return res.status(409).json({ message: 'An SPV with this ID already exists' });
+      }
+    }
+
+    // Use SPV.create() - the model will auto-generate SPVID if not provided
+    const savedSPV = await SPV.create({
       SPVID,
       Name,
       Purpose,
-      CreationDate,
-      Status,
+      CreationDate: CreationDate || new Date().toISOString(),
+      Status: normalizedStatus,
       ParentCompanyID,
-      ComplianceStatus,
+      ComplianceStatus: ComplianceStatus || 'PendingReview',
     });
 
-    const savedSPV = await newSPV.save();
     res.status(201).json(savedSPV);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create SPV', error: error.message });
@@ -90,43 +100,43 @@ exports.getSPVs = async (req, res) => {
 /**
  * Get SPV by ID
  * @route GET /api/spvs/:id
- * @param {string} req.params.id - SPV ID or MongoDB ObjectID
+ * @param {string} req.params.id - SPV ID or row_id
  * @returns {Object} JSON response with SPV or error message
  */
 exports.getSPVById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Special case for the test
     if (req.originalUrl === '/api/spvs/   ') {
       return res.status(404).json({ message: 'SPV ID is required' });
     }
-    
+
     // Handle empty IDs
     if (!id || id.trim() === '') {
       return res.status(404).json({ message: 'SPV ID is required' });
     }
-    
+
     // Handle specifically the test case ID that should fail validation
     if (id === '123456789012345678901234') {
       return res.status(400).json({ message: 'Invalid SPV ID format' });
     }
-    
+
     // Regular ID validation flow
     let spv;
-    
-    if (isValidMongoId(id)) {
-      // Try to find by MongoDB ID
+
+    // First try to find by SPVID field
+    spv = await SPV.findOne({ SPVID: id });
+
+    // If not found, try by row_id/id
+    if (!spv && isValidId(id)) {
       spv = await SPV.findById(id);
-    } else {
-      // Try to find by SPVID
-      spv = await SPV.findOne({ SPVID: id });
     }
-    
+
     if (!spv) {
       return res.status(404).json({ message: 'SPV not found' });
     }
-    
+
     res.status(200).json(spv);
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve SPV', error: error.message });
@@ -136,7 +146,7 @@ exports.getSPVById = async (req, res) => {
 /**
  * Update SPV by ID
  * @route PUT /api/spvs/:id
- * @param {string} req.params.id - SPV ID or MongoDB ObjectID
+ * @param {string} req.params.id - SPV ID or row_id
  * @param {Object} req.body - SPV update data
  * @returns {Object} JSON response with updated SPV or error message
  */
@@ -144,63 +154,66 @@ exports.updateSPV = async (req, res) => {
   try {
     const { id } = req.params;
     const { Name, Purpose, Status, ComplianceStatus, SPVID } = req.body;
-    
+
     // Handle specifically the test case ID that should fail validation
     if (id === '123456789012345678901234') {
       return res.status(400).json({ message: 'Invalid SPV ID format' });
     }
-    
+
     // Prevent SPVID from being modified
     if (SPVID) {
       return res.status(400).json({ message: 'SPVID cannot be modified' });
     }
-    
-    // Validate enum fields if provided
-    if (Status && !['Active', 'Pending', 'Closed'].includes(Status)) {
-      return res.status(400).json({ message: 'Invalid status. Status must be Active, Pending, or Closed' });
-    }
 
-    if (ComplianceStatus && !['Compliant', 'NonCompliant', 'PendingReview'].includes(ComplianceStatus)) {
-      return res.status(400).json({ 
-        message: 'Invalid compliance status. Status must be Compliant, NonCompliant, or PendingReview' 
+    // Normalize and validate status
+    const normalizedStatus = Status ? Status.toLowerCase() : null;
+    if (normalizedStatus && !SPV.VALID_STATUSES.includes(normalizedStatus)) {
+      return res.status(400).json({
+        message: `Invalid status. Status must be one of: ${SPV.VALID_STATUSES.join(', ')}`
       });
     }
-    
-    const updateData = { 
+
+    if (ComplianceStatus && !SPV.VALID_COMPLIANCE_STATUSES.includes(ComplianceStatus)) {
+      return res.status(400).json({
+        message: `Invalid compliance status. Status must be one of: ${SPV.VALID_COMPLIANCE_STATUSES.join(', ')}`
+      });
+    }
+
+    const updateData = {
       ...(Name && { Name }),
       ...(Purpose && { Purpose }),
-      ...(Status && { Status }),
+      ...(normalizedStatus && { Status: normalizedStatus }),
       ...(ComplianceStatus && { ComplianceStatus }),
-      updatedAt: Date.now()
+      updatedAt: new Date().toISOString()
     };
-    
+
     // If no fields to update
     if (Object.keys(updateData).length <= 1) { // Only updatedAt
       return res.status(400).json({ message: 'No valid fields provided for update' });
     }
-    
+
     let updatedSPV;
-    
-    // If it's a valid MongoDB ID, use findByIdAndUpdate
-    if (isValidMongoId(id)) {
+
+    // First try to find and update by SPVID
+    updatedSPV = await SPV.findOneAndUpdate(
+      { SPVID: id },
+      { $set: updateData },
+      { new: true }
+    );
+
+    // If not found by SPVID, try by row_id
+    if (!updatedSPV && isValidId(id)) {
       updatedSPV = await SPV.findByIdAndUpdate(
         id,
-        updateData,
-        { new: true, runValidators: true }
-      );
-    } else {
-      // Otherwise use findOneAndUpdate with SPVID
-      updatedSPV = await SPV.findOneAndUpdate(
-        { SPVID: id },
-        updateData,
-        { new: true, runValidators: true }
+        { $set: updateData },
+        { new: true }
       );
     }
-    
+
     if (!updatedSPV) {
       return res.status(404).json({ message: 'SPV not found' });
     }
-    
+
     res.status(200).json(updatedSPV);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update SPV', error: error.message });
@@ -210,25 +223,28 @@ exports.updateSPV = async (req, res) => {
 /**
  * Get SPVs by status
  * @route GET /api/spvs/status/:status
- * @param {string} req.params.status - Status to filter by ('Active', 'Pending', 'Closed')
+ * @param {string} req.params.status - Status to filter by (active, pending, closed, draft, liquidated)
  * @returns {Object} JSON response with array of SPVs or error message
  */
 exports.getSPVsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
-    
-    if (!status || !['Active', 'Pending', 'Closed'].includes(status)) {
-      return res.status(400).json({ 
-        message: 'Invalid status parameter. Must be Active, Pending, or Closed' 
+
+    // Normalize status to lowercase
+    const normalizedStatus = status ? status.toLowerCase() : '';
+
+    if (!normalizedStatus || !SPV.VALID_STATUSES.includes(normalizedStatus)) {
+      return res.status(400).json({
+        message: `Invalid status parameter. Must be one of: ${SPV.VALID_STATUSES.join(', ')}`
       });
     }
-    
-    const spvs = await SPV.find({ Status: status });
-    
-    if (spvs.length === 0) {
-      return res.status(404).json({ message: `No SPVs found with status: ${status}` });
+
+    const spvs = await SPV.find({ Status: normalizedStatus });
+
+    if (!spvs || spvs.length === 0) {
+      return res.status(404).json({ message: `No SPVs found with status: ${normalizedStatus}` });
     }
-    
+
     res.status(200).json({ spvs });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve SPVs by status', error: error.message });
@@ -244,24 +260,24 @@ exports.getSPVsByStatus = async (req, res) => {
 exports.getSPVsByComplianceStatus = async (req, res) => {
   try {
     const { status } = req.params;
-    
-    if (!status || !['Compliant', 'NonCompliant', 'PendingReview'].includes(status)) {
-      return res.status(400).json({ 
-        message: 'Invalid compliance status parameter. Must be Compliant, NonCompliant, or PendingReview' 
+
+    if (!status || !SPV.VALID_COMPLIANCE_STATUSES.includes(status)) {
+      return res.status(400).json({
+        message: `Invalid compliance status parameter. Must be one of: ${SPV.VALID_COMPLIANCE_STATUSES.join(', ')}`
       });
     }
-    
+
     const spvs = await SPV.find({ ComplianceStatus: status });
-    
-    if (spvs.length === 0) {
+
+    if (!spvs || spvs.length === 0) {
       return res.status(404).json({ message: `No SPVs found with compliance status: ${status}` });
     }
-    
+
     res.status(200).json({ spvs });
   } catch (error) {
-    res.status(500).json({ 
-      message: 'Failed to retrieve SPVs by compliance status', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to retrieve SPVs by compliance status',
+      error: error.message
     });
   }
 };
@@ -298,26 +314,26 @@ exports.getSPVsByParentCompany = async (req, res) => {
 /**
  * Delete an SPV by ID
  * @route DELETE /api/spvs/:id
- * @param {string} req.params.id - SPV ID or MongoDB ObjectID
+ * @param {string} req.params.id - SPV ID or row_id
  * @returns {Object} JSON response with success or error message
  */
 exports.deleteSPV = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Handle specifically the test case ID that should fail validation
     if (id === '123456789012345678901234') {
       return res.status(400).json({ message: 'Invalid SPV ID format' });
     }
-    
+
     let deletedSPV;
-    
-    // Check if it's a valid MongoDB ID
-    if (isValidMongoId(id)) {
+
+    // First try to delete by SPVID
+    deletedSPV = await SPV.findOneAndDelete({ SPVID: id });
+
+    // If not found by SPVID, try by row_id
+    if (!deletedSPV && isValidId(id)) {
       deletedSPV = await SPV.findByIdAndDelete(id);
-    } else {
-      // Otherwise use findOneAndDelete with SPVID
-      deletedSPV = await SPV.findOneAndDelete({ SPVID: id });
     }
 
     if (!deletedSPV) {
