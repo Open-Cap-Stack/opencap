@@ -2,12 +2,17 @@
  * Fundraising Analytics Routes
  *
  * Issue #196: Implement Fundraising Analytics Service
+ * Issue #252: Fix Fundraising Model Page 401 Unauthorized Error
  * API endpoints for fundraising analytics features
  */
 
 const express = require('express');
 const router = express.Router();
 const fundraisingAnalyticsController = require('../../controllers/fundraisingAnalyticsController');
+const { authenticate } = require('../../middleware/authMiddleware');
+
+// Apply authentication to all routes
+router.use(authenticate);
 
 /**
  * @route   GET /api/v1/fundraising/analytics/:companyId

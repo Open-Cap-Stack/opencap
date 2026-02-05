@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../../controllers/authController');
 const { authenticateToken } = require('../../middleware/authMiddleware.js');
+const { debugTokenEndpoint } = require('../../middleware/authErrorLogger');
+
+// Debug endpoint for troubleshooting authentication issues (Issue #250)
+router.get('/debug-token', debugTokenEndpoint);
 
 // Existing routes
 router.post('/register', authController.registerUser);

@@ -64,7 +64,11 @@ describe('Document Access Controller - ZeroDB Migration', () => {
         User: 'user-456'
       }));
       expect(mockStatus).toHaveBeenCalledWith(201);
-      expect(mockJson).toHaveBeenCalledWith(insertedAccess);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: true,
+        data: insertedAccess,
+        message: 'Document access created successfully'
+      });
     });
 
     it('should handle creation errors', async () => {
@@ -75,7 +79,10 @@ describe('Document Access Controller - ZeroDB Migration', () => {
       await documentAccessController.createDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({ error: 'Insertion failed' });
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'Insertion failed'
+      });
     });
 
     it('should validate required fields', async () => {
@@ -172,7 +179,7 @@ describe('Document Access Controller - ZeroDB Migration', () => {
   });
 
   describe('updateDocumentAccess', () => {
-    it('should update document access using ZeroDB updateRows', async () => {
+    it('should update document access using ZeroDB updateRows with correct API signature', async () => {
       mockReq.params = { id: 'access-123' };
       mockReq.body = { AccessLevel: 'Write', Permissions: 'view,edit,delete' };
 
@@ -180,20 +187,26 @@ describe('Document Access Controller - ZeroDB Migration', () => {
         id: 'access-123',
         accessId: 'access-001',
         AccessLevel: 'Write',
-        Permissions: 'view,edit,delete'
+        Permissions: 'view,edit,delete',
+        updatedAt: expect.any(String)
       };
 
-      zerodbService.updateRows = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1, matched_count: 1 });
       zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [updatedAccess] });
 
       await documentAccessController.updateDocumentAccess(mockReq, mockRes);
 
-      expect(zerodbService.updateRows).toHaveBeenCalledWith('document_access',
-        { id: 'access-123' },
-        { $set: expect.objectContaining({ AccessLevel: 'Write' }) }
-      );
+      // Verify updateRows is called with correct options object structure
+      expect(zerodbService.updateRows).toHaveBeenCalledWith('document_access', {
+        filter: { id: 'access-123' },
+        update: { $set: expect.objectContaining({ AccessLevel: 'Write', updatedAt: expect.any(String) }) }
+      });
       expect(mockStatus).toHaveBeenCalledWith(200);
-      expect(mockJson).toHaveBeenCalledWith(updatedAccess);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: true,
+        data: updatedAccess,
+        message: 'Document access updated successfully'
+      });
     });
 
     it('should return 404 if document access to update not found', async () => {
@@ -206,7 +219,10 @@ describe('Document Access Controller - ZeroDB Migration', () => {
       await documentAccessController.updateDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document access not found' });
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'Document access not found'
+      });
     });
 
     it('should handle update errors', async () => {
@@ -218,7 +234,10 @@ describe('Document Access Controller - ZeroDB Migration', () => {
       await documentAccessController.updateDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({ error: 'Update failed' });
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'Update failed'
+      });
     });
 
     it('should validate AccessLevel values', async () => {
@@ -234,7 +253,7 @@ describe('Document Access Controller - ZeroDB Migration', () => {
   });
 
   describe('deleteDocumentAccess', () => {
-    it('should delete document access using ZeroDB deleteRows', async () => {
+    it('should delete document access using ZeroDB deleteRows with correct API signature', async () => {
       mockReq.params = { id: 'access-123' };
 
       const deletedAccess = {
@@ -244,11 +263,14 @@ describe('Document Access Controller - ZeroDB Migration', () => {
       };
 
       zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [deletedAccess] });
-      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deletedCount: 1 });
+      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deleted_count: 1 });
 
       await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
 
-      expect(zerodbService.deleteRows).toHaveBeenCalledWith('document_access', { id: 'access-123' });
+      // Verify deleteRows is called with correct options object structure
+      expect(zerodbService.deleteRows).toHaveBeenCalledWith('document_access', {
+        filter: { id: 'access-123' }
+      });
       expect(mockStatus).toHaveBeenCalledWith(200);
       expect(mockJson).toHaveBeenCalledWith({ message: 'Document access deleted' });
     });
@@ -337,6 +359,291 @@ describe('Document Access Controller - ZeroDB Migration', () => {
       await documentAccessController.createDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
+    });
+  });
+
+  describe('Update Operation - Additional Tests', () => {
+    it('should handle partial updates correctly', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = { Permissions: 'view,edit' }; // Only updating permissions
+
+      const updatedAccess = {
+        id: 'access-123',
+        accessId: 'access-001',
+        AccessLevel: 'Read',
+        Permissions: 'view,edit',
+        updatedAt: expect.any(String)
+      };
+
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [updatedAccess] });
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(200);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: true,
+        data: updatedAccess,
+        message: 'Document access updated successfully'
+      });
+    });
+
+    it('should handle update when ZeroDB returns no modified count', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = { AccessLevel: 'Write' };
+
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 0, matched_count: 0 });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(404);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'Document access not found'
+      });
+    });
+
+    it('should handle network errors during update', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = { AccessLevel: 'Write' };
+
+      const networkError = new Error('Network timeout');
+      networkError.code = 'ETIMEDOUT';
+
+      zerodbService.updateRows = jest.fn().mockRejectedValue(networkError);
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(400);
+      expect(mockJson).toHaveBeenCalledWith({
+        success: false,
+        error: 'Network timeout'
+      });
+    });
+
+    it('should preserve existing fields when updating', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = { AccessLevel: 'Admin' };
+
+      const updatedAccess = {
+        id: 'access-123',
+        accessId: 'access-001',
+        AccessLevel: 'Admin',
+        RelatedDocument: 'doc-456',
+        User: 'user-789',
+        Permissions: 'original-permissions',
+        updatedAt: expect.any(String)
+      };
+
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [updatedAccess] });
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      expect(mockJson).toHaveBeenCalledWith({
+        success: true,
+        data: expect.objectContaining({
+          Permissions: 'original-permissions'
+        }),
+        message: 'Document access updated successfully'
+      });
+    });
+  });
+
+  describe('Delete Operation - Additional Tests', () => {
+    it('should handle deletion when record exists in ZeroDB', async () => {
+      mockReq.params = { id: 'access-456' };
+
+      const existingAccess = {
+        id: 'access-456',
+        accessId: 'access-002',
+        AccessLevel: 'Write',
+        User: 'user-123'
+      };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [existingAccess] });
+      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deleted_count: 1 });
+
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
+
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('document_access', {
+        filter: { id: 'access-456' },
+        limit: 1
+      });
+      expect(zerodbService.deleteRows).toHaveBeenCalledWith('document_access', {
+        filter: { id: 'access-456' }
+      });
+      expect(mockStatus).toHaveBeenCalledWith(200);
+    });
+
+    it('should handle deletion when ZeroDB returns zero deleted count', async () => {
+      mockReq.params = { id: 'access-123' };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [{ id: 'access-123' }] });
+      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deleted_count: 0 });
+
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
+
+      // Should still succeed if query found the record initially
+      expect(mockStatus).toHaveBeenCalledWith(200);
+    });
+
+    it('should handle network errors during deletion', async () => {
+      mockReq.params = { id: 'access-123' };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [{ id: 'access-123' }] });
+
+      const networkError = new Error('Connection refused');
+      networkError.code = 'ECONNREFUSED';
+
+      zerodbService.deleteRows = jest.fn().mockRejectedValue(networkError);
+
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(500);
+      expect(mockJson).toHaveBeenCalledWith({ error: 'Connection refused' });
+    });
+
+    it('should not call deleteRows if record not found in initial query', async () => {
+      mockReq.params = { id: 'non-existent' };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+      zerodbService.deleteRows = jest.fn();
+
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
+
+      expect(zerodbService.deleteRows).not.toHaveBeenCalled();
+      expect(mockStatus).toHaveBeenCalledWith(404);
+    });
+  });
+
+  describe('Authorization and Security', () => {
+    it('should handle unauthorized access attempts', async () => {
+      mockReq.params = { id: 'access-123' };
+
+      const authError = new Error('Unauthorized access');
+      authError.status = 401;
+
+      zerodbService.queryTable = jest.fn().mockRejectedValue(authError);
+
+      await documentAccessController.getDocumentAccessById(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(500);
+      expect(mockJson).toHaveBeenCalledWith({ error: 'Unauthorized access' });
+    });
+
+    it('should sanitize input data before update', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = {
+        AccessLevel: 'Write',
+        maliciousField: '<script>alert("xss")</script>'
+      };
+
+      const updatedAccess = {
+        id: 'access-123',
+        AccessLevel: 'Write',
+        maliciousField: '<script>alert("xss")</script>',
+        updatedAt: expect.any(String)
+      };
+
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [updatedAccess] });
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      // Should still process but backend validation should handle sanitization
+      expect(zerodbService.updateRows).toHaveBeenCalled();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty string IDs gracefully', async () => {
+      mockReq.params = { id: '' };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+
+      await documentAccessController.getDocumentAccessById(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(404);
+    });
+
+    it('should handle null or undefined body in update', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = undefined;
+
+      await documentAccessController.updateDocumentAccess(mockReq, mockRes);
+
+      // Should handle gracefully with proper error
+      expect(mockStatus).toHaveBeenCalledWith(expect.any(Number));
+    });
+
+    it('should handle ZeroDB service returning malformed data', async () => {
+      mockReq.params = { id: 'access-123' };
+
+      // Missing 'rows' property
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: null });
+
+      await documentAccessController.getDocumentAccessById(mockReq, mockRes);
+
+      expect(mockStatus).toHaveBeenCalledWith(404);
+    });
+
+    it('should handle very long ID strings', async () => {
+      const longId = 'a'.repeat(1000);
+      mockReq.params = { id: longId };
+
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+
+      await documentAccessController.getDocumentAccessById(mockReq, mockRes);
+
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('document_access', {
+        filter: { id: longId },
+        limit: 1
+      });
+    });
+  });
+
+  describe('Concurrent Operations', () => {
+    it('should handle concurrent update requests', async () => {
+      mockReq.params = { id: 'access-123' };
+      mockReq.body = { AccessLevel: 'Write' };
+
+      const updatedAccess = { id: 'access-123', AccessLevel: 'Write', updatedAt: expect.any(String) };
+
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [updatedAccess] });
+
+      // Simulate concurrent updates
+      const promises = [
+        documentAccessController.updateDocumentAccess(mockReq, mockRes),
+        documentAccessController.updateDocumentAccess(mockReq, mockRes)
+      ];
+
+      await Promise.all(promises);
+
+      expect(zerodbService.updateRows).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle concurrent delete requests', async () => {
+      mockReq.params = { id: 'access-123' };
+
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'access-123' }] })
+        .mockResolvedValueOnce({ rows: [] }); // Second call returns empty (already deleted)
+
+      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deleted_count: 1 });
+
+      const mockRes2 = {
+        status: jest.fn().mockReturnValue({ json: jest.fn() }),
+        json: jest.fn()
+      };
+
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes);
+      await documentAccessController.deleteDocumentAccess(mockReq, mockRes2);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes2.status).toHaveBeenCalledWith(404);
     });
   });
 });

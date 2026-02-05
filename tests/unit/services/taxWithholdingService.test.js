@@ -269,5 +269,20 @@ describe('TaxWithholdingService', () => {
       // RSU should have ordinary income at full FMV
       expect(rsuResult.income.ordinaryIncome).toBe(10000);
     });
+
+    it('should handle unknown event types with default calculation', () => {
+      const customParams = {
+        eventType: 'bonus_payment',
+        grossAmount: 50000,
+        ordinaryIncome: 50000,
+        employeeProfile: baseEmployeeProfile
+      };
+
+      const result = TaxWithholdingService.getWithholdingEstimate(customParams);
+
+      // Should use default calculateWithholding method
+      expect(result.income.ordinaryIncome).toBe(50000);
+      expect(result.summary.federalWithholding).toBeGreaterThan(0);
+    });
   });
 });
