@@ -1,12 +1,17 @@
 /**
  * EquityPlanReport Routes
  * Issue #110: Implement Equity Plan Reports
+ * Issue #234: Fix Reports Page 401 Unauthorized Errors
  *
  * API routes for equity plan report operations.
  */
 const express = require('express');
 const router = express.Router();
 const equityPlanReportController = require('../../controllers/equityPlanReportController');
+const { authenticateToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Report type and format info
 router.get('/types', equityPlanReportController.getAvailableReportTypes);

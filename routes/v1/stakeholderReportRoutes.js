@@ -1,6 +1,7 @@
 /**
  * Stakeholder Report Routes
  * Issue #198: Enhance Stakeholder Report Generation
+ * Issue #234: Fix Reports Page 401 Unauthorized Errors
  *
  * API routes for stakeholder report generation:
  * - GET    /api/v1/stakeholders/:id/reports - Get stakeholder reports
@@ -16,6 +17,10 @@
 const express = require('express');
 const router = express.Router();
 const stakeholderReportController = require('../../controllers/stakeholderReportController');
+const { authenticateToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @swagger
