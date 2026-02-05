@@ -63,7 +63,17 @@ class ZeroDBModel {
         this._addTimestamps(doc, true);
 
         const result = await zerodbService.insertRow(this.tableName, doc);
-        return result.data?.[0] || doc;
+        // ZeroDB returns { row_id, row_data: {...} }, unwrap it properly
+        const insertedRow = result.data?.[0];
+        if (insertedRow?.row_data) {
+            return {
+                ...insertedRow.row_data,
+                id: insertedRow.row_id || insertedRow.row_data.id,
+                _id: insertedRow.row_id || insertedRow.row_data._id,
+                row_id: insertedRow.row_id
+            };
+        }
+        return insertedRow || doc;
     }
 
     /**
