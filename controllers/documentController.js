@@ -79,6 +79,8 @@ exports.createDocument = async (req, res) => {
             console.log('File uploaded locally:', { name: file.originalname, size: file.size, type: file.mimetype });
 
             // Upload file to persistent storage (ZeroDB file storage)
+            // CRITICAL: On Railway (ephemeral storage), this MUST succeed or the file will be lost
+            const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME;
             try {
                 const uploadResult = await fileStorageService.uploadFileFromPath(file.path, {
                     companyId: req.user?.companyId,
@@ -98,9 +100,23 @@ exports.createDocument = async (req, res) => {
                 fs.unlink(file.path, (err) => {
                     if (err) console.warn('Failed to clean up temp file:', err.message);
                 });
+                // Clear local paths since file is now in persistent storage
+                delete fileMetadata.storagePath;
+                delete fileMetadata.filePath;
             } catch (uploadError) {
-                console.warn('Failed to upload to persistent storage, keeping local file:', uploadError.message);
-                // Continue with local file path as fallback
+                console.error('Failed to upload to persistent storage:', uploadError.message);
+                // On Railway, fail the request - local files won't persist
+                if (isRailway) {
+                    // Clean up the temp file
+                    const fs = require('fs');
+                    fs.unlink(file.path, () => {});
+                    return res.status(500).json({
+                        message: 'Failed to upload file to storage. Please try again.',
+                        error: uploadError.message
+                    });
+                }
+                // On local dev, keep local file as fallback
+                console.warn('Keeping local file as fallback (development only)');
             }
         }
 
@@ -895,6 +911,7 @@ const getPreviewInfo = (contentType) => {
 /**
  * Download a document file
  * Issue #122: Document download endpoint
+ * Issue #235: Fixed ephemeral storage issue on Railway
  */
 exports.downloadDocument = async (req, res) => {
     try {
@@ -905,7 +922,8 @@ exports.downloadDocument = async (req, res) => {
         const document = await findDocumentById(id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            console.warn(`Document not found: ${id}`);
+            return res.status(404).json({ message: 'Document not found', documentId: id });
         }
 
         // Check access permissions
@@ -918,8 +936,21 @@ exports.downloadDocument = async (req, res) => {
         const hasLocalFile = localFilePath && require('fs').existsSync(localFilePath);
         const hasRemoteFile = document.fileId;
 
+        // Log file location details for debugging
+        console.log(`Download request for document ${id}:`, {
+            hasLocalFile,
+            localFilePath: localFilePath || 'none',
+            hasRemoteFile: !!hasRemoteFile,
+            fileId: document.fileId || 'none'
+        });
+
         if (!hasLocalFile && !hasRemoteFile) {
-            return res.status(404).json({ message: 'No file attached to document' });
+            console.error(`No file attached to document ${id}. Local path: ${localFilePath}, FileId: ${document.fileId}`);
+            return res.status(404).json({
+                message: 'File not available. The file may have been deleted or failed to upload.',
+                documentId: id,
+                hint: 'Try re-uploading the document'
+            });
         }
 
         const contentType = document.contentType || document.mimeType || 'application/octet-stream';
@@ -958,15 +989,27 @@ exports.downloadDocument = async (req, res) => {
             return fileStream.pipe(res);
         }
 
-        // Download file from storage service
+        // Download file from persistent storage service (ZeroDB)
         let fileData;
         try {
+            console.log(`Downloading file from storage: ${document.fileId}`);
             fileData = await fileStorageService.downloadFile(document.fileId, {
                 includeMetadata: true
             });
         } catch (fileError) {
-            console.error('File download error:', fileError.message);
-            return res.status(500).json({ message: 'Failed to download file' });
+            console.error(`File download error for fileId ${document.fileId}:`, fileError.message);
+            // Check if it's a "not found" error
+            if (fileError.message.includes('not found') || fileError.message.includes('404')) {
+                return res.status(404).json({
+                    message: 'File not found in storage. It may have been deleted.',
+                    documentId: id,
+                    fileId: document.fileId
+                });
+            }
+            return res.status(500).json({
+                message: 'Failed to download file from storage',
+                error: fileError.message
+            });
         }
 
         // Set response headers
