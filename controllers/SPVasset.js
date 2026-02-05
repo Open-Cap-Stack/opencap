@@ -1,17 +1,21 @@
 /**
  * SPV Asset Management API Controller
  * Feature: OCAE-212: Implement SPV Asset Management API
- * Issue #20: Migrate to ZeroDB via DatabaseAdapter
+ * Updated: ZeroDB Migration - Uses SPVAsset model directly
  */
-const databaseAdapter = require('../services/databaseAdapter');
+const SPVAsset = require('../models/SPVasset');
+const SPV = require('../models/SPV');
 
 /**
- * Helper function to validate MongoDB ID format
+ * Helper function to validate ID format (UUID or row_id)
  * @param {string} id - The ID to validate
  * @returns {boolean} - True if the ID is valid, false otherwise
  */
-const isValidMongoId = (id) => {
-  return /^[0-9a-fA-F]{24}$/.test(id);
+const isValidId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  // UUID format or numeric row_id
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id) || /^\d+$/.test(id) || /^[A-Za-z0-9\-_]+$/.test(id);
 };
 
 /**
@@ -23,12 +27,12 @@ exports.createSPVAsset = async (req, res) => {
   try {
     const { AssetID, SPVID, Type, Value, Description, AcquisitionDate } = req.body;
 
-    if (!AssetID || !SPVID || !Type || !Value || !Description || !AcquisitionDate) {
+    if (!SPVID || !Type || !Value || !Description || !AcquisitionDate) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
     const assetData = {
-      AssetID,
+      AssetID, // Will be auto-generated if not provided
       SPVID,
       Type,
       Value,
@@ -36,7 +40,7 @@ exports.createSPVAsset = async (req, res) => {
       AcquisitionDate,
     };
 
-    const savedAsset = await databaseAdapter.create('SPVAsset', assetData);
+    const savedAsset = await SPVAsset.create(assetData);
     res.status(201).json(savedAsset);
   } catch (error) {
     console.error('Error creating SPV Asset:', error);
@@ -51,8 +55,8 @@ exports.createSPVAsset = async (req, res) => {
  */
 exports.getSPVAssets = async (req, res) => {
   try {
-    const assets = await databaseAdapter.find('SPVAsset', {});
-    res.status(200).json({ spvassets: assets });
+    const assets = await SPVAsset.find({});
+    res.status(200).json({ spvassets: assets || [] });
   } catch (error) {
     console.error('Error retrieving SPV Assets:', error);
     res.status(500).json({ message: 'Failed to retrieve SPVAssets', error: error.message });
@@ -68,11 +72,15 @@ exports.getSPVAssetById = async (req, res) => {
   try {
     const assetId = req.params.id;
 
-    if (!isValidMongoId(assetId)) {
+    if (!isValidId(assetId)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    const asset = await databaseAdapter.findById('SPVAsset', assetId);
+    // Try finding by AssetID first, then by row_id
+    let asset = await SPVAsset.findByAssetID(assetId);
+    if (!asset) {
+      asset = await SPVAsset.findById(assetId);
+    }
 
     if (!asset) {
       return res.status(404).json({ message: 'SPVAsset not found' });
@@ -100,31 +108,19 @@ exports.getAssetsBySPVId = async (req, res) => {
     }
 
     // Check if the SPV exists
-    const spv = await databaseAdapter.findOne('SPV', { SPVID: spvId });
+    const spv = await SPV.findOne({ SPVID: spvId });
     if (!spv) {
       return res.status(404).json({ message: 'SPV not found' });
     }
 
     // Get all assets for this SPV
-    const assets = await databaseAdapter.find('SPVAsset', { SPVID: spvId });
+    const assets = await SPVAsset.findBySPVID(spvId);
 
-    if (assets.length === 0) {
+    if (!assets || assets.length === 0) {
       return res.status(404).json({ message: 'No assets found for this SPV' });
     }
 
-    // Check if the referenced SPV still exists
-    const spvExists = await databaseAdapter.findOne('SPV', { SPVID: spvId });
-
-    // If SPV doesn't exist, mark assets as orphaned
-    let plainAssets = assets;
-    if (!spvExists) {
-      plainAssets = assets.map(asset => ({
-        ...asset,
-        SPVStatus: 'Orphaned'
-      }));
-    }
-
-    res.status(200).json({ assets: plainAssets });
+    res.status(200).json({ assets });
   } catch (error) {
     console.error('Error retrieving assets by SPV ID:', error);
     res.status(500).json({ message: 'Failed to retrieve assets', error: error.message });
@@ -146,20 +142,18 @@ exports.getSPVValuation = async (req, res) => {
     }
 
     // Check if the SPV exists
-    const spv = await databaseAdapter.findOne('SPV', { SPVID: spvId });
+    const spv = await SPV.findOne({ SPVID: spvId });
     if (!spv) {
       return res.status(404).json({ message: 'SPV not found' });
     }
 
-    // Get all assets for this SPV
-    const assets = await databaseAdapter.find('SPVAsset', { SPVID: spvId });
+    // Get total value using model method
+    const totalValuation = await SPVAsset.getTotalValueBySPVID(spvId);
+    const assets = await SPVAsset.findBySPVID(spvId);
 
-    if (assets.length === 0) {
+    if (!assets || assets.length === 0) {
       return res.status(404).json({ message: 'No assets found for this SPV' });
     }
-
-    // Calculate total valuation
-    const totalValuation = assets.reduce((total, asset) => total + asset.Value, 0);
 
     res.status(200).json({
       spvId: spvId,
@@ -174,35 +168,43 @@ exports.getSPVValuation = async (req, res) => {
 
 /**
  * Calculate total valuation by asset type
- * @route GET /api/spvassets/valuation
+ * @route GET /api/spvassets/valuation/type/:type
  * @access Private (requires valid JWT)
  */
 exports.getAssetTypeValuation = async (req, res) => {
   try {
-    const { type } = req.query;
+    const type = req.params.type || req.query.type;
 
     if (!type) {
       return res.status(400).json({ message: 'Asset type is required' });
     }
 
-    // Get all assets of the specified type using aggregation
-    const result = await databaseAdapter.aggregate('SPVAsset', [
-      { $match: { Type: type } },
-      { $group: { _id: "$SPVID", totalValue: { $sum: "$Value" } } }
-    ]);
+    // Get all assets of the specified type
+    const assets = await SPVAsset.findByType(type);
 
-    if (result.length === 0) {
+    if (!assets || assets.length === 0) {
       return res.status(404).json({ message: `No assets found for type: ${type}` });
+    }
+
+    // Group by SPV and calculate totals
+    const spvGroups = {};
+    for (const asset of assets) {
+      const spvId = asset.SPVID;
+      if (!spvGroups[spvId]) {
+        spvGroups[spvId] = { totalValue: 0, count: 0 };
+      }
+      spvGroups[spvId].totalValue += asset.Value || 0;
+      spvGroups[spvId].count += 1;
     }
 
     // Create response data
     const responseData = {
       assetType: type,
-      totalValuation: result.reduce((sum, item) => sum + item.totalValue, 0),
-      assetCount: result.length,
-      assetBreakdown: result.map(item => ({
-        spvId: item._id,
-        totalValue: item.totalValue
+      totalValuation: assets.reduce((sum, asset) => sum + (asset.Value || 0), 0),
+      assetCount: assets.length,
+      assetBreakdown: Object.entries(spvGroups).map(([spvId, data]) => ({
+        spvId,
+        totalValue: data.totalValue
       }))
     };
 
@@ -222,7 +224,7 @@ exports.updateSPVAsset = async (req, res) => {
   try {
     const assetId = req.params.id;
 
-    if (!isValidMongoId(assetId)) {
+    if (!isValidId(assetId)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
@@ -234,13 +236,24 @@ exports.updateSPVAsset = async (req, res) => {
     delete updates.SPVID;
 
     // Validate data types
-    if (updates.Value && isNaN(Number(updates.Value))) {
+    if (updates.Value !== undefined && isNaN(Number(updates.Value))) {
       return res.status(400).json({ message: 'Invalid SPV Asset data: Value must be a number' });
     }
 
-    const options = { new: true, runValidators: true };
+    // Try to find and update by AssetID first, then by row_id
+    let updatedAsset = await SPVAsset.findOneAndUpdate(
+      { AssetID: assetId.toUpperCase() },
+      { $set: updates },
+      { new: true }
+    );
 
-    const updatedAsset = await databaseAdapter.findByIdAndUpdate('SPVAsset', assetId, updates, options);
+    if (!updatedAsset) {
+      updatedAsset = await SPVAsset.findByIdAndUpdate(
+        assetId,
+        { $set: updates },
+        { new: true }
+      );
+    }
 
     if (!updatedAsset) {
       return res.status(404).json({ message: 'SPV Asset not found' });
@@ -262,15 +275,19 @@ exports.deleteSPVAsset = async (req, res) => {
   try {
     const assetId = req.params.id;
 
-    if (!isValidMongoId(assetId)) {
+    if (!isValidId(assetId)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
-    // Delete the asset
-    const deletedAsset = await databaseAdapter.findByIdAndDelete('SPVAsset', assetId);
+    // Try to delete by AssetID first, then by row_id
+    let deletedAsset = await SPVAsset.findOneAndDelete({ AssetID: assetId.toUpperCase() });
 
     if (!deletedAsset) {
-      return res.status(500).json({ message: 'Failed to delete SPVAsset' });
+      deletedAsset = await SPVAsset.findByIdAndDelete(assetId);
+    }
+
+    if (!deletedAsset) {
+      return res.status(404).json({ message: 'SPVAsset not found' });
     }
 
     res.status(200).json({ message: 'SPVAsset deleted successfully' });
