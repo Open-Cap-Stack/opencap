@@ -34,6 +34,13 @@ router.get('///', (req, res) => {
 });
 
 /**
+ * @route GET /api/spvs/analytics
+ * @desc Get SPV analytics and summary data
+ * @access Private
+ */
+router.get('/analytics', SPVController.getSPVAnalytics);
+
+/**
  * @route GET /api/spvs/status/:status
  * @desc Get SPVs by status (Active, Pending, Closed)
  * @access Private

@@ -329,3 +329,70 @@ exports.deleteSPV = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete SPV', error: error.message });
   }
 };
+
+/**
+ * Get SPV Analytics
+ * @route GET /api/spvs/analytics
+ * @returns {Object} JSON response with SPV analytics data
+ */
+exports.getSPVAnalytics = async (req, res) => {
+  try {
+    const { companyId } = req.query;
+
+    // Build filter
+    const filter = {};
+    if (companyId) {
+      filter.ParentCompanyID = companyId;
+    }
+
+    // Get all SPVs
+    const spvs = await SPV.find(filter);
+
+    // Calculate analytics
+    const totalSPVs = spvs.length;
+    const activeSPVs = spvs.filter(spv => spv.Status === 'Active');
+
+    // Calculate totals (using placeholder values if fields don't exist)
+    const totalAssets = spvs.reduce((sum, spv) => sum + (spv.TotalAssets || 0), 0);
+    const totalCommitted = spvs.reduce((sum, spv) => sum + (spv.CommittedCapital || 0), 0);
+    const totalInvested = spvs.reduce((sum, spv) => sum + (spv.InvestedCapital || 0), 0);
+    const totalValuation = spvs.reduce((sum, spv) => sum + (spv.CurrentValuation || 0), 0);
+
+    // Calculate average return
+    const returns = spvs.filter(spv => spv.ReturnRate !== undefined).map(spv => spv.ReturnRate);
+    const averageReturn = returns.length > 0
+      ? returns.reduce((sum, r) => sum + r, 0) / returns.length
+      : 0;
+
+    // Get top performers (sort by return rate, take top 5)
+    const topPerformers = [...spvs]
+      .sort((a, b) => (b.ReturnRate || 0) - (a.ReturnRate || 0))
+      .slice(0, 5);
+
+    // Performance by type
+    const performanceByType = {};
+    spvs.forEach(spv => {
+      const type = spv.SPVType || 'Other';
+      if (!performanceByType[type]) {
+        performanceByType[type] = 0;
+      }
+      performanceByType[type] += spv.ReturnRate || 0;
+    });
+
+    res.status(200).json({
+      totalSPVs,
+      totalAssets,
+      totalCommitted,
+      totalInvested,
+      totalValuation,
+      averageReturn,
+      topPerformers,
+      performanceByType
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Failed to retrieve SPV analytics',
+      error: error.message
+    });
+  }
+};

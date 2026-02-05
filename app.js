@@ -243,6 +243,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/documents';
     } else if (key === 'spvAssetRoutes') {
       path = '/api/v1/spv-assets';
+    } else if (key === 'spvRoutes') {
+      path = '/api/v1/spvs';
     } else if (key === 'complianceCheckRoutes') {
       path = '/api/v1/compliance-checks';
     } else if (key === 'integrationModuleRoutes') {
