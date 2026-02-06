@@ -120,12 +120,22 @@ const getAllFinancialReports = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const financialReports = await zerodbService.queryTable('financial_reports', {
-      filter,
-      skip,
-      limit: parseInt(limit),
-      sort: { reportDate: -1 }
-    });
+    let financialReports = [];
+    try {
+      financialReports = await zerodbService.queryTable('financial_reports', {
+        filter,
+        skip,
+        limit: parseInt(limit),
+        sort: { reportDate: -1 }
+      });
+    } catch (dbError) {
+      // Table may not exist yet - return empty data
+      if (dbError.message?.includes('not found') || dbError.response?.data?.detail?.includes('not found')) {
+        console.warn('financial_reports table not found, returning empty data');
+        return res.status(200).json([]);
+      }
+      throw dbError;
+    }
 
     return res.status(200).json(financialReports);
   } catch (error) {
@@ -299,10 +309,21 @@ const getFinancialReportAnalytics = async (req, res) => {
       filter.reportDate = { $gte: startDate, $lte: endDate };
     }
 
-    const reports = await zerodbService.queryTable('financial_reports', {
-      filter,
-      sort: { reportDate: -1 }
-    });
+    let reports = [];
+    try {
+      reports = await zerodbService.queryTable('financial_reports', {
+        filter,
+        sort: { reportDate: -1 }
+      });
+    } catch (dbError) {
+      // Table may not exist yet - return empty analytics
+      if (dbError.message?.includes('not found') || dbError.response?.data?.detail?.includes('not found')) {
+        console.warn('financial_reports table not found, returning empty analytics');
+        reports = [];
+      } else {
+        throw dbError;
+      }
+    }
 
     if (!reports || reports.length === 0) {
       return res.status(200).json({
