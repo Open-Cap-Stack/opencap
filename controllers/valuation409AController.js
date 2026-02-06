@@ -590,3 +590,49 @@ exports.exportAuditData = async (req, res) => {
     });
   }
 };
+
+// Get all valuations (for list view)
+exports.getAllValuations = async (req, res) => {
+  try {
+    // Return empty array - table may not exist yet
+    res.json({
+      success: true,
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        pages: 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get valuation analytics
+exports.getValuationAnalytics = async (req, res) => {
+  try {
+    // Return empty analytics - table may not exist yet
+    res.json({
+      success: true,
+      data: {
+        totalValuations: 0,
+        pendingValuations: 0,
+        completedValuations: 0,
+        averageProcessingTime: 0,
+        valuationsByStatus: [],
+        valuationsByMonth: [],
+        recentActivity: []
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};

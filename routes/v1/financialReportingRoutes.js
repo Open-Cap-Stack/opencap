@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const financialReportController = require('../../controllers/v1/financialReportController');
+const financialReportController = require('../../controllers/v1/financialReportController.zerodb');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes

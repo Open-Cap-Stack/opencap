@@ -19,6 +19,12 @@ router.use(authenticateToken);
  *   description: 409A valuation request and management
  */
 
+// Get all valuations
+router.get('/', valuation409AController.getAllValuations);
+
+// Get valuation analytics
+router.get('/analytics', valuation409AController.getValuationAnalytics);
+
 /**
  * @swagger
  * /api/v1/valuations:
