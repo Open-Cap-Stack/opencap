@@ -125,6 +125,33 @@ const baseModel = createModel('valuations', schema);
 // Extended Valuation409A model with custom methods
 const Valuation409A = {
     ...baseModel,
+    tableName: 'valuations',
+    schema,
+
+    // Delegate core methods to baseModel (class methods aren't copied by spread)
+    async find(query, options) {
+        return baseModel.find.call(baseModel, query, options);
+    },
+
+    async findOne(query, options) {
+        return baseModel.findOne.call(baseModel, query, options);
+    },
+
+    async findById(id, options) {
+        return baseModel.findById.call(baseModel, id, options);
+    },
+
+    async updateOne(query, update, options) {
+        return baseModel.updateOne.call(baseModel, query, update, options);
+    },
+
+    async deleteOne(query) {
+        return baseModel.deleteOne.call(baseModel, query);
+    },
+
+    async countDocuments(query) {
+        return baseModel.countDocuments.call(baseModel, query);
+    },
 
     /**
      * Create a new 409A valuation with generated valuationId

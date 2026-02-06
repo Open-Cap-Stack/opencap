@@ -186,6 +186,29 @@ const baseModel = createModel('fundraising_models', schema);
 // Extended FundraisingModel with custom methods
 const FundraisingModel = {
     ...baseModel,
+    tableName: 'fundraising_models',
+    schema,
+
+    // Delegate core methods to baseModel (class methods aren't copied by spread)
+    async find(query, options) {
+        return baseModel.find.call(baseModel, query, options);
+    },
+
+    async findOne(query, options) {
+        return baseModel.findOne.call(baseModel, query, options);
+    },
+
+    async findById(id, options) {
+        return baseModel.findById.call(baseModel, id, options);
+    },
+
+    async updateOne(query, update, options) {
+        return baseModel.updateOne.call(baseModel, query, update, options);
+    },
+
+    async deleteOne(query) {
+        return baseModel.deleteOne.call(baseModel, query);
+    },
 
     /**
      * Create a new fundraising model with generated modelId

@@ -6,10 +6,17 @@
 const express = require('express');
 const router = express.Router();
 const Stakeholder = require('../../models/Stakeholder');
+const bulkReportsController = require('../../controllers/bulkReportsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 
 // Apply authentication to all stakeholder routes
 router.use(authenticateToken);
+
+/**
+ * POST /api/v1/stakeholders/reports/bulk
+ * Generate bulk reports for multiple stakeholders
+ */
+router.post('/reports/bulk', bulkReportsController.generateBulkReports);
 
 /**
  * GET /api/v1/stakeholders
