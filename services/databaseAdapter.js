@@ -412,7 +412,8 @@ class DatabaseAdapter {
       'Notification': 'compliance_events',
       'Activity': 'activities',
       'IntegrationMarketplaceItem': 'integration_marketplace_items',
-      'InstalledIntegration': 'installed_integrations'
+      'InstalledIntegration': 'installed_integrations',
+      'FinancialReport': 'financial_reports'
     };
 
     // Check for direct mapping first
@@ -439,13 +440,23 @@ class DatabaseAdapter {
    */
   async _findInZeroDB(tableName, query, options) {
     const { limit, sort, skip, projection } = options;
-    return await zerodbService.queryTable(tableName, {
-      filter: query,
-      limit,
-      sort,
-      skip,
-      projection
-    });
+    try {
+      return await zerodbService.queryTable(tableName, {
+        filter: query,
+        limit,
+        sort,
+        skip,
+        projection
+      });
+    } catch (error) {
+      // Handle table not found gracefully - return empty array
+      if (error.response?.data?.detail?.includes('not found') ||
+          error.message?.includes('not found')) {
+        console.warn(`Table '${tableName}' not found, returning empty results`);
+        return [];
+      }
+      throw error;
+    }
   }
 
   /**
@@ -481,11 +492,21 @@ class DatabaseAdapter {
    * @returns {number} Count of matching documents
    */
   async _countInZeroDB(tableName, query) {
-    const results = await zerodbService.queryTable(tableName, {
-      filter: query,
-      countOnly: true
-    });
-    return typeof results === 'number' ? results : (results?.count || results?.length || 0);
+    try {
+      const results = await zerodbService.queryTable(tableName, {
+        filter: query,
+        countOnly: true
+      });
+      return typeof results === 'number' ? results : (results?.count || results?.length || 0);
+    } catch (error) {
+      // Handle table not found gracefully - return 0 count
+      if (error.response?.data?.detail?.includes('not found') ||
+          error.message?.includes('not found')) {
+        console.warn(`Table '${tableName}' not found, returning 0 count`);
+        return 0;
+      }
+      throw error;
+    }
   }
 }
 
