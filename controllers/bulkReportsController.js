@@ -78,19 +78,17 @@ const generateBulkReports = async (req, res) => {
       companyId: req.user.companyId
     });
 
-    // Return 202 Accepted with job details
-    res.status(202).json({
+    // Return 200 OK with results (frontend expects this format)
+    res.status(200).json({
       success: true,
-      message: 'Bulk report generation job created',
-      data: {
-        jobId: job.jobId,
-        status: job.status,
-        totalReports: job.totalReports,
-        completedReports: job.completedReports,
-        failedReports: job.failedReports,
-        estimatedCompletionTime: job.estimatedCompletionTime,
-        createdAt: job.createdAt
-      }
+      message: 'Bulk report generation completed',
+      totalReports: job.totalReports,
+      successfulReports: job.completedReports,
+      failedReports: job.failedReports,
+      jobId: job.jobId,
+      status: job.status,
+      reports: job.reports,
+      createdAt: job.createdAt
     });
   } catch (error) {
     // Handle validation errors

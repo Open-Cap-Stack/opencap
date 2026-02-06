@@ -62,18 +62,54 @@ class ZeroDBModel {
 
         this._addTimestamps(doc, true);
 
-        const result = await zerodbService.insertRow(this.tableName, doc);
-        // ZeroDB returns { row_id, row_data: {...} }, unwrap it properly
-        const insertedRow = result.data?.[0];
-        if (insertedRow?.row_data) {
+        try {
+            console.log(`[ZeroDBModel] Creating document in ${this.tableName}:`, JSON.stringify(doc, null, 2));
+            const result = await zerodbService.insertRow(this.tableName, doc);
+            console.log(`[ZeroDBModel] Insert result:`, JSON.stringify(result, null, 2));
+
+            // ZeroDB returns { row_id, row_data: {...} }, unwrap it properly
+            const insertedRow = result.data?.[0];
+            if (insertedRow?.row_data) {
+                return {
+                    ...insertedRow.row_data,
+                    id: insertedRow.row_id || insertedRow.row_data.id,
+                    _id: insertedRow.row_id || insertedRow.row_data._id,
+                    row_id: insertedRow.row_id
+                };
+            }
+            // Return the doc with any available ids from result
             return {
-                ...insertedRow.row_data,
-                id: insertedRow.row_id || insertedRow.row_data.id,
-                _id: insertedRow.row_id || insertedRow.row_data._id,
-                row_id: insertedRow.row_id
+                ...doc,
+                ...insertedRow,
+                id: insertedRow?.row_id || doc._id,
+                _id: insertedRow?.row_id || doc._id
             };
+        } catch (error) {
+            console.error(`[ZeroDBModel] Error creating document in ${this.tableName}:`, error.message);
+            // If table doesn't exist, try to create it and retry
+            if (error.response?.status === 404 || error.message?.includes('not found')) {
+                console.log(`[ZeroDBModel] Table ${this.tableName} not found, attempting to create...`);
+                try {
+                    await zerodbService.createTable(this.tableName, { fields: {} });
+                    console.log(`[ZeroDBModel] Table ${this.tableName} created, retrying insert...`);
+                    const result = await zerodbService.insertRow(this.tableName, doc);
+                    const insertedRow = result.data?.[0];
+                    if (insertedRow?.row_data) {
+                        return {
+                            ...insertedRow.row_data,
+                            id: insertedRow.row_id || insertedRow.row_data.id,
+                            _id: insertedRow.row_id || insertedRow.row_data._id,
+                            row_id: insertedRow.row_id
+                        };
+                    }
+                    return { ...doc, ...insertedRow };
+                } catch (createError) {
+                    console.error(`[ZeroDBModel] Failed to create table ${this.tableName}:`, createError.message);
+                    throw error; // Throw original error
+                }
+            }
+            throw error;
         }
-        return insertedRow || doc;
     }
 
     /**

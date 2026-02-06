@@ -16,10 +16,39 @@ exports.createDataRoom = async (req, res) => {
       watermarkEnabled: settings?.watermarkDocuments || false,
       requireNDA: settings?.requireAuthentication || false
     };
-    const dataRoom = await DataRoom.create({ name, description: description || '', ownerCompany: targetCompanyId, createdBy: req.user?.userId, accessSettings: roomAccessSettings, metadata: metadata || {} });
-    try { await DataRoom.logActivity(dataRoom.dataRoomId, { action: 'data_room_created', userId: req.user?.userId, details: { name } }); } catch (e) {}
+
+    const createData = {
+      name,
+      description: description || '',
+      ownerCompany: targetCompanyId,
+      createdBy: req.user?.userId,
+      accessSettings: roomAccessSettings,
+      metadata: metadata || {}
+    };
+
+    console.log('Creating data room with data:', JSON.stringify(createData, null, 2));
+
+    const dataRoom = await DataRoom.create(createData);
+
+    console.log('Data room created:', JSON.stringify(dataRoom, null, 2));
+
+    // Ensure dataRoomId is present
+    if (!dataRoom || !dataRoom.dataRoomId) {
+      console.error('Data room created but missing dataRoomId:', dataRoom);
+      // Try to use the _id or row_id as fallback
+      if (dataRoom && (dataRoom._id || dataRoom.row_id)) {
+        dataRoom.dataRoomId = dataRoom._id || dataRoom.row_id;
+      }
+    }
+
+    try { await DataRoom.logActivity(dataRoom.dataRoomId, { action: 'data_room_created', userId: req.user?.userId, details: { name } }); } catch (e) {
+      console.error('Failed to log activity:', e.message);
+    }
     res.status(201).json(transformDataRoom(dataRoom));
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) {
+    console.error('Failed to create data room:', error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
 exports.getDataRooms = async (req, res) => {
