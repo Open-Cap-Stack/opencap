@@ -220,6 +220,13 @@ class ZeroDBService {
       );
       return response.data;
     } catch (error) {
+      // Handle table not found gracefully - return empty array
+      if (error.response?.status === 404 ||
+          error.response?.data?.detail?.includes('not found') ||
+          error.message?.includes('not found')) {
+        console.warn(`Table '${tableName}' not found, returning empty results`);
+        return [];
+      }
       console.error('Error querying table:', error.message);
       throw error;
     }
