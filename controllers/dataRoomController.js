@@ -7,23 +7,136 @@ const DataRoom = require('../models/DataRoom');
 
 exports.createDataRoom = async (req, res) => {
   try {
-    const { name, description, accessSettings, metadata } = req.body;
+    const { name, description, accessSettings, metadata, companyId, settings } = req.body;
     if (!name) return res.status(400).json({ message: 'Data room name is required' });
-    const dataRoom = await DataRoom.create({ name, description: description || '', ownerCompany: req.user?.companyId, createdBy: req.user?.userId, accessSettings: accessSettings || {}, metadata: metadata || {} });
+    // Support both frontend (companyId, settings) and backend (ownerCompany, accessSettings) formats
+    const targetCompanyId = companyId || req.user?.companyId;
+    const roomAccessSettings = accessSettings || {
+      downloadEnabled: settings?.allowDownload !== false,
+      watermarkEnabled: settings?.watermarkDocuments || false,
+      requireNDA: settings?.requireAuthentication || false
+    };
+    const dataRoom = await DataRoom.create({ name, description: description || '', ownerCompany: targetCompanyId, createdBy: req.user?.userId, accessSettings: roomAccessSettings, metadata: metadata || {} });
     try { await DataRoom.logActivity(dataRoom.dataRoomId, { action: 'data_room_created', userId: req.user?.userId, details: { name } }); } catch (e) {}
-    res.status(201).json(dataRoom);
+    res.status(201).json(transformDataRoom(dataRoom));
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
 exports.getDataRooms = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
+    const { page = 1, limit = 100, status, search, companyId } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let dataRooms = await DataRoom.findByCompany(req.user?.companyId, { skip, limit: parseInt(limit), sort: { createdAt: -1 } });
+    // Use companyId from query or fall back to user's companyId
+    const targetCompanyId = companyId || req.user?.companyId;
+    let dataRooms = await DataRoom.findByCompany(targetCompanyId, { skip, limit: parseInt(limit), sort: { createdAt: -1 } });
     if (status) dataRooms = dataRooms.filter(dr => dr.status === status);
     if (search) { const searchLower = search.toLowerCase(); dataRooms = dataRooms.filter(dr => dr.name.toLowerCase().includes(searchLower) || dr.description?.toLowerCase().includes(searchLower)); }
-    res.status(200).json({ dataRooms, pagination: { page: parseInt(page), limit: parseInt(limit), total: dataRooms.length } });
+    // Transform to frontend format
+    const transformedRooms = dataRooms.map(transformDataRoom);
+    res.status(200).json(transformedRooms);
   } catch (error) { res.status(500).json({ message: error.message }); }
+};
+
+// Helper to transform backend data room to frontend format
+function transformDataRoom(room) {
+  return {
+    _id: room.dataRoomId,
+    dataRoomId: room.dataRoomId,
+    name: room.name,
+    description: room.description || '',
+    companyId: room.ownerCompany,
+    createdBy: room.createdBy,
+    status: room.status,
+    documents: (room.documents || []).map(doc => ({
+      _id: doc.documentId,
+      documentId: doc.documentId,
+      documentName: doc.documentName || doc.documentId,
+      documentType: doc.documentType || 'unknown',
+      fileSize: doc.fileSize || 0,
+      contentType: doc.contentType || 'application/octet-stream',
+      uploadedBy: doc.addedBy,
+      uploadedAt: doc.addedAt,
+      accessCount: doc.accessCount || 0,
+      lastAccessedAt: doc.lastAccessedAt
+    })),
+    members: (room.permissions || []).map(perm => ({
+      userId: perm.userId,
+      email: perm.email || '',
+      role: perm.level === 'admin' ? 'admin' : perm.level === 'upload' ? 'contributor' : 'viewer',
+      permissions: {
+        canView: ['view', 'download', 'upload', 'admin'].includes(perm.level),
+        canDownload: ['download', 'upload', 'admin'].includes(perm.level),
+        canUpload: ['upload', 'admin'].includes(perm.level),
+        canDelete: perm.level === 'admin',
+        canShare: perm.level === 'admin'
+      },
+      addedAt: perm.grantedAt,
+      addedBy: perm.grantedBy
+    })),
+    settings: {
+      allowDownload: room.accessSettings?.downloadEnabled !== false,
+      watermarkDocuments: room.accessSettings?.watermarkEnabled || false,
+      requireAuthentication: room.accessSettings?.requireNDA || false,
+      expiresAt: room.accessSettings?.externalAccess?.expiresAt,
+      maxDownloads: room.accessSettings?.externalAccess?.maxViews
+    },
+    externalLink: room.accessSettings?.externalAccess?.enabled ? {
+      url: room.accessSettings.externalAccess.accessUrl,
+      token: room.accessSettings.externalAccess.accessToken,
+      expiresAt: room.accessSettings.externalAccess.expiresAt,
+      requirePassword: false
+    } : undefined,
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt
+  };
+}
+
+exports.getDataRoomStats = async (req, res) => {
+  try {
+    const { companyId } = req.query;
+    const targetCompanyId = companyId || req.user?.companyId;
+
+    // Get all data rooms for this company
+    const allRooms = await DataRoom.findByCompany(targetCompanyId, { limit: 1000 });
+
+    // Calculate stats
+    const activeRooms = allRooms.filter(r => r.status === 'active');
+    const archivedRooms = allRooms.filter(r => r.status === 'archived');
+
+    // Count total documents across all rooms
+    const totalDocuments = allRooms.reduce((sum, room) => sum + (room.documents?.length || 0), 0);
+
+    // Count unique members (permissions) across all rooms
+    const allMemberIds = new Set();
+    allRooms.forEach(room => {
+      (room.permissions || []).forEach(perm => {
+        if (perm.userId) allMemberIds.add(perm.userId);
+      });
+    });
+
+    // Count recent activity (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    let recentActivity = 0;
+    allRooms.forEach(room => {
+      (room.activityLog || []).forEach(activity => {
+        if (new Date(activity.timestamp) > sevenDaysAgo) {
+          recentActivity++;
+        }
+      });
+    });
+
+    res.status(200).json({
+      totalRooms: allRooms.length,
+      activeRooms: activeRooms.length,
+      archivedRooms: archivedRooms.length,
+      totalDocuments,
+      totalMembers: allMemberIds.size,
+      recentActivity
+    });
+  } catch (error) {
+    console.error('Failed to get data room stats:', error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
 exports.getDataRoomById = async (req, res) => {
@@ -33,7 +146,7 @@ exports.getDataRoomById = async (req, res) => {
     const hasAccess = DataRoom.hasPermission(dataRoom, req.user?.userId, 'view');
     const isCompanyMember = dataRoom.ownerCompany === req.user?.companyId;
     if (!hasAccess && !isCompanyMember && req.user?.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
-    res.status(200).json(dataRoom);
+    res.status(200).json(transformDataRoom(dataRoom));
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
@@ -46,11 +159,21 @@ exports.updateDataRoom = async (req, res) => {
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.description !== undefined) updateData.description = req.body.description;
     if (req.body.accessSettings !== undefined) updateData.accessSettings = { ...dataRoom.accessSettings, ...req.body.accessSettings };
+    if (req.body.settings !== undefined) {
+      // Handle frontend settings format
+      updateData.accessSettings = {
+        ...dataRoom.accessSettings,
+        downloadEnabled: req.body.settings.allowDownload !== false,
+        watermarkEnabled: req.body.settings.watermarkDocuments || false,
+        requireNDA: req.body.settings.requireAuthentication || false
+      };
+    }
     if (req.body.metadata !== undefined) updateData.metadata = { ...dataRoom.metadata, ...req.body.metadata };
     if (req.body.status !== undefined && DataRoom.dataRoomStatuses.includes(req.body.status)) updateData.status = req.body.status;
     await DataRoom.updateOne({ dataRoomId: req.params.id }, { $set: updateData });
     try { await DataRoom.logActivity(req.params.id, { action: 'data_room_updated', userId: req.user?.userId, details: { updatedFields: Object.keys(updateData) } }); } catch (e) {}
-    res.status(200).json(await DataRoom.findByDataRoomId(req.params.id));
+    const updatedRoom = await DataRoom.findByDataRoomId(req.params.id);
+    res.status(200).json(transformDataRoom(updatedRoom));
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 

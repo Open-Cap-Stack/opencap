@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const dataRoomController = require('../../controllers/dataRoomController');
 
+router.get('/stats', dataRoomController.getDataRoomStats);
 router.get('/:id/external', dataRoomController.validateExternalAccess);
 router.post('/', dataRoomController.createDataRoom);
 router.get('/', dataRoomController.getDataRooms);
