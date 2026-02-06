@@ -410,7 +410,9 @@ class DatabaseAdapter {
       'Task': 'tasks',
       'Communication': 'communications',
       'Notification': 'compliance_events',
-      'Activity': 'activities'
+      'Activity': 'activities',
+      'IntegrationMarketplaceItem': 'integration_marketplace_items',
+      'InstalledIntegration': 'installed_integrations'
     };
 
     // Check for direct mapping first
