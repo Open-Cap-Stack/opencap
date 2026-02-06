@@ -408,7 +408,9 @@ class DatabaseAdapter {
       'UserSettings': 'user_settings',
       'EventAuditLog': 'event_audit_log',
       'Task': 'tasks',
-      'Communication': 'communications'
+      'Communication': 'communications',
+      'Notification': 'compliance_events',
+      'Activity': 'activities'
     };
 
     // Check for direct mapping first

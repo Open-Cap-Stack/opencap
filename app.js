@@ -3,6 +3,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const zerodbService = require('./services/zerodbService');
+const databaseAdapter = require('./services/databaseAdapter');
 const { addVersionHeaders, createVersionedRoutes, validateApiVersion } = require('./middleware/apiVersioning');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
@@ -113,6 +114,9 @@ if (!isTestEnv && process.env.ENABLE_ZERODB === 'true') {
       .then(async result => {
         console.log(`✅ ZeroDB initialized (project: ${result.projectId}, tables: ${result.databaseStatus?.tables || 0})`);
         databaseMonitor.setupZeroDBMonitoring(zerodbService);
+        // Also initialize databaseAdapter for controllers that use it
+        await databaseAdapter.initialize(process.env.AINATIVE_API_TOKEN);
+        console.log('✅ DatabaseAdapter initialized');
       })
       .catch(err => console.error('❌ ZeroDB initialization failed:', err.message));
   } else {

@@ -210,15 +210,43 @@ class ZeroDBService {
   async queryTable(tableName, options = {}) {
     try {
       const { filter = {}, skip = 0, limit = 100, sort = {}, projection = {} } = options;
+
+      // Convert boolean values to strings for ZeroDB JSON field comparisons
+      const normalizedFilter = this._normalizeFilterForZeroDB(filter);
+
       const response = await this.client.post(
         `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/query`,
-        { filter, skip, limit, sort, projection }
+        { filter: normalizedFilter, skip, limit, sort, projection }
       );
       return response.data;
     } catch (error) {
       console.error('Error querying table:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Normalize filter values for ZeroDB JSON comparisons
+   * Converts boolean values to strings since ZeroDB stores JSON as text
+   * @param {Object} filter - Filter object
+   * @returns {Object} Normalized filter
+   */
+  _normalizeFilterForZeroDB(filter) {
+    if (!filter || typeof filter !== 'object') return filter;
+
+    const normalized = {};
+    for (const [key, value] of Object.entries(filter)) {
+      if (typeof value === 'boolean') {
+        // Convert boolean to string for JSON text comparison
+        normalized[key] = value.toString();
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively normalize nested objects (e.g., $in, $gt operators)
+        normalized[key] = this._normalizeFilterForZeroDB(value);
+      } else {
+        normalized[key] = value;
+      }
+    }
+    return normalized;
   }
 
   /**
