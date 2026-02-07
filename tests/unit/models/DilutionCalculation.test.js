@@ -521,6 +521,12 @@ describe('DilutionCalculation Model', () => {
         }
       };
 
+      // updateOne internally calls findOne (queryTable) to locate the doc.
+      // Return a doc without row_id so it falls through to updateRows.
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'calc-1', calculationId: 'DC-001' }]
+      });
+
       await DilutionCalculation.updateOne(
         { calculationId: 'DC-001' },
         { $set: updateData }
@@ -536,6 +542,11 @@ describe('DilutionCalculation Model', () => {
     });
 
     it('should update timestamp on update', async () => {
+      // updateOne internally calls findOne (queryTable) to locate the doc.
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'calc-1', calculationId: 'DC-001' }]
+      });
+
       await DilutionCalculation.updateOne(
         { calculationId: 'DC-001' },
         { $set: { status: 'completed' } }
@@ -552,6 +563,12 @@ describe('DilutionCalculation Model', () => {
 
   describe('deleteOne()', () => {
     it('should delete a calculation', async () => {
+      // deleteOne internally calls findOne (queryTable) to locate the doc.
+      // Return a doc without row_id so it falls through to deleteRows.
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'calc-1', calculationId: 'DC-001' }]
+      });
+
       await DilutionCalculation.deleteOne({ calculationId: 'DC-001' });
 
       expect(zerodbService.deleteRows).toHaveBeenCalledWith(
@@ -561,7 +578,11 @@ describe('DilutionCalculation Model', () => {
     });
 
     it('should return delete result', async () => {
-      zerodbService.deleteRows.mockResolvedValue({ deleted_count: 1 });
+      // deleteOne internally calls findOne (queryTable) to locate the doc.
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'calc-1', calculationId: 'DC-001' }]
+      });
+      zerodbService.deleteRows.mockResolvedValueOnce({ deleted_count: 1 });
 
       const result = await DilutionCalculation.deleteOne({ calculationId: 'DC-001' });
 
