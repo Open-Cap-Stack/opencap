@@ -34,15 +34,19 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/v1/stakeholders/:id
- * Get stakeholder by ID
+ * Get stakeholder by ID (_id or stakeholderId)
  */
 router.get('/:id', async (req, res) => {
   try {
-    const stakeholder = await Stakeholder.findOne({ stakeholderId: req.params.id });
+    // Try finding by _id first, then by stakeholderId
+    let stakeholder = await Stakeholder.findById(req.params.id);
+    if (!stakeholder) {
+      stakeholder = await Stakeholder.findOne({ stakeholderId: req.params.id });
+    }
     if (!stakeholder) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    res.status(200).json(stakeholder);
+    res.status(200).json({ stakeholder });
   } catch (error) {
     console.error('Error fetching stakeholder:', error);
     res.status(500).json({ error: 'Error fetching stakeholder' });
@@ -69,15 +73,23 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const result = await Stakeholder.findOneAndUpdate(
-      { stakeholderId: req.params.id },
+    // Try finding by _id first, then by stakeholderId
+    let result = await Stakeholder.findByIdAndUpdate(
+      req.params.id,
       { $set: req.body },
-      { returnDocument: 'after' }
+      { new: true }
     );
+    if (!result) {
+      result = await Stakeholder.findOneAndUpdate(
+        { stakeholderId: req.params.id },
+        { $set: req.body },
+        { new: true }
+      );
+    }
     if (!result) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    res.status(200).json(result);
+    res.status(200).json({ stakeholder: result });
   } catch (error) {
     console.error('Error updating stakeholder:', error);
     res.status(500).json({ error: 'Error updating stakeholder' });
@@ -90,11 +102,15 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await Stakeholder.findOneAndDelete({ stakeholderId: req.params.id });
+    // Try finding by _id first, then by stakeholderId
+    let result = await Stakeholder.findByIdAndDelete(req.params.id);
+    if (!result) {
+      result = await Stakeholder.findOneAndDelete({ stakeholderId: req.params.id });
+    }
     if (!result) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    res.status(200).json({ message: 'Stakeholder deleted successfully' });
+    res.status(200).json({ message: 'Stakeholder deleted' });
   } catch (error) {
     console.error('Error deleting stakeholder:', error);
     res.status(500).json({ error: 'Error deleting stakeholder' });
