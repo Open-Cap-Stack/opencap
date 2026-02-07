@@ -17,14 +17,14 @@ jest.mock('../../../services/zerodbService', () => ({
   initialize: jest.fn()
 }));
 
+// mongoChangeStreamListener was removed during ZeroDB migration
 jest.mock('../../../services/mongoChangeStreamListener', () => ({
   healthCheck: jest.fn(),
   getMetrics: jest.fn(),
   isRunning: false
-}));
+}), { virtual: true });
 
 const zerodbService = require('../../../services/zerodbService');
-const mongoChangeStreamListener = require('../../../services/mongoChangeStreamListener');
 
 // Create a minimal test app to avoid full app initialization
 const express = require('express');
@@ -65,19 +65,10 @@ function createTestApp() {
   // Sync health endpoint
   app.get('/health/sync', async (req, res) => {
     try {
-      if (process.env.SYNC_ENABLED !== 'true') {
-        return res.status(200).json({
-          status: 'disabled',
-          message: 'MongoDB to ZeroDB sync is not enabled'
-        });
-      }
-
-      const health = mongoChangeStreamListener.healthCheck();
-      const status = health.isRunning ? 'ok' : 'degraded';
-
-      res.status(status === 'ok' ? 200 : 503).json({
-        status,
-        sync: health
+      // Sync feature removed after ZeroDB migration
+      return res.status(200).json({
+        status: "disabled",
+        message: "MongoDB to ZeroDB sync is not enabled"
       });
     } catch (error) {
       res.status(503).json({
@@ -219,40 +210,7 @@ describe('Health Check Routes', () => {
       });
     });
 
-    describe('Given sync is enabled', () => {
-      beforeEach(() => {
-        process.env.SYNC_ENABLED = 'true';
-      });
-
-      afterEach(() => {
-        delete process.env.SYNC_ENABLED;
-      });
-
-      test('When sync is running healthy, Then it should return ok status', async () => {
-        mongoChangeStreamListener.healthCheck.mockReturnValue({
-          isRunning: true,
-          streamStatuses: { users: 'active', companies: 'active' }
-        });
-
-        const response = await request(app).get('/health/sync');
-
-        expect(response.status).toBe(200);
-        expect(response.body.status).toBe('ok');
-        expect(response.body.sync.isRunning).toBe(true);
-      });
-
-      test('When sync is not running, Then it should return degraded status', async () => {
-        mongoChangeStreamListener.healthCheck.mockReturnValue({
-          isRunning: false,
-          streamStatuses: {}
-        });
-
-        const response = await request(app).get('/health/sync');
-
-        expect(response.status).toBe(503);
-        expect(response.body.status).toBe('degraded');
-      });
-    });
+    
   });
 
   describe('GET /health/ready', () => {

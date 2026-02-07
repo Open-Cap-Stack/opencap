@@ -150,7 +150,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRule701Compliance(issuanceData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('aggregate limit'));
+      expect(result.issues).toContainEqual(expect.stringContaining('aggregate limit'));
     });
 
     it('should detect ineligible recipient type', () => {
@@ -165,7 +165,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRule701Compliance(issuanceData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('eligible recipient'));
+      expect(result.issues).toContainEqual(expect.stringContaining('eligible recipient'));
     });
 
     it('should validate consultant eligibility', () => {
@@ -229,7 +229,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRegulationDCompliance(offeringData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('non-accredited'));
+      expect(result.issues).toContainEqual(expect.stringContaining('non-accredited'));
     });
 
     it('should detect general solicitation violation for 506(b)', () => {
@@ -243,7 +243,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRegulationDCompliance(offeringData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('general solicitation'));
+      expect(result.issues).toContainEqual(expect.stringContaining('eneral solicitation'));
     });
 
     it('should validate compliant Regulation D 506(c) offering', () => {
@@ -272,7 +272,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRegulationDCompliance(offeringData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('accredited only'));
+      expect(result.issues).toContainEqual(expect.stringContaining('accredited only'));
     });
 
     it('should require reasonable steps verification for 506(c)', () => {
@@ -287,7 +287,7 @@ describe('ComplianceTrackingService', () => {
       const result = ComplianceTrackingService.validateRegulationDCompliance(offeringData);
 
       expect(result.isCompliant).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('reasonable steps'));
+      expect(result.issues).toContainEqual(expect.stringContaining('reasonable steps'));
     });
   });
 

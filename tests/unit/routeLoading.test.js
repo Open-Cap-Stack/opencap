@@ -11,30 +11,31 @@ const path = require('path');
 
 describe('Route Loading', () => {
   describe('Middleware Exports', () => {
-    it('should export authenticateToken from middleware/auth', () => {
-      const auth = require('../../middleware/auth');
+    it('should export authenticateToken from middleware/authMiddleware', () => {
+      const auth = require('../../middleware/authMiddleware');
       expect(auth).toBeDefined();
       expect(auth.authenticateToken).toBeDefined();
       expect(typeof auth.authenticateToken).toBe('function');
     });
 
-    it('should export authenticateJWT from middleware/auth', () => {
-      const auth = require('../../middleware/auth');
-      expect(auth.authenticateJWT).toBeDefined();
-      expect(typeof auth.authenticateJWT).toBe('function');
+    it('should export authenticate from middleware/authMiddleware', () => {
+      const auth = require('../../middleware/authMiddleware');
+      expect(auth.authenticate).toBeDefined();
+      expect(typeof auth.authenticate).toBe('function');
     });
 
-    it('should export authMiddleware as a function for router.use()', () => {
+    it('should export authMiddleware as an object with authenticateToken', () => {
       const authMiddleware = require('../../middleware/authMiddleware');
       expect(authMiddleware).toBeDefined();
-      expect(typeof authMiddleware).toBe('function');
+      expect(typeof authMiddleware).toBe('object');
+      expect(typeof authMiddleware.authenticateToken).toBe('function');
     });
 
-    it('should export requireRole from middleware/rbacMiddleware', () => {
+    it('should export hasRole from middleware/rbacMiddleware (used as requireRole)', () => {
       const rbac = require('../../middleware/rbacMiddleware');
       expect(rbac).toBeDefined();
-      expect(rbac.requireRole).toBeDefined();
-      expect(typeof rbac.requireRole).toBe('function');
+      expect(rbac.hasRole).toBeDefined();
+      expect(typeof rbac.hasRole).toBe('function');
     });
 
     it('should export hasRole from middleware/rbacMiddleware', () => {
@@ -43,11 +44,11 @@ describe('Route Loading', () => {
       expect(typeof rbac.hasRole).toBe('function');
     });
 
-    it('should export authenticateJWT from middleware/jwtAuth', () => {
+    it('should export authenticate from middleware/jwtAuth', () => {
       const jwtAuth = require('../../middleware/jwtAuth');
       expect(jwtAuth).toBeDefined();
-      expect(jwtAuth.authenticateJWT).toBeDefined();
-      expect(typeof jwtAuth.authenticateJWT).toBe('function');
+      expect(jwtAuth.authenticate).toBeDefined();
+      expect(typeof jwtAuth.authenticate).toBe('function');
     });
   });
 
@@ -208,7 +209,7 @@ describe('Route Loading', () => {
   });
 
   describe('Middleware Compatibility', () => {
-    it('should allow authMiddleware to be used with router.use()', () => {
+    it('should allow authMiddleware.authenticateToken to be used with router.use()', () => {
       const express = require('express');
       const authMiddleware = require('../../middleware/authMiddleware');
 
@@ -216,31 +217,31 @@ describe('Route Loading', () => {
 
       // This should not throw
       expect(() => {
-        router.use(authMiddleware);
+        router.use(authMiddleware.authenticateToken);
       }).not.toThrow();
     });
 
-    it('should allow requireRole to be used with router.use()', () => {
+    it('should allow hasRole to be used with router.use()', () => {
       const express = require('express');
-      const { requireRole } = require('../../middleware/rbacMiddleware');
+      const { hasRole } = require('../../middleware/rbacMiddleware');
 
       const router = express.Router();
 
       // This should not throw
       expect(() => {
-        router.use(requireRole(['admin']));
+        router.use(hasRole(['admin']));
       }).not.toThrow();
     });
 
-    it('should allow authenticateJWT to be used with router.use()', () => {
+    it('should allow authenticate to be used with router.use()', () => {
       const express = require('express');
-      const { authenticateJWT } = require('../../middleware/jwtAuth');
+      const { authenticate } = require('../../middleware/jwtAuth');
 
       const router = express.Router();
 
       // This should not throw
       expect(() => {
-        router.use(authenticateJWT);
+        router.use(authenticate);
       }).not.toThrow();
     });
   });

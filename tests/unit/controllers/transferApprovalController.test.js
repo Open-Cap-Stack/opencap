@@ -507,7 +507,7 @@ describe('TransferApproval Controller', () => {
       await transferApprovalController.deleteTransferRequest(req, res);
 
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res._getData()).error).toContain('cannot be deleted');
+      expect(JSON.parse(res._getData()).error).toContain('Only pending or canceled requests can be deleted');
     });
 
     it('should return 404 if request not found', async () => {

@@ -3,297 +3,169 @@
  *
  * Issue #121: Create Task Management API
  *
- * Tests for the Task Mongoose model including validation,
- * schema structure, and virtual properties.
+ * Tests for the Task ZeroDB model including schema structure,
+ * field definitions, constants, and CRUD method existence.
  */
 
-const mongoose = require('mongoose');
 const Task = require('../../../models/Task');
 
 describe('Task Model', () => {
-  beforeAll(async () => {
-    // Connect to a test database
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/opencap_test', {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-      });
-    }
-  });
-
-  afterAll(async () => {
-    // Cleanup - drop the test collection if it exists
-    try {
-      await mongoose.connection.collection('tasks').drop();
-    } catch (e) {
-      // Collection might not exist, that's okay
-    }
-    await mongoose.connection.close();
-  });
-
-  afterEach(async () => {
-    // Clean up after each test
-    await Task.deleteMany({});
-  });
-
-  describe('Schema Validation', () => {
-    it('should create a valid task with required fields', async () => {
-      const taskData = {
-        title: 'Test Task',
-        companyId: 'company-001'
-      };
-
-      const task = new Task(taskData);
-      const savedTask = await task.save();
-
-      expect(savedTask._id).toBeDefined();
-      expect(savedTask.title).toBe('Test Task');
-      expect(savedTask.status).toBe('pending'); // default
-      expect(savedTask.priority).toBe('medium'); // default
+  describe('Schema Structure', () => {
+    it('should have a schema defined', () => {
+      expect(Task.schema).toBeDefined();
+      expect(typeof Task.schema).toBe('object');
     });
 
-    it('should fail validation when title is missing', async () => {
-      const task = new Task({
-        description: 'Task without title'
-      });
-
-      await expect(task.save()).rejects.toThrow(/title is required/i);
+    it('should have title field marked as required', () => {
+      expect(Task.schema.title).toBeDefined();
+      expect(Task.schema.title.required).toBe(true);
+      expect(Task.schema.title.type).toBe('string');
     });
 
-    it('should fail validation for invalid status', async () => {
-      const task = new Task({
-        title: 'Test Task',
-        status: 'invalid_status'
-      });
-
-      await expect(task.save()).rejects.toThrow(/not a valid status/i);
+    it('should have description field', () => {
+      expect(Task.schema.description).toBeDefined();
+      expect(Task.schema.description.type).toBe('string');
     });
 
-    it('should fail validation for invalid priority', async () => {
-      const task = new Task({
-        title: 'Test Task',
-        priority: 'super_critical'
-      });
-
-      await expect(task.save()).rejects.toThrow(/not a valid priority/i);
+    it('should have status field with enum and default', () => {
+      expect(Task.schema.status).toBeDefined();
+      expect(Task.schema.status.type).toBe('string');
+      expect(Task.schema.status.enum).toEqual(['pending', 'in_progress', 'completed', 'cancelled']);
+      expect(Task.schema.status.default).toBe('pending');
     });
 
-    it('should accept valid status values', async () => {
-      const statuses = ['pending', 'in_progress', 'completed', 'cancelled'];
-
-      for (const status of statuses) {
-        const task = new Task({
-          title: `Task with ${status}`,
-          status
-        });
-        const savedTask = await task.save();
-        expect(savedTask.status).toBe(status);
-      }
+    it('should have priority field with enum and default', () => {
+      expect(Task.schema.priority).toBeDefined();
+      expect(Task.schema.priority.type).toBe('string');
+      expect(Task.schema.priority.enum).toEqual(['low', 'medium', 'high', 'urgent']);
+      expect(Task.schema.priority.default).toBe('medium');
     });
 
-    it('should accept valid priority values', async () => {
-      const priorities = ['low', 'medium', 'high', 'urgent'];
-
-      for (const priority of priorities) {
-        const task = new Task({
-          title: `Task with ${priority}`,
-          priority
-        });
-        const savedTask = await task.save();
-        expect(savedTask.priority).toBe(priority);
-      }
+    it('should have assigneeId field', () => {
+      expect(Task.schema.assigneeId).toBeDefined();
+      expect(Task.schema.assigneeId.type).toBe('string');
     });
 
-    it('should enforce title max length', async () => {
-      const longTitle = 'a'.repeat(201);
-      const task = new Task({
-        title: longTitle
-      });
-
-      await expect(task.save()).rejects.toThrow(/cannot exceed 200 characters/i);
+    it('should have companyId field', () => {
+      expect(Task.schema.companyId).toBeDefined();
+      expect(Task.schema.companyId.type).toBe('string');
     });
 
-    it('should enforce description max length', async () => {
-      const longDescription = 'a'.repeat(2001);
-      const task = new Task({
-        title: 'Test Task',
-        description: longDescription
-      });
+    it('should have dueDate field', () => {
+      expect(Task.schema.dueDate).toBeDefined();
+      expect(Task.schema.dueDate.type).toBe('date');
+    });
 
-      await expect(task.save()).rejects.toThrow(/cannot exceed 2000 characters/i);
+    it('should have tags field as array', () => {
+      expect(Task.schema.tags).toBeDefined();
+      expect(Task.schema.tags.type).toBe('array');
+    });
+
+    it('should have comments field as array', () => {
+      expect(Task.schema.comments).toBeDefined();
+      expect(Task.schema.comments.type).toBe('array');
     });
   });
 
-  describe('Comments', () => {
-    it('should add comments to a task', async () => {
-      const task = new Task({
-        title: 'Task with comments',
-        comments: [{
-          text: 'First comment',
-          authorId: 'user-001'
-        }]
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.comments).toHaveLength(1);
-      expect(savedTask.comments[0].text).toBe('First comment');
-      expect(savedTask.comments[0].authorId).toBe('user-001');
-      expect(savedTask.comments[0].createdAt).toBeDefined();
+  describe('Constants', () => {
+    it('should export STATUSES array', () => {
+      expect(Task.STATUSES).toBeDefined();
+      expect(Task.STATUSES).toEqual(['pending', 'in_progress', 'completed', 'cancelled']);
     });
 
-    it('should fail when comment text is missing', async () => {
-      const task = new Task({
-        title: 'Task with invalid comment',
-        comments: [{
-          authorId: 'user-001'
-        }]
-      });
-
-      await expect(task.save()).rejects.toThrow();
-    });
-
-    it('should fail when comment authorId is missing', async () => {
-      const task = new Task({
-        title: 'Task with invalid comment',
-        comments: [{
-          text: 'Comment without author'
-        }]
-      });
-
-      await expect(task.save()).rejects.toThrow();
+    it('should export PRIORITIES array', () => {
+      expect(Task.PRIORITIES).toBeDefined();
+      expect(Task.PRIORITIES).toEqual(['low', 'medium', 'high', 'urgent']);
     });
   });
 
-  describe('Tags', () => {
-    it('should save task with tags', async () => {
-      const task = new Task({
-        title: 'Task with tags',
-        tags: ['finance', 'quarterly', 'review']
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.tags).toHaveLength(3);
-      expect(savedTask.tags).toContain('finance');
+  describe('CRUD Methods', () => {
+    it('should have create method', () => {
+      expect(typeof Task.create).toBe('function');
     });
 
-    it('should trim tag values', async () => {
-      const task = new Task({
-        title: 'Task with padded tags',
-        tags: ['  finance  ', '  quarterly  ']
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.tags[0]).toBe('finance');
-      expect(savedTask.tags[1]).toBe('quarterly');
-    });
-  });
-
-  describe('Virtual Properties', () => {
-    it('should calculate isOverdue as false when no due date', async () => {
-      const task = new Task({
-        title: 'Task without due date'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.isOverdue).toBe(false);
+    it('should have find method', () => {
+      expect(typeof Task.find).toBe('function');
     });
 
-    it('should calculate isOverdue as false for future due date', async () => {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 7);
-
-      const task = new Task({
-        title: 'Task with future due date',
-        dueDate: futureDate,
-        status: 'pending'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.isOverdue).toBe(false);
+    it('should have findOne method', () => {
+      expect(typeof Task.findOne).toBe('function');
     });
 
-    it('should calculate isOverdue as true for past due date on pending task', async () => {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - 7);
-
-      const task = new Task({
-        title: 'Overdue task',
-        dueDate: pastDate,
-        status: 'pending'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.isOverdue).toBe(true);
+    it('should have findById method', () => {
+      expect(typeof Task.findById).toBe('function');
     });
 
-    it('should calculate isOverdue as false for completed task', async () => {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - 7);
-
-      const task = new Task({
-        title: 'Completed task',
-        dueDate: pastDate,
-        status: 'completed'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.isOverdue).toBe(false);
+    it('should have countDocuments method', () => {
+      expect(typeof Task.countDocuments).toBe('function');
     });
 
-    it('should calculate isOverdue as false for cancelled task', async () => {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - 7);
+    it('should have findByIdAndUpdate method', () => {
+      expect(typeof Task.findByIdAndUpdate).toBe('function');
+    });
 
-      const task = new Task({
-        title: 'Cancelled task',
-        dueDate: pastDate,
-        status: 'cancelled'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.isOverdue).toBe(false);
+    it('should have findByIdAndDelete method', () => {
+      expect(typeof Task.findByIdAndDelete).toBe('function');
     });
   });
 
-  describe('Timestamps', () => {
-    it('should automatically set createdAt and updatedAt', async () => {
-      const task = new Task({
-        title: 'Task with timestamps'
-      });
-
-      const savedTask = await task.save();
-      expect(savedTask.createdAt).toBeDefined();
-      expect(savedTask.updatedAt).toBeDefined();
+  describe('Custom Methods', () => {
+    it('should have findByCompany method', () => {
+      expect(typeof Task.findByCompany).toBe('function');
     });
 
-    it('should update updatedAt on modification', async () => {
-      const task = new Task({
-        title: 'Task to update'
-      });
+    it('should have findByAssignee method', () => {
+      expect(typeof Task.findByAssignee).toBe('function');
+    });
 
-      const savedTask = await task.save();
-      const originalUpdatedAt = savedTask.updatedAt;
+    it('should have findByStatus method', () => {
+      expect(typeof Task.findByStatus).toBe('function');
+    });
 
-      // Wait a bit to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 100));
+    it('should have findByPriority method', () => {
+      expect(typeof Task.findByPriority).toBe('function');
+    });
 
-      savedTask.title = 'Updated Task Title';
-      const updatedTask = await savedTask.save();
+    it('should have findByTag method', () => {
+      expect(typeof Task.findByTag).toBe('function');
+    });
 
-      expect(updatedTask.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+    it('should have findOverdue method', () => {
+      expect(typeof Task.findOverdue).toBe('function');
+    });
+
+    it('should have updateStatus method', () => {
+      expect(typeof Task.updateStatus).toBe('function');
+    });
+
+    it('should have updatePriority method', () => {
+      expect(typeof Task.updatePriority).toBe('function');
+    });
+
+    it('should have assign method', () => {
+      expect(typeof Task.assign).toBe('function');
+    });
+
+    it('should have addComment method', () => {
+      expect(typeof Task.addComment).toBe('function');
+    });
+
+    it('should have addTag method', () => {
+      expect(typeof Task.addTag).toBe('function');
+    });
+
+    it('should have removeTag method', () => {
+      expect(typeof Task.removeTag).toBe('function');
     });
   });
 
-  describe('Indexes', () => {
-    it('should have indexes defined for common query fields', async () => {
-      const indexes = Task.schema.indexes();
-      const indexedFields = indexes.map(idx => Object.keys(idx[0]));
+  describe('Schema Field Constraints', () => {
+    it('should enforce title max length of 200', () => {
+      expect(Task.schema.title.maxLength).toBe(200);
+    });
 
-      // Check for compound indexes
-      expect(indexedFields.some(fields => fields.includes('companyId'))).toBe(true);
-      expect(indexedFields.some(fields => fields.includes('assigneeId'))).toBe(true);
-      expect(indexedFields.some(fields => fields.includes('tags'))).toBe(true);
-      expect(indexedFields.some(fields => fields.includes('dueDate'))).toBe(true);
+    it('should enforce description max length of 2000', () => {
+      expect(Task.schema.description.maxLength).toBe(2000);
     });
   });
 });

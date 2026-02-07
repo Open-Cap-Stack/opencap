@@ -733,11 +733,16 @@ describe('Document Models ZeroDB Migration', () => {
 
         describe('updateOne', () => {
             it('should call updateRows with filter and update data', async () => {
+                // Insert a document first so findOne can locate it
+                zerodbService._mockData.documents.push({ _id: 'doc-1', documentId: 'test', title: 'Old Title' });
+
                 await DocumentModel.updateOne(
                     { documentId: 'test' },
                     { $set: { title: 'Updated Title' } }
                 );
 
+                // updateOne calls findOne first, then uses updateRows fallback path
+                expect(zerodbService.queryTable).toHaveBeenCalled();
                 expect(zerodbService.updateRows).toHaveBeenCalledWith(
                     'documents',
                     expect.objectContaining({
@@ -749,8 +754,13 @@ describe('Document Models ZeroDB Migration', () => {
 
         describe('deleteMany', () => {
             it('should call deleteRows with filter', async () => {
+                // Insert a document first so findOne/deleteOne can locate it
+                zerodbService._mockData.documents.push({ _id: 'doc-2', DocumentType: 'Other', title: 'To Delete' });
+
                 await DocumentModel.deleteMany({ DocumentType: 'Other' });
 
+                // deleteMany calls deleteOne which calls findOne first, then deleteRows
+                expect(zerodbService.queryTable).toHaveBeenCalled();
                 expect(zerodbService.deleteRows).toHaveBeenCalledWith(
                     'documents',
                     { filter: { DocumentType: 'Other' } }

@@ -8,6 +8,7 @@ const express = require('express');
 jest.mock('../../../../controllers/dataRoomController', () => ({
   createDataRoom: jest.fn((req, res) => res.status(201).json({ dataRoomId: 'dr-1' })),
   getDataRooms: jest.fn((req, res) => res.status(200).json({ dataRooms: [] })),
+  getDataRoomStats: jest.fn((req, res) => res.status(200).json({ stats: {} })),
   getDataRoomById: jest.fn((req, res) => res.status(200).json({ dataRoomId: req.params.id })),
   updateDataRoom: jest.fn((req, res) => res.status(200).json({ dataRoomId: req.params.id })),
   deleteDataRoom: jest.fn((req, res) => res.status(200).json({ message: 'Deleted' })),

@@ -2,11 +2,21 @@
  * SAFE Conversion Service Tests
  * Feature: Issue #68 - SAFE Conversion Engine
  */
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
 
 jest.mock('../../../models/SAFE');
-jest.mock('../../../models/SAFEConversion');
+jest.mock('../../../models/SAFEConversion', () => {
+  // Import the actual calculateConversion logic
+  const actual = jest.requireActual('../../../models/SAFEConversion');
+  return {
+    ...actual,
+    find: jest.fn(),
+    findOne: jest.fn(),
+    findById: jest.fn(),
+    create: jest.fn(),
+    updateOne: jest.fn(),
+    deleteOne: jest.fn(),
+  };
+});
 
 const SAFEConversionService = require('../../../services/safeConversionService');
 const SAFEConversion = require('../../../models/SAFEConversion');
@@ -183,13 +193,13 @@ describe('SAFEConversionService', () => {
 
   describe('previewRoundConversions', () => {
     it('should preview conversions for all funded SAFEs', async () => {
-      const companyId = new mongoose.Types.ObjectId();
+      const companyId = 'id-' + Math.random().toString(36).slice(2, 10);
 
       const mockSafes = [
         {
-          _id: new mongoose.Types.ObjectId(),
+          _id: 'id-' + Math.random().toString(36).slice(2, 10),
           safeId: 'safe_1',
-          investorId: { _id: new mongoose.Types.ObjectId() },
+          investorId: { _id: 'id-' + Math.random().toString(36).slice(2, 10) },
           investorName: 'Investor 1',
           investmentAmount: 100000,
           safeType: 'post-money',
@@ -198,9 +208,9 @@ describe('SAFEConversionService', () => {
           proRataRights: true
         },
         {
-          _id: new mongoose.Types.ObjectId(),
+          _id: 'id-' + Math.random().toString(36).slice(2, 10),
           safeId: 'safe_2',
-          investorId: { _id: new mongoose.Types.ObjectId() },
+          investorId: { _id: 'id-' + Math.random().toString(36).slice(2, 10) },
           investorName: 'Investor 2',
           investmentAmount: 50000,
           safeType: 'post-money',
@@ -263,7 +273,7 @@ describe('SAFEConversionService', () => {
 
   describe('calculateMFNTerms', () => {
     it('should find best terms among all SAFEs', async () => {
-      const companyId = new mongoose.Types.ObjectId();
+      const companyId = 'id-' + Math.random().toString(36).slice(2, 10);
 
       const mockSafes = [
         { valuationCap: 8000000, discountRate: 0.15 },

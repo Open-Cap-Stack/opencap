@@ -4,9 +4,24 @@
  */
 
 // Mock dependencies first
-jest.mock('../../../models/ExerciseRequest');
+jest.mock('../../../models/ExerciseRequest', () => {
+  const mockConstructor = jest.fn().mockImplementation(() => ({
+    save: jest.fn()
+  }));
+  mockConstructor.findById = jest.fn();
+  mockConstructor.find = jest.fn();
+  mockConstructor.getExerciseSummaryByGrant = jest.fn();
+  mockConstructor.getISOExercisesForTaxYear = jest.fn();
+  mockConstructor.findByEquityGrant = jest.fn();
+  return mockConstructor;
+});
 jest.mock('../../../services/taxWithholdingService');
-jest.mock('../../../models/Form3921');
+jest.mock('../../../models/Form3921', () => {
+  const mockConstructor = jest.fn().mockImplementation(() => ({
+    save: jest.fn()
+  }));
+  return mockConstructor;
+});
 
 const ExerciseRequest = require('../../../models/ExerciseRequest');
 const TaxWithholdingService = require('../../../services/taxWithholdingService');

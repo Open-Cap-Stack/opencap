@@ -449,7 +449,19 @@ describe('Valuation Routes Authentication Middleware', () => {
   });
 
   describe('User Not Found Scenario', () => {
+    let freshToken;
+
     beforeEach(() => {
+      // Generate a fresh token that is not blacklisted
+      freshToken = jwt.sign(
+        {
+          userId: 'user_not_found',
+          email: 'notfound@example.com'
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
       // Mock user not found
       User.findOne = jest.fn().mockResolvedValue(null);
 
@@ -465,7 +477,7 @@ describe('Valuation Routes Authentication Middleware', () => {
     it('should return 401 when user is not found in database', async () => {
       const response = await request(app)
         .get('/api/v1/valuations')
-        .set('Authorization', `Bearer ${validToken}`)
+        .set('Authorization', `Bearer ${freshToken}`)
         .expect(401);
 
       expect(response.body).toHaveProperty('message');

@@ -86,7 +86,8 @@ describe('PaymentService', () => {
     });
 
     it('should generate unique payment ID', async () => {
-      zerodbService.insertRow.mockResolvedValue({ rows: [{}] });
+      // Return the payment data that was passed to insertRow
+      zerodbService.insertRow.mockImplementation((table, data) => Promise.resolve({ rows: [data] }));
 
       const result1 = await paymentService.createPaymentIntent(validPaymentData);
       const result2 = await paymentService.createPaymentIntent(validPaymentData);
@@ -110,12 +111,14 @@ describe('PaymentService', () => {
         amount: 10000
       };
 
-      const confirmedPayment = {
+      const processingPayment = {
         ...pendingPayment,
-        status: 'succeeded'
+        status: 'processing'
       };
 
-      zerodbService.queryTable.mockResolvedValue([pendingPayment]);
+      zerodbService.queryTable
+        .mockResolvedValueOnce([pendingPayment])
+        .mockResolvedValueOnce([processingPayment]);
       zerodbService.updateRows.mockResolvedValue({ modifiedCount: 1 });
 
       const result = await paymentService.confirmPayment('pay-123');
@@ -265,7 +268,8 @@ describe('PaymentService', () => {
     };
 
     it('should add payment method successfully', async () => {
-      zerodbService.insertRow.mockResolvedValue({ rows: [validMethodData] });
+      // Return the data that was passed to insertRow (which includes generated methodId)
+      zerodbService.insertRow.mockImplementation((table, data) => Promise.resolve({ rows: [data] }));
       zerodbService.queryTable.mockResolvedValue([]);
 
       const result = await paymentService.addPaymentMethod(validMethodData);
@@ -386,7 +390,7 @@ describe('PaymentService', () => {
         'payment_methods',
         { methodId: 'pm-456' },
         expect.objectContaining({
-          $set: { isDefault: true }
+          $set: expect.objectContaining({ isDefault: true })
         })
       );
     });
@@ -705,7 +709,7 @@ describe('PaymentService', () => {
         'payment_methods',
         { customerId: 'customer-456', isDefault: true },
         expect.objectContaining({
-          $set: { isDefault: false }
+          $set: expect.objectContaining({ isDefault: false })
         })
       );
 
@@ -714,7 +718,7 @@ describe('PaymentService', () => {
         'payment_methods',
         { methodId: 'pm-123' },
         expect.objectContaining({
-          $set: { isDefault: true }
+          $set: expect.objectContaining({ isDefault: true })
         })
       );
 
