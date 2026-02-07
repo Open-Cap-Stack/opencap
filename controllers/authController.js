@@ -131,11 +131,8 @@ const registerUser = async (req, res) => {
       userData.verificationTokenExpires = verificationTokenExpires;
     }
 
-    // Create user
-    const user = new User(userData);
-
-    // Save user to database
-    await user.save();
+    // Create user using ZeroDB pattern
+    const user = await User.create(userData);
 
     // Send verification email in background if not in development
     if (!isDevelopment) {
@@ -272,10 +269,10 @@ const oauthLogin = async (req, res) => {
 
     // Create user if not exists
     if (!user) {
-      // Create a new user
-      const userId = new mongoose.Types.ObjectId().toString();
-      user = new User({
-        userId,
+      // Create a new user using ZeroDB pattern
+      const { v4: uuidv4 } = require('uuid');
+      user = await User.create({
+        userId: uuidv4(),
         firstName: userInfo.given_name,
         lastName: userInfo.family_name,
         email: userInfo.email,
@@ -286,8 +283,6 @@ const oauthLogin = async (req, res) => {
         oauthProvider: provider,
         oauthId: userInfo.sub
       });
-
-      await user.save();
     }
 
     // Generate tokens
