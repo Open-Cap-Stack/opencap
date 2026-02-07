@@ -9,6 +9,7 @@
  */
 
 const User = require('../models/User');
+const { isValidObjectId } = require('../utils/inputSanitizer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
@@ -597,11 +598,17 @@ const getUserProfile = async (req, res) => {
     let user;
     
     // Try finding by userId field first (for string userIds like "admin-001")
-    user = await User.findOne({ userId: userId }).select('-password');
-    
+    let foundUser = await User.findOne({ userId: userId });
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId).select('-password');
+    if (!foundUser && isValidObjectId(userId)) {
+      foundUser = await User.findById(userId);
+    }
+
+    // Remove password from response (ZeroDB returns plain objects)
+    if (foundUser) {
+      const { password: _, ...userWithoutPassword } = foundUser;
+      user = userWithoutPassword;
     }
     
     if (!user) {
@@ -628,12 +635,12 @@ const updateUserProfile = async (req, res) => {
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
-    
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+    if (!user && isValidObjectId(userId)) {
       user = await User.findById(userId);
     }
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -704,12 +711,12 @@ const sendVerificationEmail = async (req, res) => {
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
-    
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+    if (!user && isValidObjectId(userId)) {
       user = await User.findById(userId);
     }
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
