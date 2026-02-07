@@ -47,7 +47,7 @@ exports.createModel = async (req, res) => {
 
         const modelData = {
             ...req.body,
-            createdBy: req.user._id
+            createdBy: req.user.userId
         };
 
         const savedModel = await FundraisingModel.create(modelData);
@@ -143,7 +143,7 @@ exports.updateModel = async (req, res) => {
         const updateData = {
             ...req.body,
             status: 'draft', // Reset to draft when configuration changes
-            updatedBy: req.user._id
+            updatedBy: req.user.userId
         };
 
         // Don't allow status or audit field changes through this endpoint
@@ -215,7 +215,7 @@ exports.calculateModel = async (req, res) => {
             valuationMetrics,
             status: 'calculated',
             calculatedAt: new Date().toISOString(),
-            updatedBy: req.user._id
+            updatedBy: req.user.userId
         };
 
         await FundraisingModel.updateOne(
@@ -315,7 +315,7 @@ exports.addScenario = async (req, res) => {
             description,
             scenarioType: scenarioType || 'custom',
             financingOverrides: financingOverrides || {},
-            createdBy: req.user._id
+            createdBy: req.user.userId
         };
 
         const scenario = await ModelScenario.create(scenarioData);
@@ -325,7 +325,7 @@ exports.addScenario = async (req, res) => {
         scenarios.push(scenario.scenarioId);
         await FundraisingModel.updateOne(
             { modelId: model.modelId },
-            { $set: { scenarios, updatedBy: req.user._id } }
+            { $set: { scenarios, updatedBy: req.user.userId } }
         );
 
         res.status(201).json({
@@ -533,7 +533,7 @@ exports.finalizeModel = async (req, res) => {
             });
         }
 
-        const finalizedModel = await FundraisingModel.finalize(req.params.id, req.user._id);
+        const finalizedModel = await FundraisingModel.finalize(req.params.id, req.user.userId);
 
         res.status(200).json({
             success: true,
@@ -566,7 +566,7 @@ exports.cloneModel = async (req, res) => {
         const clonedModel = await FundraisingModel.clone(
             req.params.id,
             { name, description, financing },
-            req.user._id
+            req.user.userId
         );
 
         res.status(201).json({

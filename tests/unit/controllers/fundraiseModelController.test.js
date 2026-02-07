@@ -32,7 +32,7 @@ describe('FundraiseModelController', () => {
             params: {},
             query: {},
             user: {
-                _id: 'user123',
+                userId: 'user123',
                 email: 'test@example.com'
             }
         };
