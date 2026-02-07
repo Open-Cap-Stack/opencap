@@ -218,9 +218,8 @@ const loginUser = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'Login successful',
@@ -298,9 +297,8 @@ const oauthLogin = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'OAuth login successful',
@@ -681,9 +679,8 @@ const updateUserProfile = async (req, res) => {
     // Save updates
     await user.save();
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'Profile updated successfully',
