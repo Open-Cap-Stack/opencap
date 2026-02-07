@@ -794,6 +794,116 @@ describe('Company Controller - ZeroDB Migration', () => {
     });
   });
 
+  describe('createCompany - Legal Structure Fields', () => {
+    const baseCompanyData = {
+      companyId: 'COMP-001',
+      CompanyName: 'Test Corporation',
+      CompanyType: 'corporation',
+      RegisteredAddress: '123 Main St',
+      TaxID: '12-3456789',
+      corporationDate: '2024-01-15'
+    };
+
+    it('should create company with legal structure fields', async () => {
+      const legalData = {
+        ...baseCompanyData,
+        entityType: 'DELAWARE_C_CORP',
+        stateOfIncorporation: 'DE',
+        qualifiedSmallBusiness: true,
+        section1202Eligible: true,
+        taxStatus: 'ACTIVE',
+        fiscalYearEnd: 'DECEMBER',
+        authorizedShares: 10000000
+      };
+
+      mockReq.body = legalData;
+      zerodbService.insertRow.mockResolvedValue({ rows: [{ _id: 'id-1', ...legalData }] });
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'companies',
+        expect.objectContaining({
+          entityType: 'DELAWARE_C_CORP',
+          stateOfIncorporation: 'DE',
+          qualifiedSmallBusiness: true,
+          section1202Eligible: true,
+          taxStatus: 'ACTIVE',
+          fiscalYearEnd: 'DECEMBER',
+          authorizedShares: 10000000
+        })
+      );
+    });
+
+    it('should create company without legal structure fields (backward compat)', async () => {
+      mockReq.body = { ...baseCompanyData };
+      zerodbService.insertRow.mockResolvedValue({ rows: [{ _id: 'id-1', ...baseCompanyData }] });
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      const insertedData = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertedData.entityType).toBeUndefined();
+      expect(insertedData.stateOfIncorporation).toBeUndefined();
+    });
+
+    it('should return 400 for invalid entityType', async () => {
+      mockReq.body = { ...baseCompanyData, entityType: 'INVALID_TYPE' };
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('entityType') })
+      );
+      expect(zerodbService.insertRow).not.toHaveBeenCalled();
+    });
+
+    it('should accept all valid entityType values', async () => {
+      const validTypes = ['C_CORP', 'S_CORP', 'LLC', 'LP', 'DELAWARE_C_CORP', 'DELAWARE_LLC'];
+
+      for (const entityType of validTypes) {
+        jest.clearAllMocks();
+        mockReq.body = { ...baseCompanyData, entityType };
+        zerodbService.insertRow.mockResolvedValue({
+          rows: [{ _id: `id-${entityType}`, ...baseCompanyData, entityType }]
+        });
+
+        await companyController.createCompany(mockReq, mockRes);
+        expect(mockRes.status).toHaveBeenCalledWith(201);
+      }
+    });
+
+    it('should include EIN and registered agent fields', async () => {
+      mockReq.body = {
+        ...baseCompanyData,
+        ein: '94-1234567',
+        registeredAgentName: 'Delaware Agents LLC',
+        registeredAgentAddress: {
+          street: '100 Corporate Blvd',
+          city: 'Wilmington',
+          state: 'DE',
+          zip: '19801'
+        }
+      };
+
+      zerodbService.insertRow.mockResolvedValue({ rows: [{ _id: 'id-1', ...mockReq.body }] });
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'companies',
+        expect.objectContaining({
+          ein: '94-1234567',
+          registeredAgentName: 'Delaware Agents LLC',
+          registeredAgentAddress: expect.objectContaining({ state: 'DE' })
+        })
+      );
+    });
+  });
+
   describe('ZeroDB Service Integration', () => {
     it('should use correct table name for all operations', async () => {
       // Test create
