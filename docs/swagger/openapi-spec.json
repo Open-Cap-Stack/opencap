@@ -167,6 +167,176 @@
           }
         }
       },
+      "Stakeholder": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Stakeholder unique identifier"
+          },
+          "stakeholderId": {
+            "type": "string",
+            "description": "Stakeholder business identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Stakeholder name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Stakeholder email address"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Stakeholder phone number"
+          },
+          "role": {
+            "type": "string",
+            "description": "Stakeholder role (e.g., investor, founder, employee)"
+          },
+          "equity": {
+            "type": "string",
+            "description": "Equity percentage"
+          },
+          "shares": {
+            "type": "string",
+            "description": "Number of shares"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["Common", "Preferred", "Option"],
+            "description": "Share type"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["Active", "Inactive", "Pending"],
+            "description": "Stakeholder status"
+          },
+          "location": {
+            "type": "string",
+            "description": "Stakeholder location"
+          },
+          "department": {
+            "type": "string",
+            "description": "Department or team"
+          },
+          "vestingSchedule": {
+            "type": "string",
+            "description": "Vesting schedule identifier"
+          },
+          "joinDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date stakeholder joined"
+          },
+          "lastActivity": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last activity timestamp"
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Associated company ID"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Associated project ID"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Associated user ID"
+          },
+          "documents": {
+            "type": "integer",
+            "description": "Number of associated documents"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          }
+        }
+      },
+      "StakeholderInput": {
+        "type": "object",
+        "required": ["name", "role"],
+        "properties": {
+          "stakeholderId": {
+            "type": "string",
+            "description": "Stakeholder business identifier (auto-generated if not provided)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Stakeholder name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Stakeholder email address"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Stakeholder phone number"
+          },
+          "role": {
+            "type": "string",
+            "description": "Stakeholder role (e.g., investor, founder, employee)"
+          },
+          "equity": {
+            "type": "string",
+            "description": "Equity percentage"
+          },
+          "shares": {
+            "type": "string",
+            "description": "Number of shares"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["Common", "Preferred", "Option"],
+            "description": "Share type"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["Active", "Inactive", "Pending"],
+            "description": "Stakeholder status"
+          },
+          "location": {
+            "type": "string",
+            "description": "Stakeholder location"
+          },
+          "department": {
+            "type": "string",
+            "description": "Department or team"
+          },
+          "vestingSchedule": {
+            "type": "string",
+            "description": "Vesting schedule identifier"
+          },
+          "joinDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date stakeholder joined"
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Associated company ID"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Associated project ID"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Associated user ID"
+          }
+        }
+      },
       "ShareClass": {
         "type": "object",
         "properties": {
@@ -7277,6 +7447,343 @@
           },
           "500": {
             "description": "Service error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders": {
+      "get": {
+        "summary": "Get all stakeholders",
+        "description": "Retrieve a list of all stakeholders. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of stakeholders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Stakeholder"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new stakeholder",
+        "description": "Create a new stakeholder record. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StakeholderInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stakeholder created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stakeholder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - Missing required fields"
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/{id}": {
+      "get": {
+        "summary": "Get stakeholder by ID",
+        "description": "Retrieve a specific stakeholder by their ID. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stakeholder found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stakeholder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "404": {
+            "description": "Stakeholder not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a stakeholder",
+        "description": "Update an existing stakeholder record. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StakeholderInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stakeholder updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stakeholder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "404": {
+            "description": "Stakeholder not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a stakeholder",
+        "description": "Delete an existing stakeholder record. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stakeholder ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stakeholder deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Stakeholder deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "404": {
+            "description": "Stakeholder not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/v1/stakeholders/reports/bulk": {
+      "post": {
+        "summary": "Generate bulk reports for multiple stakeholders",
+        "description": "Generate multiple reports for stakeholders in bulk. Requires authentication.",
+        "tags": [
+          "Stakeholders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reports"
+                ],
+                "properties": {
+                  "reports": {
+                    "type": "array",
+                    "description": "Array of report configurations",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "reportType"
+                      ],
+                      "properties": {
+                        "reportType": {
+                          "type": "string",
+                          "description": "Type of report to generate"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "csv",
+                            "excel",
+                            "json"
+                          ],
+                          "default": "pdf"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "description": "Additional parameters for the report"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk reports generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "totalReports": {
+                      "type": "integer"
+                    },
+                    "successfulReports": {
+                      "type": "integer"
+                    },
+                    "failedReports": {
+                      "type": "integer"
+                    },
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - Missing or invalid reports array"
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required"
+          },
+          "500": {
+            "description": "Server error"
           }
         }
       }
@@ -22735,6 +23242,10 @@
     {
       "name": "Material Events",
       "description": "Material event detection and tracking for 409A compliance"
+    },
+    {
+      "name": "Stakeholders",
+      "description": "Stakeholder management - CRUD operations for managing stakeholders"
     },
     {
       "name": "StakeholderReports",
