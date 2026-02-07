@@ -29,6 +29,14 @@ router.get('/',
   companyController.getAllCompanies
 );
 
+// GET /api/companies/by-company-id/:companyId - Get company by companyId (business identifier)
+// Requires: read:companies permission
+router.get('/by-company-id/:companyId',
+  authenticateToken,
+  hasPermission('read:companies'),
+  companyController.getCompanyByCompanyId
+);
+
 // GET /api/companies/:id - Get company by ID
 // Requires: read:companies permission
 router.get('/:id',
