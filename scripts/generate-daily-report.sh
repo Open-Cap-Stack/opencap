@@ -36,9 +36,16 @@ TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
 # Calculate the time window: yesterday 23:59:00 to today 23:59:00
 # This ensures we capture a full 24-hour period ending at 11:59 PM
-# Allow YESTERDAY to be overridden for regenerating past reports
+# YESTERDAY must be calculated relative to DATE, not current system date
 if [ -z "$YESTERDAY" ]; then
-    YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null)
+    # Calculate yesterday relative to DATE variable (not system date)
+    YESTERDAY=$(date -j -f "%Y-%m-%d" -v-1d "$DATE" +%Y-%m-%d 2>/dev/null || \
+                date -d "$DATE - 1 day" +%Y-%m-%d 2>/dev/null || \
+                echo "")
+    # Fallback if date parsing fails
+    if [ -z "$YESTERDAY" ]; then
+        YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null)
+    fi
 fi
 REPORT_START="${YESTERDAY} 23:59:00"
 REPORT_END="${DATE} 23:59:00"
