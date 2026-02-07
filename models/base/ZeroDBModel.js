@@ -72,17 +72,17 @@ class ZeroDBModel {
             if (insertedRow?.row_data) {
                 return {
                     ...insertedRow.row_data,
-                    id: insertedRow.row_id || insertedRow.row_data.id,
-                    _id: insertedRow.row_id || insertedRow.row_data._id,
-                    row_id: insertedRow.row_id
+                    // Keep our _id from row_data (not row_id) for consistency with queries
+                    _id: insertedRow.row_data._id,
+                    row_id: insertedRow.row_id  // Store row_id for updates/deletes
                 };
             }
-            // Return the doc with any available ids from result
+            // Return the doc with our _id (not row_id) for consistency
             return {
                 ...doc,
                 ...insertedRow,
-                id: insertedRow?.row_id || doc._id,
-                _id: insertedRow?.row_id || doc._id
+                _id: doc._id,
+                row_id: insertedRow?.row_id
             };
         } catch (error) {
             console.error(`[ZeroDBModel] Error creating document in ${this.tableName}:`, error.message);
@@ -97,12 +97,11 @@ class ZeroDBModel {
                     if (insertedRow?.row_data) {
                         return {
                             ...insertedRow.row_data,
-                            id: insertedRow.row_id || insertedRow.row_data.id,
-                            _id: insertedRow.row_id || insertedRow.row_data._id,
+                            _id: insertedRow.row_data._id,
                             row_id: insertedRow.row_id
                         };
                     }
-                    return { ...doc, ...insertedRow };
+                    return { ...doc, ...insertedRow, _id: doc._id, row_id: insertedRow?.row_id };
                 } catch (createError) {
                     console.error(`[ZeroDBModel] Failed to create table ${this.tableName}:`, createError.message);
                     throw error; // Throw original error
@@ -151,10 +150,18 @@ class ZeroDBModel {
             projection: projection || {}
         });
 
-        // ZeroDB returns data nested in row_data - unwrap it
+        // ZeroDB returns data nested in row_data - unwrap it but preserve row_id
         const rawData = result.data || result || [];
         if (Array.isArray(rawData)) {
-            return rawData.map(item => item.row_data || item);
+            return rawData.map(item => {
+                if (item.row_data) {
+                    return {
+                        ...item.row_data,
+                        row_id: item.row_id  // Preserve row_id for updates/deletes
+                    };
+                }
+                return item;
+            });
         }
         return rawData;
     }
@@ -168,8 +175,22 @@ class ZeroDBModel {
     async findOne(query = {}, options = {}) {
         await this._ensureInitialized();
 
+        // First try server-side filter
         const results = await this.find(query, { ...options, limit: 1 });
-        return results[0] || null;
+        if (results && results.length > 0) {
+            return results[0];
+        }
+
+        // Fallback: If query has filter criteria but no results found,
+        // try client-side filtering (handles ZeroDB filter inconsistencies)
+        if (Object.keys(query).length > 0) {
+            const allResults = await this.find({}, { ...options, limit: 1000 });
+            return allResults.find(item => {
+                return Object.entries(query).every(([key, value]) => item[key] === value);
+            }) || null;
+        }
+
+        return null;
     }
 
     /**
@@ -179,7 +200,18 @@ class ZeroDBModel {
      * @returns {Object|null} Found document or null
      */
     async findById(id, options = {}) {
-        return this.findOne({ _id: id }, options);
+        await this._ensureInitialized();
+
+        // First try direct filter query
+        const filtered = await this.findOne({ _id: id }, options);
+        if (filtered) {
+            return filtered;
+        }
+
+        // Fallback: fetch all and filter client-side if ZeroDB filter not working
+        // This handles cases where ZeroDB query doesn't support _id filtering
+        const allResults = await this.find({}, { ...options, limit: 1000 });
+        return allResults.find(item => item._id === id) || null;
     }
 
     /**
@@ -192,10 +224,40 @@ class ZeroDBModel {
     async updateOne(query, update, options = {}) {
         await this._ensureInitialized();
 
+        // First find the document using client-side fallback if needed
+        const doc = await this.findOne(query);
+        if (!doc) {
+            return {
+                acknowledged: true,
+                modifiedCount: 0,
+                matchedCount: 0
+            };
+        }
+
         // Handle $set operator or direct updates
         const updateData = update.$set || update;
         updateData.updatedAt = new Date().toISOString();
 
+        // If we have row_id, use it for reliable update
+        if (doc.row_id) {
+            const newRowData = { ...doc, ...updateData };
+            // Remove internal fields that shouldn't be in row_data
+            delete newRowData.row_id;
+            delete newRowData.id;
+
+            await zerodbService.client.put(
+                `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
+                { row_data: newRowData }
+            );
+
+            return {
+                acknowledged: true,
+                modifiedCount: 1,
+                matchedCount: 1
+            };
+        }
+
+        // Fallback to filter-based update
         const result = await zerodbService.updateRows(this.tableName, {
             filter: query,
             update: { $set: updateData }
@@ -273,6 +335,25 @@ class ZeroDBModel {
     async deleteOne(query) {
         await this._ensureInitialized();
 
+        // First find the document to get its row_id for reliable deletion
+        const doc = await this.findOne(query);
+        if (!doc) {
+            return {
+                acknowledged: true,
+                deletedCount: 0
+            };
+        }
+
+        // Use the row_id for deletion if available, otherwise use filter
+        if (doc.row_id) {
+            await zerodbService.deleteRowById(this.tableName, doc.row_id);
+            return {
+                acknowledged: true,
+                deletedCount: 1
+            };
+        }
+
+        // Fallback to filter-based deletion
         const result = await zerodbService.deleteRows(this.tableName, { filter: query });
 
         return {
