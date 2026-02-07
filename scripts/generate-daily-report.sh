@@ -31,12 +31,15 @@ GIT_NAME=$(git config user.name 2>/dev/null || echo "$GH_USERNAME")
 
 # Date configuration
 # Report is for TODAY, covering 23:59 PM yesterday to 23:59 PM today
-DATE=$(date +%Y-%m-%d)
+DATE=${DATE:-$(date +%Y-%m-%d)}
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
 # Calculate the time window: yesterday 23:59:00 to today 23:59:00
 # This ensures we capture a full 24-hour period ending at 11:59 PM
-YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null)
+# Allow YESTERDAY to be overridden for regenerating past reports
+if [ -z "$YESTERDAY" ]; then
+    YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null)
+fi
 REPORT_START="${YESTERDAY} 23:59:00"
 REPORT_END="${DATE} 23:59:00"
 
@@ -93,53 +96,37 @@ log "Today's commits: $TODAY_COMMITS"
 log "Yesterday's commits: $YESTERDAY_COMMITS"
 log "7-day average: $SEVEN_DAY_AVG"
 
-# Get PRs merged in reporting window (timezone-aware: PKT = UTC+5)
-# Convert PKT window to UTC for GitHub API comparison
+# Get PRs merged in reporting window
+# Use GitHub search API which returns ALL merged PRs for the repo
 log "Collecting PR data..."
-# PKT 23:59 = UTC 18:59 (subtract 5 hours)
-UTC_START_DATE=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d)
-UTC_END_DATE=$DATE
 
-PRS_MERGED_TODAY=$(gh pr list --state merged --limit 200 --json number,title,mergedAt 2>/dev/null | \
-  python3 -c "
-import json, sys
-from datetime import datetime
-try:
-    data = json.load(sys.stdin)
-    # PKT window converted to UTC (PKT = UTC+5, so subtract 5 hours)
-    start = datetime(${YESTERDAY:0:4}, ${YESTERDAY:5:2}, ${YESTERDAY:8:2}, 18, 59)
-    end = datetime(${DATE:0:4}, ${DATE:5:2}, ${DATE:8:2}, 18, 59)
-    count = 0
-    for pr in data:
-        merged = datetime.fromisoformat(pr['mergedAt'].replace('Z', ''))
-        if start <= merged <= end:
-            count += 1
-    print(count)
-except:
-    print(0)
-" 2>/dev/null || echo "0")
+# Get repository info
+REPO_OWNER=$(gh repo view --json owner -q '.owner.login' 2>/dev/null || echo "Open-Cap-Stack")
+REPO_NAME=$(gh repo view --json name -q '.name' 2>/dev/null || echo "opencapstack")
+
+# Count PRs merged today using search API (searches all PRs, not just user's)
+PRS_MERGED_TODAY=$(gh api "search/issues?q=repo:${REPO_OWNER}/${REPO_NAME}+is:pr+is:merged+merged:${DATE}&per_page=1" 2>/dev/null | \
+  python3 -c "import json,sys; print(json.load(sys.stdin).get('total_count', 0))" 2>/dev/null || echo "0")
+
+# Fallback: try gh search if API fails
+if [ "$PRS_MERGED_TODAY" = "0" ] || [ -z "$PRS_MERGED_TODAY" ]; then
+    PRS_MERGED_TODAY=$(gh search prs --repo "${REPO_OWNER}/${REPO_NAME}" --merged-at "${DATE}" --limit 500 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+fi
+
 log "PRs merged today: $PRS_MERGED_TODAY"
 
-# Get issues closed in reporting window (timezone-aware)
+# Get issues closed in reporting window using search API
 log "Collecting issue data..."
-ISSUES_CLOSED_TODAY=$(gh issue list --state closed --limit 200 --json number,title,closedAt 2>/dev/null | \
-  python3 -c "
-import json, sys
-from datetime import datetime
-try:
-    data = json.load(sys.stdin)
-    start = datetime(${YESTERDAY:0:4}, ${YESTERDAY:5:2}, ${YESTERDAY:8:2}, 18, 59)
-    end = datetime(${DATE:0:4}, ${DATE:5:2}, ${DATE:8:2}, 18, 59)
-    count = 0
-    for issue in data:
-        if issue.get('closedAt'):
-            closed = datetime.fromisoformat(issue['closedAt'].replace('Z', ''))
-            if start <= closed <= end:
-                count += 1
-    print(count)
-except:
-    print(0)
-" 2>/dev/null || echo "0")
+
+# Count issues closed today using search API
+ISSUES_CLOSED_TODAY=$(gh api "search/issues?q=repo:${REPO_OWNER}/${REPO_NAME}+is:issue+is:closed+closed:${DATE}&per_page=1" 2>/dev/null | \
+  python3 -c "import json,sys; print(json.load(sys.stdin).get('total_count', 0))" 2>/dev/null || echo "0")
+
+# Fallback: try gh search if API fails
+if [ "$ISSUES_CLOSED_TODAY" = "0" ] || [ -z "$ISSUES_CLOSED_TODAY" ]; then
+    ISSUES_CLOSED_TODAY=$(gh search issues --repo "${REPO_OWNER}/${REPO_NAME}" --closed "${DATE}" --limit 500 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+fi
+
 log "Issues closed today: $ISSUES_CLOSED_TODAY"
 
 # ============================================================================
@@ -241,26 +228,17 @@ echo "## 🔀 PRs Merged Today" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$PRS_MERGED_TODAY" -gt 0 ]; then
-    # Extract PR numbers and titles for today
-    echo "$PRS_JSON" | grep -E "\"number\":|\"title\":|\"mergedAt\":\"${DATE}" | \
-    while read -r line; do
-        if echo "$line" | grep -q "\"number\":"; then
-            NUM=$(echo "$line" | grep -o '"number":[0-9]*' | grep -o '[0-9]*')
-        elif echo "$line" | grep -q "\"title\":"; then
-            TITLE=$(echo "$line" | sed 's/.*"title":"\([^"]*\)".*/\1/')
-        elif echo "$line" | grep -q "\"mergedAt\":\"${DATE}"; then
-            if [ -n "$NUM" ] && [ -n "$TITLE" ]; then
-                echo "- #$NUM - $TITLE" >> "$REPORT_FILE"
-            fi
-            NUM=""
-            TITLE=""
-        fi
-    done
-
-    # Simpler approach - just list the PRs
-    gh pr list --author "$GH_USERNAME" --state merged --limit 50 --json number,title,mergedAt 2>/dev/null | \
-    grep -B2 "\"mergedAt\":\"${DATE}" | grep -E "number|title" | \
-    sed 'N;s/\n/ /' | sed 's/.*"number":\([0-9]*\).*"title":"\([^"]*\)".*/- #\1 - \2/' >> "$REPORT_FILE" 2>/dev/null || true
+    # List all PRs merged today using search API
+    gh search prs --repo "${REPO_OWNER}/${REPO_NAME}" --merged-at "${DATE}" --limit 100 --json number,title 2>/dev/null | \
+    python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for pr in data:
+        print(f\"- #{pr['number']} - {pr['title']}\")
+except:
+    pass
+" >> "$REPORT_FILE" 2>/dev/null || echo "Unable to fetch PR details" >> "$REPORT_FILE"
 else
     echo "No PRs merged today." >> "$REPORT_FILE"
 fi
@@ -273,8 +251,17 @@ echo "## ✅ Issues Closed Today" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 if [ "$ISSUES_CLOSED_TODAY" -gt 0 ]; then
-    gh search issues --repo Open-Cap-Stack/opencapstack --closed "$DATE" --limit 50 2>/dev/null | \
-    awk '{print "- #"$2" - "$4" "$5" "$6" "$7" "$8}' >> "$REPORT_FILE" || echo "Unable to fetch issue details" >> "$REPORT_FILE"
+    # List all issues closed today using search API
+    gh search issues --repo "${REPO_OWNER}/${REPO_NAME}" --closed "${DATE}" --limit 100 --json number,title 2>/dev/null | \
+    python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for issue in data:
+        print(f\"- #{issue['number']} - {issue['title']}\")
+except:
+    pass
+" >> "$REPORT_FILE" 2>/dev/null || echo "Unable to fetch issue details" >> "$REPORT_FILE"
 else
     echo "No issues closed today." >> "$REPORT_FILE"
 fi
