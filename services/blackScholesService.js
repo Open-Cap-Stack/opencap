@@ -1,7 +1,114 @@
 /**
  * Black-Scholes Option Pricing Service
- * Feature: Issue #73 - ASC 718 Reporting
+ * Issue #268: OPM/Black-Scholes calculator for pre-409A estimates
+ * Issue #73: ASC 718 Reporting
+ *
+ * DISCLAIMER: This calculator produces estimates only.
+ * Actual 409A valuations must be performed by qualified appraisers.
  */
+
+// Standalone functions for simple usage (Issue #268)
+
+/**
+ * Cumulative normal distribution using error function approximation
+ * Uses the Abramowitz and Stegun approximation (formula 7.1.26)
+ * @param {number} x - Input value
+ * @returns {number} - Cumulative probability
+ */
+function normalCDF(x) {
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+
+  const t = 1.0 / (1.0 + p * x);
+  const y =
+    1.0 -
+    ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+
+  return 0.5 * (1.0 + sign * y);
+}
+
+/**
+ * Calculate the price of a European call option using Black-Scholes formula
+ * @param {number} stockPrice - Current stock price (S)
+ * @param {number} strikePrice - Strike price (K)
+ * @param {number} timeToExpiry - Time to expiration in years (T)
+ * @param {number} riskFreeRate - Risk-free interest rate (r)
+ * @param {number} volatility - Volatility of the underlying (sigma)
+ * @returns {number} - Call option price
+ */
+function calculateCallPrice(
+  stockPrice,
+  strikePrice,
+  timeToExpiry,
+  riskFreeRate,
+  volatility
+) {
+  if (
+    stockPrice <= 0 ||
+    strikePrice <= 0 ||
+    timeToExpiry <= 0 ||
+    volatility <= 0
+  ) {
+    throw new Error('Invalid inputs: all values must be positive');
+  }
+
+  const d1 =
+    (Math.log(stockPrice / strikePrice) +
+      (riskFreeRate + 0.5 * volatility * volatility) * timeToExpiry) /
+    (volatility * Math.sqrt(timeToExpiry));
+  const d2 = d1 - volatility * Math.sqrt(timeToExpiry);
+
+  return (
+    stockPrice * normalCDF(d1) -
+    strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * normalCDF(d2)
+  );
+}
+
+/**
+ * Calculate the price of a European put option using Black-Scholes formula
+ * @param {number} stockPrice - Current stock price (S)
+ * @param {number} strikePrice - Strike price (K)
+ * @param {number} timeToExpiry - Time to expiration in years (T)
+ * @param {number} riskFreeRate - Risk-free interest rate (r)
+ * @param {number} volatility - Volatility of the underlying (sigma)
+ * @returns {number} - Put option price
+ */
+function calculatePutPrice(
+  stockPrice,
+  strikePrice,
+  timeToExpiry,
+  riskFreeRate,
+  volatility
+) {
+  if (
+    stockPrice <= 0 ||
+    strikePrice <= 0 ||
+    timeToExpiry <= 0 ||
+    volatility <= 0
+  ) {
+    throw new Error('Invalid inputs: all values must be positive');
+  }
+
+  const d1 =
+    (Math.log(stockPrice / strikePrice) +
+      (riskFreeRate + 0.5 * volatility * volatility) * timeToExpiry) /
+    (volatility * Math.sqrt(timeToExpiry));
+  const d2 = d1 - volatility * Math.sqrt(timeToExpiry);
+
+  return (
+    strikePrice * Math.exp(-riskFreeRate * timeToExpiry) * normalCDF(-d2) -
+    stockPrice * normalCDF(-d1)
+  );
+}
+
+// BlackScholesService class for advanced usage (Issue #73)
 
 class BlackScholesService {
   /**
@@ -281,4 +388,9 @@ class BlackScholesService {
   }
 }
 
-module.exports = BlackScholesService;
+module.exports = {
+  normalCDF,
+  calculateCallPrice,
+  calculatePutPrice,
+  BlackScholesService
+};
