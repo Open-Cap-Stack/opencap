@@ -50,20 +50,25 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.body = stakeholderData;
 
       const mockCreatedStakeholder = {
-        id: 'zerodb-id-123',
-        ...stakeholderData,
-        createdAt: new Date().toISOString()
+        row_id: 'zerodb-id-123',
+        row_data: {
+          ...stakeholderData,
+          createdAt: new Date().toISOString()
+        }
       };
 
       zerodbService.insertRow.mockResolvedValue({
-        rows: [mockCreatedStakeholder]
+        data: [mockCreatedStakeholder]
       });
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
       expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', stakeholderData);
       expect(mockRes.status).toHaveBeenCalledWith(201);
-      expect(mockRes.json).toHaveBeenCalledWith(mockCreatedStakeholder);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
+        stakeholderId: 'STK-001',
+        name: 'John Doe'
+      }));
     });
 
     it('should return 400 when stakeholderId is missing', async () => {
@@ -139,21 +144,24 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   describe('getAllStakeholders', () => {
     it('should return all stakeholders successfully', async () => {
       const mockStakeholders = [
-        { id: '1', stakeholderId: 'STK-001', name: 'John Doe', role: 'Investor', projectId: 'PRJ-001' },
-        { id: '2', stakeholderId: 'STK-002', name: 'Jane Smith', role: 'Founder', projectId: 'PRJ-001' }
+        { row_data: { id: '1', stakeholderId: 'STK-001', name: 'John Doe', role: 'Investor', projectId: 'PRJ-001' } },
+        { row_data: { id: '2', stakeholderId: 'STK-002', name: 'Jane Smith', role: 'Founder', projectId: 'PRJ-001' } }
       ];
 
-      zerodbService.queryTable.mockResolvedValue(mockStakeholders);
+      zerodbService.queryTable.mockResolvedValue({ data: mockStakeholders });
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('stakeholders', {});
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('stakeholders', { limit: 1000 });
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(mockStakeholders);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.arrayContaining([
+        expect.objectContaining({ stakeholderId: 'STK-001' }),
+        expect.objectContaining({ stakeholderId: 'STK-002' })
+      ]));
     });
 
     it('should return empty array when no stakeholders exist', async () => {
-      zerodbService.queryTable.mockResolvedValue([]);
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
@@ -177,28 +185,34 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.params.id = stakeholderId;
 
       const mockStakeholder = {
-        id: stakeholderId,
-        stakeholderId: 'STK-001',
-        name: 'John Doe',
-        role: 'Investor',
-        projectId: 'PRJ-001'
+        row_id: stakeholderId,
+        row_data: {
+          id: stakeholderId,
+          stakeholderId: 'STK-001',
+          name: 'John Doe',
+          role: 'Investor',
+          projectId: 'PRJ-001'
+        }
       };
 
-      zerodbService.queryTable.mockResolvedValue([mockStakeholder]);
+      zerodbService.queryTable.mockResolvedValue({ data: [mockStakeholder] });
 
       await stakeholderController.getStakeholderById(mockReq, mockRes);
 
       expect(zerodbService.queryTable).toHaveBeenCalledWith('stakeholders', {
-        filter: { id: stakeholderId }
+        filter: { id: stakeholderId },
+        limit: 1
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith({ stakeholder: mockStakeholder });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        stakeholder: expect.objectContaining({ stakeholderId: 'STK-001' })
+      });
     });
 
     it('should return 404 when stakeholder is not found', async () => {
       mockReq.params.id = 'non-existent-id';
 
-      zerodbService.queryTable.mockResolvedValue([]);
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
 
       await stakeholderController.getStakeholderById(mockReq, mockRes);
 
@@ -228,27 +242,34 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       };
 
       const mockUpdatedStakeholder = {
-        id: stakeholderId,
-        stakeholderId: 'STK-001',
-        name: 'John Doe Updated',
-        role: 'Lead Investor',
-        projectId: 'PRJ-001'
+        row_id: stakeholderId,
+        row_data: {
+          id: stakeholderId,
+          stakeholderId: 'STK-001',
+          name: 'John Doe Updated',
+          role: 'Lead Investor',
+          projectId: 'PRJ-001'
+        }
       };
 
       zerodbService.updateRows.mockResolvedValue({
-        modifiedCount: 1,
-        rows: [mockUpdatedStakeholder]
+        modified_count: 1
+      });
+
+      zerodbService.queryTable.mockResolvedValue({
+        data: [mockUpdatedStakeholder]
       });
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
-      expect(zerodbService.updateRows).toHaveBeenCalledWith(
-        'stakeholders',
-        { id: stakeholderId },
-        { $set: mockReq.body }
-      );
+      expect(zerodbService.updateRows).toHaveBeenCalledWith('stakeholders', {
+        filter: { id: stakeholderId },
+        update: mockReq.body
+      });
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith({ stakeholder: mockUpdatedStakeholder });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        stakeholder: expect.objectContaining({ name: 'John Doe Updated' })
+      });
     });
 
     it('should return 404 when stakeholder to update is not found', async () => {
@@ -256,8 +277,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.body = { name: 'Updated Name' };
 
       zerodbService.updateRows.mockResolvedValue({
-        modifiedCount: 0,
-        rows: []
+        modified_count: 0
       });
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
@@ -285,12 +305,14 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.params.id = stakeholderId;
 
       zerodbService.deleteRows.mockResolvedValue({
-        deletedCount: 1
+        deleted_count: 1
       });
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
-      expect(zerodbService.deleteRows).toHaveBeenCalledWith('stakeholders', { id: stakeholderId });
+      expect(zerodbService.deleteRows).toHaveBeenCalledWith('stakeholders', {
+        filter: { id: stakeholderId }
+      });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Stakeholder deleted' });
     });
@@ -299,7 +321,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.params.id = 'non-existent-id';
 
       zerodbService.deleteRows.mockResolvedValue({
-        deletedCount: 0
+        deleted_count: 0
       });
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
@@ -366,7 +388,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         projectId: 'PRJ-001'
       };
 
-      // Return unexpected format without rows array
+      // Return unexpected format without data array
       zerodbService.insertRow.mockResolvedValue({});
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
@@ -377,12 +399,12 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   });
 
   describe('Integration with ZeroDB Service Methods', () => {
-    it('should use queryTable for fetching stakeholders', async () => {
-      zerodbService.queryTable.mockResolvedValue([]);
+    it('should use queryTable with limit for fetching all stakeholders', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('stakeholders', {});
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('stakeholders', { limit: 1000 });
     });
 
     it('should use insertRow for creating stakeholders', async () => {
@@ -393,36 +415,42 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         projectId: 'PRJ-001'
       };
 
-      zerodbService.insertRow.mockResolvedValue({ rows: [{ id: '1', ...mockReq.body }] });
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: '1', row_data: mockReq.body }]
+      });
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
       expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', mockReq.body);
     });
 
-    it('should use updateRows with $set operator for updates', async () => {
+    it('should use updateRows with filter and update object for updates', async () => {
       mockReq.params.id = 'zerodb-id-123';
       mockReq.body = { name: 'Updated Name' };
 
-      zerodbService.updateRows.mockResolvedValue({ modifiedCount: 1, rows: [{ id: '123', name: 'Updated Name' }] });
+      zerodbService.updateRows.mockResolvedValue({ modified_count: 1 });
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: '123', row_data: { id: '123', name: 'Updated Name' } }]
+      });
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
-      expect(zerodbService.updateRows).toHaveBeenCalledWith(
-        'stakeholders',
-        { id: 'zerodb-id-123' },
-        { $set: { name: 'Updated Name' } }
-      );
+      expect(zerodbService.updateRows).toHaveBeenCalledWith('stakeholders', {
+        filter: { id: 'zerodb-id-123' },
+        update: { name: 'Updated Name' }
+      });
     });
 
-    it('should use deleteRows with id filter for deletion', async () => {
+    it('should use deleteRows with filter object for deletion', async () => {
       mockReq.params.id = 'zerodb-id-123';
 
-      zerodbService.deleteRows.mockResolvedValue({ deletedCount: 1 });
+      zerodbService.deleteRows.mockResolvedValue({ deleted_count: 1 });
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
-      expect(zerodbService.deleteRows).toHaveBeenCalledWith('stakeholders', { id: 'zerodb-id-123' });
+      expect(zerodbService.deleteRows).toHaveBeenCalledWith('stakeholders', {
+        filter: { id: 'zerodb-id-123' }
+      });
     });
   });
 });
