@@ -25,7 +25,7 @@ const Company = require('../../../models/Company');
 
 describe('Company Model - ZeroDB Comprehensive Tests', () => {
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Schema Definition', () => {
@@ -393,7 +393,7 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
 
   describe('Company.isDelawareIncorporated()', () => {
     it('should return true for DE state of incorporation', async () => {
-      zerodbService.queryTable.mockResolvedValue({
+      zerodbService.queryTable.mockResolvedValueOnce({
         data: [{ row_data: { companyId: 'comp-1', stateOfIncorporation: 'DE' } }]
       });
 
@@ -402,7 +402,7 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
     });
 
     it('should return true for DELAWARE_C_CORP entity type', async () => {
-      zerodbService.queryTable.mockResolvedValue({
+      zerodbService.queryTable.mockResolvedValueOnce({
         data: [{ row_data: { companyId: 'comp-1', entityType: 'DELAWARE_C_CORP' } }]
       });
 
@@ -411,7 +411,7 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
     });
 
     it('should return true for DELAWARE_LLC entity type', async () => {
-      zerodbService.queryTable.mockResolvedValue({
+      zerodbService.queryTable.mockResolvedValueOnce({
         data: [{ row_data: { companyId: 'comp-1', entityType: 'DELAWARE_LLC' } }]
       });
 
@@ -420,7 +420,7 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
     });
 
     it('should return false for non-Delaware company', async () => {
-      zerodbService.queryTable.mockResolvedValue({
+      zerodbService.queryTable.mockResolvedValueOnce({
         data: [{ row_data: { companyId: 'comp-1', stateOfIncorporation: 'CA', entityType: 'C_CORP' } }]
       });
 
@@ -429,7 +429,7 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
     });
 
     it('should return false for non-existent company', async () => {
-      zerodbService.queryTable.mockResolvedValue({ data: [] });
+      zerodbService.queryTable.mockResolvedValueOnce({ data: [] });
 
       const result = await Company.isDelawareIncorporated('non-existent');
       expect(result).toBe(false);
@@ -653,7 +653,14 @@ describe('Company Model - ZeroDB Comprehensive Tests', () => {
     });
 
     it('should find and update a company', async () => {
+      // Reset queryTable to clear any leftover mockResolvedValueOnce queue
+      zerodbService.queryTable.mockReset();
+      // findOneAndUpdate with { new: true } calls queryTable 3 times:
+      // 1) findOne to get existing doc, 2) updateOne's internal findOne, 3) final findOne for updated doc
       zerodbService.queryTable
+        .mockResolvedValueOnce({
+          data: [{ row_data: { companyId: 'comp-1', CompanyName: 'Old Name' } }]
+        })
         .mockResolvedValueOnce({
           data: [{ row_data: { companyId: 'comp-1', CompanyName: 'Old Name' } }]
         })
