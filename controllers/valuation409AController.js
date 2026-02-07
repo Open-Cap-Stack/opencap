@@ -58,13 +58,12 @@ exports.getCompanyValuations = async (req, res) => {
     const query = { companyId };
     if (status) query.status = status;
 
-    const valuations = await Valuation409A.find(query)
-      .populate('companyId', 'name')
-      .populate('requestedBy', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+    // ZeroDB doesn't support populate - fetch data without it
+    const valuations = await Valuation409A.find(query, {
+      sort: { createdAt: -1 },
+      skip: (page - 1) * parseInt(limit),
+      limit: parseInt(limit)
+    });
 
     const total = await Valuation409A.countDocuments(query);
 
@@ -91,14 +90,8 @@ exports.getValuation = async (req, res) => {
   try {
     const { valuationId } = req.params;
 
-    const valuation = await Valuation409A.findOne({ valuationId })
-      .populate('companyId', 'name')
-      .populate('requestedBy', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('documents.documentId')
-      .populate('documents.uploadedBy', 'firstName lastName email')
-      .populate('boardApproval.approvedBy', 'firstName lastName email')
-      .populate('statusHistory.changedBy', 'firstName lastName email');
+    // ZeroDB doesn't support populate - fetch data without it
+    const valuation = await Valuation409A.findOne({ valuationId });
 
     if (!valuation) {
       return res.status(404).json({
@@ -628,6 +621,33 @@ exports.getValuationAnalytics = async (req, res) => {
         valuationsByMonth: [],
         recentActivity: []
       }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get latest valuation for a company
+exports.getLatestValuation = async (req, res) => {
+  try {
+    const { companyId } = req.query;
+
+    if (!companyId) {
+      return res.status(400).json({
+        success: false,
+        error: 'companyId query parameter is required'
+      });
+    }
+
+    // Find the most recent approved valuation that hasn't expired
+    const valuation = await Valuation409A.findCurrentValuation(companyId);
+
+    res.json({
+      success: true,
+      valuation: valuation || null
     });
   } catch (error) {
     res.status(500).json({

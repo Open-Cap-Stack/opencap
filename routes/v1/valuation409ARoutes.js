@@ -27,6 +27,29 @@ router.get('/analytics', valuation409AController.getValuationAnalytics);
 
 /**
  * @swagger
+ * /api/v1/valuations/latest:
+ *   get:
+ *     summary: Get latest valuation for a company
+ *     tags: [409A Valuations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The company ID to get the latest valuation for
+ *     responses:
+ *       200:
+ *         description: Latest valuation or null if none exists
+ *       400:
+ *         description: Missing companyId parameter
+ */
+router.get('/latest', valuation409AController.getLatestValuation);
+
+/**
+ * @swagger
  * /api/v1/valuations:
  *   post:
  *     summary: Create a new 409A valuation request

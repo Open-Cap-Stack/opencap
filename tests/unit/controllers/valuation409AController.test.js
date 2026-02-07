@@ -74,12 +74,8 @@ describe('Valuation409A Controller', () => {
       mockReq.params = { companyId: 'company_123' };
       mockReq.query = { page: 1, limit: 20 };
 
-      Valuation409A.find.mockReturnValue({
-        populate: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([{ valuationId: 'val_123' }])
-      });
+      // ZeroDB model returns array directly (no chainable methods)
+      Valuation409A.find.mockResolvedValue([{ valuationId: 'val_123' }]);
       Valuation409A.countDocuments.mockResolvedValue(1);
 
       await valuation409AController.getCompanyValuations(mockReq, mockRes);
@@ -100,12 +96,8 @@ describe('Valuation409A Controller', () => {
       mockReq.params = { companyId: 'company_123' };
       mockReq.query = { status: 'approved' };
 
-      Valuation409A.find.mockReturnValue({
-        populate: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([])
-      });
+      // ZeroDB model returns array directly (no chainable methods)
+      Valuation409A.find.mockResolvedValue([]);
       Valuation409A.countDocuments.mockResolvedValue(0);
 
       await valuation409AController.getCompanyValuations(mockReq, mockRes);
@@ -117,23 +109,11 @@ describe('Valuation409A Controller', () => {
   });
 
   describe('getValuation', () => {
-    // Helper to create chainable mock
-    const createChainableMock = (resolveValue) => {
-      const mock = {
-        populate: jest.fn()
-      };
-      mock.populate.mockReturnValue(mock);
-      mock.then = (cb) => Promise.resolve(resolveValue).then(cb);
-      mock.catch = (cb) => Promise.resolve(resolveValue).catch(cb);
-      return mock;
-    };
-
     it('should return a specific valuation', async () => {
       mockReq.params = { valuationId: 'val_123' };
 
-      Valuation409A.findOne.mockReturnValue(
-        createChainableMock({ valuationId: 'val_123', status: 'requested' })
-      );
+      // ZeroDB model returns object directly (no chainable methods)
+      Valuation409A.findOne.mockResolvedValue({ valuationId: 'val_123', status: 'requested' });
 
       await valuation409AController.getValuation(mockReq, mockRes);
 
@@ -143,7 +123,8 @@ describe('Valuation409A Controller', () => {
     it('should return 404 when valuation not found', async () => {
       mockReq.params = { valuationId: 'nonexistent' };
 
-      Valuation409A.findOne.mockReturnValue(createChainableMock(null));
+      // ZeroDB model returns null directly (no chainable methods)
+      Valuation409A.findOne.mockResolvedValue(null);
 
       await valuation409AController.getValuation(mockReq, mockRes);
 
@@ -381,6 +362,57 @@ describe('Valuation409A Controller', () => {
       expect(mockValuation.addDocument).toHaveBeenCalled();
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({ success: true })
+      );
+    });
+  });
+
+  describe('getLatestValuation', () => {
+    it('should return latest valuation for a company', async () => {
+      mockReq.query = { companyId: 'company_123' };
+
+      Valuation409A.findCurrentValuation.mockResolvedValue({
+        valuationId: 'val_123',
+        status: 'approved',
+        fairMarketValue: 1.25
+      });
+
+      await valuation409AController.getLatestValuation(mockReq, mockRes);
+
+      expect(Valuation409A.findCurrentValuation).toHaveBeenCalledWith('company_123');
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          valuation: expect.objectContaining({ valuationId: 'val_123' })
+        })
+      );
+    });
+
+    it('should return null when no valuation exists', async () => {
+      mockReq.query = { companyId: 'company_123' };
+
+      Valuation409A.findCurrentValuation.mockResolvedValue(null);
+
+      await valuation409AController.getLatestValuation(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          valuation: null
+        })
+      );
+    });
+
+    it('should return 400 when companyId is missing', async () => {
+      mockReq.query = {}; // No companyId
+
+      await valuation409AController.getLatestValuation(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'companyId query parameter is required'
+        })
       );
     });
   });

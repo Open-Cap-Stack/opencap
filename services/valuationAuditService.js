@@ -46,16 +46,10 @@ const COMPLIANCE_STANDARDS = {
 class ValuationAuditService {
   /**
    * Get complete audit trail for a valuation
+   * Note: ZeroDB doesn't support populate - returns IDs instead of populated objects
    */
   static async getValuationAuditTrail(valuationId) {
-    const valuation = await Valuation409A.findOne({ valuationId })
-      .populate('companyId', 'name')
-      .populate('requestedBy', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('updatedBy', 'firstName lastName email')
-      .populate('boardApproval.approvedBy', 'firstName lastName email')
-      .populate('documents.uploadedBy', 'firstName lastName email')
-      .populate('statusHistory.changedBy', 'firstName lastName email');
+    const valuation = await Valuation409A.findOne({ valuationId });
 
     if (!valuation) {
       throw new Error('Valuation not found');
@@ -72,41 +66,29 @@ class ValuationAuditService {
         reason: valuation.reason
       },
       timeline: this._buildTimeline(valuation),
-      statusHistory: valuation.statusHistory.map(h => ({
+      statusHistory: (valuation.statusHistory || []).map(h => ({
         status: h.status,
         changedAt: h.changedAt,
-        changedBy: h.changedBy ? {
-          name: `${h.changedBy.firstName} ${h.changedBy.lastName}`,
-          email: h.changedBy.email
-        } : null,
+        changedBy: h.changedBy || null,
         reason: h.reason
       })),
-      documents: valuation.documents.map(d => ({
+      documents: (valuation.documents || []).map(d => ({
         type: d.type,
         name: d.name,
         uploadedAt: d.uploadedAt,
-        uploadedBy: d.uploadedBy ? {
-          name: `${d.uploadedBy.firstName} ${d.uploadedBy.lastName}`,
-          email: d.uploadedBy.email
-        } : null
+        uploadedBy: d.uploadedBy || null
       })),
       boardApproval: valuation.boardApproval ? {
         approved: valuation.boardApproval.approved,
         approvedAt: valuation.boardApproval.approvedAt,
-        approvedBy: valuation.boardApproval.approvedBy ? {
-          name: `${valuation.boardApproval.approvedBy.firstName} ${valuation.boardApproval.approvedBy.lastName}`,
-          email: valuation.boardApproval.approvedBy.email
-        } : null,
+        approvedBy: valuation.boardApproval.approvedBy || null,
         resolution: valuation.boardApproval.resolution
       } : null,
       valuationFirm: valuation.valuationFirm,
       metadata: {
         createdAt: valuation.createdAt,
         updatedAt: valuation.updatedAt,
-        createdBy: valuation.createdBy ? {
-          name: `${valuation.createdBy.firstName} ${valuation.createdBy.lastName}`,
-          email: valuation.createdBy.email
-        } : null
+        createdBy: valuation.createdBy || null
       }
     };
 
@@ -115,6 +97,7 @@ class ValuationAuditService {
 
   /**
    * Build timeline from valuation data
+   * Note: ZeroDB doesn't support populate - user IDs are returned instead of populated objects
    */
   static _buildTimeline(valuation) {
     const timeline = [];
@@ -123,17 +106,17 @@ class ValuationAuditService {
     timeline.push({
       event: 'Valuation Requested',
       date: valuation.requestedAt || valuation.createdAt,
-      actor: valuation.requestedBy ? `${valuation.requestedBy.firstName} ${valuation.requestedBy.lastName}` : 'System',
+      actor: valuation.requestedBy || 'System',
       details: `Reason: ${valuation.reason}`
     });
 
     // Add status changes
-    valuation.statusHistory.forEach(h => {
+    (valuation.statusHistory || []).forEach(h => {
       if (h.status !== 'requested') {
         timeline.push({
           event: `Status changed to ${h.status}`,
           date: h.changedAt,
-          actor: h.changedBy ? `${h.changedBy.firstName} ${h.changedBy.lastName}` : 'System',
+          actor: h.changedBy || 'System',
           details: h.reason
         });
       }
@@ -150,11 +133,11 @@ class ValuationAuditService {
     }
 
     // Add document uploads
-    valuation.documents.forEach(d => {
+    (valuation.documents || []).forEach(d => {
       timeline.push({
         event: `Document Uploaded: ${d.type}`,
         date: d.uploadedAt,
-        actor: d.uploadedBy ? `${d.uploadedBy.firstName} ${d.uploadedBy.lastName}` : 'System',
+        actor: d.uploadedBy || 'System',
         details: d.name
       });
     });
@@ -164,8 +147,7 @@ class ValuationAuditService {
       timeline.push({
         event: 'Board Approval',
         date: valuation.boardApproval.approvedAt,
-        actor: valuation.boardApproval.approvedBy ?
-          `${valuation.boardApproval.approvedBy.firstName} ${valuation.boardApproval.approvedBy.lastName}` : 'Board',
+        actor: valuation.boardApproval.approvedBy || 'Board',
         details: valuation.boardApproval.resolution
       });
     }
@@ -176,6 +158,7 @@ class ValuationAuditService {
 
   /**
    * Get company valuation history with audit details
+   * Note: ZeroDB doesn't support populate - returns IDs instead of populated objects
    */
   static async getCompanyValuationHistory(companyId, options = {}) {
     const query = { companyId };
@@ -187,10 +170,7 @@ class ValuationAuditService {
       if (options.endDate) query.effectiveDate.$lte = new Date(options.endDate);
     }
 
-    const valuations = await Valuation409A.find(query)
-      .populate('requestedBy', 'firstName lastName')
-      .populate('boardApproval.approvedBy', 'firstName lastName')
-      .sort({ effectiveDate: -1 });
+    const valuations = await Valuation409A.find(query, { sort: { effectiveDate: -1 } });
 
     return valuations.map(v => ({
       valuationId: v.valuationId,
@@ -203,7 +183,7 @@ class ValuationAuditService {
       valuationFirm: v.valuationFirm?.name,
       boardApproved: v.boardApproval?.approved || false,
       documentCount: v.documents?.length || 0,
-      requestedBy: v.requestedBy ? `${v.requestedBy.firstName} ${v.requestedBy.lastName}` : null,
+      requestedBy: v.requestedBy || null,
       createdAt: v.createdAt,
       isExpired: v.isExpired
     }));
@@ -211,19 +191,24 @@ class ValuationAuditService {
 
   /**
    * Generate IRS compliance report
+   * Note: ZeroDB doesn't support populate - uses IDs instead of populated objects
    */
   static async generateIRSComplianceReport(companyId, fiscalYear = null) {
     const year = fiscalYear || new Date().getFullYear();
     const startDate = new Date(year, 0, 1);
     const endDate = new Date(year, 11, 31);
 
-    const valuations = await Valuation409A.find({
-      companyId,
-      $or: [
-        { effectiveDate: { $gte: startDate, $lte: endDate } },
-        { createdAt: { $gte: startDate, $lte: endDate } }
-      ]
-    }).populate('boardApproval.approvedBy', 'firstName lastName title');
+    // ZeroDB doesn't support $or queries the same way - fetch all and filter
+    const allValuations = await Valuation409A.find({ companyId });
+    const valuations = allValuations.filter(v => {
+      const effectiveInRange = v.effectiveDate &&
+        new Date(v.effectiveDate) >= startDate &&
+        new Date(v.effectiveDate) <= endDate;
+      const createdInRange = v.createdAt &&
+        new Date(v.createdAt) >= startDate &&
+        new Date(v.createdAt) <= endDate;
+      return effectiveInRange || createdInRange;
+    });
 
     const complianceChecks = [];
 
@@ -261,7 +246,7 @@ class ValuationAuditService {
           case 4: // Board approval
             compliant = v.boardApproval?.approved === true;
             evidence = compliant ?
-              `Approved by ${v.boardApproval.approvedBy?.firstName} ${v.boardApproval.approvedBy?.lastName}` :
+              `Approved by user ${v.boardApproval.approvedBy || 'unknown'}` :
               'Board approval not recorded';
             break;
         }
