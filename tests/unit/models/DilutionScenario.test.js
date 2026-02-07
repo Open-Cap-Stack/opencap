@@ -402,6 +402,11 @@ describe('DilutionScenario Model', () => {
         description: 'Updated description'
       };
 
+      // findOne internally calls queryTable - return a doc so updateOne proceeds
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'scenario-1', scenarioId: 'DS-001' }]
+      });
+
       await DilutionScenario.updateOne(
         { scenarioId: 'DS-001' },
         { $set: updateData }
@@ -417,6 +422,11 @@ describe('DilutionScenario Model', () => {
     });
 
     it('should update timestamp on update', async () => {
+      // findOne internally calls queryTable - return a doc so updateOne proceeds
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'scenario-1', scenarioId: 'DS-001' }]
+      });
+
       await DilutionScenario.updateOne(
         { scenarioId: 'DS-001' },
         { $set: { name: 'Updated' } }
@@ -433,6 +443,11 @@ describe('DilutionScenario Model', () => {
 
   describe('deleteOne()', () => {
     it('should delete a scenario', async () => {
+      // findOne internally calls queryTable - return a doc so deleteOne proceeds
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'scenario-1', scenarioId: 'DS-001' }]
+      });
+
       await DilutionScenario.deleteOne({ scenarioId: 'DS-001' });
 
       expect(zerodbService.deleteRows).toHaveBeenCalledWith(
@@ -442,7 +457,11 @@ describe('DilutionScenario Model', () => {
     });
 
     it('should return delete result', async () => {
-      zerodbService.deleteRows.mockResolvedValue({ deleted_count: 1 });
+      // findOne internally calls queryTable - return a doc so deleteOne proceeds
+      zerodbService.queryTable.mockResolvedValueOnce({
+        data: [{ _id: 'scenario-1', scenarioId: 'DS-001' }]
+      });
+      zerodbService.deleteRows.mockResolvedValueOnce({ deleted_count: 1 });
 
       const result = await DilutionScenario.deleteOne({ scenarioId: 'DS-001' });
 
