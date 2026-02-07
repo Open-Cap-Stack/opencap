@@ -68,6 +68,7 @@ describe('Company Routes - Auth/RBAC Integration', () => {
   describe('No Token (401)', () => {
     const endpoints = [
       { method: 'get', path: '/api/v1/companies' },
+      { method: 'get', path: '/api/v1/companies/by-company-id/COMP-001' },
       { method: 'get', path: '/api/v1/companies/mock-id' },
       { method: 'post', path: '/api/v1/companies' },
       { method: 'put', path: '/api/v1/companies/mock-id' },
