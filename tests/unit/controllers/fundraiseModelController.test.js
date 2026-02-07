@@ -16,6 +16,12 @@ const ModelScenario = require('../../../models/ModelScenario');
 const DilutionCalculationService = require('../../../services/dilutionCalculationService');
 const fundraiseModelController = require('../../../controllers/fundraiseModelController');
 
+// Manually assign mock methods for ModelScenario (ZeroDB createModel pattern)
+ModelScenario.findOne = jest.fn();
+ModelScenario.find = jest.fn();
+ModelScenario.create = jest.fn();
+ModelScenario.deleteMany = jest.fn();
+
 describe('FundraiseModelController', () => {
     let mockReq;
     let mockRes;
@@ -33,7 +39,9 @@ describe('FundraiseModelController', () => {
 
         mockRes = {
             status: jest.fn().mockReturnThis(),
-            json: jest.fn().mockReturnThis()
+            json: jest.fn().mockReturnThis(),
+            setHeader: jest.fn(),
+            send: jest.fn().mockReturnThis()
         };
 
         jest.clearAllMocks();
