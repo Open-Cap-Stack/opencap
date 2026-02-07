@@ -6,6 +6,13 @@ const zerodbService = require('../services/zerodbService');
 
 const TABLE_NAME = 'companies';
 const VALID_COMPANY_TYPES = ['startup', 'corporation', 'non-profit', 'government'];
+const VALID_ENTITY_TYPES = ['C_CORP', 'S_CORP', 'LLC', 'LP', 'DELAWARE_C_CORP', 'DELAWARE_LLC'];
+const LEGAL_STRUCTURE_FIELDS = [
+  'entityType', 'stateOfIncorporation', 'dateOfIncorporation',
+  'qualifiedSmallBusiness', 'section1202Eligible', 'taxStatus',
+  'registeredAgentName', 'registeredAgentAddress', 'ein',
+  'fiscalYearEnd', 'authorizedShares'
+];
 
 /**
  * Validate company data against schema requirements
@@ -53,6 +60,13 @@ exports.createCompany = async (req, res) => {
       });
     }
 
+    // Validate entityType if provided
+    if (req.body.entityType && !VALID_ENTITY_TYPES.includes(req.body.entityType)) {
+      return res.status(400).json({
+        message: `entityType must be one of: ${VALID_ENTITY_TYPES.join(', ')}`
+      });
+    }
+
     const now = new Date().toISOString();
     const companyData = {
       companyId,
@@ -64,6 +78,13 @@ exports.createCompany = async (req, res) => {
       createdAt: now,
       updatedAt: now
     };
+
+    // Include optional legal structure fields if provided
+    for (const field of LEGAL_STRUCTURE_FIELDS) {
+      if (req.body[field] !== undefined) {
+        companyData[field] = req.body[field];
+      }
+    }
 
     // Insert into ZeroDB
     const result = await zerodbService.insertRow(TABLE_NAME, companyData);
