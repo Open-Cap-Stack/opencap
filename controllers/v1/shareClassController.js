@@ -1,12 +1,25 @@
 /**
  * V1 ShareClass Controller
- * 
+ *
  * [Feature] OCAE-208: Implement share class management endpoints
  * Enhanced controller with authentication, validation, filtering, and analytics
+ * Updated: ZeroDB Migration - Removed Mongoose dependencies
  */
 
 const ShareClass = require('../../models/ShareClass');
-const mongoose = require('mongoose');
+
+/**
+ * Helper function to validate ID format (UUID or row_id)
+ * @param {string} id - The ID to validate
+ * @returns {boolean} - True if the ID is valid, false otherwise
+ */
+const isValidId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  // UUID format, MongoDB ObjectId format, or alphanumeric with dashes/underscores
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+  return uuidRegex.test(id) || objectIdRegex.test(id) || /^\d+$/.test(id) || /^[A-Za-z0-9\-_]+$/.test(id);
+};
 
 // Helper function to validate request body
 const validateShareClass = (data) => {
@@ -62,17 +75,16 @@ exports.createShareClass = async (req, res) => {
     }
     
     // Check if shareClassId already exists
-    const existing = await ShareClass.findOne({ shareClassId: req.body.shareClassId }).exec();
+    const existing = await ShareClass.findOne({ shareClassId: req.body.shareClassId });
     if (existing) {
       return res.status(400).json({ 
         errors: [`Share class with ID ${req.body.shareClassId} already exists`] 
       });
     }
     
-    // Create new share class
-    const newShareClass = new ShareClass(req.body);
-    await newShareClass.save();
-    
+    // Create new share class using ZeroDB-compatible create method
+    const newShareClass = await ShareClass.create(req.body);
+
     res.status(201).json(newShareClass);
   } catch (error) {
     console.error('Error creating share class:', error);
@@ -118,7 +130,7 @@ exports.getAllShareClasses = async (req, res) => {
     }
     
     // Execute query
-    const shareClasses = await ShareClass.find(filter).exec();
+    const shareClasses = await ShareClass.find(filter);
     
     res.status(200).json(shareClasses);
   } catch (error) {
@@ -137,41 +149,22 @@ exports.getAllShareClasses = async (req, res) => {
 exports.searchShareClasses = async (req, res) => {
   try {
     const { q } = req.query;
-    
+
     if (!q) {
-      return res.status(400).json({ 
-        error: 'Search query is required' 
+      return res.status(400).json({
+        error: 'Search query is required'
       });
     }
-    
-    // Use text index for search
-    const shareClasses = await ShareClass.find(
-      { $text: { $search: q } },
-      { score: { $meta: "textScore" } }
-    )
-    .sort({ score: { $meta: "textScore" } })
-    .exec();
-    
-    // If text search returns no results, try partial matching
-    if (shareClasses.length === 0) {
-      const regex = new RegExp(q, 'i');
-      const results = await ShareClass.find({
-        $or: [
-          { name: regex },
-          { description: regex },
-          { shareClassId: regex }
-        ]
-      }).exec();
-      
-      return res.status(200).json(results);
-    }
-    
+
+    // Use the model's search method for ZeroDB compatibility
+    const shareClasses = await ShareClass.search(q);
+
     res.status(200).json(shareClasses);
   } catch (error) {
     console.error('Error searching share classes:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error searching share classes',
-      message: error.message 
+      message: error.message
     });
   }
 };
@@ -183,11 +176,11 @@ exports.searchShareClasses = async (req, res) => {
 exports.getShareClassById = async (req, res) => {
   try {
     // Validate ID format
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid share class ID format' });
     }
-    
-    const shareClass = await ShareClass.findById(req.params.id).exec();
+
+    const shareClass = await ShareClass.findById(req.params.id);
     
     if (!shareClass) {
       return res.status(404).json({ error: 'Share class not found' });
@@ -210,42 +203,46 @@ exports.getShareClassById = async (req, res) => {
 exports.updateShareClass = async (req, res) => {
   try {
     // Validate ID format
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid share class ID format' });
     }
     
     // If shareClassId is being updated, check it doesn't conflict
     if (req.body.shareClassId) {
-      const existing = await ShareClass.findOne({ 
-        shareClassId: req.body.shareClassId,
-        _id: { $ne: req.params.id }
-      }).exec();
-      
-      if (existing) {
-        return res.status(400).json({ 
-          errors: [`Share class with ID ${req.body.shareClassId} already exists`] 
+      const existingWithId = await ShareClass.findOne({
+        shareClassId: req.body.shareClassId
+      });
+
+      if (existingWithId && existingWithId._id !== req.params.id) {
+        return res.status(400).json({
+          errors: [`Share class with ID ${req.body.shareClassId} already exists`]
         });
       }
     }
-    
+
     // Validate request body if any fields are being updated
     if (Object.keys(req.body).length > 0) {
+      const currentShareClass = await ShareClass.findById(req.params.id);
+      if (!currentShareClass) {
+        return res.status(404).json({ error: 'Share class not found' });
+      }
+
       const errors = validateShareClass({
-        ...await ShareClass.findById(req.params.id).lean().exec(),
+        ...currentShareClass,
         ...req.body
       });
-      
+
       if (errors.length > 0) {
         return res.status(400).json({ errors });
       }
     }
-    
+
     // Update the share class
     const updatedShareClass = await ShareClass.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
-    ).exec();
+      { new: true }
+    );
     
     if (!updatedShareClass) {
       return res.status(404).json({ error: 'Share class not found' });
@@ -268,11 +265,11 @@ exports.updateShareClass = async (req, res) => {
 exports.deleteShareClass = async (req, res) => {
   try {
     // Validate ID format
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid share class ID format' });
     }
     
-    const deletedShareClass = await ShareClass.findByIdAndDelete(req.params.id).exec();
+    const deletedShareClass = await ShareClass.findByIdAndDelete(req.params.id);
     
     if (!deletedShareClass) {
       return res.status(404).json({ error: 'Share class not found' });
@@ -327,9 +324,10 @@ exports.bulkCreateShareClasses = async (req, res) => {
     }
     
     // Check for existing shareClassIds in database
-    const existingIds = await ShareClass.find({
-      shareClassId: { $in: shareClassIds }
-    }).select('shareClassId').exec();
+    const allShareClasses = await ShareClass.find({});
+    const existingIds = allShareClasses.filter(sc =>
+      shareClassIds.includes(sc.shareClassId)
+    );
     
     if (existingIds.length > 0) {
       return res.status(400).json({ 
@@ -356,78 +354,83 @@ exports.bulkCreateShareClasses = async (req, res) => {
  */
 exports.getShareClassAnalytics = async (req, res) => {
   try {
-    // Get basic statistics with aggregation pipeline
-    const analyticsResults = await ShareClass.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalShareClasses: { $sum: 1 },
-          totalAmountRaised: { $sum: '$amountRaised' },
-          totalDilutedShares: { $sum: '$dilutedShares' },
-          totalAuthorizedShares: { $sum: '$authorizedShares' },
-          avgOwnershipPercentage: { $avg: '$ownershipPercentage' },
-          minOwnershipPercentage: { $min: '$ownershipPercentage' },
-          maxOwnershipPercentage: { $max: '$ownershipPercentage' }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          totalShareClasses: 1,
-          totalAmountRaised: 1,
-          totalDilutedShares: 1,
-          totalAuthorizedShares: 1,
-          averageOwnershipPercentage: { $round: ['$avgOwnershipPercentage', 2] },
-          ownershipRange: {
-            min: '$minOwnershipPercentage',
-            max: '$maxOwnershipPercentage'
-          }
-        }
-      }
-    ]).exec();
-    
-    // Get distribution of share classes by ownership percentage range
-    const ownershipDistribution = await ShareClass.aggregate([
-      {
-        $group: {
-          _id: {
-            $switch: {
-              branches: [
-                { case: { $lte: ['$ownershipPercentage', 10] }, then: '0-10%' },
-                { case: { $lte: ['$ownershipPercentage', 25] }, then: '11-25%' },
-                { case: { $lte: ['$ownershipPercentage', 50] }, then: '26-50%' },
-                { case: { $lte: ['$ownershipPercentage', 75] }, then: '51-75%' }
-              ],
-              default: '76-100%'
-            }
-          },
-          count: { $sum: 1 },
-          totalShares: { $sum: '$dilutedShares' }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]).exec();
-    
-    const analytics = {
-      ...(analyticsResults[0] || { 
+    // Fetch all share classes for analytics calculation
+    const shareClasses = await ShareClass.find({});
+
+    if (shareClasses.length === 0) {
+      return res.status(200).json({
         totalShareClasses: 0,
         totalAmountRaised: 0,
+        totalDilutedShares: 0,
+        totalAuthorizedShares: 0,
         averageOwnershipPercentage: 0,
-        ownershipRange: { min: 0, max: 0 }
-      }),
-      ownershipDistribution: ownershipDistribution.map(item => ({
-        range: item._id,
-        count: item.count,
-        totalShares: item.totalShares
-      }))
+        ownershipRange: { min: 0, max: 0 },
+        ownershipDistribution: []
+      });
+    }
+
+    // Calculate basic statistics
+    const totalShareClasses = shareClasses.length;
+    const totalAmountRaised = shareClasses.reduce((sum, sc) => sum + (sc.amountRaised || 0), 0);
+    const totalDilutedShares = shareClasses.reduce((sum, sc) => sum + (sc.dilutedShares || 0), 0);
+    const totalAuthorizedShares = shareClasses.reduce((sum, sc) => sum + (sc.authorizedShares || 0), 0);
+
+    const ownershipPercentages = shareClasses.map(sc => sc.ownershipPercentage || 0);
+    const avgOwnershipPercentage = ownershipPercentages.reduce((sum, p) => sum + p, 0) / totalShareClasses;
+    const minOwnershipPercentage = Math.min(...ownershipPercentages);
+    const maxOwnershipPercentage = Math.max(...ownershipPercentages);
+
+    // Calculate ownership distribution
+    const distributionBuckets = {
+      '0-10%': { count: 0, totalShares: 0 },
+      '11-25%': { count: 0, totalShares: 0 },
+      '26-50%': { count: 0, totalShares: 0 },
+      '51-75%': { count: 0, totalShares: 0 },
+      '76-100%': { count: 0, totalShares: 0 }
     };
-    
+
+    shareClasses.forEach(sc => {
+      const ownership = sc.ownershipPercentage || 0;
+      const shares = sc.dilutedShares || 0;
+      let bucket;
+
+      if (ownership <= 10) bucket = '0-10%';
+      else if (ownership <= 25) bucket = '11-25%';
+      else if (ownership <= 50) bucket = '26-50%';
+      else if (ownership <= 75) bucket = '51-75%';
+      else bucket = '76-100%';
+
+      distributionBuckets[bucket].count++;
+      distributionBuckets[bucket].totalShares += shares;
+    });
+
+    const ownershipDistribution = Object.entries(distributionBuckets)
+      .filter(([, data]) => data.count > 0)
+      .map(([range, data]) => ({
+        range,
+        count: data.count,
+        totalShares: data.totalShares
+      }));
+
+    const analytics = {
+      totalShareClasses,
+      totalAmountRaised,
+      totalDilutedShares,
+      totalAuthorizedShares,
+      averageOwnershipPercentage: Math.round(avgOwnershipPercentage * 100) / 100,
+      ownershipRange: {
+        min: minOwnershipPercentage,
+        max: maxOwnershipPercentage
+      },
+      ownershipDistribution
+    };
+
     res.status(200).json(analytics);
   } catch (error) {
     console.error('Error generating analytics:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error generating analytics',
-      message: error.message 
+      message: error.message
     });
   }
 };
