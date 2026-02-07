@@ -1,35 +1,42 @@
 /**
  * InvestorCommunicationTemplate Model Unit Tests
  * Issue #91: Build Investor Communication System
- * TDD Red Phase: Tests written before implementation
+ *
+ * Tests for ZeroDB-based InvestorCommunicationTemplate model
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
+const InvestorCommunicationTemplate = require('../../../models/InvestorCommunicationTemplate');
 
 describe('InvestorCommunicationTemplate Model', () => {
-  let InvestorCommunicationTemplate;
+  describe('Schema Definition', () => {
+    it('should have correct table name', () => {
+      expect(InvestorCommunicationTemplate.tableName).toBe('investor_communication_templates');
+    });
 
-  beforeAll(() => {
-    InvestorCommunicationTemplate = require('../../../models/InvestorCommunicationTemplate');
-  });
-
-  describe('Schema Validation', () => {
     it('should have required fields defined', () => {
       const schema = InvestorCommunicationTemplate.schema;
+      expect(schema.templateId).toBeDefined();
+      expect(schema.companyId).toBeDefined();
+      expect(schema.name).toBeDefined();
+      expect(schema.communicationType).toBeDefined();
+      expect(schema.subject).toBeDefined();
+      expect(schema.content).toBeDefined();
+    });
 
-      expect(schema.paths.templateId).toBeDefined();
-      expect(schema.paths.companyId).toBeDefined();
-      expect(schema.paths.name).toBeDefined();
-      expect(schema.paths.communicationType).toBeDefined();
-      expect(schema.paths.subject).toBeDefined();
-      expect(schema.paths.content).toBeDefined();
+    it('should mark required fields as required', () => {
+      const schema = InvestorCommunicationTemplate.schema;
+      expect(schema.templateId.required).toBe(true);
+      expect(schema.companyId.required).toBe(true);
+      expect(schema.name.required).toBe(true);
+      expect(schema.communicationType.required).toBe(true);
+      expect(schema.subject.required).toBe(true);
+      expect(schema.content.required).toBe(true);
+      expect(schema.createdBy.required).toBe(true);
     });
 
     it('should have correct enum values for communicationType', () => {
-      const schema = InvestorCommunicationTemplate.schema;
-      const enumValues = schema.paths.communicationType.enumValues;
-
+      const enumValues = InvestorCommunicationTemplate.schema.communicationType.enum;
       expect(enumValues).toContain('quarterly_update');
       expect(enumValues).toContain('annual_report');
       expect(enumValues).toContain('document_notification');
@@ -38,155 +45,58 @@ describe('InvestorCommunicationTemplate Model', () => {
       expect(enumValues).toContain('general');
     });
 
-    it('should have variables array for template placeholders', () => {
+    it('should have variables array field', () => {
       const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.variables).toBeDefined();
+      expect(schema.variables).toBeDefined();
+      expect(schema.variables.type).toBe('array');
     });
 
-    it('should have isActive field', () => {
+    it('should have isActive field with default true', () => {
       const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.isActive).toBeDefined();
+      expect(schema.isActive).toBeDefined();
+      expect(schema.isActive.default).toBe(true);
     });
 
-    it('should have isDefault field', () => {
+    it('should have isDefault field with default false', () => {
       const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.isDefault).toBeDefined();
+      expect(schema.isDefault).toBeDefined();
+      expect(schema.isDefault.default).toBe(false);
     });
 
-    it('should have htmlContent field for rich content', () => {
-      const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.htmlContent).toBeDefined();
+    it('should have htmlContent field', () => {
+      expect(InvestorCommunicationTemplate.schema.htmlContent).toBeDefined();
     });
 
     it('should have description field', () => {
-      const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.description).toBeDefined();
+      expect(InvestorCommunicationTemplate.schema.description).toBeDefined();
     });
 
     it('should have createdBy field', () => {
-      const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.createdBy).toBeDefined();
+      expect(InvestorCommunicationTemplate.schema.createdBy).toBeDefined();
     });
 
     it('should have updatedBy field', () => {
-      const schema = InvestorCommunicationTemplate.schema;
-
-      expect(schema.paths.updatedBy).toBeDefined();
+      expect(InvestorCommunicationTemplate.schema.updatedBy).toBeDefined();
     });
   });
 
-  describe('Document Creation', () => {
-    it('should create a valid template document', () => {
-      const templateData = {
-        templateId: 'TPL-001',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Quarterly Update Template',
-        communicationType: 'quarterly_update',
-        subject: 'Q{{quarter}} {{year}} Quarterly Update',
-        content: 'Dear {{investorName}}, here is our quarterly update...',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new InvestorCommunicationTemplate(templateData);
-
-      expect(template.templateId).toBe('TPL-001');
-      expect(template.name).toBe('Quarterly Update Template');
-      expect(template.communicationType).toBe('quarterly_update');
-    });
-
-    it('should have default isActive of true', () => {
-      const templateData = {
-        templateId: 'TPL-002',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Test Template',
-        communicationType: 'general',
-        subject: 'Test Subject',
-        content: 'Test content',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new InvestorCommunicationTemplate(templateData);
-
-      expect(template.isActive).toBe(true);
-    });
-
-    it('should have default isDefault of false', () => {
-      const templateData = {
-        templateId: 'TPL-003',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Test Template',
-        communicationType: 'general',
-        subject: 'Test Subject',
-        content: 'Test content',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new InvestorCommunicationTemplate(templateData);
-
-      expect(template.isDefault).toBe(false);
-    });
-
-    it('should allow HTML content', () => {
-      const templateData = {
-        templateId: 'TPL-004',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'HTML Template',
-        communicationType: 'quarterly_update',
-        subject: 'Q{{quarter}} Update',
-        content: 'Plain text version',
-        htmlContent: '<h1>Q{{quarter}} Update</h1><p>Hello {{investorName}}</p>',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new InvestorCommunicationTemplate(templateData);
-
-      expect(template.htmlContent).toContain('<h1>');
-    });
-
-    it('should allow variable definitions', () => {
-      const templateData = {
-        templateId: 'TPL-005',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Template with Variables',
-        communicationType: 'quarterly_update',
-        subject: 'Q{{quarter}} {{year}} Update',
-        content: 'Dear {{investorName}}...',
-        variables: [
-          { name: 'quarter', description: 'Quarter number (1-4)', required: true },
-          { name: 'year', description: 'Year', required: true },
-          { name: 'investorName', description: 'Investor full name', defaultValue: 'Valued Investor' }
-        ],
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new InvestorCommunicationTemplate(templateData);
-
-      expect(template.variables).toHaveLength(3);
-      expect(template.variables[0].name).toBe('quarter');
-      expect(template.variables[2].defaultValue).toBe('Valued Investor');
+  describe('Constants', () => {
+    it('should export COMMUNICATION_TYPES constant', () => {
+      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toBeDefined();
+      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toContain('quarterly_update');
+      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toContain('annual_report');
+      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toContain('general');
     });
   });
 
-  describe('Template Methods', () => {
-    it('should extract variables from content using extractVariables method', () => {
-      const templateData = {
-        templateId: 'TPL-006',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Variable Template',
-        communicationType: 'quarterly_update',
+  describe('extractVariables', () => {
+    it('should extract variables from template content', () => {
+      const template = {
         subject: 'Q{{quarter}} {{year}} Update',
         content: 'Dear {{investorName}}, your investment of {{amount}} is doing well.',
-        createdBy: new mongoose.Types.ObjectId()
       };
 
-      const template = new InvestorCommunicationTemplate(templateData);
-      const variables = template.extractVariables();
+      const variables = InvestorCommunicationTemplate.extractVariables(template);
 
       expect(variables).toContain('quarter');
       expect(variables).toContain('year');
@@ -194,20 +104,38 @@ describe('InvestorCommunicationTemplate Model', () => {
       expect(variables).toContain('amount');
     });
 
-    it('should process template with variables using process method', () => {
-      const templateData = {
-        templateId: 'TPL-007',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Processable Template',
-        communicationType: 'quarterly_update',
+    it('should extract variables from subject and content', () => {
+      const template = {
+        subject: 'Hello {{name}}',
+        content: 'Welcome {{user}}',
+      };
+
+      const variables = InvestorCommunicationTemplate.extractVariables(template);
+      expect(variables).toContain('name');
+      expect(variables).toContain('user');
+    });
+
+    it('should extract variables from htmlContent', () => {
+      const template = {
+        subject: 'Update',
+        content: 'Plain text',
+        htmlContent: '<h1>Hello {{htmlVar}}</h1>',
+      };
+
+      const variables = InvestorCommunicationTemplate.extractVariables(template);
+      expect(variables).toContain('htmlVar');
+    });
+  });
+
+  describe('processTemplate', () => {
+    it('should process template with variable substitution', () => {
+      const template = {
         subject: 'Q{{quarter}} {{year}} Update',
         content: 'Dear {{investorName}}, thank you for your investment.',
         variables: [],
-        createdBy: new mongoose.Types.ObjectId()
       };
 
-      const template = new InvestorCommunicationTemplate(templateData);
-      const result = template.process({
+      const result = InvestorCommunicationTemplate.processTemplate(template, {
         quarter: '4',
         year: '2025',
         investorName: 'John Doe'
@@ -217,20 +145,14 @@ describe('InvestorCommunicationTemplate Model', () => {
       expect(result.content).toContain('Dear John Doe');
     });
 
-    it('should handle nested object variables in process method', () => {
-      const templateData = {
-        templateId: 'TPL-008',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Nested Variable Template',
-        communicationType: 'quarterly_update',
+    it('should handle nested object variables', () => {
+      const template = {
         subject: 'Update for {{company.name}}',
         content: 'Investment: {{investment.amount}}',
         variables: [],
-        createdBy: new mongoose.Types.ObjectId()
       };
 
-      const template = new InvestorCommunicationTemplate(templateData);
-      const result = template.process({
+      const result = InvestorCommunicationTemplate.processTemplate(template, {
         company: { name: 'ACME Corp' },
         investment: { amount: '$100,000' }
       });
@@ -240,30 +162,55 @@ describe('InvestorCommunicationTemplate Model', () => {
     });
 
     it('should use default values when variables are missing', () => {
-      const templateData = {
-        templateId: 'TPL-009',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Default Value Template',
-        communicationType: 'quarterly_update',
+      const template = {
         subject: 'Update',
         content: 'Dear {{investorName}}, welcome.',
         variables: [
           { name: 'investorName', defaultValue: 'Valued Investor', required: false }
         ],
-        createdBy: new mongoose.Types.ObjectId()
       };
 
-      const template = new InvestorCommunicationTemplate(templateData);
-      const result = template.process({});
+      const result = InvestorCommunicationTemplate.processTemplate(template, {});
 
       expect(result.content).toContain('Valued Investor');
     });
   });
 
-  describe('Model Exports', () => {
-    it('should export COMMUNICATION_TYPES constant', () => {
-      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toBeDefined();
-      expect(InvestorCommunicationTemplate.COMMUNICATION_TYPES).toContain('quarterly_update');
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof InvestorCommunicationTemplate.create).toBe('function');
+    });
+
+    it('should have find method', () => {
+      expect(typeof InvestorCommunicationTemplate.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof InvestorCommunicationTemplate.findOne).toBe('function');
+    });
+
+    it('should have findByTemplateId method', () => {
+      expect(typeof InvestorCommunicationTemplate.findByTemplateId).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof InvestorCommunicationTemplate.findByCompany).toBe('function');
+    });
+
+    it('should have findDefault method', () => {
+      expect(typeof InvestorCommunicationTemplate.findDefault).toBe('function');
+    });
+
+    it('should have activate method', () => {
+      expect(typeof InvestorCommunicationTemplate.activate).toBe('function');
+    });
+
+    it('should have deactivate method', () => {
+      expect(typeof InvestorCommunicationTemplate.deactivate).toBe('function');
+    });
+
+    it('should have setDefault method', () => {
+      expect(typeof InvestorCommunicationTemplate.setDefault).toBe('function');
     });
   });
 });

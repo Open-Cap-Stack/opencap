@@ -19,7 +19,7 @@ const logAuthError = (req, errorType, details = {}) => {
     method: req.method,
     path: req.path,
     url: req.url,
-    ip: req.ip || req.connection.remoteAddress,
+    ip: req.ip || (req.connection && req.connection.remoteAddress),
     userAgent: req.get('user-agent'),
     hasAuthHeader: !!req.headers.authorization,
     authHeaderPrefix: req.headers.authorization

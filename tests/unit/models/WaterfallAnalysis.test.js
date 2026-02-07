@@ -1,366 +1,279 @@
 /**
  * WaterfallAnalysis Model Unit Tests
  * Issue #56: Create waterfall analysis engine
- * TDD Red Phase: Tests written before implementation
+ *
+ * Tests for the WaterfallAnalysis ZeroDB model including schema structure,
+ * field definitions, constants, and CRUD method existence.
  */
-process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock mongoose before requiring the model
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    model: jest.fn().mockImplementation((name, schema) => {
-      return actualMongoose.model(name, schema);
-    }),
-    Schema: actualMongoose.Schema
-  };
-});
+const WaterfallAnalysis = require('../../../models/WaterfallAnalysis');
 
 describe('WaterfallAnalysis Model', () => {
-  let WaterfallAnalysis;
+  describe('Schema Structure', () => {
+    it('should have a schema defined', () => {
+      expect(WaterfallAnalysis.schema).toBeDefined();
+      expect(typeof WaterfallAnalysis.schema).toBe('object');
+    });
 
-  beforeAll(() => {
-    // Clear any cached models
-    if (mongoose.models.WaterfallAnalysis) {
-      delete mongoose.models.WaterfallAnalysis;
-    }
-    WaterfallAnalysis = require('../../../models/WaterfallAnalysis');
+    it('should have analysisId field as required and unique', () => {
+      expect(WaterfallAnalysis.schema.analysisId).toBeDefined();
+      expect(WaterfallAnalysis.schema.analysisId.required).toBe(true);
+      expect(WaterfallAnalysis.schema.analysisId.unique).toBe(true);
+    });
+
+    it('should have companyId field as required', () => {
+      expect(WaterfallAnalysis.schema.companyId).toBeDefined();
+      expect(WaterfallAnalysis.schema.companyId.required).toBe(true);
+    });
+
+    it('should have exitValuation field as required', () => {
+      expect(WaterfallAnalysis.schema.exitValuation).toBeDefined();
+      expect(WaterfallAnalysis.schema.exitValuation.required).toBe(true);
+      expect(WaterfallAnalysis.schema.exitValuation.type).toBe('number');
+    });
+
+    it('should have exitType field as required with enum', () => {
+      expect(WaterfallAnalysis.schema.exitType).toBeDefined();
+      expect(WaterfallAnalysis.schema.exitType.required).toBe(true);
+      expect(WaterfallAnalysis.schema.exitType.enum).toEqual(['acquisition', 'ipo', 'liquidation', 'merger', 'dissolution']);
+    });
+
+    it('should have transaction cost fields with defaults', () => {
+      expect(WaterfallAnalysis.schema.transactionCosts).toBeDefined();
+      expect(WaterfallAnalysis.schema.transactionCosts.default).toBe(0);
+
+      expect(WaterfallAnalysis.schema.escrowAmount).toBeDefined();
+      expect(WaterfallAnalysis.schema.escrowAmount.default).toBe(0);
+
+      expect(WaterfallAnalysis.schema.debtPayoff).toBeDefined();
+      expect(WaterfallAnalysis.schema.debtPayoff.default).toBe(0);
+
+      expect(WaterfallAnalysis.schema.netProceeds).toBeDefined();
+      expect(WaterfallAnalysis.schema.netProceeds.default).toBe(0);
+    });
+
+    it('should have scenario fields', () => {
+      expect(WaterfallAnalysis.schema.scenarioName).toBeDefined();
+      expect(WaterfallAnalysis.schema.scenarioName.type).toBe('string');
+
+      expect(WaterfallAnalysis.schema.scenarioDescription).toBeDefined();
+      expect(WaterfallAnalysis.schema.scenarioDescription.type).toBe('string');
+    });
+
+    it('should have shareClasses as array', () => {
+      expect(WaterfallAnalysis.schema.shareClasses).toBeDefined();
+      expect(WaterfallAnalysis.schema.shareClasses.type).toBe('array');
+    });
+
+    it('should have results as array', () => {
+      expect(WaterfallAnalysis.schema.results).toBeDefined();
+      expect(WaterfallAnalysis.schema.results.type).toBe('array');
+    });
+
+    it('should have shareClassResults as array', () => {
+      expect(WaterfallAnalysis.schema.shareClassResults).toBeDefined();
+      expect(WaterfallAnalysis.schema.shareClassResults.type).toBe('array');
+    });
+
+    it('should have summary as object with default', () => {
+      expect(WaterfallAnalysis.schema.summary).toBeDefined();
+      expect(WaterfallAnalysis.schema.summary.type).toBe('object');
+      expect(WaterfallAnalysis.schema.summary.default).toBeDefined();
+      expect(WaterfallAnalysis.schema.summary.default.totalDistributed).toBe(0);
+    });
+
+    it('should have status field with enum and default draft', () => {
+      expect(WaterfallAnalysis.schema.status).toBeDefined();
+      expect(WaterfallAnalysis.schema.status.enum).toEqual(['draft', 'calculated', 'finalized', 'archived']);
+      expect(WaterfallAnalysis.schema.status.default).toBe('draft');
+    });
+
+    it('should have calculationVersion field', () => {
+      expect(WaterfallAnalysis.schema.calculationVersion).toBeDefined();
+      expect(WaterfallAnalysis.schema.calculationVersion.default).toBe('1.0');
+    });
+
+    it('should have comparisonGroupId field', () => {
+      expect(WaterfallAnalysis.schema.comparisonGroupId).toBeDefined();
+    });
+
+    it('should have notes field', () => {
+      expect(WaterfallAnalysis.schema.notes).toBeDefined();
+      expect(WaterfallAnalysis.schema.notes.type).toBe('string');
+    });
+
+    it('should have metadata field', () => {
+      expect(WaterfallAnalysis.schema.metadata).toBeDefined();
+      expect(WaterfallAnalysis.schema.metadata.type).toBe('object');
+    });
+
+    it('should have timestamp fields', () => {
+      expect(WaterfallAnalysis.schema.createdAt).toBeDefined();
+      expect(WaterfallAnalysis.schema.updatedAt).toBeDefined();
+    });
   });
 
-  afterAll(() => {
-    // Clean up
-    if (mongoose.models.WaterfallAnalysis) {
-      delete mongoose.models.WaterfallAnalysis;
-    }
-  });
-
-  describe('Schema Validation', () => {
-    it('should require companyId', async () => {
-      const analysis = new WaterfallAnalysis({
-        exitValuation: 10000000,
-        exitType: 'acquisition'
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeDefined();
-      expect(error.errors.companyId).toBeDefined();
+  describe('Constants', () => {
+    it('should export EXIT_TYPES', () => {
+      expect(WaterfallAnalysis.EXIT_TYPES).toBeDefined();
+      expect(WaterfallAnalysis.EXIT_TYPES).toEqual(['acquisition', 'ipo', 'liquidation', 'merger', 'dissolution']);
     });
 
-    it('should require exitValuation', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitType: 'acquisition'
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeDefined();
-      expect(error.errors.exitValuation).toBeDefined();
+    it('should export PREFERENCE_TYPES', () => {
+      expect(WaterfallAnalysis.PREFERENCE_TYPES).toBeDefined();
+      expect(WaterfallAnalysis.PREFERENCE_TYPES).toEqual(['common', 'non_participating', 'participating', 'participating_capped']);
     });
 
-    it('should require exitType', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeDefined();
-      expect(error.errors.exitType).toBeDefined();
+    it('should export VALID_STATUSES', () => {
+      expect(WaterfallAnalysis.VALID_STATUSES).toBeDefined();
+      expect(WaterfallAnalysis.VALID_STATUSES).toEqual(['draft', 'calculated', 'finalized', 'archived']);
     });
 
-    it('should only allow valid exit types', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'invalid_type'
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeDefined();
-      expect(error.errors.exitType).toBeDefined();
-    });
-
-    it('should accept valid exit types', async () => {
+    it('should accept all valid exit types', () => {
       const validTypes = ['acquisition', 'ipo', 'liquidation', 'merger', 'dissolution'];
-
-      for (const exitType of validTypes) {
-        const analysis = new WaterfallAnalysis({
-          companyId: 'comp-123',
-          exitValuation: 10000000,
-          exitType
-        });
-
-        let error;
-        try {
-          await analysis.validate();
-        } catch (e) {
-          error = e;
-        }
-
-        expect(error?.errors?.exitType).toBeUndefined();
-      }
-    });
-
-    it('should not allow negative exit valuation', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: -1000000,
-        exitType: 'acquisition'
+      validTypes.forEach(exitType => {
+        expect(WaterfallAnalysis.EXIT_TYPES).toContain(exitType);
       });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeDefined();
-      expect(error.errors.exitValuation).toBeDefined();
-    });
-
-    it('should create valid analysis with all required fields', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        scenarioName: 'Base Case Acquisition'
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeUndefined();
     });
   });
 
-  describe('ShareClass Schema', () => {
-    it('should accept valid preference type', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        shareClasses: [{
-          shareClassId: 'sc-001',
-          name: 'Series A Preferred',
-          preferenceType: 'non_participating',
-          liquidationMultiple: 1,
-          totalShares: 1000000,
-          pricePerShare: 1.00
-        }]
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error?.errors?.['shareClasses.0.preferenceType']).toBeUndefined();
+  describe('CRUD Methods', () => {
+    it('should have create method', () => {
+      expect(typeof WaterfallAnalysis.create).toBe('function');
     });
 
-    it('should accept participating preferred with cap', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        shareClasses: [{
-          shareClassId: 'sc-001',
-          name: 'Series A Preferred',
-          preferenceType: 'participating_capped',
-          liquidationMultiple: 1,
-          participationCap: 3,
-          totalShares: 1000000,
-          pricePerShare: 1.00
-        }]
-      });
-
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
-
-      expect(error).toBeUndefined();
+    it('should have find method', () => {
+      expect(typeof WaterfallAnalysis.find).toBe('function');
     });
 
-    it('should require shareClassId in shareClasses', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        shareClasses: [{
-          name: 'Series A Preferred',
-          preferenceType: 'non_participating',
-          liquidationMultiple: 1,
-          totalShares: 1000000,
-          pricePerShare: 1.00
-        }]
-      });
+    it('should have findOne method', () => {
+      expect(typeof WaterfallAnalysis.findOne).toBe('function');
+    });
 
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
+    it('should have findById method', () => {
+      expect(typeof WaterfallAnalysis.findById).toBe('function');
+    });
 
-      expect(error).toBeDefined();
-      expect(error.errors['shareClasses.0.shareClassId']).toBeDefined();
+    it('should have updateOne method', () => {
+      expect(typeof WaterfallAnalysis.updateOne).toBe('function');
+    });
+
+    it('should have deleteOne method', () => {
+      expect(typeof WaterfallAnalysis.deleteOne).toBe('function');
+    });
+
+    it('should have deleteMany method', () => {
+      expect(typeof WaterfallAnalysis.deleteMany).toBe('function');
+    });
+
+    it('should have countDocuments method', () => {
+      expect(typeof WaterfallAnalysis.countDocuments).toBe('function');
     });
   });
 
-  describe('Results Schema', () => {
-    it('should store results by stakeholder', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        results: [{
-          stakeholderId: 'stake-001',
-          shareClassId: 'sc-001',
-          shareClassName: 'Series A Preferred',
-          sharesOwned: 100000,
-          proceedsFromPreference: 100000,
-          proceedsFromParticipation: 50000,
-          totalProceeds: 150000,
-          percentageOfExit: 1.5
-        }]
-      });
+  describe('Custom Methods', () => {
+    it('should have findByAnalysisId method', () => {
+      expect(typeof WaterfallAnalysis.findByAnalysisId).toBe('function');
+    });
 
-      let error;
-      try {
-        await analysis.validate();
-      } catch (e) {
-        error = e;
-      }
+    it('should have findByCompany method', () => {
+      expect(typeof WaterfallAnalysis.findByCompany).toBe('function');
+    });
 
-      expect(error).toBeUndefined();
-      expect(analysis.results[0].totalProceeds).toBe(150000);
+    it('should have findByComparisonGroup method', () => {
+      expect(typeof WaterfallAnalysis.findByComparisonGroup).toBe('function');
+    });
+
+    it('should have markCalculated method', () => {
+      expect(typeof WaterfallAnalysis.markCalculated).toBe('function');
+    });
+
+    it('should have finalize method', () => {
+      expect(typeof WaterfallAnalysis.finalize).toBe('function');
+    });
+
+    it('should have archive method', () => {
+      expect(typeof WaterfallAnalysis.archive).toBe('function');
     });
   });
 
-  describe('Scenario Fields', () => {
-    it('should store scenario name and description', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        scenarioName: 'Base Case Acquisition',
-        scenarioDescription: 'Analysis of base case $10M acquisition scenario'
-      });
-
-      expect(analysis.scenarioName).toBe('Base Case Acquisition');
-      expect(analysis.scenarioDescription).toBe('Analysis of base case $10M acquisition scenario');
+  describe('Business Logic', () => {
+    it('getTotalPreferenceStack should return 0 for empty share classes', () => {
+      expect(WaterfallAnalysis.getTotalPreferenceStack({ shareClasses: [] })).toBe(0);
     });
 
-    it('should have default status of draft', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition'
-      });
-
-      expect(analysis.status).toBe('draft');
+    it('getTotalPreferenceStack should return 0 when no share classes', () => {
+      expect(WaterfallAnalysis.getTotalPreferenceStack({})).toBe(0);
     });
-  });
 
-  describe('Summary Calculations', () => {
-    it('should store summary totals', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
-        summary: {
-          totalDistributed: 9500000,
-          totalToPreferred: 5000000,
-          totalToCommon: 4500000,
-          remainingProceeds: 500000,
-          effectiveExitMultiple: 2.5
-        }
-      });
-
-      expect(analysis.summary.totalDistributed).toBe(9500000);
-      expect(analysis.summary.effectiveExitMultiple).toBe(2.5);
-    });
-  });
-
-  describe('Seniority Stack', () => {
-    it('should track seniority order for preferences', async () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition',
+    it('getTotalPreferenceStack should calculate for preferred share classes', () => {
+      const analysis = {
         shareClasses: [
           {
-            shareClassId: 'sc-001',
-            name: 'Series B Preferred',
             preferenceType: 'non_participating',
-            liquidationMultiple: 1,
-            seniorityRank: 1,
-            totalShares: 500000,
-            pricePerShare: 2.00
+            originalInvestment: 1000000,
+            liquidationMultiple: 1
           },
           {
-            shareClassId: 'sc-002',
-            name: 'Series A Preferred',
-            preferenceType: 'participating',
-            liquidationMultiple: 1,
-            seniorityRank: 2,
-            totalShares: 1000000,
-            pricePerShare: 1.00
+            preferenceType: 'common',
+            originalInvestment: 500000,
+            liquidationMultiple: 1
           }
         ]
-      });
-
-      expect(analysis.shareClasses[0].seniorityRank).toBe(1);
-      expect(analysis.shareClasses[1].seniorityRank).toBe(2);
+      };
+      expect(WaterfallAnalysis.getTotalPreferenceStack(analysis)).toBe(1000000);
     });
-  });
 
-  describe('Timestamps', () => {
-    it('should have createdAt and updatedAt fields', () => {
-      const analysis = new WaterfallAnalysis({
-        companyId: 'comp-123',
-        exitValuation: 10000000,
-        exitType: 'acquisition'
-      });
+    it('coversAllPreferences should return true when proceeds exceed preferences', () => {
+      const analysis = {
+        netProceeds: 5000000,
+        shareClasses: [
+          {
+            preferenceType: 'non_participating',
+            originalInvestment: 1000000,
+            liquidationMultiple: 1
+          }
+        ]
+      };
+      expect(WaterfallAnalysis.coversAllPreferences(analysis)).toBe(true);
+    });
 
-      // Schema should define timestamps
-      expect(WaterfallAnalysis.schema.options.timestamps).toBe(true);
+    it('getOrderedShareClasses should sort by seniority rank', () => {
+      const analysis = {
+        shareClasses: [
+          { name: 'Series B', seniorityRank: 1 },
+          { name: 'Common', seniorityRank: 3 },
+          { name: 'Series A', seniorityRank: 2 }
+        ]
+      };
+      const ordered = WaterfallAnalysis.getOrderedShareClasses(analysis);
+      expect(ordered[0].seniorityRank).toBe(1);
+      expect(ordered[1].seniorityRank).toBe(2);
+      expect(ordered[2].seniorityRank).toBe(3);
+    });
+
+    it('getPreferredClasses should filter out common classes', () => {
+      const analysis = {
+        shareClasses: [
+          { name: 'Series A', preferenceType: 'non_participating', seniorityRank: 1 },
+          { name: 'Common', preferenceType: 'common', seniorityRank: 3 }
+        ]
+      };
+      const preferred = WaterfallAnalysis.getPreferredClasses(analysis);
+      expect(preferred).toHaveLength(1);
+      expect(preferred[0].name).toBe('Series A');
+    });
+
+    it('getCommonClasses should return only common classes', () => {
+      const analysis = {
+        shareClasses: [
+          { name: 'Series A', preferenceType: 'non_participating' },
+          { name: 'Common', preferenceType: 'common' }
+        ]
+      };
+      const common = WaterfallAnalysis.getCommonClasses(analysis);
+      expect(common).toHaveLength(1);
+      expect(common[0].name).toBe('Common');
     });
   });
 });

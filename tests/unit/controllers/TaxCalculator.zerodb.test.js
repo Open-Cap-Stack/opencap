@@ -3,10 +3,8 @@
  * Issue #20 - Batch 3 Controllers
  */
 
-const databaseAdapter = require('../../../services/databaseAdapter');
-
-// Mock the databaseAdapter
-jest.mock('../../../services/databaseAdapter', () => ({
+// Mock the TaxCalculator model (controller uses this directly, not databaseAdapter)
+jest.mock('../../../models/TaxCalculator', () => ({
   create: jest.fn(),
   find: jest.fn(),
   findById: jest.fn(),
@@ -14,16 +12,7 @@ jest.mock('../../../services/databaseAdapter', () => ({
   findByIdAndDelete: jest.fn(),
 }));
 
-// Mock mongoose for ObjectId validation
-jest.mock('mongoose', () => ({
-  Types: {
-    ObjectId: {
-      isValid: jest.fn().mockReturnValue(true),
-    },
-  },
-}));
-
-// Import controller after mocking
+// Import controller and mocked model
 const {
   calculateTax,
   getTaxCalculations,
@@ -32,7 +21,7 @@ const {
   updateTaxCalculation,
 } = require('../../../controllers/TaxCalculator');
 
-const mongoose = require('mongoose');
+const TaxCalculator = require('../../../models/TaxCalculator');
 
 describe('TaxCalculator Controller - ZeroDB Migration', () => {
   let req;
@@ -40,7 +29,6 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mongoose.Types.ObjectId.isValid.mockReturnValue(true);
     req = {
       body: {},
       params: {},
@@ -70,11 +58,11 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
         CalculatedTax: 25000,
       };
 
-      databaseAdapter.create.mockResolvedValue(mockSavedCalculation);
+      TaxCalculator.create.mockResolvedValue(mockSavedCalculation);
 
       await calculateTax(req, res);
 
-      expect(databaseAdapter.create).toHaveBeenCalledWith('TaxCalculator', {
+      expect(TaxCalculator.create).toHaveBeenCalledWith({
         ...taxData,
         CalculatedTax: 25000,
       });
@@ -101,7 +89,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
         TaxImplication: 'Capital Gains',
         TaxDueDate: '2024-04-15',
       };
-      databaseAdapter.create.mockRejectedValue(new Error('Database error'));
+      TaxCalculator.create.mockRejectedValue(new Error('Database error'));
 
       await calculateTax(req, res);
 
@@ -117,26 +105,27 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
         { _id: '2', calculationId: 'TAX002', SaleAmount: 200000 },
       ];
 
-      databaseAdapter.find.mockResolvedValue(mockCalculations);
+      TaxCalculator.find.mockResolvedValue(mockCalculations);
 
       await getTaxCalculations(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('TaxCalculator', {});
+      expect(TaxCalculator.find).toHaveBeenCalledWith({});
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ taxCalculations: mockCalculations });
     });
 
-    it('should return 404 when no calculations found', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
+    it('should return 200 with empty array when no calculations found', async () => {
+      TaxCalculator.find.mockResolvedValue([]);
 
       await getTaxCalculations(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ message: 'No tax calculations found' });
+      // Controller returns 200 with empty array for consistent REST API behavior
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ taxCalculations: [] });
     });
 
     it('should return 500 on database error', async () => {
-      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
+      TaxCalculator.find.mockRejectedValue(new Error('Database error'));
 
       await getTaxCalculations(req, res);
 
@@ -154,28 +143,18 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
       };
       req.params.id = 'calc123';
 
-      databaseAdapter.findById.mockResolvedValue(mockCalculation);
+      TaxCalculator.findById.mockResolvedValue(mockCalculation);
 
       await getTaxCalculationById(req, res);
 
-      expect(databaseAdapter.findById).toHaveBeenCalledWith('TaxCalculator', 'calc123');
+      expect(TaxCalculator.findById).toHaveBeenCalledWith('calc123');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ taxCalculation: mockCalculation });
     });
 
-    it('should return 400 for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
-
-      await getTaxCalculationById(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Invalid tax calculation ID format' });
-    });
-
     it('should return 404 when calculation not found', async () => {
       req.params.id = 'nonexistent';
-      databaseAdapter.findById.mockResolvedValue(null);
+      TaxCalculator.findById.mockResolvedValue(null);
 
       await getTaxCalculationById(req, res);
 
@@ -185,7 +164,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
 
     it('should return 500 on database error', async () => {
       req.params.id = 'calc123';
-      databaseAdapter.findById.mockRejectedValue(new Error('Database error'));
+      TaxCalculator.findById.mockRejectedValue(new Error('Database error'));
 
       await getTaxCalculationById(req, res);
 
@@ -199,28 +178,18 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
       req.params.id = 'calc123';
       const mockDeletedCalculation = { _id: 'calc123', calculationId: 'TAX001' };
 
-      databaseAdapter.findByIdAndDelete.mockResolvedValue(mockDeletedCalculation);
+      TaxCalculator.findByIdAndDelete.mockResolvedValue(mockDeletedCalculation);
 
       await deleteTaxCalculation(req, res);
 
-      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('TaxCalculator', 'calc123');
+      expect(TaxCalculator.findByIdAndDelete).toHaveBeenCalledWith('calc123');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ message: 'Tax calculation deleted' });
     });
 
-    it('should return 400 for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
-
-      await deleteTaxCalculation(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Invalid tax calculation ID format' });
-    });
-
     it('should return 404 when calculation not found', async () => {
       req.params.id = 'nonexistent';
-      databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
+      TaxCalculator.findByIdAndDelete.mockResolvedValue(null);
 
       await deleteTaxCalculation(req, res);
 
@@ -230,7 +199,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
 
     it('should return 500 on database error', async () => {
       req.params.id = 'calc123';
-      databaseAdapter.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
+      TaxCalculator.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
 
       await deleteTaxCalculation(req, res);
 
@@ -259,8 +228,8 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
         CalculatedTax: 37500,
       };
 
-      databaseAdapter.findById.mockResolvedValue(existingCalculation);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(updatedCalculation);
+      TaxCalculator.findById.mockResolvedValue(existingCalculation);
+      TaxCalculator.findByIdAndUpdate.mockResolvedValue(updatedCalculation);
 
       await updateTaxCalculation(req, res);
 
@@ -268,21 +237,10 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
       expect(res.json).toHaveBeenCalledWith({ taxCalculation: updatedCalculation });
     });
 
-    it('should return 400 for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      req.body = { SaleAmount: 150000 };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
-
-      await updateTaxCalculation(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Invalid tax calculation ID format' });
-    });
-
     it('should return 404 when calculation not found during update', async () => {
       req.params.id = 'nonexistent';
       req.body = { SaleAmount: 150000 };
-      databaseAdapter.findById.mockResolvedValue(null);
+      TaxCalculator.findById.mockResolvedValue(null);
 
       await updateTaxCalculation(req, res);
 
@@ -300,7 +258,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
         TaxRate: 0.25,
       };
 
-      databaseAdapter.findById.mockResolvedValue(existingCalculation);
+      TaxCalculator.findById.mockResolvedValue(existingCalculation);
 
       await updateTaxCalculation(req, res);
 
@@ -311,7 +269,9 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
     it('should return 500 on database error', async () => {
       req.params.id = 'calc123';
       req.body = { SaleScenario: 'M&A' };
-      databaseAdapter.findByIdAndUpdate.mockRejectedValue(new Error('Database error'));
+
+      // When not updating SaleAmount or TaxRate, controller goes directly to findByIdAndUpdate
+      TaxCalculator.findByIdAndUpdate.mockRejectedValue(new Error('Database error'));
 
       await updateTaxCalculation(req, res);
 

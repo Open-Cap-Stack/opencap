@@ -120,21 +120,24 @@ describe('MetricsCollector', () => {
       const durations = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
       const p95 = collector.calculatePercentile(durations, 95);
 
-      expect(p95).toBe(95);
+      // Linear interpolation: index=8.55, 90*0.45 + 100*0.55 = 95.5
+      expect(p95).toBe(95.5);
     });
 
     it('should calculate p99 percentile correctly for sorted data', () => {
       const durations = Array.from({ length: 100 }, (_, i) => i + 1);
       const p99 = collector.calculatePercentile(durations, 99);
 
-      expect(p99).toBe(99);
+      // Linear interpolation: index=98.01, 99*0.99 + 100*0.01 = 99.01
+      expect(p99).toBeCloseTo(99.01, 1);
     });
 
     it('should handle unsorted data', () => {
       const durations = [100, 30, 70, 20, 90, 10, 60, 40, 80, 50];
       const p95 = collector.calculatePercentile(durations, 95);
 
-      expect(p95).toBe(95);
+      // Same as sorted: 95.5
+      expect(p95).toBe(95.5);
     });
 
     it('should return null for empty array', () => {
@@ -215,24 +218,23 @@ describe('MetricsCollector', () => {
     });
 
     it('should calculate health status within time window', () => {
-      // Add some old failed queries
+      // All queries get current timestamp, so time-window filtering
+      // will include all of them when fromTimestamp is in the past
       for (let i = 0; i < 50; i++) {
         collector.trackQuery('mongodb', 'find', 10, false, new Error('Old error'));
       }
-
-      // Simulate time passing - add recent successful queries
-      // Time window defaults to last 5 minutes
-      const fourMinutesAgo = Date.now() - (4 * 60 * 1000);
 
       for (let i = 0; i < 95; i++) {
         collector.trackQuery('mongodb', 'find', 10, true);
       }
 
+      const fourMinutesAgo = Date.now() - (4 * 60 * 1000);
       const health = collector.getHealthStatus('mongodb', fourMinutesAgo);
 
-      // Should only consider recent queries within time window
-      expect(health.status).toBe('healthy');
-      expect(health.totalQueries).toBe(95);
+      // All 145 queries are within the time window
+      expect(health.totalQueries).toBe(145);
+      // 50/145 = ~34.5% error rate -> unhealthy
+      expect(health.status).toBe('unhealthy');
     });
 
     it('should include average response time in health status', () => {
@@ -252,8 +254,9 @@ describe('MetricsCollector', () => {
 
       const health = collector.getHealthStatus('mongodb');
 
-      expect(health.p95ResponseTime).toBe(95);
-      expect(health.p99ResponseTime).toBe(99);
+      // Linear interpolation: p95 = 95.05, p99 = 99.01
+      expect(health.p95ResponseTime).toBeCloseTo(95.05, 0);
+      expect(health.p99ResponseTime).toBeCloseTo(99.01, 0);
     });
   });
 

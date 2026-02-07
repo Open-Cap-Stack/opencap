@@ -355,7 +355,25 @@ const SAFE = {
      */
     async getPendingConversion(companyId) {
         return this.find({ companyId, status: 'funded' }, { sort: { fundedAt: 1 } });
-    }
+    },
+
+    // Expose base model methods
+    schema: schema,
+    find: baseModel.find.bind(baseModel),
+    findOne: baseModel.findOne.bind(baseModel),
+    findById: baseModel.findById.bind(baseModel),
+    updateOne: baseModel.updateOne.bind(baseModel),
+    updateMany: baseModel.updateMany.bind(baseModel),
+    findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+    findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+    deleteOne: baseModel.deleteOne.bind(baseModel),
+    deleteMany: baseModel.deleteMany.bind(baseModel),
+    findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+    findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+    countDocuments: baseModel.countDocuments.bind(baseModel),
+    exists: baseModel.exists.bind(baseModel),
+    distinct: baseModel.distinct.bind(baseModel),
+    aggregate: baseModel.aggregate.bind(baseModel)
 };
 
 module.exports = SAFE;

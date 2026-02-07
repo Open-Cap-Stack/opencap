@@ -4,13 +4,8 @@
  * Issue #187: Add Profile Photo Upload Endpoint
  */
 
-const userController = require('../../../controllers/userController');
-const databaseAdapter = require('../../../services/databaseAdapter');
-const fileStorageService = require('../../../services/fileStorageService');
-const sharp = require('sharp');
-
-// Mock dependencies
-jest.mock('../../../services/databaseAdapter', () => ({
+// Mock dependencies before requiring controller
+jest.mock('../../../models/User', () => ({
   findOne: jest.fn(),
   findById: jest.fn(),
   findOneAndUpdate: jest.fn(),
@@ -18,6 +13,11 @@ jest.mock('../../../services/databaseAdapter', () => ({
 }));
 jest.mock('../../../services/fileStorageService');
 jest.mock('sharp');
+
+const userController = require('../../../controllers/userController');
+const User = require('../../../models/User');
+const fileStorageService = require('../../../services/fileStorageService');
+const sharp = require('sharp');
 
 describe('User Controller - Profile Photo Upload', () => {
   let req, res;
@@ -87,8 +87,8 @@ describe('User Controller - Profile Photo Upload', () => {
         mimetype: 'image/jpeg'
       };
 
-      databaseAdapter.findOne.mockResolvedValue(null);
-      databaseAdapter.findById.mockResolvedValue(null);
+      User.findOne.mockResolvedValue(null);
+      User.findById.mockResolvedValue(null);
 
       await userController.uploadProfilePhoto(req, res);
 
@@ -112,7 +112,7 @@ describe('User Controller - Profile Photo Upload', () => {
         profile: {}
       };
 
-      databaseAdapter.findOne.mockResolvedValue(mockUser);
+      User.findOne.mockResolvedValue(mockUser);
 
       fileStorageService.uploadFile
         .mockResolvedValueOnce({
@@ -142,7 +142,7 @@ describe('User Controller - Profile Photo Upload', () => {
           expiresIn: 31536000
         });
 
-      databaseAdapter.findOneAndUpdate.mockResolvedValue({
+      User.findOneAndUpdate.mockResolvedValue({
         userId: 'user_12345',
         profile: {
           avatar: 'https://storage.example.com/photos/original.jpg',
@@ -195,18 +195,16 @@ describe('User Controller - Profile Photo Upload', () => {
       expect(fileStorageService.getPresignedUrl).toHaveBeenCalledTimes(2);
 
       // Verify user profile was updated
-      expect(databaseAdapter.findOneAndUpdate).toHaveBeenCalledWith(
-        'User',
+      expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_12345' },
-        {
-          $set: expect.objectContaining({
+        { $set: expect.objectContaining({
             'profile.avatar': 'https://storage.example.com/photos/original.jpg',
             'profile.avatarThumbnail': 'https://storage.example.com/photos/thumb.jpg',
             'profile.avatarFileId': 'file_original_123',
             'profile.avatarThumbnailFileId': 'file_thumb_123'
           })
         },
-        { new: true, select: '-password' }
+        { new: true }
       );
 
       // Verify successful response
@@ -226,7 +224,7 @@ describe('User Controller - Profile Photo Upload', () => {
         mimetype: 'image/jpeg'
       };
 
-      databaseAdapter.findOne.mockResolvedValue({
+      User.findOne.mockResolvedValue({
         userId: 'user_12345',
         companyId: 'company_123'
       });
@@ -251,7 +249,7 @@ describe('User Controller - Profile Photo Upload', () => {
         mimetype: 'image/jpeg'
       };
 
-      databaseAdapter.findOne.mockResolvedValue({
+      User.findOne.mockResolvedValue({
         userId: 'user_12345',
         companyId: 'company_123'
       });
@@ -276,7 +274,7 @@ describe('User Controller - Profile Photo Upload', () => {
         mimetype: 'image/jpeg'
       };
 
-      databaseAdapter.findOne.mockResolvedValue({
+      User.findOne.mockResolvedValue({
         userId: 'user_12345',
         companyId: 'company_123'
       });
@@ -311,8 +309,8 @@ describe('User Controller - Profile Photo Upload', () => {
     });
 
     it('should return 404 if user is not found', async () => {
-      databaseAdapter.findOne.mockResolvedValue(null);
-      databaseAdapter.findById.mockResolvedValue(null);
+      User.findOne.mockResolvedValue(null);
+      User.findById.mockResolvedValue(null);
 
       await userController.deleteProfilePhoto(req, res);
 
@@ -332,7 +330,7 @@ describe('User Controller - Profile Photo Upload', () => {
         }
       };
 
-      databaseAdapter.findOne.mockResolvedValue(mockUser);
+      User.findOne.mockResolvedValue(mockUser);
 
       await userController.deleteProfilePhoto(req, res);
 
@@ -353,9 +351,9 @@ describe('User Controller - Profile Photo Upload', () => {
         }
       };
 
-      databaseAdapter.findOne.mockResolvedValue(mockUser);
+      User.findOne.mockResolvedValue(mockUser);
       fileStorageService.deleteFile.mockResolvedValue({ deleted: true });
-      databaseAdapter.findOneAndUpdate.mockResolvedValue({
+      User.findOneAndUpdate.mockResolvedValue({
         userId: 'user_12345',
         profile: {
           avatar: null,
@@ -379,11 +377,9 @@ describe('User Controller - Profile Photo Upload', () => {
       );
 
       // Verify user profile was updated
-      expect(databaseAdapter.findOneAndUpdate).toHaveBeenCalledWith(
-        'User',
+      expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_12345' },
-        {
-          $set: {
+        { $set: {
             'profile.avatar': null,
             'profile.avatarThumbnail': null,
             'profile.avatarFileId': null,
@@ -411,11 +407,11 @@ describe('User Controller - Profile Photo Upload', () => {
         }
       };
 
-      databaseAdapter.findOne.mockResolvedValue(mockUser);
+      User.findOne.mockResolvedValue(mockUser);
       fileStorageService.deleteFile.mockRejectedValue(
         new Error('File not found in storage')
       );
-      databaseAdapter.findOneAndUpdate.mockResolvedValue({
+      User.findOneAndUpdate.mockResolvedValue({
         userId: 'user_12345',
         profile: { avatar: null }
       });
@@ -423,7 +419,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.deleteProfilePhoto(req, res);
 
       // Verify profile was still updated
-      expect(databaseAdapter.findOneAndUpdate).toHaveBeenCalled();
+      expect(User.findOneAndUpdate).toHaveBeenCalled();
 
       // Verify successful response
       expect(res.status).toHaveBeenCalledWith(200);
@@ -441,8 +437,8 @@ describe('User Controller - Profile Photo Upload', () => {
         }
       };
 
-      databaseAdapter.findOne.mockResolvedValue(mockUser);
-      databaseAdapter.findOneAndUpdate.mockRejectedValue(
+      User.findOne.mockResolvedValue(mockUser);
+      User.findOneAndUpdate.mockRejectedValue(
         new Error('Database error')
       );
 

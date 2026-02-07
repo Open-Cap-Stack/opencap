@@ -1,191 +1,169 @@
 /**
  * IntegrationMarketplaceItem Model Unit Tests
  * Issue #202: Build Integration Marketplace Backend
+ *
+ * Tests for ZeroDB-based IntegrationMarketplaceItem model
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
 const IntegrationMarketplaceItem = require('../../../models/IntegrationMarketplaceItem');
 
 describe('IntegrationMarketplaceItem Model', () => {
-  describe('Schema Validation', () => {
-    it('should create a valid integration marketplace item', () => {
-      const validData = {
-        integrationId: 'INT-001',
-        name: 'Stripe',
-        description: 'Payment processing integration',
-        category: 'payments',
-        provider: 'Stripe Inc.',
-        version: '1.0.0'
-      };
-
-      const item = new IntegrationMarketplaceItem(validData);
-      const error = item.validateSync();
-
-      expect(error).toBeUndefined();
-      expect(item.name).toBe('Stripe');
-      expect(item.category).toBe('payments');
+  describe('Schema Definition', () => {
+    it('should have correct table name', () => {
+      expect(IntegrationMarketplaceItem.tableName).toBe('integration_marketplace_items');
     });
 
-    it('should require name field', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider'
-      });
-
-      const error = item.validateSync();
-      expect(error.errors.name).toBeDefined();
+    it('should have schema defined', () => {
+      expect(IntegrationMarketplaceItem.schema).toBeDefined();
     });
 
-    it('should require description field', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        category: 'payments',
-        provider: 'Test Provider'
-      });
-
-      const error = item.validateSync();
-      expect(error.errors.description).toBeDefined();
+    it('should have required fields', () => {
+      const schema = IntegrationMarketplaceItem.schema;
+      expect(schema.name.required).toBe(true);
+      expect(schema.description.required).toBe(true);
+      expect(schema.category.required).toBe(true);
+      expect(schema.provider.required).toBe(true);
+      expect(schema.integrationId.required).toBe(true);
     });
 
-    it('should require category field', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        provider: 'Test Provider'
-      });
-
-      const error = item.validateSync();
-      expect(error.errors.category).toBeDefined();
-    });
-
-    it('should require provider field', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments'
-      });
-
-      const error = item.validateSync();
-      expect(error.errors.provider).toBeDefined();
-    });
-
-    it('should only allow valid categories', () => {
+    it('should have category field with valid enum values', () => {
       const validCategories = [
         'payments', 'accounting', 'communication', 'crm', 'hr',
         'legal', 'analytics', 'storage', 'productivity', 'security', 'other'
       ];
 
+      expect(IntegrationMarketplaceItem.schema.category.enum).toBeDefined();
       validCategories.forEach(category => {
-        const item = new IntegrationMarketplaceItem({
-          integrationId: `INT-${category}`,
-          name: 'Test',
-          description: 'Test description',
-          category,
-          provider: 'Test Provider'
-        });
-        const error = item.validateSync();
-        expect(error).toBeUndefined();
+        expect(IntegrationMarketplaceItem.schema.category.enum).toContain(category);
       });
     });
 
-    it('should reject invalid category', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'invalid-category',
-        provider: 'Test Provider'
-      });
-
-      const error = item.validateSync();
-      expect(error.errors.category).toBeDefined();
+    it('should have status field with valid enum values', () => {
+      expect(IntegrationMarketplaceItem.schema.status.enum).toContain('active');
+      expect(IntegrationMarketplaceItem.schema.status.enum).toContain('inactive');
+      expect(IntegrationMarketplaceItem.schema.status.enum).toContain('deprecated');
+      expect(IntegrationMarketplaceItem.schema.status.enum).toContain('beta');
     });
 
     it('should default status to active', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider'
-      });
-
-      expect(item.status).toBe('active');
+      expect(IntegrationMarketplaceItem.schema.status.default).toBe('active');
     });
 
     it('should default version to 1.0.0', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider'
-      });
-
-      expect(item.version).toBe('1.0.0');
+      expect(IntegrationMarketplaceItem.schema.version.default).toBe('1.0.0');
     });
   });
 
-  describe('Virtuals', () => {
-    it('should compute isAvailable for active status', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider',
-        status: 'active'
-      });
-
-      expect(item.isAvailable).toBe(true);
+  describe('Constants', () => {
+    it('should export CATEGORIES constant', () => {
+      expect(IntegrationMarketplaceItem.CATEGORIES).toBeDefined();
+      expect(IntegrationMarketplaceItem.CATEGORIES).toContain('payments');
+      expect(IntegrationMarketplaceItem.CATEGORIES).toContain('accounting');
+      expect(IntegrationMarketplaceItem.CATEGORIES).toContain('other');
     });
 
-    it('should compute isAvailable for beta status', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider',
-        status: 'beta'
-      });
-
-      expect(item.isAvailable).toBe(true);
+    it('should export VALID_STATUSES constant', () => {
+      expect(IntegrationMarketplaceItem.VALID_STATUSES).toBeDefined();
+      expect(IntegrationMarketplaceItem.VALID_STATUSES).toContain('active');
+      expect(IntegrationMarketplaceItem.VALID_STATUSES).toContain('inactive');
     });
 
-    it('should compute isAvailable as false for inactive status', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider',
-        status: 'inactive'
-      });
+    it('should export CONFIG_FIELD_TYPES constant', () => {
+      expect(IntegrationMarketplaceItem.CONFIG_FIELD_TYPES).toBeDefined();
+      expect(IntegrationMarketplaceItem.CONFIG_FIELD_TYPES).toContain('string');
+    });
 
-      expect(item.isAvailable).toBe(false);
+    it('should export PRICING_TYPES constant', () => {
+      expect(IntegrationMarketplaceItem.PRICING_TYPES).toBeDefined();
+      expect(IntegrationMarketplaceItem.PRICING_TYPES).toContain('free');
+    });
+
+    it('should export BILLING_CYCLES constant', () => {
+      expect(IntegrationMarketplaceItem.BILLING_CYCLES).toBeDefined();
+      expect(IntegrationMarketplaceItem.BILLING_CYCLES).toContain('monthly');
     });
   });
 
-  describe('toJSON', () => {
-    it('should include virtuals in JSON output', () => {
-      const item = new IntegrationMarketplaceItem({
-        integrationId: 'INT-001',
-        name: 'Test',
-        description: 'Test description',
-        category: 'payments',
-        provider: 'Test Provider',
-        status: 'active'
-      });
+  describe('isAvailable', () => {
+    it('should return true for active status', () => {
+      const item = { status: 'active' };
+      expect(IntegrationMarketplaceItem.isAvailable(item)).toBe(true);
+    });
 
-      const json = item.toJSON();
-      expect(json.isAvailable).toBe(true);
+    it('should return true for beta status', () => {
+      const item = { status: 'beta' };
+      expect(IntegrationMarketplaceItem.isAvailable(item)).toBe(true);
+    });
+
+    it('should return false for inactive status', () => {
+      const item = { status: 'inactive' };
+      expect(IntegrationMarketplaceItem.isAvailable(item)).toBe(false);
+    });
+
+    it('should return false for deprecated status', () => {
+      const item = { status: 'deprecated' };
+      expect(IntegrationMarketplaceItem.isAvailable(item)).toBe(false);
+    });
+  });
+
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof IntegrationMarketplaceItem.create).toBe('function');
+    });
+
+    it('should have find method', () => {
+      expect(typeof IntegrationMarketplaceItem.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof IntegrationMarketplaceItem.findOne).toBe('function');
+    });
+
+    it('should have findByIntegrationId method', () => {
+      expect(typeof IntegrationMarketplaceItem.findByIntegrationId).toBe('function');
+    });
+
+    it('should have findByCategory method', () => {
+      expect(typeof IntegrationMarketplaceItem.findByCategory).toBe('function');
+    });
+
+    it('should have findActive method', () => {
+      expect(typeof IntegrationMarketplaceItem.findActive).toBe('function');
+    });
+
+    it('should have incrementInstallCount method', () => {
+      expect(typeof IntegrationMarketplaceItem.incrementInstallCount).toBe('function');
+    });
+
+    it('should have updateRating method', () => {
+      expect(typeof IntegrationMarketplaceItem.updateRating).toBe('function');
+    });
+  });
+
+  describe('Schema Field Types', () => {
+    it('should have installCount as number type', () => {
+      expect(IntegrationMarketplaceItem.schema.installCount.type).toBe('number');
+    });
+
+    it('should have tags as array type', () => {
+      expect(IntegrationMarketplaceItem.schema.tags.type).toBe('array');
+    });
+
+    it('should have features as array type', () => {
+      expect(IntegrationMarketplaceItem.schema.features.type).toBe('array');
+    });
+
+    it('should have configurationSchema as object type', () => {
+      expect(IntegrationMarketplaceItem.schema.configurationSchema.type).toBe('object');
+    });
+
+    it('should have rating as object type', () => {
+      expect(IntegrationMarketplaceItem.schema.rating.type).toBe('object');
+    });
+
+    it('should have pricing as object type', () => {
+      expect(IntegrationMarketplaceItem.schema.pricing.type).toBe('object');
     });
   });
 });

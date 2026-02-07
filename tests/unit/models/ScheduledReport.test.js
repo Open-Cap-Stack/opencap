@@ -1,39 +1,25 @@
 /**
  * ScheduledReport Model Unit Tests
  * Issue #112: Create Report Scheduling System
- * TDD Red Phase: Tests written before implementation
+ *
+ * Tests for ZeroDB-based ScheduledReport model
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock mongoose before requiring the model
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    model: jest.fn().mockReturnValue(function(data) {
-      return { ...data, save: jest.fn().mockResolvedValue(data) };
-    }),
-    Schema: actualMongoose.Schema
-  };
-});
+const ScheduledReport = require('../../../models/ScheduledReport');
 
 describe('ScheduledReport Model', () => {
-  let ScheduledReport;
-
-  beforeAll(() => {
-    jest.resetModules();
-    ScheduledReport = require('../../../models/ScheduledReport');
-  });
-
   describe('Schema Definition', () => {
-    it('should export a mongoose model', () => {
+    it('should have correct table name', () => {
+      expect(ScheduledReport.tableName).toBe('scheduled_reports');
+    });
+
+    it('should export a defined model', () => {
       expect(ScheduledReport).toBeDefined();
+      expect(ScheduledReport.schema).toBeDefined();
     });
 
     it('should have required fields defined', () => {
-      // The model should have these required fields
       const requiredFields = [
         'scheduleId',
         'companyId',
@@ -43,138 +29,200 @@ describe('ScheduledReport Model', () => {
       ];
 
       requiredFields.forEach(field => {
-        expect(ScheduledReport.schema.paths[field]).toBeDefined();
+        expect(ScheduledReport.schema[field]).toBeDefined();
+        expect(ScheduledReport.schema[field].required).toBe(true);
       });
     });
 
     it('should have scheduleId as unique field', () => {
-      const scheduleIdPath = ScheduledReport.schema.paths.scheduleId;
-      expect(scheduleIdPath).toBeDefined();
-      expect(scheduleIdPath.options.unique).toBe(true);
+      expect(ScheduledReport.schema.scheduleId.unique).toBe(true);
     });
 
     it('should have valid reportType enum values', () => {
-      const reportTypePath = ScheduledReport.schema.paths.reportType;
-      expect(reportTypePath).toBeDefined();
-      expect(reportTypePath.enumValues).toContain('cap_table');
-      expect(reportTypePath.enumValues).toContain('financial_summary');
-      expect(reportTypePath.enumValues).toContain('investor_report');
-      expect(reportTypePath.enumValues).toContain('vesting_summary');
-      expect(reportTypePath.enumValues).toContain('equity_plan');
-      expect(reportTypePath.enumValues).toContain('transaction_history');
-      expect(reportTypePath.enumValues).toContain('compliance');
-      expect(reportTypePath.enumValues).toContain('custom');
+      const enumValues = ScheduledReport.schema.reportType.enum;
+      expect(enumValues).toContain('cap_table');
+      expect(enumValues).toContain('financial_summary');
+      expect(enumValues).toContain('investor_report');
+      expect(enumValues).toContain('vesting_summary');
+      expect(enumValues).toContain('equity_plan');
+      expect(enumValues).toContain('transaction_history');
+      expect(enumValues).toContain('compliance');
+      expect(enumValues).toContain('custom');
     });
 
     it('should have valid format enum values', () => {
-      const formatPath = ScheduledReport.schema.paths.format;
-      expect(formatPath).toBeDefined();
-      expect(formatPath.enumValues).toContain('pdf');
-      expect(formatPath.enumValues).toContain('excel');
-      expect(formatPath.enumValues).toContain('csv');
+      const enumValues = ScheduledReport.schema.format.enum;
+      expect(enumValues).toContain('pdf');
+      expect(enumValues).toContain('excel');
+      expect(enumValues).toContain('csv');
     });
 
     it('should have valid status enum values', () => {
-      const statusPath = ScheduledReport.schema.paths.status;
-      expect(statusPath).toBeDefined();
-      expect(statusPath.enumValues).toContain('active');
-      expect(statusPath.enumValues).toContain('paused');
-      expect(statusPath.enumValues).toContain('failed');
-      expect(statusPath.enumValues).toContain('completed');
+      const enumValues = ScheduledReport.schema.status.enum;
+      expect(enumValues).toContain('active');
+      expect(enumValues).toContain('paused');
+      expect(enumValues).toContain('failed');
+      expect(enumValues).toContain('completed');
     });
 
-    it('should have recipients as an array of strings', () => {
-      const recipientsPath = ScheduledReport.schema.paths.recipients;
-      expect(recipientsPath).toBeDefined();
-      expect(recipientsPath.instance).toBe('Array');
+    it('should have recipients as array type', () => {
+      expect(ScheduledReport.schema.recipients).toBeDefined();
+      expect(ScheduledReport.schema.recipients.type).toBe('array');
     });
 
-    it('should have schedule field for cron expression', () => {
-      const schedulePath = ScheduledReport.schema.paths.schedule;
-      expect(schedulePath).toBeDefined();
-      expect(schedulePath.instance).toBe('String');
+    it('should have schedule field as string type', () => {
+      expect(ScheduledReport.schema.schedule).toBeDefined();
+      expect(ScheduledReport.schema.schedule.type).toBe('string');
     });
 
-    it('should have nextRunAt as Date type', () => {
-      const nextRunAtPath = ScheduledReport.schema.paths.nextRunAt;
-      expect(nextRunAtPath).toBeDefined();
-      expect(nextRunAtPath.instance).toBe('Date');
+    it('should have nextRunAt as date type', () => {
+      expect(ScheduledReport.schema.nextRunAt).toBeDefined();
+      expect(ScheduledReport.schema.nextRunAt.type).toBe('date');
     });
 
-    it('should have lastRunAt as Date type', () => {
-      const lastRunAtPath = ScheduledReport.schema.paths.lastRunAt;
-      expect(lastRunAtPath).toBeDefined();
-      expect(lastRunAtPath.instance).toBe('Date');
+    it('should have lastRunAt as date type', () => {
+      expect(ScheduledReport.schema.lastRunAt).toBeDefined();
+      expect(ScheduledReport.schema.lastRunAt.type).toBe('date');
     });
 
-    it('should have timezone field with default value', () => {
-      const timezonePath = ScheduledReport.schema.paths.timezone;
-      expect(timezonePath).toBeDefined();
-      expect(timezonePath.defaultValue).toBe('UTC');
-    });
-
-    it('should have parameters as Mixed type for flexibility', () => {
-      const parametersPath = ScheduledReport.schema.paths.parameters;
-      expect(parametersPath).toBeDefined();
+    it('should have parameters as object type', () => {
+      expect(ScheduledReport.schema.parameters).toBeDefined();
+      expect(ScheduledReport.schema.parameters.type).toBe('object');
     });
 
     it('should have description field as optional', () => {
-      const descriptionPath = ScheduledReport.schema.paths.description;
-      expect(descriptionPath).toBeDefined();
-      expect(descriptionPath.isRequired).toBeFalsy();
+      expect(ScheduledReport.schema.description).toBeDefined();
+      expect(ScheduledReport.schema.description.required).toBeFalsy();
     });
 
-    it('should have companyId indexed for efficient queries', () => {
-      const companyIdPath = ScheduledReport.schema.paths.companyId;
-      expect(companyIdPath).toBeDefined();
-      expect(companyIdPath.options.index).toBe(true);
-    });
-
-    it('should have status indexed for efficient queries', () => {
-      const statusPath = ScheduledReport.schema.paths.status;
-      expect(statusPath).toBeDefined();
-      expect(statusPath.options.index).toBe(true);
-    });
-
-    it('should have timestamps enabled', () => {
-      expect(ScheduledReport.schema.options.timestamps).toBe(true);
+    it('should have timestamp fields', () => {
+      expect(ScheduledReport.schema.createdAt).toBeDefined();
+      expect(ScheduledReport.schema.updatedAt).toBeDefined();
     });
   });
 
   describe('Default Values', () => {
     it('should default status to active', () => {
-      const statusPath = ScheduledReport.schema.paths.status;
-      expect(statusPath.defaultValue).toBe('active');
+      expect(ScheduledReport.schema.status.default).toBe('active');
     });
 
     it('should default format to pdf', () => {
-      const formatPath = ScheduledReport.schema.paths.format;
-      expect(formatPath.defaultValue).toBe('pdf');
+      expect(ScheduledReport.schema.format.default).toBe('pdf');
     });
 
     it('should default timezone to UTC', () => {
-      const timezonePath = ScheduledReport.schema.paths.timezone;
-      expect(timezonePath.defaultValue).toBe('UTC');
+      expect(ScheduledReport.schema.timezone.default).toBe('UTC');
     });
 
     it('should default recipients to empty array', () => {
-      const recipientsPath = ScheduledReport.schema.paths.recipients;
-      expect(recipientsPath.defaultValue).toEqual([]);
+      expect(ScheduledReport.schema.recipients.default).toEqual([]);
     });
   });
 
-  describe('Indexes', () => {
-    it('should have compound index on companyId and status', () => {
-      const indexes = ScheduledReport.schema.indexes();
-      const compoundIndex = indexes.find(idx =>
-        idx[0].companyId === 1 && idx[0].status === 1
-      );
-      expect(compoundIndex).toBeDefined();
+  describe('Constants', () => {
+    it('should export REPORT_TYPES constant', () => {
+      expect(ScheduledReport.REPORT_TYPES).toBeDefined();
+      expect(ScheduledReport.REPORT_TYPES).toContain('cap_table');
+      expect(ScheduledReport.REPORT_TYPES).toContain('custom');
     });
 
-    it('should have index on nextRunAt for scheduling queries', () => {
-      const nextRunAtPath = ScheduledReport.schema.paths.nextRunAt;
-      expect(nextRunAtPath.options.index).toBe(true);
+    it('should export REPORT_FORMATS constant', () => {
+      expect(ScheduledReport.REPORT_FORMATS).toBeDefined();
+      expect(ScheduledReport.REPORT_FORMATS).toContain('pdf');
+      expect(ScheduledReport.REPORT_FORMATS).toContain('excel');
+      expect(ScheduledReport.REPORT_FORMATS).toContain('csv');
+    });
+
+    it('should export VALID_STATUSES constant', () => {
+      expect(ScheduledReport.VALID_STATUSES).toBeDefined();
+      expect(ScheduledReport.VALID_STATUSES).toContain('active');
+      expect(ScheduledReport.VALID_STATUSES).toContain('paused');
+    });
+  });
+
+  describe('Business Logic Methods', () => {
+    describe('isDue', () => {
+      it('should return true when report is due', () => {
+        const report = {
+          status: 'active',
+          nextRunAt: new Date(Date.now() - 60000).toISOString() // 1 minute ago
+        };
+        expect(ScheduledReport.isDue(report)).toBe(true);
+      });
+
+      it('should return false when report is not due yet', () => {
+        const report = {
+          status: 'active',
+          nextRunAt: new Date(Date.now() + 60000).toISOString() // 1 minute from now
+        };
+        expect(ScheduledReport.isDue(report)).toBe(false);
+      });
+
+      it('should return false when report is paused', () => {
+        const report = {
+          status: 'paused',
+          nextRunAt: new Date(Date.now() - 60000).toISOString()
+        };
+        expect(ScheduledReport.isDue(report)).toBe(false);
+      });
+
+      it('should return false when no nextRunAt', () => {
+        const report = {
+          status: 'active',
+          nextRunAt: null
+        };
+        expect(ScheduledReport.isDue(report)).toBe(false);
+      });
+    });
+  });
+
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof ScheduledReport.create).toBe('function');
+    });
+
+    it('should have find method', () => {
+      expect(typeof ScheduledReport.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof ScheduledReport.findOne).toBe('function');
+    });
+
+    it('should have findByScheduleId method', () => {
+      expect(typeof ScheduledReport.findByScheduleId).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof ScheduledReport.findByCompany).toBe('function');
+    });
+
+    it('should have findDue method', () => {
+      expect(typeof ScheduledReport.findDue).toBe('function');
+    });
+
+    it('should have updateLastRun method', () => {
+      expect(typeof ScheduledReport.updateLastRun).toBe('function');
+    });
+
+    it('should have recordFailure method', () => {
+      expect(typeof ScheduledReport.recordFailure).toBe('function');
+    });
+
+    it('should have pause method', () => {
+      expect(typeof ScheduledReport.pause).toBe('function');
+    });
+
+    it('should have resume method', () => {
+      expect(typeof ScheduledReport.resume).toBe('function');
+    });
+
+    it('should have addRecipient method', () => {
+      expect(typeof ScheduledReport.addRecipient).toBe('function');
+    });
+
+    it('should have removeRecipient method', () => {
+      expect(typeof ScheduledReport.removeRecipient).toBe('function');
     });
   });
 });

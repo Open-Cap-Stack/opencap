@@ -9,11 +9,9 @@
 
 const TriggerEngineService = require('../../../services/triggerEngineService');
 const databaseAdapter = require('../../../services/databaseAdapter');
-const EventStreamingService = require('../../../services/eventStreamingService');
 
 // Mock dependencies
 jest.mock('../../../services/databaseAdapter');
-jest.mock('../../../services/eventStreamingService');
 
 describe('TriggerEngineService', () => {
   let triggerEngine;
@@ -22,7 +20,9 @@ describe('TriggerEngineService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     triggerEngine = new TriggerEngineService();
-    mockEventStreaming = new EventStreamingService();
+    mockEventStreaming = {
+      publishEvent: jest.fn().mockResolvedValue(true)
+    };
     triggerEngine.eventStreamingService = mockEventStreaming;
   });
 

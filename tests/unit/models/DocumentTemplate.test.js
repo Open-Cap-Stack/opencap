@@ -1,15 +1,23 @@
 /**
  * DocumentTemplate Model Unit Tests
  * Issue #193: Implement Document Template System
+ * Rewritten for ZeroDB model compatibility
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
+// Mock zerodbService to prevent real API calls
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  projectId: 'test-project'
+}));
 
 describe('DocumentTemplate Model', () => {
   let DocumentTemplate;
 
   beforeAll(() => {
+    jest.resetModules();
     DocumentTemplate = require('../../../models/DocumentTemplate');
   });
 
@@ -17,16 +25,15 @@ describe('DocumentTemplate Model', () => {
     it('should have required fields defined', () => {
       const schema = DocumentTemplate.schema;
 
-      expect(schema.paths.templateId).toBeDefined();
-      expect(schema.paths.companyId).toBeDefined();
-      expect(schema.paths.name).toBeDefined();
-      expect(schema.paths.category).toBeDefined();
-      expect(schema.paths.content).toBeDefined();
+      expect(schema.templateId).toBeDefined();
+      expect(schema.companyId).toBeDefined();
+      expect(schema.name).toBeDefined();
+      expect(schema.category).toBeDefined();
+      expect(schema.content).toBeDefined();
     });
 
     it('should have correct enum values for category', () => {
-      const schema = DocumentTemplate.schema;
-      const enumValues = schema.paths.category.enumValues;
+      const enumValues = DocumentTemplate.schema.category.enum;
 
       expect(enumValues).toContain('Legal');
       expect(enumValues).toContain('Financial');
@@ -38,161 +45,80 @@ describe('DocumentTemplate Model', () => {
     });
 
     it('should have variables array for template placeholders', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.variables).toBeDefined();
+      expect(DocumentTemplate.schema.variables).toBeDefined();
+      expect(DocumentTemplate.schema.variables.type).toBe('array');
     });
 
     it('should have isActive field with default value true', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.isActive).toBeDefined();
+      expect(DocumentTemplate.schema.isActive).toBeDefined();
+      expect(DocumentTemplate.schema.isActive.default).toBe(true);
     });
 
     it('should have htmlContent field for rich content', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.htmlContent).toBeDefined();
+      expect(DocumentTemplate.schema.htmlContent).toBeDefined();
     });
 
     it('should have description field', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.description).toBeDefined();
+      expect(DocumentTemplate.schema.description).toBeDefined();
     });
 
     it('should have createdBy and updatedBy fields', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.createdBy).toBeDefined();
-      expect(schema.paths.updatedBy).toBeDefined();
+      expect(DocumentTemplate.schema.createdBy).toBeDefined();
+      expect(DocumentTemplate.schema.updatedBy).toBeDefined();
     });
 
     it('should have version field for template versioning', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.version).toBeDefined();
+      expect(DocumentTemplate.schema.version).toBeDefined();
+      expect(DocumentTemplate.schema.version.default).toBe(1);
     });
 
     it('should have tags array for categorization', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.tags).toBeDefined();
+      expect(DocumentTemplate.schema.tags).toBeDefined();
+      expect(DocumentTemplate.schema.tags.type).toBe('array');
     });
 
     it('should have metadata field for additional properties', () => {
-      const schema = DocumentTemplate.schema;
-      expect(schema.paths.metadata).toBeDefined();
+      expect(DocumentTemplate.schema.metadata).toBeDefined();
     });
   });
 
-  describe('Document Creation', () => {
-    it('should create a valid template document', () => {
-      const templateData = {
-        templateId: 'TMPL-001',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Stock Option Agreement',
-        category: 'Legal',
-        content: 'This Stock Option Agreement is entered into by {{companyName}} and {{employeeName}}...',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new DocumentTemplate(templateData);
-
-      expect(template.templateId).toBe('TMPL-001');
-      expect(template.name).toBe('Stock Option Agreement');
-      expect(template.category).toBe('Legal');
+  describe('Field Properties', () => {
+    it('should require templateId', () => {
+      expect(DocumentTemplate.schema.templateId.required).toBe(true);
     });
 
-    it('should have default isActive of true', () => {
-      const templateData = {
-        templateId: 'TMPL-002',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Test Template',
-        category: 'General',
-        content: 'Test content',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new DocumentTemplate(templateData);
-      expect(template.isActive).toBe(true);
+    it('should require companyId', () => {
+      expect(DocumentTemplate.schema.companyId.required).toBe(true);
     });
 
-    it('should have default version of 1', () => {
-      const templateData = {
-        templateId: 'TMPL-003',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Test Template',
-        category: 'General',
-        content: 'Test content',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new DocumentTemplate(templateData);
-      expect(template.version).toBe(1);
+    it('should require name', () => {
+      expect(DocumentTemplate.schema.name.required).toBe(true);
     });
 
-    it('should allow HTML content', () => {
-      const templateData = {
-        templateId: 'TMPL-004',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'HTML Template',
-        category: 'Corporate',
-        content: 'Plain text version',
-        htmlContent: '<h1>{{documentTitle}}</h1><p>Hello {{recipientName}}</p>',
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new DocumentTemplate(templateData);
-      expect(template.htmlContent).toContain('<h1>');
+    it('should require category', () => {
+      expect(DocumentTemplate.schema.category.required).toBe(true);
     });
 
-    it('should allow variable definitions', () => {
-      const templateData = {
-        templateId: 'TMPL-005',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Template with Variables',
-        category: 'Financial',
-        content: 'Investment of {{amount}} from {{investorName}}...',
-        variables: [
-          { name: 'amount', description: 'Investment amount', type: 'currency', required: true },
-          { name: 'investorName', description: 'Investor full name', type: 'text', defaultValue: 'Valued Investor' }
-        ],
-        createdBy: new mongoose.Types.ObjectId()
-      };
-
-      const template = new DocumentTemplate(templateData);
-
-      expect(template.variables).toHaveLength(2);
-      expect(template.variables[0].name).toBe('amount');
-      expect(template.variables[0].type).toBe('currency');
-      expect(template.variables[1].defaultValue).toBe('Valued Investor');
+    it('should require content', () => {
+      expect(DocumentTemplate.schema.content.required).toBe(true);
     });
 
-    it('should allow tags for categorization', () => {
-      const templateData = {
-        templateId: 'TMPL-006',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Tagged Template',
-        category: 'Legal',
-        content: 'Template content',
-        tags: ['equity', 'option', 'employee'],
-        createdBy: new mongoose.Types.ObjectId()
-      };
+    it('should require createdBy', () => {
+      expect(DocumentTemplate.schema.createdBy.required).toBe(true);
+    });
 
-      const template = new DocumentTemplate(templateData);
-
-      expect(template.tags).toHaveLength(3);
-      expect(template.tags).toContain('equity');
+    it('should have templateId marked as unique', () => {
+      expect(DocumentTemplate.schema.templateId.unique).toBe(true);
     });
   });
 
-  describe('Template Methods', () => {
-    it('should extract variables from content using extractVariables method', () => {
-      const templateData = {
-        templateId: 'TMPL-007',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Variable Template',
-        category: 'Financial',
-        content: 'Company: {{companyName}}, Amount: {{investmentAmount}}, Date: {{signatureDate}}',
-        createdBy: new mongoose.Types.ObjectId()
+  describe('Template Methods - extractVariables', () => {
+    it('should extract variables from content', () => {
+      const templateObj = {
+        content: 'Company: {{companyName}}, Amount: {{investmentAmount}}, Date: {{signatureDate}}'
       };
 
-      const template = new DocumentTemplate(templateData);
-      const variables = template.extractVariables();
+      const variables = DocumentTemplate.extractVariables(templateObj);
 
       expect(variables).toContain('companyName');
       expect(variables).toContain('investmentAmount');
@@ -200,36 +126,35 @@ describe('DocumentTemplate Model', () => {
     });
 
     it('should extract variables from both content and htmlContent', () => {
-      const templateData = {
-        templateId: 'TMPL-008',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Full Variable Template',
-        category: 'Legal',
+      const templateObj = {
         content: 'Plain: {{plainVar}}',
-        htmlContent: '<p>HTML: {{htmlVar}}</p>',
-        createdBy: new mongoose.Types.ObjectId()
+        htmlContent: '<p>HTML: {{htmlVar}}</p>'
       };
 
-      const template = new DocumentTemplate(templateData);
-      const variables = template.extractVariables();
+      const variables = DocumentTemplate.extractVariables(templateObj);
 
       expect(variables).toContain('plainVar');
       expect(variables).toContain('htmlVar');
     });
 
-    it('should generate document with variable substitution using generate method', () => {
-      const templateData = {
-        templateId: 'TMPL-009',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Generatable Template',
-        category: 'Corporate',
-        content: 'Dear {{recipientName}}, this is a document from {{companyName}}.',
-        variables: [],
-        createdBy: new mongoose.Types.ObjectId()
+    it('should return unique variable names', () => {
+      const templateObj = {
+        content: '{{name}} and {{name}} again'
       };
 
-      const template = new DocumentTemplate(templateData);
-      const result = template.generate({
+      const variables = DocumentTemplate.extractVariables(templateObj);
+      expect(variables.filter(v => v === 'name')).toHaveLength(1);
+    });
+  });
+
+  describe('Template Methods - generate', () => {
+    it('should generate document with variable substitution', () => {
+      const templateObj = {
+        content: 'Dear {{recipientName}}, this is a document from {{companyName}}.',
+        variables: []
+      };
+
+      const result = DocumentTemplate.generate(templateObj, {
         recipientName: 'John Doe',
         companyName: 'ACME Corp'
       });
@@ -237,19 +162,13 @@ describe('DocumentTemplate Model', () => {
       expect(result.content).toBe('Dear John Doe, this is a document from ACME Corp.');
     });
 
-    it('should handle nested object variables in generate method', () => {
-      const templateData = {
-        templateId: 'TMPL-010',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Nested Variable Template',
-        category: 'Investment',
+    it('should handle nested object variables', () => {
+      const templateObj = {
         content: 'Company: {{company.name}}, Investment: {{investment.amount}}',
-        variables: [],
-        createdBy: new mongoose.Types.ObjectId()
+        variables: []
       };
 
-      const template = new DocumentTemplate(templateData);
-      const result = template.generate({
+      const result = DocumentTemplate.generate(templateObj, {
         company: { name: 'TechStart Inc' },
         investment: { amount: '$500,000' }
       });
@@ -259,91 +178,105 @@ describe('DocumentTemplate Model', () => {
     });
 
     it('should use default values when variables are missing', () => {
-      const templateData = {
-        templateId: 'TMPL-011',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Default Value Template',
-        category: 'HR',
+      const templateObj = {
         content: 'Dear {{employeeName}}, welcome to our team.',
         variables: [
           { name: 'employeeName', defaultValue: 'Team Member', required: false }
-        ],
-        createdBy: new mongoose.Types.ObjectId()
+        ]
       };
 
-      const template = new DocumentTemplate(templateData);
-      const result = template.generate({});
+      const result = DocumentTemplate.generate(templateObj, {});
 
       expect(result.content).toContain('Team Member');
     });
 
     it('should generate both content and htmlContent', () => {
-      const templateData = {
-        templateId: 'TMPL-012',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Dual Content Template',
-        category: 'Corporate',
+      const templateObj = {
         content: 'Hello {{name}}',
         htmlContent: '<p>Hello <strong>{{name}}</strong></p>',
-        variables: [],
-        createdBy: new mongoose.Types.ObjectId()
+        variables: []
       };
 
-      const template = new DocumentTemplate(templateData);
-      const result = template.generate({ name: 'Jane Doe' });
+      const result = DocumentTemplate.generate(templateObj, { name: 'Jane Doe' });
 
       expect(result.content).toBe('Hello Jane Doe');
       expect(result.htmlContent).toBe('<p>Hello <strong>Jane Doe</strong></p>');
     });
+  });
 
-    it('should validate required variables using validateVariables method', () => {
-      const templateData = {
-        templateId: 'TMPL-013',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Required Variables Template',
-        category: 'Legal',
-        content: '{{companyName}} agreement with {{employeeName}}',
+  describe('Template Methods - validateVariables', () => {
+    it('should validate required variables are present', () => {
+      const templateObj = {
         variables: [
           { name: 'companyName', required: true },
           { name: 'employeeName', required: true }
-        ],
-        createdBy: new mongoose.Types.ObjectId()
+        ]
       };
 
-      const template = new DocumentTemplate(templateData);
-
-      const validResult = template.validateVariables({
+      const validResult = DocumentTemplate.validateVariables(templateObj, {
         companyName: 'ACME',
         employeeName: 'John'
       });
       expect(validResult.isValid).toBe(true);
 
-      const invalidResult = template.validateVariables({
+      const invalidResult = DocumentTemplate.validateVariables(templateObj, {
         companyName: 'ACME'
       });
       expect(invalidResult.isValid).toBe(false);
       expect(invalidResult.missingVariables).toContain('employeeName');
     });
 
-    it('should create a preview with sample values using preview method', () => {
-      const templateData = {
-        templateId: 'TMPL-014',
-        companyId: new mongoose.Types.ObjectId(),
-        name: 'Preview Template',
-        category: 'Financial',
+    it('should pass when no required variables are missing', () => {
+      const templateObj = {
+        variables: [
+          { name: 'optional', required: false }
+        ]
+      };
+
+      const result = DocumentTemplate.validateVariables(templateObj, {});
+      expect(result.isValid).toBe(true);
+      expect(result.missingVariables).toHaveLength(0);
+    });
+  });
+
+  describe('Template Methods - preview', () => {
+    it('should create a preview with sample values', () => {
+      const templateObj = {
         content: 'Amount: {{amount}}, Date: {{date}}',
         variables: [
           { name: 'amount', type: 'currency', sampleValue: '$10,000' },
           { name: 'date', type: 'date', sampleValue: '2026-01-01' }
-        ],
-        createdBy: new mongoose.Types.ObjectId()
+        ]
       };
 
-      const template = new DocumentTemplate(templateData);
-      const preview = template.preview();
+      const preview = DocumentTemplate.preview(templateObj);
 
       expect(preview.content).toContain('$10,000');
       expect(preview.content).toContain('2026-01-01');
+    });
+
+    it('should use default values when no sample values are provided', () => {
+      const templateObj = {
+        content: 'Name: {{name}}',
+        variables: [
+          { name: 'name', type: 'text', defaultValue: 'Default Name' }
+        ]
+      };
+
+      const preview = DocumentTemplate.preview(templateObj);
+      expect(preview.content).toContain('Default Name');
+    });
+
+    it('should use type-based placeholders when no sample or default values exist', () => {
+      const templateObj = {
+        content: 'Amount: {{amount}}',
+        variables: [
+          { name: 'amount', type: 'currency' }
+        ]
+      };
+
+      const preview = DocumentTemplate.preview(templateObj);
+      expect(preview.content).toContain('$0.00');
     });
   });
 
@@ -363,27 +296,45 @@ describe('DocumentTemplate Model', () => {
     });
   });
 
-  describe('Indexes', () => {
-    it('should have unique index on templateId', () => {
-      const schema = DocumentTemplate.schema;
-      const indexes = schema.indexes();
-
-      const templateIdIndex = indexes.find(idx =>
-        idx[0] && idx[0].templateId !== undefined
-      );
-
-      expect(templateIdIndex).toBeDefined();
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof DocumentTemplate.create).toBe('function');
     });
 
-    it('should have index on companyId and category', () => {
-      const schema = DocumentTemplate.schema;
-      const indexes = schema.indexes();
+    it('should have find method', () => {
+      expect(typeof DocumentTemplate.find).toBe('function');
+    });
 
-      const companyIndex = indexes.find(idx =>
-        idx[0] && idx[0].companyId !== undefined && idx[0].category !== undefined
-      );
+    it('should have findOne method', () => {
+      expect(typeof DocumentTemplate.findOne).toBe('function');
+    });
 
-      expect(companyIndex).toBeDefined();
+    it('should have findByTemplateId method', () => {
+      expect(typeof DocumentTemplate.findByTemplateId).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof DocumentTemplate.findByCompany).toBe('function');
+    });
+
+    it('should have findByTags method', () => {
+      expect(typeof DocumentTemplate.findByTags).toBe('function');
+    });
+
+    it('should have extractVariables method', () => {
+      expect(typeof DocumentTemplate.extractVariables).toBe('function');
+    });
+
+    it('should have generate method', () => {
+      expect(typeof DocumentTemplate.generate).toBe('function');
+    });
+
+    it('should have validateVariables method', () => {
+      expect(typeof DocumentTemplate.validateVariables).toBe('function');
+    });
+
+    it('should have preview method', () => {
+      expect(typeof DocumentTemplate.preview).toBe('function');
     });
   });
 });

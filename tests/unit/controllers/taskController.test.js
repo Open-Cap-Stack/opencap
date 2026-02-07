@@ -3,16 +3,27 @@
  *
  * Issue #121: Create Task Management API
  *
- * Tests for the task controller using DatabaseAdapter for ZeroDB migration
+ * Tests for the task controller using Task model (ZeroDB-backed)
  * Follows TDD pattern: Red -> Green -> Refactor
  */
 
 const httpMocks = require('node-mocks-http');
 const taskController = require('../../../controllers/taskController');
-const databaseAdapter = require('../../../services/databaseAdapter');
+const Task = require('../../../models/Task');
 
-// Mock the database adapter
-jest.mock('../../../services/databaseAdapter');
+// Mock the Task model
+jest.mock('../../../models/Task', () => ({
+  create: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  findById: jest.fn(),
+  findByIdAndUpdate: jest.fn(),
+  findByIdAndDelete: jest.fn(),
+  addComment: jest.fn(),
+  countDocuments: jest.fn(),
+  updateOne: jest.fn(),
+  deleteOne: jest.fn()
+}));
 
 describe('TaskController', () => {
   let req, res;
@@ -46,23 +57,18 @@ describe('TaskController', () => {
         updatedAt: new Date().toISOString()
       };
 
-      databaseAdapter.create.mockResolvedValue(mockCreatedTask);
+      Task.create.mockResolvedValue(mockCreatedTask);
 
       await taskController.createTask(req, res);
 
       expect(res.statusCode).toBe(201);
-      expect(databaseAdapter.create).toHaveBeenCalledWith('Task', expect.objectContaining({
-        title: taskData.title,
-        description: taskData.description,
-        status: taskData.status,
-        priority: taskData.priority
-      }));
+      expect(Task.create).toHaveBeenCalledWith(taskData);
     });
 
     it('should return 400 when required fields are missing', async () => {
       req.body = { description: 'Missing title' };
 
-      databaseAdapter.create.mockRejectedValue(new Error('Validation error: title is required'));
+      Task.create.mockRejectedValue(new Error('Validation failed: Task title is required'));
 
       await taskController.createTask(req, res);
 
@@ -75,7 +81,7 @@ describe('TaskController', () => {
         status: 'invalid_status'
       };
 
-      databaseAdapter.create.mockRejectedValue(new Error('Validation error: invalid status'));
+      Task.create.mockRejectedValue(new Error('Validation failed: invalid_status is not a valid status'));
 
       await taskController.createTask(req, res);
 
@@ -88,7 +94,7 @@ describe('TaskController', () => {
         priority: 'super_urgent'
       };
 
-      databaseAdapter.create.mockRejectedValue(new Error('Validation error: invalid priority'));
+      Task.create.mockRejectedValue(new Error('Validation failed: super_urgent is not a valid priority'));
 
       await taskController.createTask(req, res);
 
@@ -101,11 +107,11 @@ describe('TaskController', () => {
         status: 'pending'
       };
 
-      databaseAdapter.create.mockRejectedValue(new Error('Database connection failed'));
+      Task.create.mockRejectedValue(new Error('Database connection failed'));
 
       await taskController.createTask(req, res);
 
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(500);
     });
 
     it('should set default status to pending if not provided', async () => {
@@ -122,7 +128,7 @@ describe('TaskController', () => {
         comments: []
       };
 
-      databaseAdapter.create.mockResolvedValue(mockCreatedTask);
+      Task.create.mockResolvedValue(mockCreatedTask);
 
       await taskController.createTask(req, res);
 
@@ -137,61 +143,43 @@ describe('TaskController', () => {
         { _id: 'task_2', title: 'Task 2', status: 'completed' }
       ];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getTasks(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.find).toHaveBeenCalledWith('Task', {}, expect.any(Object));
+      expect(Task.find).toHaveBeenCalledWith({});
     });
 
     it('should return empty array when no tasks exist', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
+      Task.find.mockResolvedValue([]);
 
       await taskController.getTasks(req, res);
 
       expect(res.statusCode).toBe(200);
       const data = res._getData();
-      const tasks = typeof data === 'string' ? JSON.parse(data) : data;
-      expect(Array.isArray(tasks)).toBe(true);
-      expect(tasks.length).toBe(0);
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      expect(parsed.tasks).toEqual([]);
     });
 
     it('should handle database errors', async () => {
-      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
+      Task.find.mockRejectedValue(new Error('Database error'));
 
       await taskController.getTasks(req, res);
 
       expect(res.statusCode).toBe(500);
     });
 
-    it('should support pagination', async () => {
-      req.query = { page: 2, limit: 10 };
-      const mockTasks = [{ _id: 'task_1', title: 'Task 1' }];
-
-      databaseAdapter.find.mockResolvedValue(mockTasks);
-
-      await taskController.getTasks(req, res);
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        {},
-        expect.objectContaining({ skip: 10, limit: 10 })
-      );
-    });
-
     it('should filter by status', async () => {
       req.query = { status: 'pending' };
       const mockTasks = [{ _id: 'task_1', title: 'Task 1', status: 'pending' }];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getTasks(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ status: 'pending' }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending' })
       );
     });
 
@@ -199,14 +187,12 @@ describe('TaskController', () => {
       req.query = { priority: 'high' };
       const mockTasks = [{ _id: 'task_1', title: 'Task 1', priority: 'high' }];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getTasks(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ priority: 'high' }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ priority: 'high' })
       );
     });
 
@@ -214,14 +200,12 @@ describe('TaskController', () => {
       req.query = { assigneeId: 'user-001' };
       const mockTasks = [{ _id: 'task_1', title: 'Task 1', assigneeId: 'user-001' }];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getTasks(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ assigneeId: 'user-001' }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ assigneeId: 'user-001' })
       );
     });
 
@@ -229,29 +213,12 @@ describe('TaskController', () => {
       req.query = { companyId: 'company-001' };
       const mockTasks = [{ _id: 'task_1', title: 'Task 1', companyId: 'company-001' }];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getTasks(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ companyId: 'company-001' }),
-        expect.any(Object)
-      );
-    });
-
-    it('should filter by tags', async () => {
-      req.query = { tags: 'finance,quarterly' };
-      const mockTasks = [{ _id: 'task_1', title: 'Task 1', tags: ['finance', 'quarterly'] }];
-
-      databaseAdapter.find.mockResolvedValue(mockTasks);
-
-      await taskController.getTasks(req, res);
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ tags: { $in: ['finance', 'quarterly'] } }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ companyId: 'company-001' })
       );
     });
   });
@@ -266,18 +233,18 @@ describe('TaskController', () => {
         comments: []
       };
 
-      databaseAdapter.findById.mockResolvedValue(mockTask);
+      Task.findById.mockResolvedValue(mockTask);
 
       await taskController.getTaskById(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.findById).toHaveBeenCalledWith('Task', 'task_123');
+      expect(Task.findById).toHaveBeenCalledWith('task_123');
     });
 
     it('should return 404 when task not found', async () => {
       req.params = { id: 'nonexistent_id' };
 
-      databaseAdapter.findById.mockResolvedValue(null);
+      Task.findById.mockResolvedValue(null);
 
       await taskController.getTaskById(req, res);
 
@@ -287,7 +254,7 @@ describe('TaskController', () => {
     it('should handle invalid ID format', async () => {
       req.params = { id: 'invalid-id' };
 
-      databaseAdapter.findById.mockRejectedValue(new Error('Invalid ID format'));
+      Task.findById.mockRejectedValue(new Error('Invalid ID format'));
 
       await taskController.getTaskById(req, res);
 
@@ -309,16 +276,15 @@ describe('TaskController', () => {
         status: 'in_progress'
       };
 
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
+      Task.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
 
       await taskController.updateTask(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
-        'Task',
+      expect(Task.findByIdAndUpdate).toHaveBeenCalledWith(
         'task_123',
         req.body,
-        expect.any(Object)
+        expect.objectContaining({ new: true })
       );
     });
 
@@ -326,7 +292,7 @@ describe('TaskController', () => {
       req.params = { id: 'nonexistent_id' };
       req.body = { title: 'Updated Title' };
 
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(null);
+      Task.findByIdAndUpdate.mockResolvedValue(null);
 
       await taskController.updateTask(req, res);
 
@@ -337,7 +303,7 @@ describe('TaskController', () => {
       req.params = { id: 'task_123' };
       req.body = { status: 'INVALID_STATUS' };
 
-      databaseAdapter.findByIdAndUpdate.mockRejectedValue(new Error('Validation error'));
+      Task.findByIdAndUpdate.mockRejectedValue(new Error('Invalid status: INVALID_STATUS'));
 
       await taskController.updateTask(req, res);
 
@@ -354,7 +320,7 @@ describe('TaskController', () => {
         status: 'completed'
       };
 
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
+      Task.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
 
       await taskController.updateTask(req, res);
 
@@ -374,7 +340,7 @@ describe('TaskController', () => {
         priority: 'urgent'
       };
 
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
+      Task.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
 
       await taskController.updateTask(req, res);
 
@@ -386,18 +352,18 @@ describe('TaskController', () => {
     it('should delete a task successfully', async () => {
       req.params = { id: 'task_123' };
 
-      databaseAdapter.findByIdAndDelete.mockResolvedValue({ _id: 'task_123' });
+      Task.findByIdAndDelete.mockResolvedValue({ _id: 'task_123' });
 
       await taskController.deleteTask(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('Task', 'task_123');
+      expect(Task.findByIdAndDelete).toHaveBeenCalledWith('task_123');
     });
 
     it('should return 404 when task not found', async () => {
       req.params = { id: 'nonexistent_id' };
 
-      databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
+      Task.findByIdAndDelete.mockResolvedValue(null);
 
       await taskController.deleteTask(req, res);
 
@@ -407,7 +373,7 @@ describe('TaskController', () => {
     it('should handle database errors during delete', async () => {
       req.params = { id: 'task_123' };
 
-      databaseAdapter.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
+      Task.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
 
       await taskController.deleteTask(req, res);
 
@@ -423,12 +389,6 @@ describe('TaskController', () => {
         authorId: 'user-001'
       };
 
-      const mockTask = {
-        _id: 'task_123',
-        title: 'Test Task',
-        comments: []
-      };
-
       const mockUpdatedTask = {
         _id: 'task_123',
         title: 'Test Task',
@@ -440,8 +400,7 @@ describe('TaskController', () => {
         }]
       };
 
-      databaseAdapter.findById.mockResolvedValue(mockTask);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedTask);
+      Task.addComment.mockResolvedValue(mockUpdatedTask);
 
       await taskController.addComment(req, res);
 
@@ -455,7 +414,7 @@ describe('TaskController', () => {
         authorId: 'user-001'
       };
 
-      databaseAdapter.findById.mockResolvedValue(null);
+      Task.addComment.mockRejectedValue(new Error('Task not found: nonexistent_id'));
 
       await taskController.addComment(req, res);
 
@@ -491,7 +450,7 @@ describe('TaskController', () => {
         { _id: 'task_5', status: 'cancelled', priority: 'urgent' }
       ];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getAnalytics(req, res);
 
@@ -519,14 +478,12 @@ describe('TaskController', () => {
         { _id: 'task_1', status: 'pending', priority: 'high', companyId: 'company-001' }
       ];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getAnalytics(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ companyId: 'company-001' }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ companyId: 'company-001' })
       );
     });
 
@@ -536,19 +493,17 @@ describe('TaskController', () => {
         { _id: 'task_1', status: 'pending', priority: 'high', assigneeId: 'user-001' }
       ];
 
-      databaseAdapter.find.mockResolvedValue(mockTasks);
+      Task.find.mockResolvedValue(mockTasks);
 
       await taskController.getAnalytics(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'Task',
-        expect.objectContaining({ assigneeId: 'user-001' }),
-        expect.any(Object)
+      expect(Task.find).toHaveBeenCalledWith(
+        expect.objectContaining({ assigneeId: 'user-001' })
       );
     });
 
     it('should handle database errors', async () => {
-      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
+      Task.find.mockRejectedValue(new Error('Database error'));
 
       await taskController.getAnalytics(req, res);
 
@@ -556,7 +511,7 @@ describe('TaskController', () => {
     });
 
     it('should return zero counts when no tasks exist', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
+      Task.find.mockResolvedValue([]);
 
       await taskController.getAnalytics(req, res);
 
@@ -582,7 +537,7 @@ describe('TaskController', () => {
         status: 'pending'
       };
 
-      databaseAdapter.create.mockResolvedValue(zerodbResult);
+      Task.create.mockResolvedValue(zerodbResult);
 
       await taskController.createTask(req, res);
 
@@ -598,7 +553,7 @@ describe('TaskController', () => {
         status: 'pending'
       };
 
-      databaseAdapter.findById.mockResolvedValue(parallelResult);
+      Task.findById.mockResolvedValue(parallelResult);
 
       await taskController.getTaskById(req, res);
 

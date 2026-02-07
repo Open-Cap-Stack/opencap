@@ -30,16 +30,16 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
         process.env.SYNC_ENABLED = originalEnv;
       });
 
-      it('should not initialize MongoDB connection when SYNC_ENABLED=false', () => {
-        // Verify MongoDB initialization is conditional
+      it('should not have MongoDB connection code after migration', () => {
+        // After ZeroDB migration, app.js should not reference MongoDB
         const appContent = fs.readFileSync(
           path.join(__dirname, '../../app.js'),
           'utf8'
         );
 
-        // MongoDB connection should be conditional on sync being enabled
-        expect(appContent).toContain('SYNC_ENABLED');
-        expect(appContent).toContain('connectToMongoDB');
+        // MongoDB has been fully removed
+        expect(appContent).not.toContain('connectToMongoDB');
+        expect(appContent).not.toContain('mongoose.connect');
       });
 
       it('should use ZeroDB as primary database when sync is disabled', () => {
@@ -55,24 +55,14 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
     });
 
     describe('When MongoDB is only used for continuous sync', () => {
-      it('should only import mongoose in sync-related files', () => {
-        // Files that should use mongoose (sync feature only)
-        const allowedMongooseFiles = [
-          'services/mongoChangeStreamListener.js',
-          'services/syncOrchestrator.js',
-          'services/databaseAdapter.js',
-          'db/mongoConnection.js',
-          'middleware/databaseMonitor.js'
-        ];
+      it('should not have mongoose as a required dependency after migration', () => {
+        // After full ZeroDB migration, mongoose should be removed from dependencies
+        const packagePath = path.join(__dirname, '../../package.json');
+        const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
-        // Check these files exist and use mongoose
-        allowedMongooseFiles.forEach(file => {
-          const filePath = path.join(__dirname, '../../', file);
-          if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            expect(content).toContain('mongoose');
-          }
-        });
+        // MongoDB/mongoose have been fully removed from dependencies
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongoose');
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongodb');
       });
 
       it('should have clear documentation about MongoDB sync dependency', () => {
@@ -115,13 +105,13 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
     });
 
     describe('When checking package.json dependencies', () => {
-      it('should document why MongoDB/Mongoose are kept', () => {
+      it('should have MongoDB and Mongoose removed from dependencies', () => {
         const packagePath = path.join(__dirname, '../../package.json');
         const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
-        // MongoDB and mongoose should be in dependencies (for sync feature)
-        expect(packageJson.dependencies.mongodb).toBeDefined();
-        expect(packageJson.dependencies.mongoose).toBeDefined();
+        // MongoDB and mongoose should be fully removed after migration
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongodb');
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongoose');
       });
 
       it('should have ZeroDB as the primary database dependency', () => {
@@ -135,14 +125,14 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
     });
 
     describe('When reviewing environment configuration', () => {
-      it('should have SYNC_ENABLED environment variable documented', () => {
+      it('should not have SYNC_ENABLED in env example after migration', () => {
         const envExamplePath = path.join(__dirname, '../../.env.example');
 
         if (fs.existsSync(envExamplePath)) {
-          const content = fs.readFileSync(envExamplePath, 'utf8');
+          const envContent = fs.readFileSync(envExamplePath, 'utf8');
 
-          // Should document sync configuration
-          expect(content).toContain('SYNC_ENABLED');
+          // SYNC_ENABLED removed after full migration
+          expect(envContent).not.toContain('SYNC_ENABLED');
         }
       });
 
@@ -155,42 +145,40 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
         }
       });
 
-      it('should document MongoDB connection is optional', () => {
+      it('should document ZeroDB as primary database', () => {
         const envExamplePath = path.join(__dirname, '../../.env.example');
 
         if (fs.existsSync(envExamplePath)) {
-          const content = fs.readFileSync(envExamplePath, 'utf8');
+          const envContent = fs.readFileSync(envExamplePath, 'utf8');
 
-          // Check for documentation about MongoDB being optional
-          expect(content.toLowerCase()).toMatch(/(mongodb|mongo).*optional|sync/i);
+          // Should document ZeroDB configuration
+          expect(envContent).toContain('ENABLE_ZERODB');
+          expect(envContent).toContain('AINATIVE_API_TOKEN');
         }
       });
     });
 
     describe('When checking database initialization', () => {
-      it('should initialize ZeroDB before MongoDB in app.js', () => {
+      it('should only initialize ZeroDB in app.js (MongoDB removed)', () => {
         const appContent = fs.readFileSync(
           path.join(__dirname, '../../app.js'),
           'utf8'
         );
 
-        // ZeroDB initialization should come before or independent of MongoDB
-        const zerodbInitIndex = appContent.indexOf('zerodbService.initialize');
-        const mongoInitIndex = appContent.indexOf('connectToMongoDB');
-
-        // Both should be present
-        expect(zerodbInitIndex).toBeGreaterThan(-1);
-        expect(mongoInitIndex).toBeGreaterThan(-1);
+        // ZeroDB initialization should be present
+        expect(appContent).toContain('zerodbService.initialize');
+        // MongoDB initialization should be removed
+        expect(appContent).not.toContain('connectToMongoDB');
       });
 
-      it('should handle MongoDB connection failure gracefully', () => {
+      it('should handle ZeroDB initialization failure gracefully', () => {
         const appContent = fs.readFileSync(
           path.join(__dirname, '../../app.js'),
           'utf8'
         );
 
-        // Should have error handling for MongoDB connection
-        expect(appContent).toMatch(/connectToMongoDB.*catch/s);
+        // Should have error handling for ZeroDB initialization
+        expect(appContent).toMatch(/zerodbService\.initialize[\s\S]*?\.catch/s);
       });
     });
 
@@ -235,12 +223,10 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
         expect(fs.existsSync(adapterPath)).toBe(true);
 
         if (fs.existsSync(adapterPath)) {
-          const content = fs.readFileSync(adapterPath, 'utf8');
+          const adapterContent = fs.readFileSync(adapterPath, 'utf8');
 
-          // Should support both MongoDB and ZeroDB
-          expect(content).toContain('mongoose');
-          expect(content).toContain('zerodbService');
-          expect(content).toContain('migrationMode');
+          // Should reference ZeroDB service
+          expect(adapterContent).toContain('zerodbService');
         }
       });
 
@@ -264,24 +250,24 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
     });
 
     describe('When verifying backward compatibility', () => {
-      it('should maintain existing model files for sync compatibility', () => {
-        // Model files should exist for MongoDB sync feature
+      it('should maintain model files using ZeroDB after migration', () => {
+        // Model files should exist using ZeroDB patterns
         const modelsPath = path.join(__dirname, '../../models');
 
         if (fs.existsSync(modelsPath)) {
           const modelFiles = fs.readdirSync(modelsPath)
-            .filter(f => f.endsWith('.js'));
+            .filter(f => f.endsWith('.js') && !f.startsWith('base'));
 
-          // Should have model files (needed for MongoDB schema in sync)
+          // Should have model files
           expect(modelFiles.length).toBeGreaterThan(0);
 
-          // Each model should use mongoose
+          // Models should NOT use mongoose (migrated to ZeroDB)
           modelFiles.forEach(file => {
-            const content = fs.readFileSync(
+            const modelContent = fs.readFileSync(
               path.join(modelsPath, file),
               'utf8'
             );
-            expect(content).toContain('mongoose');
+            expect(modelContent).not.toContain("require('mongoose')");
           });
         }
       });
@@ -319,8 +305,7 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
         // Should check ENABLE_ZERODB flag
         expect(appContent).toContain('ENABLE_ZERODB');
 
-        // Should allow running without MongoDB (checks for SYNC_ENABLED === 'true')
-        expect(appContent).toMatch(/SYNC_ENABLED.*===.*['"]true['"]/);
+
       });
 
       it('should log clear messages about database configuration', () => {
@@ -329,9 +314,10 @@ describe('MongoDB Dependency Removal - TDD Tests', () => {
           'utf8'
         );
 
-        // Should have console.log statements about database initialization
+        // Should have console.log statements about ZeroDB initialization
         expect(appContent).toMatch(/console\.log.*ZeroDB/i);
-        expect(appContent).toMatch(/console\.log.*MongoDB/i);
+        // MongoDB logging should be removed
+        expect(appContent).not.toMatch(/console\.log.*MongoDB/i);
       });
     });
   });

@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const { checkPermission } = require('../../middleware/rbacMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const taxDocumentController = require('../../controllers/taxDocumentController');
 
 /**
@@ -56,7 +56,7 @@ router.get(
 router.post(
     '/',
     authenticateToken,
-    checkPermission(['admin', 'accountant', 'finance']),
+    hasRole(['admin', 'accountant', 'finance']),
     taxDocumentController.createTaxDocument
 );
 
@@ -68,7 +68,7 @@ router.post(
 router.put(
     '/:id',
     authenticateToken,
-    checkPermission(['admin', 'accountant', 'finance']),
+    hasRole(['admin', 'accountant', 'finance']),
     taxDocumentController.updateTaxDocument
 );
 
@@ -80,7 +80,7 @@ router.put(
 router.delete(
     '/:id',
     authenticateToken,
-    checkPermission(['admin']),
+    hasRole(['admin']),
     taxDocumentController.deleteTaxDocument
 );
 

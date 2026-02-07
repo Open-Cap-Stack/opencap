@@ -5,6 +5,10 @@
 
 const mockPublishEvent = jest.fn();
 const mockFilterEvents = jest.fn();
+const mockPublishUserEvent = jest.fn();
+const mockPublishCompanyEvent = jest.fn();
+const mockPublishTransactionEvent = jest.fn();
+const mockPublishDocumentEvent = jest.fn();
 const mockCreateSubscription = jest.fn();
 const mockGetSubscriptions = jest.fn();
 const mockDeleteSubscription = jest.fn();
@@ -14,25 +18,24 @@ const mockDeleteWebhook = jest.fn();
 const mockGetAuditLog = jest.fn();
 const mockGetEventStats = jest.fn();
 
-jest.mock('../../../services/eventStreamingService', () => {
-  return jest.fn().mockImplementation(() => ({
-    publishEvent: mockPublishEvent,
-    publishUserEvent: jest.fn().mockResolvedValue({ event_id: 'evt_123' }),
-    publishCompanyEvent: jest.fn().mockResolvedValue({ event_id: 'evt_123' }),
-    publishTransactionEvent: jest.fn().mockResolvedValue({ event_id: 'evt_123' }),
-    publishDocumentEvent: jest.fn().mockResolvedValue({ event_id: 'evt_123' }),
-    filterEvents: mockFilterEvents,
-    createSubscription: mockCreateSubscription,
-    getSubscriptions: mockGetSubscriptions,
-    deleteSubscription: mockDeleteSubscription,
-    registerWebhook: mockRegisterWebhook,
-    getWebhooks: mockGetWebhooks,
-    deleteWebhook: mockDeleteWebhook,
-    getAuditLog: mockGetAuditLog,
-    getEventStats: mockGetEventStats,
-    topics: { USER_CREATED: 'user.created', USER_UPDATED: 'user.updated' }
-  }));
-});
+// Mock as a plain object (not a constructor), matching how the controller imports and uses it
+jest.mock('../../../services/eventStreamingService', () => ({
+  publishEvent: mockPublishEvent,
+  publishUserEvent: mockPublishUserEvent,
+  publishCompanyEvent: mockPublishCompanyEvent,
+  publishTransactionEvent: mockPublishTransactionEvent,
+  publishDocumentEvent: mockPublishDocumentEvent,
+  filterEvents: mockFilterEvents,
+  createSubscription: mockCreateSubscription,
+  getSubscriptions: mockGetSubscriptions,
+  deleteSubscription: mockDeleteSubscription,
+  registerWebhook: mockRegisterWebhook,
+  getWebhooks: mockGetWebhooks,
+  deleteWebhook: mockDeleteWebhook,
+  getAuditLog: mockGetAuditLog,
+  getEventStats: mockGetEventStats,
+  topics: { USER_CREATED: 'user.created', USER_UPDATED: 'user.updated' }
+}));
 
 const eventStreamingController = require('../../../controllers/eventStreamingController');
 
@@ -45,6 +48,10 @@ describe('Event Streaming Controller', () => {
     mockRes = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
 
     mockPublishEvent.mockResolvedValue({ event_id: 'evt_123', topic: 'user.created', published_at: new Date().toISOString() });
+    mockPublishUserEvent.mockResolvedValue({ event_id: 'evt_123' });
+    mockPublishCompanyEvent.mockResolvedValue({ event_id: 'evt_123' });
+    mockPublishTransactionEvent.mockResolvedValue({ event_id: 'evt_123' });
+    mockPublishDocumentEvent.mockResolvedValue({ event_id: 'evt_123' });
     mockFilterEvents.mockResolvedValue([]);
     mockCreateSubscription.mockResolvedValue({ subscriptionId: 'sub_123' });
     mockGetSubscriptions.mockResolvedValue([]);

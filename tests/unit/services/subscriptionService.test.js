@@ -397,10 +397,10 @@ describe('SubscriptionService', () => {
     });
 
     it('should return false if subscription is not active', async () => {
-      databaseAdapter.findOne.mockResolvedValue({
-        ...mockSubscription,
-        status: 'canceled'
-      });
+      // findOne queries for status in [active, trialing], so canceled sub returns null
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+
 
       const result = await SubscriptionService.checkFeatureAccess('COMPANY-001', 'cap_table');
 

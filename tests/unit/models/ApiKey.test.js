@@ -1,395 +1,175 @@
 /**
  * ApiKey Model Unit Tests
  * Issue #119: Create API Access for Partners
- * TDD Red Phase: Tests written before implementation
+ * Adapted for ZeroDB model interface
  */
 process.env.SKIP_DB_SETUP = 'true';
-
-const mongoose = require('mongoose');
-
-// Clear any existing models
-if (mongoose.models.ApiKey) {
-  delete mongoose.models.ApiKey;
-}
 
 describe('ApiKey Model', () => {
   let ApiKey;
 
   beforeAll(() => {
-    // Load the model after clearing
+    jest.resetModules();
     ApiKey = require('../../../models/ApiKey');
   });
 
-  afterAll(async () => {
-    // Clean up mongoose models
-    if (mongoose.models.ApiKey) {
-      delete mongoose.models.ApiKey;
-    }
-  });
-
   describe('Schema Validation', () => {
-    it('should create a valid API key with all required fields', async () => {
-      const validApiKey = {
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key_value',
-        secretHash: 'hashed_secret_value',
-        name: 'Production API Key',
-        description: 'API key for production environment',
-        permissions: ['read:companies', 'read:stakeholders'],
-        rateLimit: {
-          requestsPerMinute: 60,
-          requestsPerHour: 1000
-        },
-        status: 'active'
-      };
-
-      const apiKey = new ApiKey(validApiKey);
-      const validationError = apiKey.validateSync();
-
-      expect(validationError).toBeUndefined();
-      expect(apiKey.apiKeyId).toBe('APIK-12345678');
-      expect(apiKey.partnerId).toBe('partner-123');
-      expect(apiKey.companyId).toBe('company-456');
-      expect(apiKey.status).toBe('active');
+    it('should have all required fields defined in schema', () => {
+      expect(ApiKey.schema).toBeDefined();
+      expect(ApiKey.schema).toHaveProperty('apiKeyId');
+      expect(ApiKey.schema).toHaveProperty('partnerId');
+      expect(ApiKey.schema).toHaveProperty('companyId');
+      expect(ApiKey.schema).toHaveProperty('keyHash');
+      expect(ApiKey.schema).toHaveProperty('secretHash');
+      expect(ApiKey.schema).toHaveProperty('name');
     });
 
-    it('should require apiKeyId', async () => {
-      const apiKey = new ApiKey({
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.apiKeyId).toBeDefined();
+    it('should require apiKeyId', () => {
+      expect(ApiKey.schema.apiKeyId.required).toBe(true);
     });
 
-    it('should require partnerId', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.partnerId).toBeDefined();
+    it('should require partnerId', () => {
+      expect(ApiKey.schema.partnerId.required).toBe(true);
     });
 
-    it('should require companyId', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.companyId).toBeDefined();
+    it('should require companyId', () => {
+      expect(ApiKey.schema.companyId.required).toBe(true);
     });
 
-    it('should require keyHash', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.keyHash).toBeDefined();
+    it('should require keyHash', () => {
+      expect(ApiKey.schema.keyHash.required).toBe(true);
     });
 
-    it('should require secretHash', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        name: 'Test Key'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.secretHash).toBeDefined();
+    it('should require secretHash', () => {
+      expect(ApiKey.schema.secretHash.required).toBe(true);
     });
 
-    it('should require name', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.name).toBeDefined();
+    it('should require name', () => {
+      expect(ApiKey.schema.name.required).toBe(true);
     });
   });
 
   describe('Status Enum Validation', () => {
-    it('should accept valid status values', async () => {
-      const validStatuses = ['active', 'suspended', 'revoked'];
-
-      for (const status of validStatuses) {
-        const apiKey = new ApiKey({
-          apiKeyId: `APIK-${status}`,
-          partnerId: 'partner-123',
-          companyId: 'company-456',
-          keyHash: 'hashed_key',
-          secretHash: 'hashed_secret',
-          name: 'Test Key',
-          status
-        });
-
-        const validationError = apiKey.validateSync();
-        expect(validationError).toBeUndefined();
-      }
+    it('should accept valid status values in schema', () => {
+      const validStatuses = ApiKey.schema.status.enum;
+      expect(validStatuses).toContain('active');
+      expect(validStatuses).toContain('suspended');
+      expect(validStatuses).toContain('revoked');
     });
 
-    it('should reject invalid status values', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        status: 'invalid_status'
-      });
-
-      const validationError = apiKey.validateSync();
-      expect(validationError.errors.status).toBeDefined();
+    it('should not include invalid status values', () => {
+      const validStatuses = ApiKey.schema.status.enum;
+      expect(validStatuses).not.toContain('invalid_status');
     });
 
-    it('should default status to active', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.status).toBe('active');
+    it('should default status to active', () => {
+      expect(ApiKey.schema.status.default).toBe('active');
     });
   });
 
   describe('Rate Limit Configuration', () => {
-    it('should accept valid rate limit configuration', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        rateLimit: {
-          requestsPerMinute: 100,
-          requestsPerHour: 5000
-        }
-      });
-
-      expect(apiKey.rateLimit.requestsPerMinute).toBe(100);
-      expect(apiKey.rateLimit.requestsPerHour).toBe(5000);
+    it('should have default rate limit configuration', () => {
+      const defaultRateLimit = ApiKey.schema.rateLimit.default;
+      expect(defaultRateLimit.requestsPerMinute).toBe(60);
+      expect(defaultRateLimit.requestsPerHour).toBe(1000);
     });
 
-    it('should have default rate limits', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.rateLimit.requestsPerMinute).toBe(60);
-      expect(apiKey.rateLimit.requestsPerHour).toBe(1000);
+    it('should have rateLimit field as object type', () => {
+      expect(ApiKey.schema.rateLimit.type).toBe('object');
     });
   });
 
   describe('Permissions Array', () => {
-    it('should accept an array of permissions', async () => {
-      const permissions = ['read:companies', 'write:companies', 'read:stakeholders'];
-
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        permissions
-      });
-
-      expect(apiKey.permissions).toEqual(permissions);
-      expect(apiKey.permissions.length).toBe(3);
+    it('should have permissions field as array type', () => {
+      expect(ApiKey.schema.permissions.type).toBe('array');
     });
 
-    it('should default to empty permissions array', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.permissions).toEqual([]);
+    it('should default to empty permissions array', () => {
+      expect(ApiKey.schema.permissions.default).toEqual([]);
     });
   });
 
   describe('IP Whitelist', () => {
-    it('should accept IP whitelist array', async () => {
-      const ipWhitelist = ['192.168.1.1', '10.0.0.0/8', '2001:db8::1'];
-
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        ipWhitelist
-      });
-
-      expect(apiKey.ipWhitelist).toEqual(ipWhitelist);
+    it('should have ipWhitelist field as array type', () => {
+      expect(ApiKey.schema.ipWhitelist.type).toBe('array');
     });
 
-    it('should default to empty IP whitelist', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.ipWhitelist).toEqual([]);
+    it('should default to empty IP whitelist', () => {
+      expect(ApiKey.schema.ipWhitelist.default).toEqual([]);
     });
   });
 
   describe('Expiration and Usage Tracking', () => {
-    it('should accept expiresAt date', async () => {
-      const expiresAt = new Date('2025-12-31');
-
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        expiresAt
-      });
-
-      expect(apiKey.expiresAt).toEqual(expiresAt);
+    it('should have expiresAt field', () => {
+      expect(ApiKey.schema).toHaveProperty('expiresAt');
+      expect(ApiKey.schema.expiresAt.type).toBe('date');
     });
 
-    it('should track lastUsedAt', async () => {
-      const lastUsedAt = new Date();
-
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        lastUsedAt
-      });
-
-      expect(apiKey.lastUsedAt).toEqual(lastUsedAt);
+    it('should have lastUsedAt field', () => {
+      expect(ApiKey.schema).toHaveProperty('lastUsedAt');
+      expect(ApiKey.schema.lastUsedAt.type).toBe('date');
     });
 
-    it('should have null lastUsedAt by default', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.lastUsedAt).toBeNull();
+    it('should have null lastUsedAt by default', () => {
+      expect(ApiKey.schema.lastUsedAt.default).toBeNull();
     });
   });
 
   describe('Description Field', () => {
-    it('should accept description', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key',
-        description: 'This is a test API key for development'
-      });
-
-      expect(apiKey.description).toBe('This is a test API key for development');
+    it('should have description field', () => {
+      expect(ApiKey.schema).toHaveProperty('description');
     });
 
-    it('should have empty string description by default', async () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      expect(apiKey.description).toBe('');
+    it('should have empty string description by default', () => {
+      expect(ApiKey.schema.description.default).toBe('');
     });
   });
 
   describe('Timestamps', () => {
-    it('should have createdAt and updatedAt timestamps enabled', () => {
-      const apiKey = new ApiKey({
-        apiKeyId: 'APIK-12345678',
-        partnerId: 'partner-123',
-        companyId: 'company-456',
-        keyHash: 'hashed_key',
-        secretHash: 'hashed_secret',
-        name: 'Test Key'
-      });
-
-      // Check that timestamps option is enabled in schema
-      expect(ApiKey.schema.options.timestamps).toBe(true);
+    it('should have createdAt and updatedAt fields in schema', () => {
+      expect(ApiKey.schema).toHaveProperty('createdAt');
+      expect(ApiKey.schema).toHaveProperty('updatedAt');
     });
   });
 
   describe('toJSON Transform', () => {
     it('should hide sensitive fields in JSON output', () => {
-      const apiKey = new ApiKey({
+      const mockApiKey = {
         apiKeyId: 'APIK-12345678',
         partnerId: 'partner-123',
         companyId: 'company-456',
         keyHash: 'hashed_key_value',
         secretHash: 'hashed_secret_value',
         name: 'Test Key'
-      });
+      };
 
-      const json = apiKey.toJSON();
+      const json = ApiKey.toJSON(mockApiKey);
 
       // keyHash and secretHash should be removed from JSON
       expect(json.keyHash).toBeUndefined();
       expect(json.secretHash).toBeUndefined();
       expect(json.apiKeyId).toBe('APIK-12345678');
       expect(json.name).toBe('Test Key');
+    });
+
+    it('should return null for null input', () => {
+      expect(ApiKey.toJSON(null)).toBeNull();
+    });
+  });
+
+  describe('Schema Field Types', () => {
+    it('should have apiKeyId as unique', () => {
+      expect(ApiKey.schema.apiKeyId.unique).toBe(true);
+    });
+
+    it('should have usageCount as number type', () => {
+      expect(ApiKey.schema.usageCount.type).toBe('number');
+      expect(ApiKey.schema.usageCount.default).toBe(0);
+    });
+
+    it('should have usageHistory as array type', () => {
+      expect(ApiKey.schema.usageHistory.type).toBe('array');
+      expect(ApiKey.schema.usageHistory.default).toEqual([]);
     });
   });
 });

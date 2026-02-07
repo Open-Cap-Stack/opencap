@@ -3,7 +3,7 @@
  * Issue #28: Implement event streaming for real-time updates
  */
 
-const EventStreamingService = require('../../../services/eventStreamingService');
+const eventStreamingService = require('../../../services/eventStreamingService');
 const zerodbService = require('../../../services/zerodbService');
 const websocketService = require('../../../services/websocketService');
 
@@ -11,13 +11,9 @@ jest.mock('../../../services/zerodbService');
 jest.mock('../../../services/websocketService');
 
 describe('Event Streaming Service', () => {
-  let eventStreamingService;
-
-  beforeEach(() => {
+    beforeEach(() => {
     jest.clearAllMocks();
-    eventStreamingService = new EventStreamingService();
-
-    zerodbService.publishEvent = jest.fn().mockResolvedValue({ event_id: 'evt_123', topic: 'test.topic', published_at: new Date().toISOString() });
+        zerodbService.publishEvent = jest.fn().mockResolvedValue({ event_id: 'evt_123', topic: 'test.topic', published_at: new Date().toISOString() });
     zerodbService.listEvents = jest.fn().mockResolvedValue([]);
     zerodbService.insertRows = jest.fn().mockResolvedValue({ inserted: 1 });
     zerodbService.queryTable = jest.fn().mockResolvedValue([]);

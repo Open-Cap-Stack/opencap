@@ -132,18 +132,19 @@ describe('PerformanceOptimizer', () => {
         });
       }
 
-      // Low frequency, low duration
-      for (let i = 0; i < 2; i++) {
+      // Lower frequency, lower duration (still meets threshold: freq>=2 AND avgDuration > 100)
+      for (let i = 0; i < 5; i++) {
         performanceOptimizer.trackQuery({
           operation: 'queryTable',
           tableName: 'logs',
-          duration: 100,
+          duration: 200,
           filter: { level: 'error' }
         });
       }
 
       const recommendations = performanceOptimizer.recommendIndexes();
 
+      expect(recommendations.length).toBeGreaterThanOrEqual(2);
       expect(recommendations[0].priority).toBeGreaterThan(recommendations[recommendations.length - 1].priority);
     });
 
@@ -424,11 +425,12 @@ describe('PerformanceOptimizer', () => {
     it('should export performance data for external analysis', () => {
       performanceOptimizer.trackQuery({ operation: 'queryTable', tableName: 'users', duration: 1000 });
 
-      const exportedData = performanceOptimizer.exportData();
+      const exportedData = performanceOptimizer.exportData('json');
+      const parsed = JSON.parse(exportedData);
 
-      expect(exportedData).toHaveProperty('queries');
-      expect(exportedData).toHaveProperty('batchOperations');
-      expect(exportedData).toHaveProperty('connectionPoolMetrics');
+      expect(parsed).toHaveProperty('queries');
+      expect(parsed).toHaveProperty('batchOperations');
+      expect(parsed).toHaveProperty('connectionPoolMetrics');
     });
 
     it('should support JSON export format', () => {
@@ -436,6 +438,7 @@ describe('PerformanceOptimizer', () => {
 
       const json = performanceOptimizer.exportData('json');
 
+      expect(typeof json).toBe('string');
       expect(() => JSON.parse(json)).not.toThrow();
     });
   });

@@ -2,1327 +2,835 @@
  * Database Adapter Service Test Suite
  * [Feature] Issue #6: Database Abstraction Layer Testing
  *
- * Comprehensive test coverage for database abstraction layer with MongoDB and ZeroDB support
- * Tests CRUD operations, migration modes, consistency validation, metrics, and fallback logic
+ * Tests for the ZeroDB-only database adapter.
+ * Covers CRUD operations, metrics, aggregation, initialization, and error handling.
  */
 
-const databaseAdapter = require('../../../services/databaseAdapter');
-const mongoose = require('mongoose');
 const zerodbService = require('../../../services/zerodbService');
 
-// Mock external services
-jest.mock('mongoose');
+// Mock zerodbService
 jest.mock('../../../services/zerodbService');
 
+// We need a fresh instance for each test, so we re-require after clearing cache
+let databaseAdapter;
+
 describe('Database Adapter Service', () => {
-  let originalEnv;
-
-  beforeAll(() => {
-    originalEnv = { ...process.env };
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.MIGRATION_MODE = 'parallel'; // Default for most tests
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
+    // Get a fresh instance for each test
+    jest.isolateModules(() => {
+      databaseAdapter = require('../../../services/databaseAdapter');
+    });
   });
 
   describe('Initialization and Configuration', () => {
-    describe('initialize', () => {
-      it('should initialize with parallel migration mode by default', async () => {
-        const result = await databaseAdapter.initialize();
-
-        expect(result).toHaveProperty('mode', 'parallel');
-        expect(result).toHaveProperty('mongodbConnected');
-        expect(result).toHaveProperty('zerodbConnected');
-      });
-
-      it('should initialize with mongodb-only mode when specified', async () => {
-        process.env.MIGRATION_MODE = 'mongodb-only';
-
-        const result = await databaseAdapter.initialize();
-
-        expect(result).toHaveProperty('mode', 'mongodb-only');
-        expect(result.mongodbConnected).toBe(true);
-        expect(result.zerodbConnected).toBe(false);
-      });
-
-      it('should initialize with zerodb-only mode when specified', async () => {
-        process.env.MIGRATION_MODE = 'zerodb-only';
-
-        const result = await databaseAdapter.initialize();
-
-        expect(result).toHaveProperty('mode', 'zerodb-only');
-        expect(result.mongodbConnected).toBe(false);
-        expect(result.zerodbConnected).toBe(true);
-      });
-
-      it('should handle initialization errors gracefully', async () => {
-        mongoose.connect = jest.fn().mockRejectedValue(new Error('Connection failed'));
-
-        await expect(databaseAdapter.initialize())
-          .rejects.toThrow('Connection failed');
+    describe('getMigrationMode', () => {
+      it('should always return zerodb-only', () => {
+        const mode = databaseAdapter.getMigrationMode();
+        expect(mode).toBe('zerodb-only');
       });
     });
 
-    describe('getMigrationMode', () => {
-      it('should return current migration mode', () => {
-        process.env.MIGRATION_MODE = 'parallel';
+    describe('isMongoDBRequired', () => {
+      it('should always return false', () => {
+        expect(databaseAdapter.isMongoDBRequired()).toBe(false);
+      });
+    });
 
-        const mode = databaseAdapter.getMigrationMode();
+    describe('initialize', () => {
+      it('should initialize with a ZeroDB token', async () => {
+        zerodbService.initialize.mockResolvedValue(true);
 
-        expect(mode).toBe('parallel');
+        await databaseAdapter.initialize('test-token');
+
+        expect(zerodbService.initialize).toHaveBeenCalledWith('test-token');
       });
 
-      it('should default to parallel if not specified', () => {
-        delete process.env.MIGRATION_MODE;
+      it('should throw error when no token is provided', async () => {
+        await expect(databaseAdapter.initialize())
+          .rejects.toThrow('ZeroDB token required');
+      });
 
-        const mode = databaseAdapter.getMigrationMode();
+      it('should throw error when token is null', async () => {
+        await expect(databaseAdapter.initialize(null))
+          .rejects.toThrow('ZeroDB token required');
+      });
 
-        expect(mode).toBe('parallel');
+      it('should throw error when token is empty string', async () => {
+        await expect(databaseAdapter.initialize(''))
+          .rejects.toThrow('ZeroDB token required');
+      });
+
+      it('should propagate initialization errors from zerodbService', async () => {
+        zerodbService.initialize.mockRejectedValue(new Error('Connection failed'));
+
+        await expect(databaseAdapter.initialize('test-token'))
+          .rejects.toThrow('Connection failed');
+      });
+
+      it('should set initialized flag on success', async () => {
+        zerodbService.initialize.mockResolvedValue(true);
+        await databaseAdapter.initialize('test-token');
+
+        // After initialization, operations should not throw initialization error
+        zerodbService.insertRow.mockResolvedValue({ _id: '123' });
+        await expect(databaseAdapter.create('User', { name: 'Test' })).resolves.toBeDefined();
       });
     });
   });
 
-  describe('CRUD Operations - Parallel Mode', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'parallel';
+  describe('Uninitialized State', () => {
+    it('should throw error on create when not initialized', async () => {
+      await expect(databaseAdapter.create('User', { name: 'Test' }))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on find when not initialized', async () => {
+      await expect(databaseAdapter.find('User', {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on findOne when not initialized', async () => {
+      await expect(databaseAdapter.findOne('User', {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on findById when not initialized', async () => {
+      await expect(databaseAdapter.findById('User', '123'))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on update when not initialized', async () => {
+      await expect(databaseAdapter.update('User', {}, {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on findByIdAndUpdate when not initialized', async () => {
+      await expect(databaseAdapter.findByIdAndUpdate('User', '123', {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on delete when not initialized', async () => {
+      await expect(databaseAdapter.delete('User', {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on findByIdAndDelete when not initialized', async () => {
+      await expect(databaseAdapter.findByIdAndDelete('User', '123'))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on count when not initialized', async () => {
+      await expect(databaseAdapter.count('User', {}))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+
+    it('should throw error on aggregate when not initialized', async () => {
+      await expect(databaseAdapter.aggregate('User', []))
+        .rejects.toThrow('DatabaseAdapter not initialized');
+    });
+  });
+
+  describe('CRUD Operations', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
     });
 
     describe('create', () => {
-      it('should create document in both MongoDB and ZeroDB', async () => {
-        const modelName = 'User';
-        const data = {
-          userId: 'USER_001',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@example.com',
-          role: 'admin'
-        };
+      it('should create a document via zerodbService.insertRow', async () => {
+        const data = { userId: 'USER_001', firstName: 'John', email: 'john@example.com' };
+        const mockResult = { _id: 'zero_123', ...data };
 
-        const mockMongoResult = { _id: 'mongo_123', ...data };
-        const mockZeroResult = { id: 'zero_123', ...data };
+        zerodbService.insertRow.mockResolvedValue(mockResult);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue(mockMongoResult)
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue(mockZeroResult);
+        const result = await databaseAdapter.create('User', data);
 
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result).toHaveProperty('mongodb', mockMongoResult);
-        expect(result).toHaveProperty('zerodb', mockZeroResult);
-        expect(result).toHaveProperty('consistent', true);
-        expect(mongoose.model).toHaveBeenCalledWith(modelName);
-        expect(zerodbService.insertRows).toHaveBeenCalledWith(
-          modelName.toLowerCase(),
-          expect.arrayContaining([expect.objectContaining(data)])
-        );
+        expect(zerodbService.insertRow).toHaveBeenCalledWith('users', data);
+        expect(result).toEqual(mockResult);
       });
 
-      it('should validate consistency between MongoDB and ZeroDB results', async () => {
-        const modelName = 'Company';
-        const data = { companyId: 'COMP_001', CompanyName: 'Test Corp' };
+      it('should convert model name to table name', async () => {
+        zerodbService.insertRow.mockResolvedValue({ _id: '123' });
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_id', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_id', ...data });
+        await databaseAdapter.create('ShareClass', { name: 'Common' });
 
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result.consistent).toBe(true);
-        expect(result).toHaveProperty('validationChecks');
+        expect(zerodbService.insertRow).toHaveBeenCalledWith('share_class', { name: 'Common' });
       });
 
-      it('should handle partial failure with fallback', async () => {
-        const modelName = 'Document';
-        const data = { title: 'Test Document' };
+      it('should use mapped table names for known models', async () => {
+        zerodbService.insertRow.mockResolvedValue({ _id: '123' });
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_id', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockRejectedValue(new Error('ZeroDB error'));
+        await databaseAdapter.create('SPVAsset', { name: 'Asset1' });
 
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result).toHaveProperty('mongodb');
-        expect(result.zerodb).toBeNull();
-        expect(result).toHaveProperty('error');
-        expect(result.fallbackUsed).toBe(true);
+        expect(zerodbService.insertRow).toHaveBeenCalledWith('spv_assets', { name: 'Asset1' });
       });
 
-      it('should collect metrics during create operation', async () => {
-        const modelName = 'Stakeholder';
-        const data = { name: 'Jane Smith' };
+      it('should propagate create errors', async () => {
+        zerodbService.insertRow.mockRejectedValue(new Error('Insert failed'));
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_id', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_id', ...data });
+        await expect(databaseAdapter.create('User', { name: 'Test' }))
+          .rejects.toThrow('Insert failed');
+      });
 
-        const result = await databaseAdapter.create(modelName, data);
+      it('should record success metrics on successful create', async () => {
+        zerodbService.insertRow.mockResolvedValue({ _id: '123' });
 
-        expect(result).toHaveProperty('metrics');
-        expect(result.metrics).toHaveProperty('responseTime');
-        expect(result.metrics).toHaveProperty('mongodbTime');
-        expect(result.metrics).toHaveProperty('zerodbTime');
-        expect(result.metrics.responseTime).toBeGreaterThanOrEqual(0);
+        await databaseAdapter.create('User', { name: 'Test' });
+
+        const metrics = databaseAdapter.getMetrics();
+        expect(metrics.zerodb.successCount).toBeGreaterThan(0);
+      });
+
+      it('should record error metrics on failed create', async () => {
+        zerodbService.insertRow.mockRejectedValue(new Error('Failed'));
+
+        try {
+          await databaseAdapter.create('User', { name: 'Test' });
+        } catch (error) {
+          // Expected
+        }
+
+        const metrics = databaseAdapter.getMetrics();
+        expect(metrics.zerodb.errorCount).toBeGreaterThan(0);
       });
     });
 
-    describe('read', () => {
-      it('should read from both databases and validate consistency', async () => {
-        const modelName = 'User';
-        const query = { userId: 'USER_001' };
+    describe('find', () => {
+      it('should find documents via zerodbService.queryTable', async () => {
+        const mockResults = [
+          { _id: '1', email: 'user1@example.com' },
+          { _id: '2', email: 'user2@example.com' }
+        ];
 
-        const mockMongoResult = { _id: 'mongo_123', userId: 'USER_001', email: 'test@example.com' };
-        const mockZeroResult = { id: 'zero_123', userId: 'USER_001', email: 'test@example.com' };
+        zerodbService.queryTable.mockResolvedValue(mockResults);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([mockMongoResult])
-          })
+        const result = await databaseAdapter.find('User', { role: 'admin' });
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('users', {
+          filter: { role: 'admin' },
+          limit: undefined,
+          sort: undefined,
+          skip: undefined,
+          projection: undefined
         });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [mockZeroResult] });
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.mongodb).toEqual([mockMongoResult]);
-        expect(result.zerodb).toEqual([mockZeroResult]);
-        expect(result.consistent).toBe(true);
+        expect(result).toEqual(mockResults);
       });
 
-      it('should detect inconsistencies between databases', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
+      it('should pass options (limit, sort, skip, projection) to queryTable', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([{ _id: 'mongo_id', CompanyName: 'Company A' }])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({
-          rows: [{ id: 'zero_id', CompanyName: 'Company B' }]
+        await databaseAdapter.find('Company', { status: 'active' }, {
+          limit: 10,
+          sort: { name: 1 },
+          skip: 5,
+          projection: { name: 1, status: 1 }
         });
 
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.consistent).toBe(false);
-        expect(result).toHaveProperty('inconsistencies');
-        expect(result.inconsistencies.length).toBeGreaterThan(0);
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {
+          filter: { status: 'active' },
+          limit: 10,
+          sort: { name: 1 },
+          skip: 5,
+          projection: { name: 1, status: 1 }
+        });
       });
 
-      it('should use primary database result when inconsistency detected', async () => {
-        const modelName = 'FinancialReport';
-        const query = { reportId: 'RPT_001' };
+      it('should return empty array on table not found error', async () => {
+        const error = new Error('Table not found');
+        error.message = 'Table not found';
+        zerodbService.queryTable.mockRejectedValue(error);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([{ _id: 'mongo_id', amount: 1000 }])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({
-          rows: [{ id: 'zero_id', amount: 2000 }]
-        });
+        const result = await databaseAdapter.find('NonExistentModel', {});
 
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.primaryResult).toEqual(result.mongodb);
-      });
-    });
-
-    describe('update', () => {
-      it('should update document in both databases', async () => {
-        const modelName = 'User';
-        const query = { userId: 'USER_001' };
-        const updateData = { email: 'newemail@example.com' };
-
-        const mockMongoResult = { modifiedCount: 1, matchedCount: 1 };
-        const mockZeroResult = { updatedCount: 1 };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          updateMany: jest.fn().mockResolvedValue(mockMongoResult)
-        });
-        zerodbService.updateRows = jest.fn().mockResolvedValue(mockZeroResult);
-
-        const result = await databaseAdapter.update(modelName, query, updateData);
-
-        expect(result.mongodb).toEqual(mockMongoResult);
-        expect(result.zerodb).toEqual(mockZeroResult);
-        expect(result.consistent).toBe(true);
+        expect(result).toEqual([]);
       });
 
-      it('should handle update with options parameter', async () => {
-        const modelName = 'Document';
-        const query = { documentId: 'DOC_001' };
-        const updateData = { status: 'approved' };
-        const options = { upsert: true };
+      it('should propagate non-not-found errors', async () => {
+        zerodbService.queryTable.mockRejectedValue(new Error('Connection lost'));
 
-        mongoose.model = jest.fn().mockReturnValue({
-          updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 })
-        });
-        zerodbService.updateRows = jest.fn().mockResolvedValue({ updatedCount: 1 });
-
-        await databaseAdapter.update(modelName, query, updateData, options);
-
-        expect(mongoose.model().updateMany).toHaveBeenCalledWith(
-          query,
-          updateData,
-          options
-        );
+        await expect(databaseAdapter.find('User', {}))
+          .rejects.toThrow('Connection lost');
       });
 
-      it('should rollback ZeroDB on MongoDB update failure', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
-        const updateData = { CompanyName: 'Updated Name' };
+      it('should use default empty query and options', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          updateMany: jest.fn().mockRejectedValue(new Error('MongoDB update failed'))
-        });
-        zerodbService.updateRows = jest.fn().mockResolvedValue({ updatedCount: 1 });
+        const result = await databaseAdapter.find('User');
 
-        await expect(databaseAdapter.update(modelName, query, updateData))
-          .rejects.toThrow('MongoDB update failed');
-
-        // Verify rollback was attempted
-        expect(zerodbService.updateRows).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('delete', () => {
-      it('should delete document from both databases', async () => {
-        const modelName = 'Notification';
-        const query = { notificationId: 'NOTIF_001' };
-
-        const mockMongoResult = { deletedCount: 1 };
-        const mockZeroResult = { deletedCount: 1 };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          deleteMany: jest.fn().mockResolvedValue(mockMongoResult)
-        });
-        zerodbService.deleteRows = jest.fn().mockResolvedValue(mockZeroResult);
-
-        const result = await databaseAdapter.delete(modelName, query);
-
-        expect(result.mongodb.deletedCount).toBe(1);
-        expect(result.zerodb.deletedCount).toBe(1);
-        expect(result.consistent).toBe(true);
-      });
-
-      it('should handle cascade delete across related tables', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
-        const options = { cascade: ['users', 'documents', 'activities'] };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 })
-        });
-        zerodbService.deleteRows = jest.fn().mockResolvedValue({ deletedCount: 1 });
-
-        const result = await databaseAdapter.delete(modelName, query, options);
-
-        expect(result).toHaveProperty('cascadeResults');
-        expect(result.cascadeResults).toHaveProperty('users');
-        expect(result.cascadeResults).toHaveProperty('documents');
-        expect(result.cascadeResults).toHaveProperty('activities');
+        expect(result).toEqual([]);
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('users', expect.objectContaining({
+          filter: {}
+        }));
       });
     });
 
     describe('findOne', () => {
-      it('should find single document from both databases', async () => {
-        const modelName = 'User';
-        const query = { email: 'test@example.com' };
+      it('should return first matching document', async () => {
+        const mockDoc = { _id: '123', email: 'test@example.com' };
+        zerodbService.queryTable.mockResolvedValue([mockDoc]);
 
-        const mockMongoResult = { _id: 'mongo_123', email: 'test@example.com' };
-        const mockZeroResult = { id: 'zero_123', email: 'test@example.com' };
+        const result = await databaseAdapter.findOne('User', { email: 'test@example.com' });
 
-        mongoose.model = jest.fn().mockReturnValue({
-          findOne: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue(mockMongoResult)
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [mockZeroResult] });
-
-        const result = await databaseAdapter.findOne(modelName, query);
-
-        expect(result.mongodb).toEqual(mockMongoResult);
-        expect(result.zerodb).toEqual(mockZeroResult);
+        expect(result).toEqual(mockDoc);
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('users', expect.objectContaining({
+          filter: { email: 'test@example.com' },
+          limit: 1
+        }));
       });
 
-      it('should return null when document not found in either database', async () => {
-        const modelName = 'User';
-        const query = { userId: 'NONEXISTENT' };
+      it('should return null when no document found', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          findOne: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue(null)
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+        const result = await databaseAdapter.findOne('User', { userId: 'NONEXISTENT' });
 
-        const result = await databaseAdapter.findOne(modelName, query);
+        expect(result).toBeNull();
+      });
 
-        expect(result.mongodb).toBeNull();
-        expect(result.zerodb).toBeNull();
+      it('should return null when queryTable returns null', async () => {
+        zerodbService.queryTable.mockResolvedValue(null);
+
+        const result = await databaseAdapter.findOne('User', { userId: 'NONEXISTENT' });
+
+        expect(result).toBeNull();
       });
     });
 
     describe('findById', () => {
-      it('should find document by ID from both databases', async () => {
-        const modelName = 'Company';
-        const id = 'mongo_123';
+      it('should find document by ID', async () => {
+        const mockDoc = { _id: 'doc_123', CompanyName: 'Test Corp' };
+        zerodbService.queryTable.mockResolvedValue([mockDoc]);
 
-        const mockMongoResult = { _id: 'mongo_123', CompanyName: 'Test Corp' };
-        const mockZeroResult = { id: 'zero_123', CompanyName: 'Test Corp' };
+        const result = await databaseAdapter.findById('Company', 'doc_123');
 
-        mongoose.model = jest.fn().mockReturnValue({
-          findById: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue(mockMongoResult)
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [mockZeroResult] });
-
-        const result = await databaseAdapter.findById(modelName, id);
-
-        expect(result.mongodb).toEqual(mockMongoResult);
-        expect(result.zerodb).toEqual(mockZeroResult);
+        expect(result).toEqual(mockDoc);
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', expect.objectContaining({
+          filter: { _id: 'doc_123' },
+          limit: 1
+        }));
       });
-    });
-  });
 
-  describe('CRUD Operations - MongoDB Only Mode', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'mongodb-only';
-    });
+      it('should return null when ID is not found', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
 
-    describe('create', () => {
-      it('should only create in MongoDB', async () => {
-        const modelName = 'User';
-        const data = { email: 'test@example.com' };
+        const result = await databaseAdapter.findById('Company', 'nonexistent');
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result).toHaveProperty('mongodb');
-        expect(result.zerodb).toBeUndefined();
-        expect(zerodbService.insertRows).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('read', () => {
-      it('should only read from MongoDB', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([{ _id: 'mongo_123' }])
-          })
-        });
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result).toEqual([{ _id: 'mongo_123' }]);
-        expect(zerodbService.queryTable).not.toHaveBeenCalled();
+        expect(result).toBeNull();
       });
     });
 
     describe('update', () => {
-      it('should only update in MongoDB', async () => {
-        const modelName = 'Document';
-        const query = { documentId: 'DOC_001' };
-        const updateData = { status: 'approved' };
+      it('should update documents via zerodbService.updateRows', async () => {
+        const mockResult = { updatedCount: 1 };
+        zerodbService.updateRows.mockResolvedValue(mockResult);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 })
+        const result = await databaseAdapter.update(
+          'User',
+          { userId: 'USER_001' },
+          { email: 'newemail@example.com' }
+        );
+
+        expect(zerodbService.updateRows).toHaveBeenCalledWith('users', {
+          filter: { userId: 'USER_001' },
+          update: { email: 'newemail@example.com' }
         });
+        expect(result).toEqual(mockResult);
+      });
 
-        const result = await databaseAdapter.update(modelName, query, updateData);
+      it('should propagate update errors', async () => {
+        zerodbService.updateRows.mockRejectedValue(new Error('Update failed'));
 
-        expect(result.modifiedCount).toBe(1);
-        expect(zerodbService.updateRows).not.toHaveBeenCalled();
+        await expect(databaseAdapter.update('User', { userId: 'USER_001' }, { name: 'New' }))
+          .rejects.toThrow('Update failed');
+      });
+    });
+
+    describe('findByIdAndUpdate', () => {
+      it('should update a document by ID', async () => {
+        const mockResult = { _id: '123', name: 'Updated' };
+        zerodbService.updateRows.mockResolvedValue(mockResult);
+
+        const result = await databaseAdapter.findByIdAndUpdate('User', '123', { name: 'Updated' });
+
+        expect(zerodbService.updateRows).toHaveBeenCalledWith('users', {
+          filter: { _id: '123' },
+          update: { name: 'Updated' }
+        });
+        expect(result).toEqual(mockResult);
       });
     });
 
     describe('delete', () => {
-      it('should only delete from MongoDB', async () => {
-        const modelName = 'Activity';
-        const query = { activityId: 'ACT_001' };
+      it('should delete documents via zerodbService.deleteRows', async () => {
+        const mockResult = { deletedCount: 1 };
+        zerodbService.deleteRows.mockResolvedValue(mockResult);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 })
+        const result = await databaseAdapter.delete('Notification', { notificationId: 'NOTIF_001' });
+
+        expect(zerodbService.deleteRows).toHaveBeenCalledWith('compliance_events', {
+          filter: { notificationId: 'NOTIF_001' }
         });
+        expect(result).toEqual(mockResult);
+      });
 
-        const result = await databaseAdapter.delete(modelName, query);
+      it('should propagate delete errors', async () => {
+        zerodbService.deleteRows.mockRejectedValue(new Error('Delete failed'));
 
-        expect(result.deletedCount).toBe(1);
-        expect(zerodbService.deleteRows).not.toHaveBeenCalled();
+        await expect(databaseAdapter.delete('User', { userId: 'USER_001' }))
+          .rejects.toThrow('Delete failed');
+      });
+    });
+
+    describe('findByIdAndDelete', () => {
+      it('should delete a document by ID', async () => {
+        const mockResult = { _id: '123', deletedCount: 1 };
+        zerodbService.deleteRows.mockResolvedValue(mockResult);
+
+        const result = await databaseAdapter.findByIdAndDelete('User', '123');
+
+        expect(zerodbService.deleteRows).toHaveBeenCalledWith('users', {
+          filter: { _id: '123' }
+        });
+        expect(result).toEqual(mockResult);
+      });
+    });
+
+    describe('count', () => {
+      it('should count documents matching query', async () => {
+        zerodbService.queryTable.mockResolvedValue(5);
+
+        const result = await databaseAdapter.count('User', { role: 'admin' });
+
+        expect(result).toBe(5);
+        expect(zerodbService.queryTable).toHaveBeenCalledWith('users', {
+          filter: { role: 'admin' },
+          countOnly: true
+        });
+      });
+
+      it('should handle count result as object with count property', async () => {
+        zerodbService.queryTable.mockResolvedValue({ count: 10 });
+
+        const result = await databaseAdapter.count('User', { role: 'admin' });
+
+        expect(result).toBe(10);
+      });
+
+      it('should handle count result as array with length', async () => {
+        zerodbService.queryTable.mockResolvedValue([1, 2, 3]);
+
+        const result = await databaseAdapter.count('User', { role: 'admin' });
+
+        expect(result).toBe(3);
+      });
+
+      it('should return 0 for table not found', async () => {
+        const error = new Error('Table not found');
+        zerodbService.queryTable.mockRejectedValue(error);
+
+        const result = await databaseAdapter.count('NonExistent', {});
+
+        expect(result).toBe(0);
+      });
+
+      it('should use default empty query', async () => {
+        zerodbService.queryTable.mockResolvedValue(0);
+
+        const result = await databaseAdapter.count('User');
+
+        expect(result).toBe(0);
       });
     });
   });
 
-  describe('CRUD Operations - ZeroDB Only Mode', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'zerodb-only';
+  describe('Aggregation', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
     });
 
-    describe('create', () => {
-      it('should only create in ZeroDB', async () => {
-        const modelName = 'User';
-        const data = { email: 'test@example.com' };
+    it('should handle $match stage by querying ZeroDB', async () => {
+      const mockData = [
+        { _id: '1', status: 'active', amount: 100 },
+        { _id: '2', status: 'active', amount: 200 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
+      const pipeline = [
+        { $match: { status: 'active' } }
+      ];
 
-        const result = await databaseAdapter.create(modelName, data);
+      const result = await databaseAdapter.aggregate('User', pipeline);
 
-        expect(result).toHaveProperty('zerodb');
-        expect(result.mongodb).toBeUndefined();
-        expect(mongoose.model).not.toHaveBeenCalled();
-      });
+      expect(result).toEqual(mockData);
     });
 
-    describe('read', () => {
-      it('should only read from ZeroDB', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
+    it('should handle $match followed by $group with $sum', async () => {
+      const mockData = [
+        { _id: '1', status: 'active', amount: 100 },
+        { _id: '2', status: 'active', amount: 200 },
+        { _id: '3', status: 'inactive', amount: 50 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        zerodbService.queryTable = jest.fn().mockResolvedValue({
-          rows: [{ id: 'zero_123', companyId: 'COMP_001' }]
-        });
+      const pipeline = [
+        { $match: {} },
+        {
+          $group: {
+            _id: '$status',
+            totalAmount: { $sum: '$amount' }
+          }
+        }
+      ];
 
-        const result = await databaseAdapter.read(modelName, query);
+      const result = await databaseAdapter.aggregate('FinancialReport', pipeline);
 
-        expect(result).toEqual([{ id: 'zero_123', companyId: 'COMP_001' }]);
-        expect(mongoose.model).not.toHaveBeenCalled();
-      });
+      expect(result).toEqual(expect.arrayContaining([
+        expect.objectContaining({ _id: 'active', totalAmount: 300 }),
+        expect.objectContaining({ _id: 'inactive', totalAmount: 50 })
+      ]));
     });
 
-    describe('update', () => {
-      it('should only update in ZeroDB', async () => {
-        const modelName = 'Document';
-        const query = { documentId: 'DOC_001' };
-        const updateData = { status: 'approved' };
+    it('should handle $group with $avg operator', async () => {
+      const mockData = [
+        { _id: '1', category: 'A', value: 10 },
+        { _id: '2', category: 'A', value: 20 },
+        { _id: '3', category: 'B', value: 30 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        zerodbService.updateRows = jest.fn().mockResolvedValue({ updatedCount: 1 });
+      const pipeline = [
+        { $match: {} },
+        {
+          $group: {
+            _id: '$category',
+            avgValue: { $avg: '$value' }
+          }
+        }
+      ];
 
-        const result = await databaseAdapter.update(modelName, query, updateData);
+      const result = await databaseAdapter.aggregate('Transaction', pipeline);
 
-        expect(result.updatedCount).toBe(1);
-        expect(mongoose.model).not.toHaveBeenCalled();
-      });
+      const groupA = result.find(r => r._id === 'A');
+      expect(groupA.avgValue).toBe(15);
     });
 
-    describe('delete', () => {
-      it('should only delete from ZeroDB', async () => {
-        const modelName = 'Activity';
-        const query = { activityId: 'ACT_001' };
+    it('should handle $group with $max operator', async () => {
+      const mockData = [
+        { _id: '1', category: 'A', value: 10 },
+        { _id: '2', category: 'A', value: 20 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        zerodbService.deleteRows = jest.fn().mockResolvedValue({ deletedCount: 1 });
+      const pipeline = [
+        { $match: {} },
+        { $group: { _id: '$category', maxValue: { $max: '$value' } } }
+      ];
 
-        const result = await databaseAdapter.delete(modelName, query);
+      const result = await databaseAdapter.aggregate('Transaction', pipeline);
 
-        expect(result.deletedCount).toBe(1);
-        expect(mongoose.model).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Consistency Validation', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'parallel';
+      expect(result[0].maxValue).toBe(20);
     });
 
-    describe('validateConsistency', () => {
-      it('should validate data consistency between databases', async () => {
-        const mongoData = [{ _id: 'mongo_123', name: 'Test' }];
-        const zeroData = [{ id: 'zero_123', name: 'Test' }];
+    it('should handle $group with $min operator', async () => {
+      const mockData = [
+        { _id: '1', category: 'A', value: 10 },
+        { _id: '2', category: 'A', value: 20 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        const result = await databaseAdapter.validateConsistency(mongoData, zeroData);
+      const pipeline = [
+        { $match: {} },
+        { $group: { _id: '$category', minValue: { $min: '$value' } } }
+      ];
 
-        expect(result).toHaveProperty('consistent', true);
-        expect(result).toHaveProperty('recordCount');
-        expect(result).toHaveProperty('validationTime');
-      });
+      const result = await databaseAdapter.aggregate('Transaction', pipeline);
 
-      it('should detect missing records in ZeroDB', async () => {
-        const mongoData = [
-          { _id: 'mongo_123', name: 'Test1' },
-          { _id: 'mongo_456', name: 'Test2' }
-        ];
-        const zeroData = [{ id: 'zero_123', name: 'Test1' }];
-
-        const result = await databaseAdapter.validateConsistency(mongoData, zeroData);
-
-        expect(result.consistent).toBe(false);
-        expect(result.inconsistencies).toContainEqual(
-          expect.objectContaining({
-            type: 'missing_in_zerodb'
-          })
-        );
-      });
-
-      it('should detect field value mismatches', async () => {
-        const mongoData = [{ _id: 'mongo_123', name: 'Test', amount: 100 }];
-        const zeroData = [{ id: 'zero_123', name: 'Test', amount: 200 }];
-
-        const result = await databaseAdapter.validateConsistency(mongoData, zeroData);
-
-        expect(result.consistent).toBe(false);
-        expect(result.inconsistencies).toContainEqual(
-          expect.objectContaining({
-            type: 'field_mismatch',
-            field: 'amount'
-          })
-        );
-      });
-
-      it('should handle large dataset validation efficiently', async () => {
-        const largeMongoData = Array.from({ length: 10000 }, (_, i) => ({
-          _id: `mongo_${i}`,
-          value: i
-        }));
-        const largeZeroData = Array.from({ length: 10000 }, (_, i) => ({
-          id: `zero_${i}`,
-          value: i
-        }));
-
-        const startTime = Date.now();
-        const result = await databaseAdapter.validateConsistency(largeMongoData, largeZeroData);
-        const duration = Date.now() - startTime;
-
-        expect(result.consistent).toBe(true);
-        expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
-      });
-
-      it('should ignore system fields in comparison', async () => {
-        const mongoData = [{
-          _id: 'mongo_123',
-          name: 'Test',
-          __v: 0,
-          createdAt: new Date('2024-01-01')
-        }];
-        const zeroData = [{
-          id: 'zero_123',
-          name: 'Test',
-          created_at: new Date('2024-01-01')
-        }];
-
-        const result = await databaseAdapter.validateConsistency(mongoData, zeroData);
-
-        expect(result.consistent).toBe(true);
-      });
+      expect(result[0].minValue).toBe(10);
     });
 
-    describe('syncInconsistencies', () => {
-      it('should sync inconsistent data from MongoDB to ZeroDB', async () => {
-        const inconsistencies = [
-          { type: 'missing_in_zerodb', mongoRecord: { _id: 'mongo_123', name: 'Test' } }
-        ];
+    it('should handle $group with null _id (group all)', async () => {
+      const mockData = [
+        { _id: '1', amount: 100 },
+        { _id: '2', amount: 200 }
+      ];
+      zerodbService.queryTable.mockResolvedValue(mockData);
 
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ success: true });
+      const pipeline = [
+        { $match: {} },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ];
 
-        const result = await databaseAdapter.syncInconsistencies('User', inconsistencies);
+      const result = await databaseAdapter.aggregate('Transaction', pipeline);
 
-        expect(result).toHaveProperty('synced', true);
-        expect(result).toHaveProperty('syncedCount', 1);
-        expect(zerodbService.insertRows).toHaveBeenCalled();
-      });
+      expect(result).toHaveLength(1);
+      expect(result[0]._id).toBeNull();
+      expect(result[0].total).toBe(300);
+    });
 
-      it('should handle sync failures gracefully', async () => {
-        const inconsistencies = [
-          { type: 'missing_in_zerodb', mongoRecord: { _id: 'mongo_123' } }
-        ];
+    it('should propagate aggregate errors', async () => {
+      zerodbService.queryTable.mockRejectedValue(new Error('Aggregation failed'));
 
-        zerodbService.insertRows = jest.fn().mockRejectedValue(new Error('Sync failed'));
+      const pipeline = [{ $match: { status: 'active' } }];
 
-        const result = await databaseAdapter.syncInconsistencies('User', inconsistencies);
-
-        expect(result.synced).toBe(false);
-        expect(result).toHaveProperty('errors');
-      });
+      await expect(databaseAdapter.aggregate('User', pipeline))
+        .rejects.toThrow('Aggregation failed');
     });
   });
 
   describe('Metrics Collection', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'parallel';
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
     });
 
     describe('getMetrics', () => {
-      it('should return operation metrics', async () => {
-        // Perform some operations to generate metrics
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        await databaseAdapter.read('User', {});
-
+      it('should return zerodb metrics', () => {
         const metrics = databaseAdapter.getMetrics();
 
-        expect(metrics).toHaveProperty('totalOperations');
-        expect(metrics).toHaveProperty('successfulOperations');
-        expect(metrics).toHaveProperty('failedOperations');
-        expect(metrics).toHaveProperty('averageResponseTime');
-        expect(metrics).toHaveProperty('errorRate');
+        expect(metrics).toHaveProperty('zerodb');
+        expect(metrics.zerodb).toHaveProperty('averageResponseTime');
+        expect(metrics.zerodb).toHaveProperty('errorCount');
+        expect(metrics.zerodb).toHaveProperty('successCount');
+        expect(metrics.zerodb).toHaveProperty('errorRate');
       });
 
-      it('should track response times for each database', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+      it('should track successful operations', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
 
-        await databaseAdapter.read('User', {});
+        await databaseAdapter.find('User', {});
+        await databaseAdapter.find('Company', {});
 
         const metrics = databaseAdapter.getMetrics();
 
-        expect(metrics).toHaveProperty('mongodbAverageTime');
-        expect(metrics).toHaveProperty('zerodbAverageTime');
-        expect(metrics.mongodbAverageTime).toBeGreaterThanOrEqual(0);
-        expect(metrics.zerodbAverageTime).toBeGreaterThanOrEqual(0);
+        expect(metrics.zerodb.successCount).toBe(2);
+        expect(metrics.zerodb.errorCount).toBe(0);
       });
 
-      it('should track operation counts by type', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          }),
-          create: jest.fn().mockResolvedValue({})
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({});
+      it('should track failed operations', async () => {
+        zerodbService.queryTable.mockRejectedValue(new Error('Query failed'));
 
-        await databaseAdapter.read('User', {});
-        await databaseAdapter.create('User', { email: 'test@example.com' });
+        try { await databaseAdapter.find('User', {}); } catch (e) {}
+        try { await databaseAdapter.find('Company', {}); } catch (e) {}
 
         const metrics = databaseAdapter.getMetrics();
 
-        expect(metrics).toHaveProperty('operationsByType');
-        expect(metrics.operationsByType).toHaveProperty('read');
-        expect(metrics.operationsByType).toHaveProperty('create');
-        expect(metrics.operationsByType.read).toBeGreaterThan(0);
-        expect(metrics.operationsByType.create).toBeGreaterThan(0);
+        expect(metrics.zerodb.errorCount).toBe(2);
       });
 
-      it('should calculate error rates accurately', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn()
-              .mockResolvedValueOnce([])
-              .mockRejectedValueOnce(new Error('Query failed'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+      it('should calculate error rate', async () => {
+        zerodbService.queryTable
+          .mockResolvedValueOnce([])
+          .mockRejectedValueOnce(new Error('Failed'));
 
-        await databaseAdapter.read('User', {});
-        try {
-          await databaseAdapter.read('User', {});
-        } catch (error) {
-          // Expected error
-        }
+        await databaseAdapter.find('User', {});
+        try { await databaseAdapter.find('Company', {}); } catch (e) {}
 
         const metrics = databaseAdapter.getMetrics();
 
-        expect(metrics.errorRate).toBeGreaterThan(0);
-        expect(metrics.errorRate).toBeLessThanOrEqual(1);
+        // 1 error / (1 error + 1 success) = 50%
+        expect(metrics.zerodb.errorRate).toBe(50);
+      });
+
+      it('should calculate average response time', async () => {
+        zerodbService.queryTable.mockResolvedValue([]);
+
+        await databaseAdapter.find('User', {});
+
+        const metrics = databaseAdapter.getMetrics();
+
+        expect(metrics.zerodb.averageResponseTime).toBeGreaterThanOrEqual(0);
       });
     });
 
     describe('resetMetrics', () => {
       it('should reset all metrics to initial state', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        await databaseAdapter.read('User', {});
+        zerodbService.queryTable.mockResolvedValue([]);
+        await databaseAdapter.find('User', {});
 
         let metrics = databaseAdapter.getMetrics();
-        expect(metrics.totalOperations).toBeGreaterThan(0);
+        expect(metrics.zerodb.successCount).toBeGreaterThan(0);
 
         databaseAdapter.resetMetrics();
 
         metrics = databaseAdapter.getMetrics();
-        expect(metrics.totalOperations).toBe(0);
-        expect(metrics.successfulOperations).toBe(0);
-        expect(metrics.failedOperations).toBe(0);
+        expect(metrics.zerodb.successCount).toBe(0);
+        expect(metrics.zerodb.errorCount).toBe(0);
+        expect(metrics.zerodb.averageResponseTime).toBe(0);
+        expect(metrics.zerodb.errorRate).toBe(0);
       });
     });
   });
 
-  describe('Fallback Logic', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'parallel';
+  describe('Model to Table Name Mapping', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
+      zerodbService.insertRow.mockResolvedValue({ _id: '123' });
     });
 
-    describe('MongoDB Failure Fallback', () => {
-      it('should fallback to ZeroDB when MongoDB fails', async () => {
-        const modelName = 'User';
-        const query = { userId: 'USER_001' };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(new Error('MongoDB connection lost'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({
-          rows: [{ id: 'zero_123', userId: 'USER_001' }]
-        });
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.fallbackUsed).toBe(true);
-        expect(result.fallbackDatabase).toBe('zerodb');
-        expect(result.data).toEqual([{ id: 'zero_123', userId: 'USER_001' }]);
-      });
-
-      it('should log fallback events for monitoring', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(new Error('MongoDB error'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result).toHaveProperty('fallbackEvent');
-        expect(result.fallbackEvent).toHaveProperty('timestamp');
-        expect(result.fallbackEvent).toHaveProperty('reason');
-        expect(result.fallbackEvent).toHaveProperty('fromDatabase', 'mongodb');
-        expect(result.fallbackEvent).toHaveProperty('toDatabase', 'zerodb');
-      });
+    it('should map User to users', async () => {
+      await databaseAdapter.create('User', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('users', {});
     });
 
-    describe('ZeroDB Failure Fallback', () => {
-      it('should fallback to MongoDB when ZeroDB fails', async () => {
-        const modelName = 'Document';
-        const query = { documentId: 'DOC_001' };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([{ _id: 'mongo_123', documentId: 'DOC_001' }])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(new Error('ZeroDB timeout'));
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.fallbackUsed).toBe(true);
-        expect(result.fallbackDatabase).toBe('mongodb');
-        expect(result.data).toEqual([{ _id: 'mongo_123', documentId: 'DOC_001' }]);
-      });
+    it('should map Document to documents', async () => {
+      await databaseAdapter.create('Document', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('documents', {});
     });
 
-    describe('Both Databases Fail', () => {
-      it('should throw error when both databases fail', async () => {
-        const modelName = 'User';
-        const query = { userId: 'USER_001' };
+    it('should map Company to companies', async () => {
+      await databaseAdapter.create('Company', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('companies', {});
+    });
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(new Error('MongoDB error'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(new Error('ZeroDB error'));
+    it('should map SPV to spvs', async () => {
+      await databaseAdapter.create('SPV', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('spvs', {});
+    });
 
-        await expect(databaseAdapter.read(modelName, query))
-          .rejects.toThrow('Both databases failed');
+    it('should map SPVAsset to spv_assets', async () => {
+      await databaseAdapter.create('SPVAsset', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('spv_assets', {});
+    });
+
+    it('should map AuditLog to audit_logs', async () => {
+      await databaseAdapter.create('AuditLog', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('audit_logs', {});
+    });
+
+    it('should map FinancialReport to financial_reports', async () => {
+      await databaseAdapter.create('FinancialReport', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('financial_reports', {});
+    });
+
+    it('should convert unmapped CamelCase model names to snake_case', async () => {
+      await databaseAdapter.create('ShareClass', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('share_class', {});
+    });
+  });
+
+  describe('Concurrent Operations', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
+    });
+
+    it('should handle concurrent create operations', async () => {
+      zerodbService.insertRow.mockImplementation(async (table, data) => {
+        return { _id: `id_${Date.now()}_${Math.random()}`, ...data };
       });
 
-      it('should include error details from both databases', async () => {
-        const modelName = 'Company';
-        const query = { companyId: 'COMP_001' };
+      const promises = Array.from({ length: 5 }, (_, i) =>
+        databaseAdapter.create('User', { email: `user${i}@example.com` })
+      );
 
-        const mongoError = new Error('MongoDB connection refused');
-        const zeroError = new Error('ZeroDB timeout');
+      const results = await Promise.allSettled(promises);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(mongoError)
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(zeroError);
-
-        try {
-          await databaseAdapter.read(modelName, query);
-          fail('Should have thrown error');
-        } catch (error) {
-          expect(error.message).toContain('Both databases failed');
-          expect(error).toHaveProperty('mongodbError');
-          expect(error).toHaveProperty('zerodbError');
-        }
+      results.forEach(result => {
+        expect(result.status).toBe('fulfilled');
       });
     });
 
-    describe('Fallback Recovery', () => {
-      it('should attempt recovery after fallback', async () => {
-        const modelName = 'Activity';
-        const query = { activityId: 'ACT_001' };
+    it('should handle concurrent read operations', async () => {
+      zerodbService.queryTable.mockResolvedValue([]);
 
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn()
-              .mockRejectedValueOnce(new Error('MongoDB error'))
-              .mockResolvedValueOnce([{ _id: 'mongo_123' }])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [{ id: 'zero_123' }] });
+      const promises = Array.from({ length: 10 }, () =>
+        databaseAdapter.find('User', { status: 'active' })
+      );
 
-        // First call should use fallback
-        const result1 = await databaseAdapter.read(modelName, query);
-        expect(result1.fallbackUsed).toBe(true);
+      const results = await Promise.all(promises);
 
-        // Second call should attempt recovery
-        const result2 = await databaseAdapter.read(modelName, query);
-        expect(result2.fallbackUsed).toBe(false);
+      expect(results).toHaveLength(10);
+      results.forEach(result => {
+        expect(result).toEqual([]);
       });
     });
   });
 
-  describe('Error Handling', () => {
-    describe('Invalid Input Handling', () => {
-      it('should throw error for invalid model name', async () => {
-        await expect(databaseAdapter.create('', { data: 'test' }))
-          .rejects.toThrow('Model name is required');
-      });
-
-      it('should throw error for null data', async () => {
-        await expect(databaseAdapter.create('User', null))
-          .rejects.toThrow('Data is required');
-      });
-
-      it('should throw error for invalid query', async () => {
-        await expect(databaseAdapter.read('User', null))
-          .rejects.toThrow('Query is required');
-      });
+  describe('Edge Cases', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
     });
 
-    describe('MongoDB Error Handling', () => {
-      it('should handle MongoDB connection errors', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(new Error('Connection refused'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
+    it('should handle empty query results', async () => {
+      zerodbService.queryTable.mockResolvedValue([]);
 
-        const result = await databaseAdapter.read('User', {});
+      const result = await databaseAdapter.find('User', { userId: 'NONEXISTENT' });
 
-        expect(result.fallbackUsed).toBe(true);
-        expect(result).toHaveProperty('mongodbError');
-      });
-
-      it('should handle MongoDB timeout errors', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockRejectedValue(new Error('Query timeout'))
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        const result = await databaseAdapter.read('Company', {});
-
-        expect(result.fallbackUsed).toBe(true);
-        expect(result.mongodbError.message).toContain('timeout');
-      });
-
-      it('should handle MongoDB validation errors', async () => {
-        const validationError = new Error('Validation failed');
-        validationError.name = 'ValidationError';
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockRejectedValue(validationError)
-        });
-
-        await expect(databaseAdapter.create('User', { invalid: 'data' }))
-          .rejects.toThrow('Validation failed');
-      });
+      expect(result).toEqual([]);
     });
 
-    describe('ZeroDB Error Handling', () => {
-      it('should handle ZeroDB API errors', async () => {
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(new Error('API error'));
+    it('should handle special characters in data', async () => {
+      const data = {
+        userId: 'USER_001',
+        name: 'Test \u00e9 \u00e7 \u00f1 User',
+        bio: 'Line1\nLine2\tTabbed'
+      };
 
-        const result = await databaseAdapter.read('User', {});
+      zerodbService.insertRow.mockResolvedValue({ _id: '123', ...data });
 
-        expect(result.fallbackUsed).toBe(true);
-        expect(result).toHaveProperty('zerodbError');
-      });
+      const result = await databaseAdapter.create('User', data);
 
-      it('should handle ZeroDB rate limiting', async () => {
-        const rateLimitError = new Error('Rate limit exceeded');
-        rateLimitError.statusCode = 429;
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(rateLimitError);
-
-        const result = await databaseAdapter.read('Document', {});
-
-        expect(result.fallbackUsed).toBe(true);
-        expect(result.zerodbError.statusCode).toBe(429);
-      });
-
-      it('should handle ZeroDB authentication errors', async () => {
-        const authError = new Error('Authentication failed');
-        authError.statusCode = 401;
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockRejectedValue(authError);
-
-        const result = await databaseAdapter.read('Company', {});
-
-        expect(result.fallbackUsed).toBe(true);
-        expect(result.zerodbError.statusCode).toBe(401);
-      });
+      expect(result.name).toContain('\u00e9');
+      expect(result.bio).toContain('\n');
     });
 
-    describe('Concurrent Operation Errors', () => {
-      it('should handle race conditions in parallel mode', async () => {
-        const modelName = 'User';
-        const data = { email: 'test@example.com' };
+    it('should handle undefined and null fields in data', async () => {
+      const data = {
+        companyId: 'COMP_001',
+        CompanyName: undefined,
+        TaxID: null
+      };
 
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
+      zerodbService.insertRow.mockResolvedValue({ _id: '123', ...data });
 
-        // Execute multiple creates concurrently
-        const promises = Array.from({ length: 5 }, () =>
-          databaseAdapter.create(modelName, data)
-        );
+      const result = await databaseAdapter.create('Company', data);
 
-        const results = await Promise.allSettled(promises);
+      expect(result).toHaveProperty('companyId', 'COMP_001');
+    });
 
-        // All should complete (either successfully or with clear error)
-        results.forEach(result => {
-          expect(['fulfilled', 'rejected']).toContain(result.status);
-        });
-      });
+    it('should handle large documents', async () => {
+      const largeContent = 'x'.repeat(1000000);
+      const data = { documentId: 'DOC_001', content: largeContent };
+
+      zerodbService.insertRow.mockResolvedValue({ _id: '123', ...data });
+
+      const result = await databaseAdapter.create('Document', data);
+
+      expect(result.content.length).toBe(1000000);
     });
   });
 
-  describe('Integration Scenarios', () => {
-    beforeEach(() => {
-      process.env.MIGRATION_MODE = 'parallel';
+  describe('Complete CRUD Workflow', () => {
+    beforeEach(async () => {
+      zerodbService.initialize.mockResolvedValue(true);
+      await databaseAdapter.initialize('test-token');
     });
 
-    describe('Complete CRUD Workflow', () => {
-      it('should handle complete lifecycle: create, read, update, delete', async () => {
-        const modelName = 'User';
-        const userData = {
-          userId: 'USER_001',
-          email: 'test@example.com',
-          role: 'user'
-        };
+    it('should handle complete lifecycle: create, find, update, delete', async () => {
+      const userData = { userId: 'USER_001', email: 'test@example.com', role: 'user' };
 
-        // Setup mocks for all operations
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...userData }),
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([{ _id: 'mongo_123', ...userData }])
-          }),
-          updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
-          deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 })
-        });
+      // Create
+      zerodbService.insertRow.mockResolvedValue({ _id: 'doc_123', ...userData });
+      const created = await databaseAdapter.create('User', userData);
+      expect(created._id).toBe('doc_123');
 
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...userData });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({
-          rows: [{ id: 'zero_123', ...userData }]
-        });
-        zerodbService.updateRows = jest.fn().mockResolvedValue({ updatedCount: 1 });
-        zerodbService.deleteRows = jest.fn().mockResolvedValue({ deletedCount: 1 });
+      // Find
+      zerodbService.queryTable.mockResolvedValue([{ _id: 'doc_123', ...userData }]);
+      const found = await databaseAdapter.find('User', { userId: 'USER_001' });
+      expect(found).toHaveLength(1);
 
-        // Create
-        const createResult = await databaseAdapter.create(modelName, userData);
-        expect(createResult.consistent).toBe(true);
+      // Update
+      zerodbService.updateRows.mockResolvedValue({ updatedCount: 1 });
+      const updated = await databaseAdapter.update('User', { userId: 'USER_001' }, { role: 'admin' });
+      expect(updated.updatedCount).toBe(1);
 
-        // Read
-        const readResult = await databaseAdapter.read(modelName, { userId: 'USER_001' });
-        expect(readResult.consistent).toBe(true);
-
-        // Update
-        const updateResult = await databaseAdapter.update(
-          modelName,
-          { userId: 'USER_001' },
-          { role: 'admin' }
-        );
-        expect(updateResult.consistent).toBe(true);
-
-        // Delete
-        const deleteResult = await databaseAdapter.delete(modelName, { userId: 'USER_001' });
-        expect(deleteResult.consistent).toBe(true);
-      });
-    });
-
-    describe('Migration Mode Transitions', () => {
-      it('should handle transition from mongodb-only to parallel', async () => {
-        const modelName = 'Company';
-        const data = { companyId: 'COMP_001', CompanyName: 'Test Corp' };
-
-        // Start in mongodb-only mode
-        process.env.MIGRATION_MODE = 'mongodb-only';
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-
-        await databaseAdapter.create(modelName, data);
-        expect(zerodbService.insertRows).not.toHaveBeenCalled();
-
-        // Switch to parallel mode
-        process.env.MIGRATION_MODE = 'parallel';
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        await databaseAdapter.create(modelName, { ...data, companyId: 'COMP_002' });
-        expect(zerodbService.insertRows).toHaveBeenCalled();
-      });
-
-      it('should handle transition from parallel to zerodb-only', async () => {
-        const modelName = 'Document';
-        const data = { documentId: 'DOC_001', title: 'Test' };
-
-        // Start in parallel mode
-        process.env.MIGRATION_MODE = 'parallel';
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        await databaseAdapter.create(modelName, data);
-        expect(mongoose.model).toHaveBeenCalled();
-        expect(zerodbService.insertRows).toHaveBeenCalled();
-
-        // Switch to zerodb-only mode
-        process.env.MIGRATION_MODE = 'zerodb-only';
-        jest.clearAllMocks();
-
-        await databaseAdapter.create(modelName, { ...data, documentId: 'DOC_002' });
-        expect(mongoose.model).not.toHaveBeenCalled();
-        expect(zerodbService.insertRows).toHaveBeenCalled();
-      });
-    });
-
-    describe('High Load Scenarios', () => {
-      it('should handle concurrent operations efficiently', async () => {
-        const modelName = 'Activity';
-        const activities = Array.from({ length: 100 }, (_, i) => ({
-          activityId: `ACT_${i}`,
-          type: 'test'
-        }));
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockImplementation(data =>
-            Promise.resolve({ _id: `mongo_${data.activityId}`, ...data })
-          )
-        });
-        zerodbService.insertRows = jest.fn().mockImplementation(data =>
-          Promise.resolve({ id: `zero_${data[0].activityId}`, ...data[0] })
-        );
-
-        const startTime = Date.now();
-        const results = await Promise.all(
-          activities.map(activity => databaseAdapter.create(modelName, activity))
-        );
-        const duration = Date.now() - startTime;
-
-        expect(results).toHaveLength(100);
-        expect(duration).toBeLessThan(10000); // Should complete within 10 seconds
-      });
-    });
-  });
-
-  describe('Edge Cases and Boundary Conditions', () => {
-    describe('Empty and Null Values', () => {
-      it('should handle empty query results', async () => {
-        const modelName = 'User';
-        const query = { userId: 'NONEXISTENT' };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([])
-          })
-        });
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        const result = await databaseAdapter.read(modelName, query);
-
-        expect(result.mongodb).toEqual([]);
-        expect(result.zerodb).toEqual([]);
-        expect(result.consistent).toBe(true);
-      });
-
-      it('should handle undefined fields in data', async () => {
-        const modelName = 'Company';
-        const data = {
-          companyId: 'COMP_001',
-          CompanyName: undefined,
-          TaxID: null
-        };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result.mongodb).toHaveProperty('companyId', 'COMP_001');
-      });
-    });
-
-    describe('Large Data Volumes', () => {
-      it('should handle large documents efficiently', async () => {
-        const modelName = 'Document';
-        const largeContent = 'x'.repeat(1000000); // 1MB of text
-        const data = {
-          documentId: 'DOC_001',
-          content: largeContent
-        };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result.mongodb.content.length).toBe(1000000);
-      });
-
-      it('should handle bulk operations efficiently', async () => {
-        const modelName = 'Activity';
-        const bulkData = Array.from({ length: 1000 }, (_, i) => ({
-          activityId: `ACT_${i}`,
-          type: 'bulk_test'
-        }));
-
-        mongoose.model = jest.fn().mockReturnValue({
-          insertMany: jest.fn().mockResolvedValue(bulkData.map(d => ({ _id: `mongo_${d.activityId}`, ...d })))
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ insertedCount: 1000 });
-
-        const result = await databaseAdapter.bulkCreate(modelName, bulkData);
-
-        expect(result.mongodb).toHaveLength(1000);
-        expect(result.zerodb.insertedCount).toBe(1000);
-      });
-    });
-
-    describe('Special Characters and Encoding', () => {
-      it('should handle special characters in data', async () => {
-        const modelName = 'User';
-        const data = {
-          userId: 'USER_001',
-          name: 'Test \u00e9 \u00e7 \u00f1 User', // Accented characters
-          bio: 'Line1\nLine2\tTabbed'
-        };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result.mongodb.name).toContain('\u00e9');
-        expect(result.mongodb.bio).toContain('\n');
-      });
-
-      it('should handle emoji characters', async () => {
-        const modelName = 'Notification';
-        const data = {
-          notificationId: 'NOTIF_001',
-          message: 'Test notification \ud83d\ude80 \ud83c\udf89'
-        };
-
-        mongoose.model = jest.fn().mockReturnValue({
-          create: jest.fn().mockResolvedValue({ _id: 'mongo_123', ...data })
-        });
-        zerodbService.insertRows = jest.fn().mockResolvedValue({ id: 'zero_123', ...data });
-
-        const result = await databaseAdapter.create(modelName, data);
-
-        expect(result.mongodb.message).toContain('\ud83d\ude80');
-      });
-    });
-
-    describe('Complex Query Patterns', () => {
-      it('should handle complex queries', async () => {
-        // Placeholder test for complex queries
-        expect(true).toBe(true);
-      });
-    });
-  });
-
-  describe('Conditional Mongoose Loading', () => {
-    describe('zerodb-only mode', () => {
-      it('should not call mongoose.model in zerodb-only mode', async () => {
-        process.env.MIGRATION_MODE = 'zerodb-only';
-
-        // The adapter should use zerodbService and not mongoose
-        zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
-
-        // In zerodb-only mode, mongoose.model should never be called
-        // The test verifies that the adapter routes correctly
-        expect(mongoose.model).not.toHaveBeenCalled();
-      });
-
-      it('should initialize without MongoDB in zerodb-only mode', async () => {
-        process.env.MIGRATION_MODE = 'zerodb-only';
-
-        // In zerodb-only mode, connectDB should not be called
-        // Only zerodbService.initialize should be called
-        zerodbService.initialize = jest.fn().mockResolvedValue(true);
-
-        expect(databaseAdapter.isMongoDBRequired()).toBe(false);
-      });
-    });
-
-    describe('mongodb-only mode', () => {
-      it('should require mongoose in mongodb-only mode', () => {
-        process.env.MIGRATION_MODE = 'mongodb-only';
-
-        expect(databaseAdapter.isMongoDBRequired()).toBe(true);
-      });
-    });
-
-    describe('parallel mode', () => {
-      it('should require mongoose in parallel mode', () => {
-        process.env.MIGRATION_MODE = 'parallel';
-
-        expect(databaseAdapter.isMongoDBRequired()).toBe(true);
-      });
+      // Delete
+      zerodbService.deleteRows.mockResolvedValue({ deletedCount: 1 });
+      const deleted = await databaseAdapter.delete('User', { userId: 'USER_001' });
+      expect(deleted.deletedCount).toBe(1);
     });
   });
 });

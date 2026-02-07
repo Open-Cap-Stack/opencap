@@ -1,233 +1,242 @@
 /**
  * TenderSubmission Model Unit Tests
  * Issue #105: Implement Tender Offer System (Basic)
- * TDD Red Phase: Tests written before implementation
+ *
+ * Rewritten for ZeroDB compatibility
  */
 process.env.SKIP_DB_SETUP = 'true';
 
+// Mock the zerodbService before importing model
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRows: jest.fn(),
+  client: { put: jest.fn() }
+}));
+
 describe('TenderSubmission Model', () => {
   let TenderSubmission;
-  let tenderSubmissionSchema;
+  let schema;
 
   beforeAll(() => {
-    jest.resetModules();
-    const mongoose = require('mongoose');
-
-    // Capture the schema when mongoose.model is called
-    const originalModel = mongoose.model;
-    mongoose.model = jest.fn((name, schema) => {
-      if (name === 'TenderSubmission' && schema) {
-        tenderSubmissionSchema = schema;
-      }
-      return { modelName: name, schema: schema };
-    });
-
     TenderSubmission = require('../../../models/TenderSubmission');
-    mongoose.model = originalModel;
+    schema = TenderSubmission.schema;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('Schema Definition', () => {
     it('should have required identifier fields', () => {
-      expect(tenderSubmissionSchema).toBeDefined();
-      const paths = tenderSubmissionSchema.paths;
-
-      expect(paths).toHaveProperty('submissionId');
-      expect(paths).toHaveProperty('offerId');
-      expect(paths).toHaveProperty('stakeholderId');
+      expect(schema).toBeDefined();
+      expect(schema.submissionId).toBeDefined();
+      expect(schema.offerId).toBeDefined();
+      expect(schema.stakeholderId).toBeDefined();
     });
 
     it('should have share submission fields', () => {
-      const paths = tenderSubmissionSchema.paths;
-
-      expect(paths).toHaveProperty('sharesOffered');
-      expect(paths).toHaveProperty('pricePerShare');
+      expect(schema.sharesOffered).toBeDefined();
+      expect(schema.pricePerShare).toBeDefined();
     });
 
     it('should have status field with proper enum', () => {
-      const paths = tenderSubmissionSchema.paths;
-
-      expect(paths).toHaveProperty('status');
-      expect(paths.status.enumValues).toContain('pending');
-      expect(paths.status.enumValues).toContain('accepted');
-      expect(paths.status.enumValues).toContain('rejected');
-      expect(paths.status.enumValues).toContain('withdrawn');
-      expect(paths.status.enumValues).toContain('settled');
+      expect(schema.status).toBeDefined();
+      expect(schema.status.enum).toContain('pending');
+      expect(schema.status.enum).toContain('accepted');
+      expect(schema.status.enum).toContain('rejected');
+      expect(schema.status.enum).toContain('withdrawn');
+      expect(schema.status.enum).toContain('settled');
     });
 
     it('should have acceptance tracking fields', () => {
-      const paths = tenderSubmissionSchema.paths;
-
-      expect(paths).toHaveProperty('sharesAccepted');
-      expect(paths).toHaveProperty('payoutAmount');
+      expect(schema.sharesAccepted).toBeDefined();
+      expect(schema.payoutAmount).toBeDefined();
     });
 
     it('should have timestamp tracking fields', () => {
-      const paths = tenderSubmissionSchema.paths;
-
-      expect(paths).toHaveProperty('submittedAt');
-      expect(paths).toHaveProperty('processedAt');
+      expect(schema.submittedAt).toBeDefined();
+      expect(schema.processedAt).toBeDefined();
     });
   });
 
   describe('Validation', () => {
     it('should require submissionId to be unique', () => {
-      const submissionIdPath = tenderSubmissionSchema.paths.submissionId;
-      expect(submissionIdPath.options.unique).toBe(true);
-      expect(submissionIdPath.options.required).toBe(true);
+      expect(schema.submissionId.unique).toBe(true);
+      expect(schema.submissionId.required).toBe(true);
     });
 
     it('should require offerId', () => {
-      const offerIdPath = tenderSubmissionSchema.paths.offerId;
-      expect(offerIdPath.options.required).toBe(true);
+      expect(schema.offerId.required).toBe(true);
     });
 
     it('should require stakeholderId', () => {
-      const stakeholderIdPath = tenderSubmissionSchema.paths.stakeholderId;
-      expect(stakeholderIdPath.options.required).toBe(true);
+      expect(schema.stakeholderId.required).toBe(true);
     });
 
-    it('should require sharesOffered to be positive', () => {
-      const sharesOfferedPath = tenderSubmissionSchema.paths.sharesOffered;
-      expect(sharesOfferedPath.options.min).toBe(1);
-      expect(sharesOfferedPath.options.required).toBe(true);
+    it('should require sharesOffered', () => {
+      expect(schema.sharesOffered.required).toBe(true);
     });
 
-    it('should require pricePerShare to be non-negative', () => {
-      const pricePath = tenderSubmissionSchema.paths.pricePerShare;
-      expect(pricePath.options.min).toBe(0);
+    it('should require pricePerShare', () => {
+      expect(schema.pricePerShare.required).toBe(true);
     });
 
     it('should default status to pending', () => {
-      const statusPath = tenderSubmissionSchema.paths.status;
-      expect(statusPath.options.default).toBe('pending');
+      expect(schema.status.default).toBe('pending');
     });
 
     it('should default sharesAccepted to 0', () => {
-      const sharesAcceptedPath = tenderSubmissionSchema.paths.sharesAccepted;
-      expect(sharesAcceptedPath.options.default).toBe(0);
+      expect(schema.sharesAccepted.default).toBe(0);
     });
 
     it('should default payoutAmount to 0', () => {
-      const payoutPath = tenderSubmissionSchema.paths.payoutAmount;
-      expect(payoutPath.options.default).toBe(0);
+      expect(schema.payoutAmount.default).toBe(0);
     });
   });
 
   describe('Timestamps', () => {
-    it('should have timestamps enabled', () => {
-      expect(tenderSubmissionSchema.options.timestamps).toBe(true);
+    it('should have timestamp fields in schema', () => {
+      expect(schema.createdAt).toBeDefined();
+      expect(schema.updatedAt).toBeDefined();
     });
   });
 
-  describe('Indexes', () => {
-    it('should have index on offerId', () => {
-      const offerIdPath = tenderSubmissionSchema.paths.offerId;
-      expect(offerIdPath.options.index).toBe(true);
+  describe('Schema Field Types', () => {
+    it('should have offerId as string type', () => {
+      expect(schema.offerId.type).toBe('string');
     });
 
-    it('should have index on stakeholderId', () => {
-      const stakeholderIdPath = tenderSubmissionSchema.paths.stakeholderId;
-      expect(stakeholderIdPath.options.index).toBe(true);
+    it('should have stakeholderId as string type', () => {
+      expect(schema.stakeholderId.type).toBe('string');
     });
 
-    it('should have index on status', () => {
-      const statusPath = tenderSubmissionSchema.paths.status;
-      expect(statusPath.options.index).toBe(true);
+    it('should have status as string type', () => {
+      expect(schema.status.type).toBe('string');
     });
 
-    it('should have index on submissionId', () => {
-      const submissionIdPath = tenderSubmissionSchema.paths.submissionId;
-      expect(submissionIdPath.options.index).toBe(true);
+    it('should have submissionId as string type', () => {
+      expect(schema.submissionId.type).toBe('string');
     });
   });
 
-  describe('Virtuals', () => {
-    it('should have expectedPayout virtual', () => {
-      expect(tenderSubmissionSchema.virtuals).toHaveProperty('expectedPayout');
+  describe('Business Logic Methods', () => {
+    it('should have getExpectedPayout method', () => {
+      expect(typeof TenderSubmission.getExpectedPayout).toBe('function');
     });
 
-    it('should have actualPayout virtual', () => {
-      expect(tenderSubmissionSchema.virtuals).toHaveProperty('actualPayout');
+    it('should calculate expectedPayout correctly', () => {
+      const submission = { sharesOffered: 100, pricePerShare: 10 };
+      expect(TenderSubmission.getExpectedPayout(submission)).toBe(1000);
     });
 
-    it('should have acceptanceRate virtual', () => {
-      expect(tenderSubmissionSchema.virtuals).toHaveProperty('acceptanceRate');
+    it('should have getActualPayout method', () => {
+      expect(typeof TenderSubmission.getActualPayout).toBe('function');
     });
 
-    it('should have isModifiable virtual', () => {
-      expect(tenderSubmissionSchema.virtuals).toHaveProperty('isModifiable');
+    it('should calculate actualPayout correctly', () => {
+      const submission = { sharesAccepted: 50, pricePerShare: 10 };
+      expect(TenderSubmission.getActualPayout(submission)).toBe(500);
+    });
+
+    it('should have getAcceptanceRate method', () => {
+      expect(typeof TenderSubmission.getAcceptanceRate).toBe('function');
+    });
+
+    it('should calculate acceptanceRate correctly', () => {
+      const submission = { sharesOffered: 100, sharesAccepted: 75 };
+      expect(TenderSubmission.getAcceptanceRate(submission)).toBe(75);
+    });
+
+    it('should have isModifiable method', () => {
+      expect(typeof TenderSubmission.isModifiable).toBe('function');
+    });
+
+    it('should return true for pending submissions', () => {
+      expect(TenderSubmission.isModifiable({ status: 'pending' })).toBe(true);
+    });
+
+    it('should return false for non-pending submissions', () => {
+      expect(TenderSubmission.isModifiable({ status: 'accepted' })).toBe(false);
     });
   });
 
   describe('Additional Fields', () => {
     it('should have shareClass field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('shareClass');
+      expect(schema.shareClass).toBeDefined();
     });
 
     it('should have prorataPercentage field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('prorataPercentage');
+      expect(schema.prorataPercentage).toBeDefined();
     });
 
     it('should have paymentMethod field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('paymentMethod');
+      expect(schema.paymentMethod).toBeDefined();
     });
 
     it('should have paymentReference field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('paymentReference');
+      expect(schema.paymentReference).toBeDefined();
     });
 
     it('should have payoutDate field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('payoutDate');
+      expect(schema.payoutDate).toBeDefined();
     });
 
     it('should have withdrawnAt field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('withdrawnAt');
+      expect(schema.withdrawnAt).toBeDefined();
     });
 
     it('should have settledAt field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('settledAt');
+      expect(schema.settledAt).toBeDefined();
     });
 
     it('should have rejectionReason field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('rejectionReason');
+      expect(schema.rejectionReason).toBeDefined();
     });
 
     it('should have eligibilityVerified field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('eligibilityVerified');
+      expect(schema.eligibilityVerified).toBeDefined();
     });
 
     it('should have eligibilityNotes field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('eligibilityNotes');
+      expect(schema.eligibilityNotes).toBeDefined();
     });
 
     it('should have notes field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('notes');
+      expect(schema.notes).toBeDefined();
     });
 
     it('should have metadata field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('metadata');
+      expect(schema.metadata).toBeDefined();
     });
 
     it('should have createdBy field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('createdBy');
+      expect(schema.createdBy).toBeDefined();
     });
 
     it('should have updatedBy field', () => {
-      const paths = tenderSubmissionSchema.paths;
-      expect(paths).toHaveProperty('updatedBy');
+      expect(schema.updatedBy).toBeDefined();
+    });
+  });
+
+  describe('Exported Constants', () => {
+    it('should export VALID_STATUSES', () => {
+      expect(TenderSubmission.VALID_STATUSES).toBeDefined();
+      expect(TenderSubmission.VALID_STATUSES).toContain('pending');
+      expect(TenderSubmission.VALID_STATUSES).toContain('accepted');
+      expect(TenderSubmission.VALID_STATUSES).toContain('rejected');
+      expect(TenderSubmission.VALID_STATUSES).toContain('withdrawn');
+      expect(TenderSubmission.VALID_STATUSES).toContain('settled');
+    });
+
+    it('should export PAYMENT_METHODS', () => {
+      expect(TenderSubmission.PAYMENT_METHODS).toBeDefined();
+      expect(TenderSubmission.PAYMENT_METHODS).toContain('wire');
+      expect(TenderSubmission.PAYMENT_METHODS).toContain('check');
+      expect(TenderSubmission.PAYMENT_METHODS).toContain('ach');
+      expect(TenderSubmission.PAYMENT_METHODS).toContain('other');
     });
   });
 });

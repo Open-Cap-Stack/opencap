@@ -349,7 +349,9 @@ describe('ReportSchedulingService', () => {
         companyId: 'COMP-001',
         format: 'pdf',
         recipients: ['user@company.com'],
-        parameters: {}
+        parameters: {},
+        status: 'active',
+        schedule: '0 9 1 * *'
       };
 
       databaseAdapter.findOne.mockResolvedValue(schedule);
@@ -377,7 +379,9 @@ describe('ReportSchedulingService', () => {
       const schedule = {
         scheduleId,
         reportType: 'cap_table',
-        companyId: 'COMP-001'
+        companyId: 'COMP-001',
+        status: 'active',
+        schedule: '0 9 1 * *'
       };
 
       databaseAdapter.findOne.mockResolvedValue(schedule);

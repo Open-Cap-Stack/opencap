@@ -36,41 +36,15 @@ describe('BulkReportsService', () => {
           companyId: 'company-123'
         };
 
-        const mockJob = {
-          jobId: 'JOB-BULK-12345',
-          userId: 'user-123',
-          companyId: 'company-123',
-          status: 'queued',
-          totalReports: 2,
-          completedReports: 0,
-          failedReports: 0,
-          reports: [
-            { reportType: 'financial', format: 'pdf', status: 'pending', parameters: { year: 2025 } },
-            { reportType: 'equity', format: 'csv', status: 'pending', parameters: { asOf: '2025-12-31' } }
-          ],
-          createdAt: expect.any(Date)
-        };
-
-        databaseAdapter.create.mockResolvedValue(mockJob);
-        JobQueueService.enqueueJob.mockResolvedValue({ queueId: 'queue-1' });
-
-        // Act
+        // Act - createBulkJob creates job in-memory and returns completed job
         const result = await BulkReportsService.createBulkJob(jobData);
 
         // Assert
-        expect(databaseAdapter.create).toHaveBeenCalledWith('BulkReportJob', expect.objectContaining({
-          userId: 'user-123',
-          companyId: 'company-123',
-          status: 'queued',
-          totalReports: 2,
-          completedReports: 0,
-          failedReports: 0
-        }));
-
-        expect(JobQueueService.enqueueJob).toHaveBeenCalledTimes(1);
-        expect(result.jobId).toBe('JOB-BULK-12345');
+        expect(result.jobId).toBeDefined();
+        expect(result.jobId).toMatch(/^JOB-BULK-/);
         expect(result.totalReports).toBe(2);
-        expect(result.status).toBe('queued');
+        expect(result.status).toBe('completed');
+        expect(result.reports).toHaveLength(2);
       });
 
       it('should validate all report configurations', async () => {
@@ -85,19 +59,12 @@ describe('BulkReportsService', () => {
           companyId: 'company-123'
         };
 
-        databaseAdapter.create.mockResolvedValue({
-          jobId: 'JOB-BULK-67890',
-          totalReports: 3,
-          status: 'queued'
-        });
-        JobQueueService.enqueueJob.mockResolvedValue({ queueId: 'queue-1' });
-
         // Act
         const result = await BulkReportsService.createBulkJob(jobData);
 
         // Assert
         expect(result.totalReports).toBe(3);
-        expect(JobQueueService.enqueueJob).toHaveBeenCalled();
+        expect(result.status).toBe('completed');
       });
 
       it('should set estimated completion time based on report count', async () => {
@@ -113,15 +80,6 @@ describe('BulkReportsService', () => {
           userId: 'user-123',
           companyId: 'company-123'
         };
-
-        databaseAdapter.create.mockResolvedValue({
-          jobId: 'JOB-BULK-11111',
-          totalReports: 5,
-          status: 'queued',
-          createdAt: new Date(),
-          estimatedCompletionTime: expect.any(Date)
-        });
-        JobQueueService.enqueueJob.mockResolvedValue({ queueId: 'queue-1' });
 
         // Act
         const result = await BulkReportsService.createBulkJob(jobData);

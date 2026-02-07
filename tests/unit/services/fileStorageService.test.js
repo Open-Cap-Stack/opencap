@@ -9,13 +9,29 @@
 
 const fileStorageService = require('../../../services/fileStorageService');
 const zerodbService = require('../../../services/zerodbService');
-const mongoose = require('mongoose');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
 
 // Mock external services
 jest.mock('../../../services/zerodbService');
+jest.mock('axios', () => ({
+  get: jest.fn(),
+  post: jest.fn(),
+  create: jest.fn(() => ({
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() }
+    },
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+    patch: jest.fn()
+  }))
+}));
+const axios = require('axios');
+
 
 describe('FileStorageService', () => {
   let tempDir;
@@ -62,15 +78,15 @@ describe('FileStorageService', () => {
         const fileBuffer = Buffer.from('Test file content');
         const fileName = 'test-document.txt';
         const options = {
-          companyId: new mongoose.Types.ObjectId().toString(),
-          uploadedBy: new mongoose.Types.ObjectId().toString(),
+          companyId: 'test-company-id-123',
+          uploadedBy: 'test-company-id-123',
           category: 'financial_report'
         };
 
         zerodbService.client = {
           post: jest.fn().mockResolvedValue({
             data: {
-              id: 'file-123',
+              file_id: 'file-123',
               file_key: 'opencap/files/file-123.txt',
               file_name: fileName,
               size_bytes: fileBuffer.length,
@@ -90,14 +106,14 @@ describe('FileStorageService', () => {
 
       it('should upload a file from path', async () => {
         const options = {
-          companyId: new mongoose.Types.ObjectId().toString(),
-          uploadedBy: new mongoose.Types.ObjectId().toString()
+          companyId: 'test-company-id-123',
+          uploadedBy: 'test-company-id-123'
         };
 
         zerodbService.client = {
           post: jest.fn().mockResolvedValue({
             data: {
-              id: 'file-456',
+              file_id: 'file-456',
               file_key: 'opencap/files/file-456.txt',
               file_name: 'test-document.txt',
               size_bytes: 38,
@@ -121,7 +137,7 @@ describe('FileStorageService', () => {
         zerodbService.client = {
           post: jest.fn().mockResolvedValue({
             data: {
-              id: 'file-789',
+              file_id: 'file-789',
               content_type: 'application/pdf'
             }
           })
@@ -149,7 +165,7 @@ describe('FileStorageService', () => {
             capturedPayload = data;
             return Promise.resolve({
               data: {
-                id: 'file-meta-123',
+                file_id: 'file-meta-123',
                 file_metadata: data.file_metadata || data.get?.('file_metadata')
               }
             });
@@ -205,7 +221,7 @@ describe('FileStorageService', () => {
 
         zerodbService.client = {
           post: jest.fn().mockResolvedValue({
-            data: { id: 'file-batch', file_name: 'test' }
+            data: { file_id: 'file-batch', file_name: 'test' }
           })
         };
 
@@ -251,13 +267,22 @@ describe('FileStorageService', () => {
 
         zerodbService.client = {
           get: jest.fn().mockResolvedValue({
-            data: expectedContent,
-            headers: {
-              'content-type': 'text/plain',
-              'content-length': expectedContent.length
+            data: {
+              download_url: 'https://storage.zerodb.io/download/file-123',
+              file_name: 'test.txt',
+              content_type: 'text/plain',
+              size_bytes: expectedContent.length
             }
           })
         };
+
+        axios.get.mockResolvedValue({
+          data: expectedContent,
+          headers: {
+            'content-type': 'text/plain',
+            'content-length': expectedContent.length
+          }
+        });
 
         const result = await fileStorageService.downloadFile(fileId);
 
@@ -271,14 +296,21 @@ describe('FileStorageService', () => {
 
         zerodbService.client = {
           get: jest.fn().mockResolvedValue({
-            data: Buffer.from('content'),
-            headers: {
-              'content-type': 'application/pdf',
-              'x-file-name': 'report.pdf',
-              'x-file-metadata': JSON.stringify({ year: 2024 })
+            data: {
+              download_url: 'https://storage.zerodb.io/download/file-456',
+              file_name: 'report.pdf',
+              content_type: 'application/pdf',
+              size_bytes: 7
             }
           })
         };
+
+        axios.get.mockResolvedValue({
+          data: Buffer.from('content'),
+          headers: {
+            'content-type': 'application/pdf'
+          }
+        });
 
         const result = await fileStorageService.downloadFile(fileId, { includeMetadata: true });
 
@@ -301,13 +333,23 @@ describe('FileStorageService', () => {
 
       it('should stream large files', async () => {
         const fileId = 'large-file-123';
+        const mockStream = { pipe: jest.fn(), on: jest.fn() };
 
         zerodbService.client = {
           get: jest.fn().mockResolvedValue({
-            data: Buffer.alloc(10 * 1024 * 1024), // 10MB
-            headers: { 'content-type': 'application/octet-stream' }
+            data: {
+              download_url: 'https://storage.zerodb.io/download/large-file-123',
+              file_name: 'large.bin',
+              content_type: 'application/octet-stream',
+              size_bytes: 10 * 1024 * 1024
+            }
           })
         };
+
+        axios.get.mockResolvedValue({
+          data: mockStream,
+          headers: { 'content-type': 'application/octet-stream' }
+        });
 
         const result = await fileStorageService.downloadFile(fileId, { stream: true });
 
@@ -323,10 +365,19 @@ describe('FileStorageService', () => {
 
         zerodbService.client = {
           get: jest.fn().mockResolvedValue({
-            data: Buffer.from(expectedContent),
-            headers: { 'content-type': 'text/plain' }
+            data: {
+              download_url: 'https://storage.zerodb.io/download/file-789',
+              file_name: 'downloaded-file.txt',
+              content_type: 'text/plain',
+              size_bytes: expectedContent.length
+            }
           })
         };
+
+        axios.get.mockResolvedValue({
+          data: Buffer.from(expectedContent),
+          headers: { 'content-type': 'text/plain' }
+        });
 
         const result = await fileStorageService.downloadFileToPath(fileId, outputPath);
 
@@ -334,8 +385,8 @@ describe('FileStorageService', () => {
         expect(result.success).toBe(true);
 
         // Verify file was written
-        const content = await fs.readFile(outputPath, 'utf-8');
-        expect(content).toBe(expectedContent);
+        const fileContent = await fs.readFile(outputPath, 'utf-8');
+        expect(fileContent).toBe(expectedContent);
       });
     });
   });

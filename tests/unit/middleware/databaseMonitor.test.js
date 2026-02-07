@@ -16,15 +16,8 @@ jest.mock('fs', () => ({
   }))
 }));
 
-jest.mock('mongoose', () => ({
-  plugin: jest.fn(),
-  connection: {
-    on: jest.fn()
-  }
-}));
 
 const fs = require('fs');
-const mongoose = require('mongoose');
 
 describe('Database Monitor Middleware', () => {
   let databaseMonitor;
@@ -78,7 +71,6 @@ describe('Database Monitor Middleware', () => {
       });
 
       it('should have empty metrics initially', () => {
-        expect(databaseMonitor.metrics.mongodb.totalOps).toBe(0);
         expect(databaseMonitor.metrics.zerodb.totalOps).toBe(0);
       });
 
@@ -147,8 +139,8 @@ describe('Database Monitor Middleware', () => {
         databaseMonitor.enabled = false;
       });
 
-      it('should log MongoDB operation', () => {
-        databaseMonitor.logOperation('mongodb', {
+      it('should log ZeroDB operation', () => {
+        databaseMonitor.logOperation('zerodb', {
           operation: 'find',
           model: 'User',
           duration: 15,
@@ -156,8 +148,8 @@ describe('Database Monitor Middleware', () => {
           timestamp: new Date().toISOString()
         });
 
-        expect(databaseMonitor.metrics.mongodb.totalOps).toBe(1);
-        expect(databaseMonitor.metrics.mongodb.operations.length).toBe(1);
+        expect(databaseMonitor.metrics.zerodb.totalOps).toBe(1);
+        expect(databaseMonitor.metrics.zerodb.operations.length).toBe(1);
       });
 
       it('should log ZeroDB operation', () => {
@@ -174,29 +166,29 @@ describe('Database Monitor Middleware', () => {
       it('should not log when disabled', () => {
         databaseMonitor.enabled = false;
 
-        databaseMonitor.logOperation('mongodb', {
+        databaseMonitor.logOperation('zerodb', {
           operation: 'find',
           duration: 15,
           success: true
         });
 
-        expect(databaseMonitor.metrics.mongodb.totalOps).toBe(0);
+        expect(databaseMonitor.metrics.zerodb.totalOps).toBe(0);
       });
 
       it('should trim old operations when exceeding max', () => {
         // Reset operations
-        databaseMonitor.metrics.mongodb.operations = [];
+        databaseMonitor.metrics.zerodb.operations = [];
 
         // Fill to max + some
         for (let i = 0; i < 1005; i++) {
-          databaseMonitor.logOperation('mongodb', {
+          databaseMonitor.logOperation('zerodb', {
             operation: 'find',
             duration: i,
             success: true
           });
         }
 
-        expect(databaseMonitor.metrics.mongodb.operations.length).toBeLessThanOrEqual(
+        expect(databaseMonitor.metrics.zerodb.operations.length).toBeLessThanOrEqual(
           databaseMonitor.maxOperationsInMemory
         );
       });
@@ -205,48 +197,48 @@ describe('Database Monitor Middleware', () => {
     describe('logError', () => {
       beforeEach(() => {
         databaseMonitor.enabled = true;
-        databaseMonitor.metrics.mongodb.errors = [];
-        databaseMonitor.metrics.mongodb.totalErrors = 0;
+        databaseMonitor.metrics.zerodb.errors = [];
+        databaseMonitor.metrics.zerodb.totalErrors = 0;
       });
 
       afterEach(() => {
         databaseMonitor.enabled = false;
       });
 
-      it('should log MongoDB error', () => {
+      it('should log ZeroDB error', () => {
         const error = new Error('Connection failed');
         error.code = 'ECONNREFUSED';
 
-        databaseMonitor.logError('mongodb', error, {
+        databaseMonitor.logError('zerodb', error, {
           operation: 'find',
           model: 'User'
         });
 
-        expect(databaseMonitor.metrics.mongodb.totalErrors).toBe(1);
-        expect(databaseMonitor.metrics.mongodb.errors.length).toBe(1);
+        expect(databaseMonitor.metrics.zerodb.totalErrors).toBe(1);
+        expect(databaseMonitor.metrics.zerodb.errors.length).toBe(1);
       });
 
       it('should not log when disabled', () => {
         databaseMonitor.enabled = false;
 
-        databaseMonitor.logError('mongodb', new Error('Test'), {});
+        databaseMonitor.logError('zerodb', new Error('Test'), {});
 
-        expect(databaseMonitor.metrics.mongodb.totalErrors).toBe(0);
+        expect(databaseMonitor.metrics.zerodb.totalErrors).toBe(0);
       });
 
       it('should trim old errors when exceeding 100', () => {
         for (let i = 0; i < 105; i++) {
-          databaseMonitor.logError('mongodb', new Error(`Error ${i}`), {});
+          databaseMonitor.logError('zerodb', new Error(`Error ${i}`), {});
         }
 
-        expect(databaseMonitor.metrics.mongodb.errors.length).toBeLessThanOrEqual(100);
+        expect(databaseMonitor.metrics.zerodb.errors.length).toBeLessThanOrEqual(100);
       });
     });
 
     describe('calculateMetrics', () => {
       beforeEach(() => {
         databaseMonitor.enabled = true;
-        databaseMonitor.metrics.mongodb.operations = [];
+        databaseMonitor.metrics.zerodb.operations = [];
       });
 
       afterEach(() => {
@@ -261,18 +253,18 @@ describe('Database Monitor Middleware', () => {
         ];
 
         ops.forEach(op => {
-          databaseMonitor.metrics.mongodb.operations.push(op);
+          databaseMonitor.metrics.zerodb.operations.push(op);
         });
 
         databaseMonitor.calculateMetrics();
 
-        expect(databaseMonitor.currentMetrics.mongodb.avg).toBe(20);
+        expect(databaseMonitor.currentMetrics.zerodb.avg).toBe(20);
       });
 
       it('should calculate percentiles', () => {
         // Create 100 operations with increasing durations
         for (let i = 1; i <= 100; i++) {
-          databaseMonitor.metrics.mongodb.operations.push({
+          databaseMonitor.metrics.zerodb.operations.push({
             duration: i,
             success: true
           });
@@ -280,8 +272,8 @@ describe('Database Monitor Middleware', () => {
 
         databaseMonitor.calculateMetrics();
 
-        expect(databaseMonitor.currentMetrics.mongodb.p95).toBeGreaterThan(90);
-        expect(databaseMonitor.currentMetrics.mongodb.p99).toBeGreaterThan(95);
+        expect(databaseMonitor.currentMetrics.zerodb.p95).toBeGreaterThan(90);
+        expect(databaseMonitor.currentMetrics.zerodb.p99).toBeGreaterThan(95);
       });
 
       it('should calculate error rate', () => {
@@ -293,31 +285,30 @@ describe('Database Monitor Middleware', () => {
         ];
 
         ops.forEach(op => {
-          databaseMonitor.metrics.mongodb.operations.push(op);
+          databaseMonitor.metrics.zerodb.operations.push(op);
         });
 
         databaseMonitor.calculateMetrics();
 
-        expect(databaseMonitor.currentMetrics.mongodb.errorRate).toBe(50);
+        expect(databaseMonitor.currentMetrics.zerodb.errorRate).toBe(50);
       });
 
       it('should handle empty operations', () => {
-        databaseMonitor.metrics.mongodb.operations = [];
+        databaseMonitor.metrics.zerodb.operations = [];
 
         databaseMonitor.calculateMetrics();
 
-        expect(databaseMonitor.currentMetrics.mongodb.avg).toBe(0);
-        expect(databaseMonitor.currentMetrics.mongodb.errorRate).toBe(0);
+        expect(databaseMonitor.currentMetrics.zerodb.avg).toBe(0);
+        expect(databaseMonitor.currentMetrics.zerodb.errorRate).toBe(0);
       });
     });
 
     describe('getMetrics', () => {
-      it('should return metrics for both databases', () => {
+      it('should return metrics for zerodb', () => {
         const metrics = databaseMonitor.getMetrics();
 
-        expect(metrics.mongodb).toBeDefined();
         expect(metrics.zerodb).toBeDefined();
-        expect(metrics.mongodb.totalOperations).toBeDefined();
+        expect(metrics.zerodb.totalOperations).toBeDefined();
         expect(metrics.zerodb.rateLimit).toBeDefined();
       });
     });
@@ -325,7 +316,7 @@ describe('Database Monitor Middleware', () => {
     describe('getRecentOperations', () => {
       beforeEach(() => {
         databaseMonitor.enabled = true;
-        databaseMonitor.metrics.mongodb.operations = [];
+        databaseMonitor.metrics.zerodb.operations = [];
       });
 
       afterEach(() => {
@@ -334,13 +325,13 @@ describe('Database Monitor Middleware', () => {
 
       it('should return recent operations', () => {
         for (let i = 0; i < 100; i++) {
-          databaseMonitor.metrics.mongodb.operations.push({
+          databaseMonitor.metrics.zerodb.operations.push({
             operation: `op${i}`,
             duration: i
           });
         }
 
-        const recent = databaseMonitor.getRecentOperations('mongodb', 10);
+        const recent = databaseMonitor.getRecentOperations('zerodb', 10);
 
         expect(recent.length).toBe(10);
         expect(recent[0].operation).toBe('op90');
@@ -348,12 +339,12 @@ describe('Database Monitor Middleware', () => {
 
       it('should default to 50 operations', () => {
         for (let i = 0; i < 100; i++) {
-          databaseMonitor.metrics.mongodb.operations.push({
+          databaseMonitor.metrics.zerodb.operations.push({
             operation: `op${i}`
           });
         }
 
-        const recent = databaseMonitor.getRecentOperations('mongodb');
+        const recent = databaseMonitor.getRecentOperations('zerodb');
 
         expect(recent.length).toBe(50);
       });
@@ -362,7 +353,7 @@ describe('Database Monitor Middleware', () => {
     describe('getRecentErrors', () => {
       beforeEach(() => {
         databaseMonitor.enabled = true;
-        databaseMonitor.metrics.mongodb.errors = [];
+        databaseMonitor.metrics.zerodb.errors = [];
       });
 
       afterEach(() => {
@@ -371,12 +362,12 @@ describe('Database Monitor Middleware', () => {
 
       it('should return recent errors', () => {
         for (let i = 0; i < 20; i++) {
-          databaseMonitor.metrics.mongodb.errors.push({
+          databaseMonitor.metrics.zerodb.errors.push({
             error: { message: `Error ${i}` }
           });
         }
 
-        const recent = databaseMonitor.getRecentErrors('mongodb', 5);
+        const recent = databaseMonitor.getRecentErrors('zerodb', 5);
 
         expect(recent.length).toBe(5);
       });

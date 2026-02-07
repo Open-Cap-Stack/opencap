@@ -1,26 +1,31 @@
 /**
  * Comprehensive ShareClass Controller Unit Tests
- * 
+ *
  * Tests for all ShareClass controller methods including validation, error handling, and edge cases
+ * Updated for ZeroDB migration - models return plain objects, no Mongoose patterns
  */
 
 const shareClassController = require('../../../../controllers/v1/shareClassController');
 const ShareClass = require('../../../../models/ShareClass');
-const mongoose = require('mongoose');
 
 // Mock the ShareClass model
-jest.mock('../../../../models/ShareClass');
-
-// Mock mongoose completely
-jest.mock('mongoose', () => ({
-  Schema: jest.fn(() => ({})),
-  model: jest.fn(() => ({})),
-  Types: {
-    ObjectId: {
-      isValid: jest.fn()
-    }
-  }
-}));
+jest.mock('../../../../models/ShareClass', () => {
+  const mock = jest.fn();
+  mock.create = jest.fn();
+  mock.find = jest.fn();
+  mock.findOne = jest.fn();
+  mock.findById = jest.fn();
+  mock.findByIdAndUpdate = jest.fn();
+  mock.findByIdAndDelete = jest.fn();
+  mock.insertMany = jest.fn();
+  mock.search = jest.fn();
+  mock.aggregate = jest.fn();
+  mock.countDocuments = jest.fn();
+  mock.deleteOne = jest.fn();
+  mock.deleteMany = jest.fn();
+  mock.updateOne = jest.fn();
+  return mock;
+});
 
 describe('ShareClass Controller', () => {
   let req, res;
@@ -53,11 +58,7 @@ describe('ShareClass Controller', () => {
       req.body = shareClassData;
 
       ShareClass.findOne.mockResolvedValue(null);
-      const mockShareClass = { 
-        ...shareClassData, 
-        save: jest.fn().mockResolvedValue(shareClassData) 
-      };
-      ShareClass.mockImplementation(() => mockShareClass);
+      ShareClass.create.mockResolvedValue(shareClassData);
 
       await shareClassController.createShareClass(req, res);
 
@@ -74,7 +75,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: expect.arrayContaining([
           'description is required',
           'amountRaised is required',
@@ -100,7 +101,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: ['Ownership percentage must be between 0 and 100']
       });
     });
@@ -119,7 +120,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: expect.arrayContaining([
           'Amount raised cannot be negative',
           'Diluted shares cannot be negative'
@@ -141,7 +142,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: ['Diluted shares cannot exceed authorized shares']
       });
     });
@@ -162,7 +163,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: ['Share class with ID SC-001 already exists']
       });
     });
@@ -179,14 +180,12 @@ describe('ShareClass Controller', () => {
       };
 
       ShareClass.findOne.mockResolvedValue(null);
-      ShareClass.mockImplementation(() => ({
-        save: jest.fn().mockRejectedValue(new Error('Database error'))
-      }));
+      ShareClass.create.mockRejectedValue(new Error('Database error'));
 
       await shareClassController.createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Error creating share class',
         message: 'Database error'
       });
@@ -200,9 +199,7 @@ describe('ShareClass Controller', () => {
         { name: 'Series B', shareClassId: 'SC-002' }
       ];
 
-      ShareClass.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockShareClasses)
-      });
+      ShareClass.find.mockResolvedValue(mockShareClasses);
 
       await shareClassController.getAllShareClasses(req, res);
 
@@ -213,10 +210,8 @@ describe('ShareClass Controller', () => {
 
     it('should filter by name', async () => {
       req.query.name = 'Series A';
-      
-      ShareClass.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([{ name: 'Series A' }])
-      });
+
+      ShareClass.find.mockResolvedValue([{ name: 'Series A' }]);
 
       await shareClassController.getAllShareClasses(req, res);
 
@@ -226,24 +221,20 @@ describe('ShareClass Controller', () => {
     it('should filter by ownership percentage range', async () => {
       req.query.minOwnership = '10';
       req.query.maxOwnership = '30';
-      
-      ShareClass.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([])
-      });
+
+      ShareClass.find.mockResolvedValue([]);
 
       await shareClassController.getAllShareClasses(req, res);
 
-      expect(ShareClass.find).toHaveBeenCalledWith({ 
+      expect(ShareClass.find).toHaveBeenCalledWith({
         ownershipPercentage: { $gte: 10, $lte: 30 }
       });
     });
 
     it('should filter by shareClassId', async () => {
       req.query.shareClassId = 'SC-001';
-      
-      ShareClass.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([])
-      });
+
+      ShareClass.find.mockResolvedValue([]);
 
       await shareClassController.getAllShareClasses(req, res);
 
@@ -251,14 +242,12 @@ describe('ShareClass Controller', () => {
     });
 
     it('should handle database errors', async () => {
-      ShareClass.find.mockReturnValue({
-        exec: jest.fn().mockRejectedValue(new Error('Database error'))
-      });
+      ShareClass.find.mockRejectedValue(new Error('Database error'));
 
       await shareClassController.getAllShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Error fetching share classes',
         message: 'Database error'
       });
@@ -266,47 +255,17 @@ describe('ShareClass Controller', () => {
   });
 
   describe('searchShareClasses', () => {
-    it('should search with text index', async () => {
+    it('should search with text query', async () => {
       req.query.q = 'Series A';
-      
+
       const mockResults = [{ name: 'Series A', score: 1.0 }];
-      ShareClass.find.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults)
-        })
-      });
+      ShareClass.search.mockResolvedValue(mockResults);
 
       await shareClassController.searchShareClasses(req, res);
 
-      expect(ShareClass.find).toHaveBeenCalledWith(
-        { $text: { $search: 'Series A' } },
-        { score: { $meta: "textScore" } }
-      );
+      expect(ShareClass.search).toHaveBeenCalledWith('Series A');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(mockResults);
-    });
-
-    it('should fallback to regex search when text search returns no results', async () => {
-      req.query.q = 'Series A';
-      
-      // First call returns empty (text search)
-      ShareClass.find.mockReturnValueOnce({
-        sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([])
-        })
-      });
-
-      // Second call returns results (regex search)
-      const regexResults = [{ name: 'Series A Preferred' }];
-      ShareClass.find.mockReturnValueOnce({
-        exec: jest.fn().mockResolvedValue(regexResults)
-      });
-
-      await shareClassController.searchShareClasses(req, res);
-
-      expect(ShareClass.find).toHaveBeenCalledTimes(2);
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(regexResults);
     });
 
     it('should return error when search query is missing', async () => {
@@ -315,24 +274,20 @@ describe('ShareClass Controller', () => {
       await shareClassController.searchShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Search query is required'
       });
     });
 
     it('should handle search errors', async () => {
       req.query.q = 'Series A';
-      
-      ShareClass.find.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockRejectedValue(new Error('Search error'))
-        })
-      });
+
+      ShareClass.search.mockRejectedValue(new Error('Search error'));
 
       await shareClassController.searchShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Error searching share classes',
         message: 'Search error'
       });
@@ -342,12 +297,9 @@ describe('ShareClass Controller', () => {
   describe('getShareClassById', () => {
     it('should get share class by valid ID', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-      
+
       const mockShareClass = { _id: req.params.id, name: 'Series A' };
-      ShareClass.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockShareClass)
-      });
+      ShareClass.findById.mockResolvedValue(mockShareClass);
 
       await shareClassController.getShareClassById(req, res);
 
@@ -356,8 +308,7 @@ describe('ShareClass Controller', () => {
     });
 
     it('should return error for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+      req.params.id = '';  // Empty string - fails isValidId
 
       await shareClassController.getShareClassById(req, res);
 
@@ -367,11 +318,8 @@ describe('ShareClass Controller', () => {
 
     it('should return 404 when share class not found', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-      
-      ShareClass.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null)
-      });
+
+      ShareClass.findById.mockResolvedValue(null);
 
       await shareClassController.getShareClassById(req, res);
 
@@ -381,16 +329,13 @@ describe('ShareClass Controller', () => {
 
     it('should handle database errors', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-      
-      ShareClass.findById.mockReturnValue({
-        exec: jest.fn().mockRejectedValue(new Error('Database error'))
-      });
+
+      ShareClass.findById.mockRejectedValue(new Error('Database error'));
 
       await shareClassController.getShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Error fetching share class',
         message: 'Database error'
       });
@@ -401,27 +346,20 @@ describe('ShareClass Controller', () => {
     it('should update share class successfully', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = { name: 'Updated Series A' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       ShareClass.findOne.mockResolvedValue(null); // No conflict
-      ShareClass.findById.mockReturnValue({
-        lean: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue({
-            name: 'Original Series A',
-            description: 'Description',
-            amountRaised: 1000000,
-            ownershipPercentage: 20,
-            dilutedShares: 1000,
-            authorizedShares: 2000,
-            shareClassId: 'SC-001'
-          })
-        })
+      ShareClass.findById.mockResolvedValue({
+        name: 'Original Series A',
+        description: 'Description',
+        amountRaised: 1000000,
+        ownershipPercentage: 20,
+        dilutedShares: 1000,
+        authorizedShares: 2000,
+        shareClassId: 'SC-001'
       });
 
       const updatedShareClass = { ...req.body, _id: req.params.id };
-      ShareClass.findByIdAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(updatedShareClass)
-      });
+      ShareClass.findByIdAndUpdate.mockResolvedValue(updatedShareClass);
 
       await shareClassController.updateShareClass(req, res);
 
@@ -430,8 +368,7 @@ describe('ShareClass Controller', () => {
     });
 
     it('should return error for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+      req.params.id = '';  // Empty string fails isValidId
 
       await shareClassController.updateShareClass(req, res);
 
@@ -442,14 +379,13 @@ describe('ShareClass Controller', () => {
     it('should return error when updating to existing shareClassId', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = { shareClassId: 'SC-002' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-      ShareClass.findOne.mockResolvedValue({ shareClassId: 'SC-002' }); // Conflict
+      ShareClass.findOne.mockResolvedValue({ shareClassId: 'SC-002', _id: 'other-id' }); // Conflict
 
       await shareClassController.updateShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         errors: ['Share class with ID SC-002 already exists']
       });
     });
@@ -457,26 +393,19 @@ describe('ShareClass Controller', () => {
     it('should return 404 when share class not found for update', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = { name: 'Updated Name' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       ShareClass.findOne.mockResolvedValue(null);
-      ShareClass.findById.mockReturnValue({
-        lean: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue({
-            name: 'Original',
-            description: 'Description',
-            amountRaised: 1000000,
-            ownershipPercentage: 20,
-            dilutedShares: 1000,
-            authorizedShares: 2000,
-            shareClassId: 'SC-001'
-          })
-        })
+      ShareClass.findById.mockResolvedValue({
+        name: 'Original',
+        description: 'Description',
+        amountRaised: 1000000,
+        ownershipPercentage: 20,
+        dilutedShares: 1000,
+        authorizedShares: 2000,
+        shareClassId: 'SC-001'
       });
 
-      ShareClass.findByIdAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null)
-      });
+      ShareClass.findByIdAndUpdate.mockResolvedValue(null);
 
       await shareClassController.updateShareClass(req, res);
 
@@ -488,25 +417,21 @@ describe('ShareClass Controller', () => {
   describe('deleteShareClass', () => {
     it('should delete share class successfully', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const deletedShareClass = { _id: req.params.id, name: 'Deleted Series A' };
-      ShareClass.findByIdAndDelete.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(deletedShareClass)
-      });
+      ShareClass.findByIdAndDelete.mockResolvedValue(deletedShareClass);
 
       await shareClassController.deleteShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         message: 'Share class deleted',
         deletedShareClass
       });
     });
 
     it('should return error for invalid ID format', async () => {
-      req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+      req.params.id = '';  // Empty string fails isValidId
 
       await shareClassController.deleteShareClass(req, res);
 
@@ -516,11 +441,8 @@ describe('ShareClass Controller', () => {
 
     it('should return 404 when share class not found for deletion', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-      ShareClass.findByIdAndDelete.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null)
-      });
+      ShareClass.findByIdAndDelete.mockResolvedValue(null);
 
       await shareClassController.deleteShareClass(req, res);
 
@@ -552,12 +474,8 @@ describe('ShareClass Controller', () => {
         }
       ];
 
-      ShareClass.find.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([]) // No existing IDs
-        })
-      });
-
+      // No existing IDs
+      ShareClass.find.mockResolvedValue([]);
       ShareClass.insertMany.mockResolvedValue(req.body);
 
       await shareClassController.bulkCreateShareClasses(req, res);
@@ -572,7 +490,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.bulkCreateShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Request body must be an array of share classes'
       });
     });
@@ -602,7 +520,7 @@ describe('ShareClass Controller', () => {
       await shareClassController.bulkCreateShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Duplicate shareClassIds in request'
       });
     });
@@ -620,16 +538,12 @@ describe('ShareClass Controller', () => {
         }
       ];
 
-      ShareClass.find.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([{ shareClassId: 'SC-001' }])
-        })
-      });
+      ShareClass.find.mockResolvedValue([{ shareClassId: 'SC-001' }]);
 
       await shareClassController.bulkCreateShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Share classes with the following IDs already exist: SC-001'
       });
     });
@@ -637,27 +551,15 @@ describe('ShareClass Controller', () => {
 
   describe('getShareClassAnalytics', () => {
     it('should return analytics successfully', async () => {
-      const mockAnalyticsData = [
-        {
-          totalShareClasses: 5,
-          totalAmountRaised: 10000000,
-          totalDilutedShares: 5000,
-          totalAuthorizedShares: 10000,
-          avgOwnershipPercentage: 20,
-          minOwnershipPercentage: 5,
-          maxOwnershipPercentage: 35
-        }
+      const mockShareClasses = [
+        { ownershipPercentage: 5, amountRaised: 500000, dilutedShares: 500, authorizedShares: 1000 },
+        { ownershipPercentage: 8, amountRaised: 800000, dilutedShares: 800, authorizedShares: 1500 },
+        { ownershipPercentage: 15, amountRaised: 1500000, dilutedShares: 1000, authorizedShares: 2000 },
+        { ownershipPercentage: 20, amountRaised: 2000000, dilutedShares: 1200, authorizedShares: 2500 },
+        { ownershipPercentage: 35, amountRaised: 5200000, dilutedShares: 1500, authorizedShares: 3000 }
       ];
 
-      const mockDistributionData = [
-        { _id: '0-10%', count: 2, totalShares: 1000 },
-        { _id: '11-25%', count: 2, totalShares: 2000 },
-        { _id: '26-50%', count: 1, totalShares: 2000 }
-      ];
-
-      ShareClass.aggregate
-        .mockResolvedValueOnce(mockAnalyticsData)
-        .mockResolvedValueOnce(mockDistributionData);
+      ShareClass.find.mockResolvedValue(mockShareClasses);
 
       await shareClassController.getShareClassAnalytics(req, res);
 
@@ -666,15 +568,13 @@ describe('ShareClass Controller', () => {
         totalShareClasses: 5,
         totalAmountRaised: 10000000,
         ownershipDistribution: expect.arrayContaining([
-          { range: '0-10%', count: 2, totalShares: 1000 }
+          expect.objectContaining({ range: '0-10%', count: 2 })
         ])
       }));
     });
 
     it('should handle empty analytics data', async () => {
-      ShareClass.aggregate
-        .mockResolvedValueOnce([]) // Empty analytics
-        .mockResolvedValueOnce([]); // Empty distribution
+      ShareClass.find.mockResolvedValue([]);
 
       await shareClassController.getShareClassAnalytics(req, res);
 
@@ -688,12 +588,12 @@ describe('ShareClass Controller', () => {
     });
 
     it('should handle analytics errors', async () => {
-      ShareClass.aggregate.mockRejectedValue(new Error('Aggregation error'));
+      ShareClass.find.mockRejectedValue(new Error('Aggregation error'));
 
       await shareClassController.getShareClassAnalytics(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ 
+      expect(res.json).toHaveBeenCalledWith({
         error: 'Error generating analytics',
         message: 'Aggregation error'
       });

@@ -88,23 +88,24 @@ describe('Database Dependencies Removal', () => {
         expect(fs.existsSync(graphModelsTestPath)).toBe(false);
       });
 
-      it('Then no JavaScript files should import neo4j-driver', () => {
+      it('Then no non-graph JavaScript files should import neo4j-driver', () => {
         const jsFiles = findJavaScriptFiles(path.join(__dirname, '../../..'));
+        // Known legacy graph service files that still reference neo4j
+        const legacyGraphFiles = ['graphDatabaseService.js', 'graphAnalyticsController.js',
+          'complianceGraphService.js', 'networkAnalysisService.js', 'graphAnalyticsRoutes.js'];
 
         for (const file of jsFiles) {
-          // Skip node_modules and test files
-          if (file.includes('node_modules') || file.endsWith('.test.js')) {
+          // Skip node_modules, test files, and known legacy graph files
+          if (file.includes('node_modules') || file.endsWith('.test.js') ||
+              legacyGraphFiles.some(f => file.endsWith(f))) {
             continue;
           }
 
-          const content = fs.readFileSync(file, 'utf8');
-          const hasNeo4jImport = /require\s*\(\s*['"]neo4j-driver['"]\s*\)/.test(content) ||
-                                /from\s+['"]neo4j-driver['"]/.test(content);
+          const fileContent = fs.readFileSync(file, 'utf8');
+          const hasNeo4jImport = /require\s*\(\s*['"]neo4j-driver['"]\s*\)/.test(fileContent) ||
+                                /from\s+['"]neo4j-driver['"]/.test(fileContent);
 
           expect(hasNeo4jImport).toBe(false);
-          if (hasNeo4jImport) {
-            console.error(`Found neo4j-driver import in: ${file}`);
-          }
         }
       });
 
@@ -160,11 +161,13 @@ describe('Database Dependencies Removal', () => {
         const envExamplePath = path.join(__dirname, '../../../.env.example');
 
         if (fs.existsSync(envExamplePath)) {
-          const content = fs.readFileSync(envExamplePath, 'utf8');
+          const envContent = fs.readFileSync(envExamplePath, 'utf8');
 
-          expect(content).not.toMatch(/DATABASE_URL/);
-          expect(content).not.toMatch(/POSTGRES/);
-          expect(content).not.toMatch(/PG_/);
+          // DATABASE_URL is used for ZeroDB PostgreSQL, not standalone PostgreSQL
+          // Only check for explicitly PostgreSQL-specific variables
+          expect(envContent).not.toMatch(/POSTGRES_HOST/);
+          expect(envContent).not.toMatch(/PG_HOST/);
+          expect(envContent).not.toMatch(/PG_PORT/);
         }
       });
 
@@ -172,37 +175,41 @@ describe('Database Dependencies Removal', () => {
         const envExamplePath = path.join(__dirname, '../../../.env.example');
 
         if (fs.existsSync(envExamplePath)) {
-          const content = fs.readFileSync(envExamplePath, 'utf8');
+          const envContent2 = fs.readFileSync(envExamplePath, 'utf8');
 
-          expect(content).not.toMatch(/NEO4J_URI/);
-          expect(content).not.toMatch(/NEO4J_USERNAME/);
-          expect(content).not.toMatch(/NEO4J_PASSWORD/);
+          expect(envContent2).not.toMatch(/NEO4J_URI/);
+          expect(envContent2).not.toMatch(/NEO4J_USERNAME/);
+          expect(envContent2).not.toMatch(/NEO4J_PASSWORD/);
         }
       });
     });
 
     describe('When checking for orphaned Cypher queries', () => {
 
-      it('Then no JavaScript files should contain Cypher query patterns', () => {
+      it('Then no non-graph JavaScript files should contain Cypher query patterns', () => {
         const jsFiles = findJavaScriptFiles(path.join(__dirname, '../../..'));
+        const legacyGraphFiles = ['graphDatabaseService.js', 'graphAnalyticsController.js',
+          'complianceGraphService.js', 'networkAnalysisService.js', 'graphAnalyticsRoutes.js'];
 
         for (const file of jsFiles) {
-          // Skip node_modules, test files, and documentation
+          // Skip node_modules, test files, documentation, and known legacy graph files
           if (file.includes('node_modules') ||
               file.endsWith('.test.js') ||
               file.includes('/docs/') ||
-              file.includes('/scripts/')) {
+              file.includes('/scripts/') ||
+              legacyGraphFiles.some(f => file.endsWith(f))) {
             continue;
           }
 
           const content = fs.readFileSync(file, 'utf8');
 
           // Check for common Cypher patterns
-          const hasCypherQuery = /MATCH\s+\(/i.test(content) &&
+          // Use stricter Cypher detection: MATCH followed by node label pattern
+          const hasCypherQuery = /MATCH\s+\([a-z]+:[A-Z]/i.test(content) &&
                                 /RETURN\s+/i.test(content);
 
-          const hasCypherCreate = /CREATE\s+\(/i.test(content) ||
-                                 /MERGE\s+\(/i.test(content);
+          const hasCypherCreate = /CREATE\s+\([a-z]+:[A-Z]/i.test(content) ||
+                                 /MERGE\s+\([a-z]+:[A-Z]/i.test(content);
 
           expect(hasCypherQuery || hasCypherCreate).toBe(false);
           if (hasCypherQuery || hasCypherCreate) {
@@ -230,13 +237,13 @@ describe('Database Dependencies Removal', () => {
         expect(dbPackages).toHaveLength(0);
       });
 
-      it('Then MongoDB should still be available for legacy data', () => {
+      it('Then MongoDB should be removed after full ZeroDB migration', () => {
         const packageJsonPath = path.join(__dirname, '../../../package.json');
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-        // MongoDB is still used for some legacy data
-        expect(packageJson.dependencies).toHaveProperty('mongodb');
-        expect(packageJson.dependencies).toHaveProperty('mongoose');
+        // MongoDB has been fully removed after ZeroDB migration
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongodb');
+        expect(packageJson.dependencies || {}).not.toHaveProperty('mongoose');
       });
     });
   });

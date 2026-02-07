@@ -1,15 +1,23 @@
 /**
  * Webhook Model Unit Tests
  * Issue #118: Build Webhook System
+ * Rewritten for ZeroDB model compatibility
  */
 process.env.SKIP_DB_SETUP = 'true';
+
+// Mock zerodbService to prevent real API calls
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  projectId: 'test-project'
+}));
 
 describe('Webhook Model', () => {
   let Webhook;
 
   beforeAll(() => {
     jest.resetModules();
-    // Don't mock mongoose, use the actual model
     Webhook = require('../../../models/Webhook');
   });
 
@@ -19,206 +27,224 @@ describe('Webhook Model', () => {
 
   describe('Schema Definition', () => {
     it('should have webhookId field', () => {
-      expect(Webhook.schema.path('webhookId')).toBeDefined();
+      expect(Webhook.schema.webhookId).toBeDefined();
     });
 
     it('should have companyId field', () => {
-      expect(Webhook.schema.path('companyId')).toBeDefined();
+      expect(Webhook.schema.companyId).toBeDefined();
     });
 
     it('should have name field', () => {
-      expect(Webhook.schema.path('name')).toBeDefined();
+      expect(Webhook.schema.name).toBeDefined();
     });
 
     it('should have description field', () => {
-      expect(Webhook.schema.path('description')).toBeDefined();
+      expect(Webhook.schema.description).toBeDefined();
     });
 
     it('should have url field', () => {
-      expect(Webhook.schema.path('url')).toBeDefined();
+      expect(Webhook.schema.url).toBeDefined();
     });
 
     it('should have secret field', () => {
-      expect(Webhook.schema.path('secret')).toBeDefined();
+      expect(Webhook.schema.secret).toBeDefined();
     });
 
     it('should have events field as array', () => {
-      expect(Webhook.schema.path('events')).toBeDefined();
+      expect(Webhook.schema.events).toBeDefined();
+      expect(Webhook.schema.events.type).toBe('array');
     });
 
     it('should have status field with enum values', () => {
-      expect(Webhook.schema.path('status')).toBeDefined();
+      expect(Webhook.schema.status).toBeDefined();
+      expect(Webhook.schema.status.enum).toBeDefined();
     });
 
     it('should have retryConfig field', () => {
-      expect(Webhook.schema.path('retryConfig')).toBeDefined();
+      expect(Webhook.schema.retryConfig).toBeDefined();
     });
 
     it('should have headers field', () => {
-      expect(Webhook.schema.path('headers')).toBeDefined();
+      expect(Webhook.schema.headers).toBeDefined();
     });
 
     it('should have lastTriggeredAt field', () => {
-      expect(Webhook.schema.path('lastTriggeredAt')).toBeDefined();
+      expect(Webhook.schema.lastTriggeredAt).toBeDefined();
     });
 
     it('should have failureCount field', () => {
-      expect(Webhook.schema.path('failureCount')).toBeDefined();
+      expect(Webhook.schema.failureCount).toBeDefined();
     });
 
-    it('should have timestamps enabled', () => {
-      expect(Webhook.schema.options.timestamps).toBe(true);
+    it('should have timestamps (createdAt and updatedAt)', () => {
+      expect(Webhook.schema.createdAt).toBeDefined();
+      expect(Webhook.schema.updatedAt).toBeDefined();
     });
   });
 
   describe('Field Validations', () => {
     it('should require webhookId to be unique', () => {
-      const webhookIdPath = Webhook.schema.path('webhookId');
-      expect(webhookIdPath.options.unique).toBe(true);
+      expect(Webhook.schema.webhookId.unique).toBe(true);
     });
 
     it('should require companyId', () => {
-      const companyIdPath = Webhook.schema.path('companyId');
-      expect(companyIdPath.options.required).toBe(true);
+      expect(Webhook.schema.companyId.required).toBe(true);
     });
 
     it('should require name', () => {
-      const namePath = Webhook.schema.path('name');
-      expect(namePath.options.required).toBe(true);
+      expect(Webhook.schema.name.required).toBe(true);
     });
 
     it('should require url', () => {
-      const urlPath = Webhook.schema.path('url');
-      expect(urlPath.options.required).toBe(true);
+      expect(Webhook.schema.url.required).toBe(true);
     });
 
     it('should require secret', () => {
-      const secretPath = Webhook.schema.path('secret');
-      expect(secretPath.options.required).toBe(true);
+      expect(Webhook.schema.secret.required).toBe(true);
     });
 
     it('should have status enum with active, paused, failed values', () => {
-      const statusPath = Webhook.schema.path('status');
-      expect(statusPath.options.enum).toContain('active');
-      expect(statusPath.options.enum).toContain('paused');
-      expect(statusPath.options.enum).toContain('failed');
+      expect(Webhook.schema.status.enum).toContain('active');
+      expect(Webhook.schema.status.enum).toContain('paused');
+      expect(Webhook.schema.status.enum).toContain('failed');
     });
 
     it('should default status to active', () => {
-      const statusPath = Webhook.schema.path('status');
-      expect(statusPath.options.default).toBe('active');
+      expect(Webhook.schema.status.default).toBe('active');
     });
 
     it('should default failureCount to 0', () => {
-      const failureCountPath = Webhook.schema.path('failureCount');
-      expect(failureCountPath.options.default).toBe(0);
+      expect(Webhook.schema.failureCount.default).toBe(0);
     });
   });
 
-  describe('RetryConfig Sub-Schema', () => {
-    it('should have maxRetries field with default of 3', () => {
-      const retryConfigPath = Webhook.schema.path('retryConfig.maxRetries');
-      expect(retryConfigPath).toBeDefined();
-      expect(retryConfigPath.options.default).toBe(3);
+  describe('RetryConfig Defaults', () => {
+    it('should have retryConfig with default maxRetries of 3', () => {
+      expect(Webhook.schema.retryConfig.default).toBeDefined();
+      expect(Webhook.schema.retryConfig.default.maxRetries).toBe(3);
     });
 
-    it('should have retryDelay field with default of 60000', () => {
-      const retryConfigPath = Webhook.schema.path('retryConfig.retryDelay');
-      expect(retryConfigPath).toBeDefined();
-      expect(retryConfigPath.options.default).toBe(60000);
+    it('should have retryConfig with default retryDelay of 60000', () => {
+      expect(Webhook.schema.retryConfig.default).toBeDefined();
+      expect(Webhook.schema.retryConfig.default.retryDelay).toBe(60000);
     });
   });
 
-  describe('Events Array', () => {
-    it('should accept valid event types', () => {
-      const eventsPath = Webhook.schema.path('events');
-      expect(eventsPath.caster.options.enum).toContain('stakeholder.created');
-      expect(eventsPath.caster.options.enum).toContain('stakeholder.updated');
-      expect(eventsPath.caster.options.enum).toContain('stakeholder.deleted');
-      expect(eventsPath.caster.options.enum).toContain('share_class.created');
-      expect(eventsPath.caster.options.enum).toContain('share_class.updated');
-      expect(eventsPath.caster.options.enum).toContain('document.created');
-      expect(eventsPath.caster.options.enum).toContain('document.signed');
-      expect(eventsPath.caster.options.enum).toContain('equity.granted');
-      expect(eventsPath.caster.options.enum).toContain('equity.vested');
-      expect(eventsPath.caster.options.enum).toContain('transaction.completed');
+  describe('Event Types', () => {
+    it('should export valid EVENT_TYPES', () => {
+      expect(Webhook.EVENT_TYPES).toBeDefined();
+      expect(Webhook.EVENT_TYPES).toContain('stakeholder.created');
+      expect(Webhook.EVENT_TYPES).toContain('stakeholder.updated');
+      expect(Webhook.EVENT_TYPES).toContain('stakeholder.deleted');
+      expect(Webhook.EVENT_TYPES).toContain('share_class.created');
+      expect(Webhook.EVENT_TYPES).toContain('share_class.updated');
+      expect(Webhook.EVENT_TYPES).toContain('document.created');
+      expect(Webhook.EVENT_TYPES).toContain('document.signed');
+      expect(Webhook.EVENT_TYPES).toContain('equity.granted');
+      expect(Webhook.EVENT_TYPES).toContain('equity.vested');
+      expect(Webhook.EVENT_TYPES).toContain('transaction.completed');
     });
   });
 
-  describe('Indexes', () => {
-    it('should have index on webhookId', () => {
-      const indexes = Webhook.schema.indexes();
-      const webhookIdIndex = indexes.find(idx => idx[0].webhookId);
-      expect(webhookIdIndex).toBeDefined();
-    });
-
-    it('should have index on companyId', () => {
-      const indexes = Webhook.schema.indexes();
-      const companyIdIndex = indexes.find(idx => idx[0].companyId);
-      expect(companyIdIndex).toBeDefined();
-    });
-
-    it('should have index on status', () => {
-      const indexes = Webhook.schema.indexes();
-      const statusIndex = indexes.find(idx => idx[0].status);
-      expect(statusIndex).toBeDefined();
-    });
-  });
-
-  describe('Model Instance Methods', () => {
+  describe('Business Logic Methods', () => {
     it('should have isSubscribedTo method', () => {
-      expect(Webhook.schema.methods.isSubscribedTo).toBeDefined();
+      expect(typeof Webhook.isSubscribedTo).toBe('function');
+    });
+
+    it('should check if webhook is subscribed to an event', () => {
+      const webhook = {
+        events: ['stakeholder.created', 'stakeholder.updated']
+      };
+      expect(Webhook.isSubscribedTo(webhook, 'stakeholder.created')).toBe(true);
+      expect(Webhook.isSubscribedTo(webhook, 'document.created')).toBe(false);
     });
 
     it('should have incrementFailureCount method', () => {
-      expect(Webhook.schema.methods.incrementFailureCount).toBeDefined();
+      expect(typeof Webhook.incrementFailureCount).toBe('function');
     });
 
     it('should have resetFailureCount method', () => {
-      expect(Webhook.schema.methods.resetFailureCount).toBeDefined();
+      expect(typeof Webhook.resetFailureCount).toBe('function');
+    });
+
+    it('should have isOperational method', () => {
+      expect(typeof Webhook.isOperational).toBe('function');
+    });
+
+    it('should return true for isOperational when status is active and failure count is low', () => {
+      const webhook = { status: 'active', failureCount: 0 };
+      expect(Webhook.isOperational(webhook)).toBe(true);
+    });
+
+    it('should return false for isOperational when status is not active', () => {
+      const webhook = { status: 'paused', failureCount: 0 };
+      expect(Webhook.isOperational(webhook)).toBe(false);
+    });
+
+    it('should return false for isOperational when failure count exceeds threshold', () => {
+      const webhook = { status: 'active', failureCount: 10 };
+      expect(Webhook.isOperational(webhook)).toBe(false);
     });
   });
 
-  describe('Model Virtual Properties', () => {
-    it('should have isOperational virtual', () => {
-      expect(Webhook.schema.virtuals.isOperational).toBeDefined();
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof Webhook.create).toBe('function');
     });
-  });
 
-  describe('Model Creation', () => {
-    it('should create a valid webhook with all required fields', () => {
-      const webhookData = {
-        webhookId: 'WH-12345678',
-        companyId: 'company123',
-        name: 'Test Webhook',
-        description: 'A test webhook for integration',
-        url: 'https://api.example.com/webhook',
-        secret: 'supersecretkey123',
-        events: ['stakeholder.created', 'stakeholder.updated'],
-        status: 'active',
-        retryConfig: {
-          maxRetries: 5,
-          retryDelay: 30000
-        },
-        headers: {
-          'X-Custom-Header': 'custom-value'
-        }
+    it('should have find method', () => {
+      expect(typeof Webhook.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof Webhook.findOne).toBe('function');
+    });
+
+    it('should have findByWebhookId method', () => {
+      expect(typeof Webhook.findByWebhookId).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof Webhook.findByCompany).toBe('function');
+    });
+
+    it('should have findByEvent method', () => {
+      expect(typeof Webhook.findByEvent).toBe('function');
+    });
+
+    it('should have updateLastTriggered method', () => {
+      expect(typeof Webhook.updateLastTriggered).toBe('function');
+    });
+
+    it('should have toJSON method that sanitizes sensitive data', () => {
+      expect(typeof Webhook.toJSON).toBe('function');
+
+      const webhook = {
+        webhookId: 'WH-123',
+        name: 'Test',
+        secret: 'supersecret'
       };
+      const sanitized = Webhook.toJSON(webhook);
+      expect(sanitized.webhookId).toBe('WH-123');
+      expect(sanitized.secret).toBeUndefined();
+    });
+  });
 
-      const webhook = new Webhook(webhookData);
-      expect(webhook.webhookId).toBe('WH-12345678');
-      expect(webhook.companyId).toBe('company123');
-      expect(webhook.name).toBe('Test Webhook');
-      expect(webhook.url).toBe('https://api.example.com/webhook');
-      expect(webhook.secret).toBe('supersecretkey123');
-      expect(webhook.events).toContain('stakeholder.created');
-      expect(webhook.status).toBe('active');
-      expect(webhook.retryConfig.maxRetries).toBe(5);
+  describe('Exported Constants', () => {
+    it('should export EVENT_TYPES', () => {
+      expect(Webhook.EVENT_TYPES).toBeDefined();
+      expect(Array.isArray(Webhook.EVENT_TYPES)).toBe(true);
     });
 
-    it('should validate webhook has required webhookId', () => {
-      const webhookIdPath = Webhook.schema.path('webhookId');
-      expect(webhookIdPath.options.required).toBe(true);
+    it('should export VALID_STATUSES', () => {
+      expect(Webhook.VALID_STATUSES).toBeDefined();
+      expect(Webhook.VALID_STATUSES).toContain('active');
+      expect(Webhook.VALID_STATUSES).toContain('paused');
+      expect(Webhook.VALID_STATUSES).toContain('failed');
+    });
+
+    it('should require webhookId', () => {
+      expect(Webhook.schema.webhookId.required).toBe(true);
     });
   });
 });
