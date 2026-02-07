@@ -184,6 +184,7 @@ const routes = {
   taskRoutes: safeRequire(path.join(__dirname, 'routes/v1/taskRoutes')), // Issue #121: Task management
   healthRoutes: safeRequire(path.join(__dirname, 'routes/v1/healthRoutes')), // Issue #35: Production readiness health checks
   valuation409ARoutes: safeRequire(path.join(__dirname, 'routes/v1/valuation409ARoutes')), // Issue #59: 409A Valuation Request System
+  valuation409AExportRoutes: safeRequire(path.join(__dirname, 'routes/v1/valuation409AExportRoutes')), // Issue #269: 409A Data Export API
   materialEventRoutes: safeRequire(path.join(__dirname, 'routes/v1/materialEventRoutes')), // Issue #60: Material Events Tracking
   valuationPartnerRoutes: safeRequire(path.join(__dirname, 'routes/v1/valuationPartnerRoutes')), // Issue #61: Valuation Specialist Integration
   equityGrantRoutes: safeRequire(path.join(__dirname, 'routes/v1/equityGrantRoutes')), // Issue #77: Equity Grant Management
@@ -289,6 +290,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/health';
     } else if (key === 'valuation409ARoutes') {
       path = '/api/v1/valuations';
+    } else if (key === 'valuation409AExportRoutes') {
+      path = '/api/v1/valuations/export';
     } else if (key === 'materialEventRoutes') {
       path = '/api/v1/material-events';
     } else if (key === 'valuationPartnerRoutes') {
