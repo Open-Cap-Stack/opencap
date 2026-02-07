@@ -53,9 +53,11 @@ class DilutionCalculationService {
         if (optionPoolExpansion && optionPoolTargetPercentage > 0) {
             if (optionPoolPreOrPost === 'pre') {
                 // Pre-money option pool: creates dilution before investment
+                // Solve: targetPct/100 = poolTotal / (existingShares + poolTotal + newShares)
+                // => poolTotal = (existingShares + newShares) * targetPct / (100 - targetPct)
                 const existingShares = baseCapTable.totalShares || 0;
-                const totalPreMoney = existingShares + optionPoolShares + newSharesFromFinancing;
-                const targetPoolTotal = Math.round((totalPreMoney * optionPoolTargetPercentage) / 100);
+                const sharesExcludingPool = existingShares + newSharesFromFinancing;
+                const targetPoolTotal = Math.ceil((sharesExcludingPool * optionPoolTargetPercentage) / (100 - optionPoolTargetPercentage));
                 optionPoolExpansionShares = Math.max(0, targetPoolTotal - optionPoolShares);
             } else {
                 // Post-money option pool: calculated after investment
@@ -71,7 +73,7 @@ class DilutionCalculationService {
         if (optionPoolExpansion && optionPoolTargetPercentage > 0 && optionPoolPreOrPost === 'post') {
             // Target % = (optionPoolShares + expansion) / totalShares
             // Solving for total shares including expansion:
-            const targetPoolShares = Math.round(
+            const targetPoolShares = Math.ceil(
                 (totalSharesBeforePostPool * optionPoolTargetPercentage) / (100 - optionPoolTargetPercentage)
             );
             optionPoolExpansionShares = Math.max(0, targetPoolShares - optionPoolShares);
