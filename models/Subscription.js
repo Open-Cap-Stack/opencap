@@ -6,182 +6,245 @@
  * - Subscription lifecycle (trial, active, paused, canceled)
  * - Billing period tracking
  * - Usage tracking for limits
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-const subscriptionHistorySchema = new mongoose.Schema({
-  action: {
-    type: String,
-    enum: ['created', 'activated', 'paused', 'resumed', 'canceled', 'renewed', 'plan_changed', 'quantity_changed'],
-    required: true
-  },
-  fromStatus: { type: String },
-  toStatus: { type: String },
-  fromPlanId: { type: String },
-  toPlanId: { type: String },
-  fromQuantity: { type: Number },
-  toQuantity: { type: Number },
-  reason: { type: String },
-  performedBy: { type: String },
-  performedAt: { type: Date, default: Date.now },
-  metadata: { type: mongoose.Schema.Types.Mixed }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-const subscriptionSchema = new mongoose.Schema({
-  // Unique identifier for the subscription
-  subscriptionId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+// Valid subscription statuses
+const VALID_STATUSES = ['trialing', 'active', 'past_due', 'canceled', 'paused'];
 
-  // Company this subscription belongs to
-  companyId: {
-    type: String,
-    required: true,
-    index: true
-  },
+// Valid history actions
+const VALID_HISTORY_ACTIONS = ['created', 'activated', 'paused', 'resumed', 'canceled', 'renewed', 'plan_changed', 'quantity_changed'];
 
-  // Plan this subscription is for
-  planId: {
-    type: String,
-    required: true,
-    index: true
-  },
-
-  // Subscription status
-  status: {
-    type: String,
-    enum: ['trialing', 'active', 'past_due', 'canceled', 'paused'],
-    default: 'trialing',
-    index: true
-  },
-
-  // Billing period tracking
-  currentPeriodStart: {
-    type: Date
-  },
-  currentPeriodEnd: {
-    type: Date
-  },
-
-  // Trial period tracking
-  trialStart: {
-    type: Date
-  },
-  trialEnd: {
-    type: Date
-  },
-
-  // Cancellation tracking
-  canceledAt: {
-    type: Date
-  },
-  cancelAtPeriodEnd: {
-    type: Boolean,
-    default: false
-  },
-  cancellationReason: {
-    type: String
-  },
-
-  // Quantity (seats/units)
-  quantity: {
-    type: Number,
-    default: 1,
-    min: 1
-  },
-
-  // Pause tracking
-  pausedAt: {
-    type: Date
-  },
-  resumesAt: {
-    type: Date
-  },
-
-  // Metadata for custom data
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  },
-
-  // Status change history
-  history: [subscriptionHistorySchema],
-
-  // Audit fields
-  createdBy: {
-    type: String
-  },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
-
-// Compound indexes for common queries
-subscriptionSchema.index({ companyId: 1, status: 1 });
-subscriptionSchema.index({ planId: 1, status: 1 });
-subscriptionSchema.index({ currentPeriodEnd: 1, status: 1 });
-subscriptionSchema.index({ trialEnd: 1, status: 1 });
-
-// Pre-save hook to record history
-subscriptionSchema.pre('save', function(next) {
-  if (this.isNew) {
-    this.history = this.history || [];
-    this.history.push({
-      action: 'created',
-      toStatus: this.status,
-      toPlanId: this.planId,
-      toQuantity: this.quantity,
-      performedAt: new Date()
-    });
-  }
-  next();
-});
-
-// Virtual for checking if subscription is in trial
-subscriptionSchema.virtual('isTrialing').get(function() {
-  return this.status === 'trialing' && this.trialEnd && new Date() < new Date(this.trialEnd);
-});
-
-// Virtual for checking if subscription is active (including trial)
-subscriptionSchema.virtual('isActive').get(function() {
-  return this.status === 'active' || this.status === 'trialing';
-});
-
-// Virtual for days remaining in current period
-subscriptionSchema.virtual('daysRemaining').get(function() {
-  if (!this.currentPeriodEnd) return null;
-  const now = new Date();
-  const end = new Date(this.currentPeriodEnd);
-  const diff = end - now;
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-});
-
-// Virtual for trial days remaining
-subscriptionSchema.virtual('trialDaysRemaining').get(function() {
-  if (!this.trialEnd || this.status !== 'trialing') return null;
-  const now = new Date();
-  const end = new Date(this.trialEnd);
-  const diff = end - now;
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-});
-
-// Method to add history entry
-subscriptionSchema.methods.addHistoryEntry = function(entry) {
-  this.history = this.history || [];
-  this.history.push({
-    ...entry,
-    performedAt: new Date()
-  });
+// Schema definition for documentation and validation
+const subscriptionSchema = {
+  subscriptionId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  planId: { type: 'string', required: true },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'trialing' },
+  currentPeriodStart: { type: 'date', default: null },
+  currentPeriodEnd: { type: 'date', default: null },
+  trialStart: { type: 'date', default: null },
+  trialEnd: { type: 'date', default: null },
+  canceledAt: { type: 'date', default: null },
+  cancelAtPeriodEnd: { type: 'boolean', default: false },
+  cancellationReason: { type: 'string', default: null },
+  quantity: { type: 'number', default: 1 },
+  pausedAt: { type: 'date', default: null },
+  resumesAt: { type: 'date', default: null },
+  metadata: { type: 'object', default: {} },
+  history: { type: 'array', default: [] },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Ensure virtuals are included in JSON
-subscriptionSchema.set('toJSON', { virtuals: true });
-subscriptionSchema.set('toObject', { virtuals: true });
+// Create the base model
+const baseModel = createModel('subscriptions', subscriptionSchema);
 
-const Subscription = mongoose.model('Subscription', subscriptionSchema);
+// Extended Subscription model with business logic
+const Subscription = {
+  ...baseModel,
+  tableName: 'subscriptions',
+  schema: subscriptionSchema,
+
+  // Export constants
+  VALID_STATUSES,
+  VALID_HISTORY_ACTIONS,
+
+  /**
+   * Create a new subscription with defaults
+   * @param {Object} data - Subscription data
+   * @returns {Object} Created subscription
+   */
+  async create(data) {
+    if (!data.subscriptionId) {
+      data.subscriptionId = `sub_${uuidv4()}`;
+    }
+
+    if (!data.status) {
+      data.status = 'trialing';
+    }
+
+    if (!data.quantity || data.quantity < 1) {
+      data.quantity = 1;
+    }
+
+    // Add initial history entry
+    data.history = data.history || [];
+    data.history.push({
+      action: 'created',
+      toStatus: data.status,
+      toPlanId: data.planId,
+      toQuantity: data.quantity,
+      performedAt: new Date().toISOString()
+    });
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find subscription by subscriptionId
+   * @param {string} subscriptionId - Subscription ID
+   * @returns {Object|null} Subscription or null
+   */
+  async findBySubscriptionId(subscriptionId) {
+    return baseModel.findOne.call(baseModel, { subscriptionId });
+  },
+
+  /**
+   * Find subscriptions by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Subscriptions for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find subscriptions by plan
+   * @param {string} planId - Plan ID
+   * @returns {Array} Subscriptions for plan
+   */
+  async findByPlan(planId) {
+    return baseModel.find.call(baseModel, { planId });
+  },
+
+  /**
+   * Check if subscription is in trial
+   * @param {Object} subscription - Subscription object
+   * @returns {boolean} True if in trial
+   */
+  isTrialing(subscription) {
+    return subscription.status === 'trialing' &&
+           subscription.trialEnd &&
+           new Date() < new Date(subscription.trialEnd);
+  },
+
+  /**
+   * Check if subscription is active (including trial)
+   * @param {Object} subscription - Subscription object
+   * @returns {boolean} True if active
+   */
+  isActive(subscription) {
+    return subscription.status === 'active' || subscription.status === 'trialing';
+  },
+
+  /**
+   * Get days remaining in current period
+   * @param {Object} subscription - Subscription object
+   * @returns {number|null} Days remaining
+   */
+  getDaysRemaining(subscription) {
+    if (!subscription.currentPeriodEnd) return null;
+    const now = new Date();
+    const end = new Date(subscription.currentPeriodEnd);
+    const diff = end - now;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  },
+
+  /**
+   * Get trial days remaining
+   * @param {Object} subscription - Subscription object
+   * @returns {number|null} Trial days remaining
+   */
+  getTrialDaysRemaining(subscription) {
+    if (!subscription.trialEnd || subscription.status !== 'trialing') return null;
+    const now = new Date();
+    const end = new Date(subscription.trialEnd);
+    const diff = end - now;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  },
+
+  /**
+   * Add history entry
+   * @param {string} subscriptionId - Subscription ID
+   * @param {Object} entry - History entry
+   * @returns {Object} Update result
+   */
+  async addHistoryEntry(subscriptionId, entry) {
+    const subscription = await this.findBySubscriptionId(subscriptionId);
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    const history = subscription.history || [];
+    history.push({
+      ...entry,
+      performedAt: new Date().toISOString()
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { subscriptionId },
+      { $set: { history } }
+    );
+  },
+
+  /**
+   * Cancel subscription
+   * @param {string} subscriptionId - Subscription ID
+   * @param {string} reason - Cancellation reason
+   * @param {boolean} atPeriodEnd - Cancel at period end
+   * @returns {Object} Update result
+   */
+  async cancel(subscriptionId, reason, atPeriodEnd = false) {
+    const subscription = await this.findBySubscriptionId(subscriptionId);
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    const updateData = {
+      canceledAt: new Date().toISOString(),
+      cancellationReason: reason,
+      cancelAtPeriodEnd: atPeriodEnd
+    };
+
+    if (!atPeriodEnd) {
+      updateData.status = 'canceled';
+    }
+
+    // Add history entry
+    const history = subscription.history || [];
+    history.push({
+      action: 'canceled',
+      fromStatus: subscription.status,
+      toStatus: atPeriodEnd ? subscription.status : 'canceled',
+      reason,
+      performedAt: new Date().toISOString()
+    });
+    updateData.history = history;
+
+    return baseModel.updateOne.call(baseModel,
+      { subscriptionId },
+      { $set: updateData }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
+};
 
 module.exports = Subscription;

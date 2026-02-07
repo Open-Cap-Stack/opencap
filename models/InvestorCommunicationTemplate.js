@@ -4,9 +4,14 @@
  *
  * Stores reusable templates for investor communications.
  * Supports variable substitution using {{variable}} syntax.
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
+
+// Valid communication types
 const COMMUNICATION_TYPES = [
   'quarterly_update',
   'annual_report',
@@ -16,160 +21,226 @@ const COMMUNICATION_TYPES = [
   'general'
 ];
 
-const VariableDefinitionSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  defaultValue: {
-    type: String
-  },
-  required: {
-    type: Boolean,
-    default: false
-  }
-}, { _id: false });
+// Schema definition for documentation and validation
+const investorCommunicationTemplateSchema = {
+  templateId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  name: { type: 'string', required: true },
+  description: { type: 'string', default: '' },
+  communicationType: { type: 'string', required: true, enum: COMMUNICATION_TYPES },
+  subject: { type: 'string', required: true },
+  content: { type: 'string', required: true },
+  htmlContent: { type: 'string', default: null },
+  variables: { type: 'array', default: [] },
+  isActive: { type: 'boolean', default: true },
+  isDefault: { type: 'boolean', default: false },
+  createdBy: { type: 'string', required: true },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
+};
 
-const InvestorCommunicationTemplateSchema = new mongoose.Schema({
-  templateId: {
-    type: String,
-    required: [true, 'templateId is required'],
-    unique: true,
-    trim: true
-  },
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: [true, 'companyId is required'],
-    index: true
-  },
-  name: {
-    type: String,
-    required: [true, 'name is required'],
-    trim: true,
-    maxlength: [200, 'Name cannot exceed 200 characters']
-  },
-  description: {
-    type: String,
-    maxlength: [1000, 'Description cannot exceed 1000 characters']
-  },
-  communicationType: {
-    type: String,
-    required: [true, 'communicationType is required'],
-    enum: {
-      values: COMMUNICATION_TYPES,
-      message: `communicationType must be one of: ${COMMUNICATION_TYPES.join(', ')}`
+// Create the base model
+const baseModel = createModel('investor_communication_templates', investorCommunicationTemplateSchema);
+
+// Extended InvestorCommunicationTemplate model with business logic
+const InvestorCommunicationTemplate = {
+  ...baseModel,
+  tableName: 'investor_communication_templates',
+  schema: investorCommunicationTemplateSchema,
+
+  // Export constants
+  COMMUNICATION_TYPES,
+
+  /**
+   * Create a new template with defaults
+   * @param {Object} data - Template data
+   * @returns {Object} Created template
+   */
+  async create(data) {
+    if (!data.templateId) {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substring(2, 8);
+      data.templateId = `TPL-${timestamp}-${random}`.toUpperCase();
     }
-  },
-  subject: {
-    type: String,
-    required: [true, 'subject is required'],
-    trim: true,
-    maxlength: [500, 'Subject cannot exceed 500 characters']
-  },
-  content: {
-    type: String,
-    required: [true, 'content is required'],
-    maxlength: [50000, 'Content cannot exceed 50000 characters']
-  },
-  htmlContent: {
-    type: String,
-    maxlength: [100000, 'HTML content cannot exceed 100000 characters']
-  },
-  variables: [VariableDefinitionSchema],
-  isActive: {
-    type: Boolean,
-    default: true,
-    index: true
-  },
-  isDefault: {
-    type: Boolean,
-    default: false
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'createdBy is required']
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }
-}, {
-  timestamps: true
-});
 
-// Indexes
-InvestorCommunicationTemplateSchema.index({ templateId: 1 }, { unique: true });
-InvestorCommunicationTemplateSchema.index({ companyId: 1, communicationType: 1, isActive: 1 });
-InvestorCommunicationTemplateSchema.index({ companyId: 1, isDefault: 1 });
+    // Validate communication type
+    if (!COMMUNICATION_TYPES.includes(data.communicationType)) {
+      throw new Error(`communicationType must be one of: ${COMMUNICATION_TYPES.join(', ')}`);
+    }
 
-// Pre-save middleware to generate templateId if not provided
-InvestorCommunicationTemplateSchema.pre('save', function(next) {
-  if (!this.templateId) {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    this.templateId = `TPL-${timestamp}-${random}`.toUpperCase();
-  }
-  next();
-});
+    if (data.isActive === undefined) {
+      data.isActive = true;
+    }
 
-// Method to extract variables from content
-InvestorCommunicationTemplateSchema.methods.extractVariables = function() {
-  const regex = /\{\{([^}]+)\}\}/g;
-  const variables = new Set();
-  let match;
+    return baseModel.create.call(baseModel, data);
+  },
 
-  while ((match = regex.exec(this.subject)) !== null) {
-    variables.add(match[1].trim());
-  }
+  /**
+   * Find template by templateId
+   * @param {string} templateId - Template ID
+   * @returns {Object|null} Template or null
+   */
+  async findByTemplateId(templateId) {
+    return baseModel.findOne.call(baseModel, { templateId });
+  },
 
-  while ((match = regex.exec(this.content)) !== null) {
-    variables.add(match[1].trim());
-  }
+  /**
+   * Find templates by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Templates for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.isActive !== undefined) {
+      query.isActive = options.isActive;
+    }
+    if (options.communicationType) {
+      query.communicationType = options.communicationType;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
 
-  if (this.htmlContent) {
-    while ((match = regex.exec(this.htmlContent)) !== null) {
+  /**
+   * Find default template for communication type
+   * @param {string} companyId - Company ID
+   * @param {string} communicationType - Communication type
+   * @returns {Object|null} Default template or null
+   */
+  async findDefault(companyId, communicationType) {
+    return baseModel.findOne.call(baseModel, {
+      companyId,
+      communicationType,
+      isDefault: true,
+      isActive: true
+    });
+  },
+
+  /**
+   * Extract variables from template content
+   * @param {Object} template - Template object
+   * @returns {Array} Variable names
+   */
+  extractVariables(template) {
+    const regex = /\{\{([^}]+)\}\}/g;
+    const variables = new Set();
+    let match;
+
+    while ((match = regex.exec(template.subject)) !== null) {
       variables.add(match[1].trim());
     }
-  }
 
-  return Array.from(variables);
-};
+    const contentCopy = template.content;
+    while ((match = regex.exec(contentCopy)) !== null) {
+      variables.add(match[1].trim());
+    }
 
-// Method to process template with variables
-InvestorCommunicationTemplateSchema.methods.process = function(variables) {
-  const processText = (text) => {
-    if (!text) return text;
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-      const trimmedName = varName.trim();
-      // Support nested object access (e.g., quarter.number)
-      const parts = trimmedName.split('.');
-      let value = variables;
-      for (const part of parts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = value[part];
-        } else {
-          // Check variable definitions for default value
-          const varDef = this.variables.find(v => v.name === trimmedName);
-          return varDef && varDef.defaultValue ? varDef.defaultValue : match;
-        }
+    if (template.htmlContent) {
+      const htmlCopy = template.htmlContent;
+      while ((match = regex.exec(htmlCopy)) !== null) {
+        variables.add(match[1].trim());
       }
-      return value !== undefined ? String(value) : match;
-    });
-  };
+    }
 
-  return {
-    subject: processText(this.subject),
-    content: processText(this.content),
-    htmlContent: processText(this.htmlContent)
-  };
+    return Array.from(variables);
+  },
+
+  /**
+   * Process template with variable substitution
+   * @param {Object} template - Template object
+   * @param {Object} variables - Variables to substitute
+   * @returns {Object} Processed template
+   */
+  processTemplate(template, variables) {
+    const processText = (text) => {
+      if (!text) return text;
+      return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+        const trimmedName = varName.trim();
+        // Support nested object access (e.g., quarter.number)
+        const parts = trimmedName.split('.');
+        let value = variables;
+        for (const part of parts) {
+          if (value && typeof value === 'object' && part in value) {
+            value = value[part];
+          } else {
+            // Check variable definitions for default value
+            const varDef = template.variables?.find(v => v.name === trimmedName);
+            return varDef && varDef.defaultValue ? varDef.defaultValue : match;
+          }
+        }
+        return value !== undefined ? String(value) : match;
+      });
+    };
+
+    return {
+      subject: processText(template.subject),
+      content: processText(template.content),
+      htmlContent: processText(template.htmlContent)
+    };
+  },
+
+  /**
+   * Activate template
+   * @param {string} templateId - Template ID
+   * @returns {Object} Updated template
+   */
+  async activate(templateId) {
+    return baseModel.updateOne.call(baseModel,
+      { templateId },
+      { $set: { isActive: true } }
+    );
+  },
+
+  /**
+   * Deactivate template
+   * @param {string} templateId - Template ID
+   * @returns {Object} Updated template
+   */
+  async deactivate(templateId) {
+    return baseModel.updateOne.call(baseModel,
+      { templateId },
+      { $set: { isActive: false } }
+    );
+  },
+
+  /**
+   * Set as default template
+   * @param {string} companyId - Company ID
+   * @param {string} templateId - Template ID
+   * @param {string} communicationType - Communication type
+   * @returns {Object} Updated template
+   */
+  async setDefault(companyId, templateId, communicationType) {
+    // First, unset any existing default
+    await baseModel.updateMany.call(baseModel,
+      { companyId, communicationType, isDefault: true },
+      { $set: { isDefault: false } }
+    );
+
+    // Set the new default
+    return baseModel.updateOne.call(baseModel,
+      { templateId },
+      { $set: { isDefault: true } }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-const InvestorCommunicationTemplate = mongoose.model('InvestorCommunicationTemplate', InvestorCommunicationTemplateSchema);
 
 module.exports = InvestorCommunicationTemplate;
-module.exports.COMMUNICATION_TYPES = COMMUNICATION_TYPES;

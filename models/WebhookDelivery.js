@@ -6,237 +6,297 @@
  * - Delivery status and response tracking
  * - Retry management with exponential backoff
  * - Delivery history and audit trail
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-const responseSchema = new mongoose.Schema({
-  body: {
-    type: String,
-    default: null
-  },
-  headers: {
-    type: Map,
-    of: String,
-    default: null
-  },
-  error: {
-    type: String,
-    default: null
-  }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-const webhookDeliverySchema = new mongoose.Schema({
-  deliveryId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+// Valid statuses
+const VALID_STATUSES = ['pending', 'success', 'failed'];
 
-  webhookId: {
-    type: String,
-    required: true,
-    index: true
-  },
-
-  eventType: {
-    type: String,
-    required: true,
-    index: true
-  },
-
-  payload: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true
-  },
-
+// Schema definition for documentation and validation
+const webhookDeliverySchema = {
+  deliveryId: { type: 'string', required: true, unique: true },
+  webhookId: { type: 'string', required: true },
+  eventType: { type: 'string', required: true },
+  payload: { type: 'object', required: true },
   response: {
-    type: responseSchema,
-    default: () => ({
+    type: 'object',
+    default: {
       body: null,
       headers: null,
       error: null
-    })
+    }
   },
-
-  statusCode: {
-    type: Number,
-    default: null
-  },
-
-  status: {
-    type: String,
-    enum: ['pending', 'success', 'failed'],
-    default: 'pending',
-    index: true
-  },
-
-  attempts: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-
-  nextRetryAt: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  completedAt: {
-    type: Date,
-    default: null
-  },
-
-  // Request details for debugging
-  requestHeaders: {
-    type: Map,
-    of: String
-  },
-
-  requestUrl: {
-    type: String
-  },
-
-  // Duration in milliseconds
-  duration: {
-    type: Number,
-    default: null
-  },
-
-  // Metadata for tracking
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  }
-}, {
-  timestamps: true
-});
-
-// Compound indexes for efficient queries
-webhookDeliverySchema.index({ webhookId: 1, status: 1 });
-webhookDeliverySchema.index({ webhookId: 1, createdAt: -1 });
-webhookDeliverySchema.index({ status: 1, nextRetryAt: 1 });
-webhookDeliverySchema.index({ eventType: 1, status: 1 });
-
-// Virtual for checking if delivery can be retried
-webhookDeliverySchema.virtual('canRetry').get(function() {
-  return this.status === 'failed' && this.nextRetryAt !== null;
-});
-
-// Virtual for checking if delivery is overdue for retry
-webhookDeliverySchema.virtual('isRetryDue').get(function() {
-  if (!this.canRetry) return false;
-  return new Date() >= this.nextRetryAt;
-});
-
-// Method to mark delivery as successful
-webhookDeliverySchema.methods.markSuccess = function(statusCode, responseBody, responseHeaders, duration) {
-  this.status = 'success';
-  this.statusCode = statusCode;
-  this.response = {
-    body: typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody),
-    headers: responseHeaders || null,
-    error: null
-  };
-  this.completedAt = new Date();
-  this.nextRetryAt = null;
-  this.duration = duration;
-  this.attempts += 1;
-  return this.save();
+  statusCode: { type: 'number', default: null },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'pending' },
+  attempts: { type: 'number', default: 0 },
+  nextRetryAt: { type: 'date', default: null },
+  completedAt: { type: 'date', default: null },
+  requestHeaders: { type: 'object', default: {} },
+  requestUrl: { type: 'string', default: null },
+  duration: { type: 'number', default: null },
+  metadata: { type: 'object', default: {} },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Method to mark delivery as failed
-webhookDeliverySchema.methods.markFailed = function(error, statusCode, nextRetryAt) {
-  this.status = 'failed';
-  this.statusCode = statusCode || null;
-  this.response = {
-    body: null,
-    headers: null,
-    error: error?.message || error || 'Unknown error'
-  };
-  this.attempts += 1;
-  this.nextRetryAt = nextRetryAt || null;
+// Create the base model
+const baseModel = createModel('webhook_deliveries', webhookDeliverySchema);
 
-  if (!nextRetryAt) {
-    this.completedAt = new Date();
-  }
+// Extended WebhookDelivery model with business logic
+const WebhookDelivery = {
+  ...baseModel,
+  tableName: 'webhook_deliveries',
+  schema: webhookDeliverySchema,
 
-  return this.save();
-};
+  // Export constants
+  VALID_STATUSES,
 
-// Method to calculate next retry time with exponential backoff
-webhookDeliverySchema.methods.calculateNextRetry = function(baseDelay, maxRetries) {
-  if (this.attempts >= maxRetries) {
-    return null;
-  }
+  /**
+   * Create a new delivery with defaults
+   * @param {Object} data - Delivery data
+   * @returns {Object} Created delivery
+   */
+  async create(data) {
+    if (!data.deliveryId) {
+      data.deliveryId = `del_${uuidv4()}`;
+    }
 
-  // Exponential backoff: baseDelay * 2^attempts
-  const backoffDelay = baseDelay * Math.pow(2, this.attempts);
-  const maxDelay = 3600000; // Max 1 hour
-  const actualDelay = Math.min(backoffDelay, maxDelay);
+    if (!data.status) {
+      data.status = 'pending';
+    }
 
-  return new Date(Date.now() + actualDelay);
-};
+    if (!data.attempts) {
+      data.attempts = 0;
+    }
 
-// Static method to find deliveries due for retry
-webhookDeliverySchema.statics.findDueForRetry = function() {
-  return this.find({
-    status: 'failed',
-    nextRetryAt: { $lte: new Date(), $ne: null }
-  }).sort({ nextRetryAt: 1 });
-};
+    return baseModel.create.call(baseModel, data);
+  },
 
-// Static method to get delivery statistics for a webhook
-webhookDeliverySchema.statics.getStatistics = async function(webhookId, startDate, endDate) {
-  const match = { webhookId };
+  /**
+   * Find delivery by deliveryId
+   * @param {string} deliveryId - Delivery ID
+   * @returns {Object|null} Delivery or null
+   */
+  async findByDeliveryId(deliveryId) {
+    return baseModel.findOne.call(baseModel, { deliveryId });
+  },
 
-  if (startDate || endDate) {
-    match.createdAt = {};
-    if (startDate) match.createdAt.$gte = startDate;
-    if (endDate) match.createdAt.$lte = endDate;
-  }
+  /**
+   * Find deliveries by webhook
+   * @param {string} webhookId - Webhook ID
+   * @param {Object} options - Query options
+   * @returns {Array} Deliveries for webhook
+   */
+  async findByWebhook(webhookId, options = {}) {
+    const query = { webhookId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
 
-  const stats = await this.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-        avgDuration: { $avg: '$duration' }
+  /**
+   * Find deliveries by event type
+   * @param {string} eventType - Event type
+   * @param {Object} options - Query options
+   * @returns {Array} Deliveries for event type
+   */
+  async findByEventType(eventType, options = {}) {
+    const query = { eventType };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Check if delivery can be retried
+   * @param {Object} delivery - Delivery object
+   * @returns {boolean} True if can retry
+   */
+  canRetry(delivery) {
+    return delivery.status === 'failed' && delivery.nextRetryAt !== null;
+  },
+
+  /**
+   * Check if delivery is overdue for retry
+   * @param {Object} delivery - Delivery object
+   * @returns {boolean} True if retry is due
+   */
+  isRetryDue(delivery) {
+    if (!this.canRetry(delivery)) return false;
+    return new Date() >= new Date(delivery.nextRetryAt);
+  },
+
+  /**
+   * Calculate next retry time with exponential backoff
+   * @param {Object} delivery - Delivery object
+   * @param {number} baseDelay - Base delay in ms
+   * @param {number} maxRetries - Maximum retries
+   * @returns {Date|null} Next retry time or null
+   */
+  calculateNextRetry(delivery, baseDelay = 60000, maxRetries = 3) {
+    if ((delivery.attempts || 0) >= maxRetries) {
+      return null;
+    }
+
+    // Exponential backoff: baseDelay * 2^attempts
+    const backoffDelay = baseDelay * Math.pow(2, delivery.attempts || 0);
+    const maxDelay = 3600000; // Max 1 hour
+    const actualDelay = Math.min(backoffDelay, maxDelay);
+
+    return new Date(Date.now() + actualDelay);
+  },
+
+  /**
+   * Mark delivery as successful
+   * @param {string} deliveryId - Delivery ID
+   * @param {number} statusCode - HTTP status code
+   * @param {string} responseBody - Response body
+   * @param {Object} responseHeaders - Response headers
+   * @param {number} duration - Request duration in ms
+   * @returns {Object} Updated delivery
+   */
+  async markSuccess(deliveryId, statusCode, responseBody, responseHeaders, duration) {
+    const delivery = await this.findByDeliveryId(deliveryId);
+    if (!delivery) {
+      throw new Error('Delivery not found');
+    }
+
+    return baseModel.updateOne.call(baseModel,
+      { deliveryId },
+      {
+        $set: {
+          status: 'success',
+          statusCode,
+          response: {
+            body: typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody),
+            headers: responseHeaders || null,
+            error: null
+          },
+          completedAt: new Date().toISOString(),
+          nextRetryAt: null,
+          duration,
+          attempts: (delivery.attempts || 0) + 1
+        }
+      }
+    );
+  },
+
+  /**
+   * Mark delivery as failed
+   * @param {string} deliveryId - Delivery ID
+   * @param {string} error - Error message
+   * @param {number} statusCode - HTTP status code
+   * @param {Date} nextRetryAt - Next retry time
+   * @returns {Object} Updated delivery
+   */
+  async markFailed(deliveryId, error, statusCode, nextRetryAt) {
+    const delivery = await this.findByDeliveryId(deliveryId);
+    if (!delivery) {
+      throw new Error('Delivery not found');
+    }
+
+    const updateData = {
+      status: 'failed',
+      statusCode: statusCode || null,
+      response: {
+        body: null,
+        headers: null,
+        error: error?.message || error || 'Unknown error'
+      },
+      attempts: (delivery.attempts || 0) + 1,
+      nextRetryAt: nextRetryAt ? nextRetryAt.toISOString() : null
+    };
+
+    if (!nextRetryAt) {
+      updateData.completedAt = new Date().toISOString();
+    }
+
+    return baseModel.updateOne.call(baseModel,
+      { deliveryId },
+      { $set: updateData }
+    );
+  },
+
+  /**
+   * Find deliveries due for retry
+   * @returns {Array} Deliveries due for retry
+   */
+  async findDueForRetry() {
+    const failed = await baseModel.find.call(baseModel, { status: 'failed' });
+    const now = new Date();
+    return failed.filter(d => d.nextRetryAt && new Date(d.nextRetryAt) <= now);
+  },
+
+  /**
+   * Get statistics for a webhook
+   * @param {string} webhookId - Webhook ID
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   * @returns {Object} Statistics
+   */
+  async getStatistics(webhookId, startDate, endDate) {
+    let deliveries = await baseModel.find.call(baseModel, { webhookId });
+
+    // Filter by date range if provided
+    if (startDate || endDate) {
+      deliveries = deliveries.filter(d => {
+        const createdAt = new Date(d.createdAt);
+        if (startDate && createdAt < startDate) return false;
+        if (endDate && createdAt > endDate) return false;
+        return true;
+      });
+    }
+
+    const result = {
+      total: deliveries.length,
+      success: 0,
+      failed: 0,
+      pending: 0,
+      avgDuration: 0
+    };
+
+    let totalDuration = 0;
+    let durationCount = 0;
+
+    for (const delivery of deliveries) {
+      if (delivery.status === 'success') result.success++;
+      else if (delivery.status === 'failed') result.failed++;
+      else if (delivery.status === 'pending') result.pending++;
+
+      if (delivery.duration) {
+        totalDuration += delivery.duration;
+        durationCount++;
       }
     }
-  ]);
 
-  const result = {
-    total: 0,
-    success: 0,
-    failed: 0,
-    pending: 0,
-    avgDuration: 0
-  };
+    result.avgDuration = durationCount > 0 ? totalDuration / durationCount : 0;
+    result.successRate = result.total > 0 ? (result.success / result.total) * 100 : 0;
 
-  let totalDuration = 0;
-  let durationCount = 0;
+    return result;
+  },
 
-  for (const stat of stats) {
-    result[stat._id] = stat.count;
-    result.total += stat.count;
-    if (stat.avgDuration) {
-      totalDuration += stat.avgDuration * stat.count;
-      durationCount += stat.count;
-    }
-  }
-
-  result.avgDuration = durationCount > 0 ? totalDuration / durationCount : 0;
-  result.successRate = result.total > 0 ? (result.success / result.total) * 100 : 0;
-
-  return result;
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Ensure virtuals are included in JSON
-webhookDeliverySchema.set('toJSON', { virtuals: true });
-webhookDeliverySchema.set('toObject', { virtuals: true });
-
-const WebhookDelivery = mongoose.model('WebhookDelivery', webhookDeliverySchema);
 
 module.exports = WebhookDelivery;

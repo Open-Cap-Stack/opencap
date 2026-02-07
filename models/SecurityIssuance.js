@@ -7,9 +7,12 @@
  * - State-by-state filing requirements
  * - Exemption tracking (Rule 701, Regulation D)
  * - Filing deadline management
+ *
+ * Migrated to ZeroDB
  */
 
-const mongoose = require('mongoose');
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
 // Constants
 const SECURITY_TYPES = [
@@ -58,7 +61,6 @@ const FILING_STATUSES = [
   'exempt'
 ];
 
-// US State codes
 const US_STATE_CODES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
@@ -67,597 +69,432 @@ const US_STATE_CODES = [
   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
 ];
 
-// State Filing Sub-schema
-const stateFilingSchema = new mongoose.Schema({
-  stateCode: {
-    type: String,
-    required: true,
-    enum: US_STATE_CODES,
-    uppercase: true
-  },
-  filingRequired: {
-    type: Boolean,
-    default: true
-  },
-  filingStatus: {
-    type: String,
-    enum: FILING_STATUSES,
-    default: 'pending'
-  },
-  filingDeadline: {
-    type: Date
-  },
-  filingDate: {
-    type: Date
-  },
-  confirmationNumber: {
-    type: String,
-    trim: true
-  },
-  exemptionClaimed: {
-    type: String,
-    trim: true
-  },
-  feeAmount: {
-    type: Number,
-    default: 0
-  },
-  feePaid: {
-    type: Boolean,
-    default: false
-  },
-  notes: {
-    type: String,
-    trim: true,
-    maxlength: 1000
-  }
-}, { _id: false });
+const ACCREDITED_VERIFICATION_METHODS = [
+  'self_certification',
+  'third_party_verification',
+  'tax_returns',
+  'financial_statements',
+  'other'
+];
 
-// Exemption Details Sub-schema
-const exemptionDetailsSchema = new mongoose.Schema({
-  rule701Qualified: {
-    type: Boolean,
-    default: false
-  },
-  rule701RecipientType: {
-    type: String,
-    enum: ['employee', 'director', 'officer', 'consultant', 'advisor']
-  },
-  regulationDFormFiled: {
-    type: Boolean,
-    default: false
-  },
-  regulationDFilingDate: {
-    type: Date
-  },
-  accreditedInvestorVerified: {
-    type: Boolean,
-    default: false
-  },
-  accreditedVerificationMethod: {
-    type: String,
-    enum: ['self_certification', 'third_party_verification', 'tax_returns', 'financial_statements', 'other']
-  },
-  sophisticatedInvestor: {
-    type: Boolean,
-    default: false
-  },
-  preexistingRelationship: {
-    type: Boolean,
-    default: false
-  },
-  investorQuestionnaire: {
-    type: Boolean,
-    default: false
-  },
-  subscriptionAgreement: {
-    type: Boolean,
-    default: false
-  },
-  legendedCertificate: {
-    type: Boolean,
-    default: false
-  }
-}, { _id: false });
+const RULE_701_RECIPIENT_TYPES = ['employee', 'director', 'officer', 'consultant', 'advisor'];
 
-// Main Security Issuance Schema
-const securityIssuanceSchema = new mongoose.Schema({
-  // Identification
-  issuanceId: {
-    type: String,
-    required: [true, 'Issuance ID is required'],
-    unique: true,
-    trim: true,
-    index: true
-  },
-  companyId: {
-    type: String,
-    required: [true, 'Company ID is required'],
-    trim: true,
-    index: true
-  },
+const ISSUE_SEVERITIES = ['low', 'medium', 'high', 'critical'];
 
-  // Security Details
-  securityType: {
-    type: String,
-    required: [true, 'Security type is required'],
-    enum: {
-      values: SECURITY_TYPES,
-      message: `Security type must be one of: ${SECURITY_TYPES.join(', ')}`
+const ISSUE_STATUSES = ['open', 'in_progress', 'resolved'];
+
+// Schema definition for documentation and validation
+const securityIssuanceSchema = {
+  issuanceId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  securityType: { type: 'string', required: true, enum: SECURITY_TYPES },
+  shareClassId: { type: 'string', default: null },
+  stakeholderId: { type: 'string', required: true },
+  stakeholderName: { type: 'string', default: null },
+  numberOfShares: { type: 'number', required: true },
+  pricePerShare: { type: 'number', required: true },
+  totalConsideration: { type: 'number', default: 0 },
+  issuanceDate: { type: 'date', required: true },
+  status: { type: 'string', enum: ISSUANCE_STATUSES, default: 'pending' },
+  vestingScheduleId: { type: 'string', default: null },
+  vestingStartDate: { type: 'date', default: null },
+  vestingCliffDate: { type: 'date', default: null },
+  fullyVestedDate: { type: 'date', default: null },
+  certificateNumber: { type: 'string', default: null },
+  certificateIssued: { type: 'boolean', default: false },
+  certificateIssuedDate: { type: 'date', default: null },
+  boardApprovalDate: { type: 'date', default: null },
+  boardResolutionId: { type: 'string', default: null },
+  exemptionType: { type: 'string', enum: EXEMPTION_TYPES, default: null },
+  exemptionDetails: {
+    type: 'object',
+    default: {
+      rule701Qualified: false,
+      rule701RecipientType: null,
+      regulationDFormFiled: false,
+      regulationDFilingDate: null,
+      accreditedInvestorVerified: false,
+      accreditedVerificationMethod: null,
+      sophisticatedInvestor: false,
+      preexistingRelationship: false,
+      investorQuestionnaire: false,
+      subscriptionAgreement: false,
+      legendedCertificate: false
     }
   },
-  shareClassId: {
-    type: String,
-    trim: true
-  },
-  stakeholderId: {
-    type: String,
-    required: [true, 'Stakeholder ID is required'],
-    trim: true,
-    index: true
-  },
-  stakeholderName: {
-    type: String,
-    trim: true
-  },
-
-  // Issuance Terms
-  numberOfShares: {
-    type: Number,
-    required: [true, 'Number of shares is required'],
-    min: [0, 'Number of shares must be non-negative']
-  },
-  pricePerShare: {
-    type: Number,
-    required: [true, 'Price per share is required'],
-    min: [0, 'Price per share must be non-negative']
-  },
-  totalConsideration: {
-    type: Number,
-    default: 0
-  },
-  issuanceDate: {
-    type: Date,
-    required: [true, 'Issuance date is required']
-  },
-  status: {
-    type: String,
-    enum: {
-      values: ISSUANCE_STATUSES,
-      message: `Status must be one of: ${ISSUANCE_STATUSES.join(', ')}`
-    },
-    default: 'pending'
-  },
-
-  // Vesting Information
-  vestingScheduleId: {
-    type: String,
-    trim: true
-  },
-  vestingStartDate: {
-    type: Date
-  },
-  vestingCliffDate: {
-    type: Date
-  },
-  fullyVestedDate: {
-    type: Date
-  },
-
-  // Certificate Information
-  certificateNumber: {
-    type: String,
-    trim: true
-  },
-  certificateIssued: {
-    type: Boolean,
-    default: false
-  },
-  certificateIssuedDate: {
-    type: Date
-  },
-
-  // Board Approval
-  boardApprovalDate: {
-    type: Date
-  },
-  boardResolutionId: {
-    type: String,
-    trim: true
-  },
-
-  // Exemption Tracking
-  exemptionType: {
-    type: String,
-    enum: {
-      values: EXEMPTION_TYPES,
-      message: `Exemption type must be one of: ${EXEMPTION_TYPES.join(', ')}`
-    }
-  },
-  exemptionDetails: exemptionDetailsSchema,
-
-  // Federal Filing Management
-  federalFilingRequired: {
-    type: Boolean,
-    default: false
-  },
-  federalFilingStatus: {
-    type: String,
-    enum: {
-      values: FILING_STATUSES,
-      message: `Federal filing status must be one of: ${FILING_STATUSES.join(', ')}`
-    },
-    default: 'not_required'
-  },
-  federalFilingDeadline: {
-    type: Date
-  },
-  formDFilingDate: {
-    type: Date
-  },
-  formDConfirmationNumber: {
-    type: String,
-    trim: true
-  },
-  formDAmendmentRequired: {
-    type: Boolean,
-    default: false
-  },
-  formDAmendmentDeadline: {
-    type: Date
-  },
-
-  // State Filings (Blue-Sky Compliance)
-  stateFilings: [stateFilingSchema],
-
-  // Compliance Status
-  complianceStatus: {
-    type: String,
-    enum: {
-      values: COMPLIANCE_STATUSES,
-      message: `Compliance status must be one of: ${COMPLIANCE_STATUSES.join(', ')}`
-    },
-    default: 'pending_review'
-  },
-  complianceNotes: {
-    type: String,
-    trim: true,
-    maxlength: 2000
-  },
-  complianceIssues: [{
-    issue: String,
-    severity: {
-      type: String,
-      enum: ['low', 'medium', 'high', 'critical']
-    },
-    identifiedDate: Date,
-    resolvedDate: Date,
-    status: {
-      type: String,
-      enum: ['open', 'in_progress', 'resolved']
-    }
-  }],
-  lastComplianceReview: {
-    type: Date
-  },
-  nextComplianceReview: {
-    type: Date
-  },
-  reviewedBy: {
-    type: String,
-    trim: true
-  },
-
-  // Metadata
-  createdBy: {
-    type: String,
-    trim: true
-  },
-  updatedBy: {
-    type: String,
-    trim: true
-  },
-  notes: {
-    type: String,
-    trim: true,
-    maxlength: 2000
-  },
-  attachments: [{
-    documentId: String,
-    documentType: String,
-    fileName: String,
-    uploadedAt: Date
-  }]
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Virtual: Calculate total value
-securityIssuanceSchema.virtual('totalValue').get(function() {
-  return this.numberOfShares * this.pricePerShare;
-});
-
-// Virtual: Check if any filing is overdue
-securityIssuanceSchema.virtual('isOverdue').get(function() {
-  const now = new Date();
-
-  // Check federal filing
-  if (this.federalFilingStatus === 'pending' &&
-      this.federalFilingDeadline &&
-      this.federalFilingDeadline < now) {
-    return true;
-  }
-
-  // Check state filings
-  if (this.stateFilings && this.stateFilings.length > 0) {
-    return this.stateFilings.some(filing =>
-      filing.filingStatus === 'pending' &&
-      filing.filingDeadline &&
-      filing.filingDeadline < now
-    );
-  }
-
-  return false;
-});
-
-// Virtual: Count pending filings
-securityIssuanceSchema.virtual('pendingFilingsCount').get(function() {
-  let count = 0;
-
-  if (this.federalFilingStatus === 'pending') {
-    count++;
-  }
-
-  if (this.stateFilings && this.stateFilings.length > 0) {
-    count += this.stateFilings.filter(f => f.filingStatus === 'pending').length;
-  }
-
-  return count;
-});
-
-// Instance Method: Check if state filing is needed
-securityIssuanceSchema.methods.needsStateFiling = function(stateCode) {
-  // Check if exemption type requires state filing
-  const exemptionsRequiringStateFiling = [
-    'regulation_d_506b',
-    'regulation_d_506c',
-    'regulation_a',
-    'regulation_cf'
-  ];
-
-  if (!exemptionsRequiringStateFiling.includes(this.exemptionType)) {
-    return false;
-  }
-
-  // Check if already filed for this state
-  const existingFiling = this.stateFilings.find(f => f.stateCode === stateCode);
-  if (existingFiling && existingFiling.filingStatus === 'filed') {
-    return false;
-  }
-
-  return true;
+  federalFilingRequired: { type: 'boolean', default: false },
+  federalFilingStatus: { type: 'string', enum: FILING_STATUSES, default: 'not_required' },
+  federalFilingDeadline: { type: 'date', default: null },
+  formDFilingDate: { type: 'date', default: null },
+  formDConfirmationNumber: { type: 'string', default: null },
+  formDAmendmentRequired: { type: 'boolean', default: false },
+  formDAmendmentDeadline: { type: 'date', default: null },
+  stateFilings: { type: 'array', default: [] },
+  complianceStatus: { type: 'string', enum: COMPLIANCE_STATUSES, default: 'pending_review' },
+  complianceNotes: { type: 'string', default: '' },
+  complianceIssues: { type: 'array', default: [] },
+  lastComplianceReview: { type: 'date', default: null },
+  nextComplianceReview: { type: 'date', default: null },
+  reviewedBy: { type: 'string', default: null },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  notes: { type: 'string', default: '' },
+  attachments: { type: 'array', default: [] },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Instance Method: Get upcoming deadlines
-securityIssuanceSchema.methods.getUpcomingDeadlines = function(daysAhead = 30) {
-  const now = new Date();
-  const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-  const deadlines = [];
+// Create the base model
+const baseModel = createModel('security_issuances', securityIssuanceSchema);
 
-  // Check federal deadline
-  if (this.federalFilingDeadline &&
-      this.federalFilingStatus === 'pending' &&
-      this.federalFilingDeadline <= futureDate) {
-    deadlines.push({
-      type: 'federal',
-      filingType: 'Form D',
-      deadline: this.federalFilingDeadline,
-      daysRemaining: Math.ceil((this.federalFilingDeadline - now) / (24 * 60 * 60 * 1000))
-    });
-  }
+// Extended SecurityIssuance model with business logic
+const SecurityIssuance = {
+  ...baseModel,
+  tableName: 'security_issuances',
+  schema: securityIssuanceSchema,
 
-  // Check Form D amendment deadline
-  if (this.formDAmendmentRequired &&
-      this.formDAmendmentDeadline &&
-      this.formDAmendmentDeadline <= futureDate) {
-    deadlines.push({
-      type: 'federal',
-      filingType: 'Form D Amendment',
-      deadline: this.formDAmendmentDeadline,
-      daysRemaining: Math.ceil((this.formDAmendmentDeadline - now) / (24 * 60 * 60 * 1000))
-    });
-  }
+  // Export constants
+  SECURITY_TYPES,
+  EXEMPTION_TYPES,
+  ISSUANCE_STATUSES,
+  COMPLIANCE_STATUSES,
+  FILING_STATUSES,
+  US_STATE_CODES,
+  ACCREDITED_VERIFICATION_METHODS,
+  RULE_701_RECIPIENT_TYPES,
+  ISSUE_SEVERITIES,
+  ISSUE_STATUSES,
 
-  // Check state deadlines
-  this.stateFilings.forEach(filing => {
-    if (filing.filingDeadline &&
+  /**
+   * Create a new security issuance with defaults
+   * @param {Object} data - Issuance data
+   * @returns {Object} Created issuance
+   */
+  async create(data) {
+    if (!data.issuanceId) {
+      data.issuanceId = `iss_${uuidv4()}`;
+    }
+
+    // Validate security type
+    if (!SECURITY_TYPES.includes(data.securityType)) {
+      throw new Error(`securityType must be one of: ${SECURITY_TYPES.join(', ')}`);
+    }
+
+    // Validate shares and price
+    if (data.numberOfShares < 0) {
+      throw new Error('Number of shares must be non-negative');
+    }
+    if (data.pricePerShare < 0) {
+      throw new Error('Price per share must be non-negative');
+    }
+
+    // Calculate total consideration
+    data.totalConsideration = data.numberOfShares * data.pricePerShare;
+
+    if (!data.status) {
+      data.status = 'pending';
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find issuance by issuanceId
+   * @param {string} issuanceId - Issuance ID
+   * @returns {Object|null} Issuance or null
+   */
+  async findByIssuanceId(issuanceId) {
+    return baseModel.findOne.call(baseModel, { issuanceId });
+  },
+
+  /**
+   * Find issuances by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Issuances for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.securityType) {
+      query.securityType = options.securityType;
+    }
+    if (options.exemptionType) {
+      query.exemptionType = options.exemptionType;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find issuances by stakeholder
+   * @param {string} stakeholderId - Stakeholder ID
+   * @param {Object} options - Query options
+   * @returns {Array} Issuances for stakeholder
+   */
+  async findByStakeholder(stakeholderId, options = {}) {
+    const query = { stakeholderId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find by exemption type
+   * @param {string} exemptionType - Exemption type
+   * @param {Object} options - Query options
+   * @returns {Array} Matching issuances
+   */
+  async findByExemptionType(exemptionType, options = {}) {
+    const query = { exemptionType };
+    if (options.companyId) {
+      query.companyId = options.companyId;
+    }
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Get total value
+   * @param {Object} issuance - Issuance object
+   * @returns {number} Total value
+   */
+  getTotalValue(issuance) {
+    return issuance.numberOfShares * issuance.pricePerShare;
+  },
+
+  /**
+   * Check if any filing is overdue
+   * @param {Object} issuance - Issuance object
+   * @returns {boolean} True if overdue
+   */
+  isOverdue(issuance) {
+    const now = new Date();
+
+    // Check federal filing
+    if (issuance.federalFilingStatus === 'pending' &&
+        issuance.federalFilingDeadline &&
+        new Date(issuance.federalFilingDeadline) < now) {
+      return true;
+    }
+
+    // Check state filings
+    if (issuance.stateFilings && issuance.stateFilings.length > 0) {
+      return issuance.stateFilings.some(filing =>
         filing.filingStatus === 'pending' &&
-        filing.filingDeadline <= futureDate) {
+        filing.filingDeadline &&
+        new Date(filing.filingDeadline) < now
+      );
+    }
+
+    return false;
+  },
+
+  /**
+   * Get pending filings count
+   * @param {Object} issuance - Issuance object
+   * @returns {number} Pending filings count
+   */
+  getPendingFilingsCount(issuance) {
+    let count = 0;
+
+    if (issuance.federalFilingStatus === 'pending') {
+      count++;
+    }
+
+    if (issuance.stateFilings && issuance.stateFilings.length > 0) {
+      count += issuance.stateFilings.filter(f => f.filingStatus === 'pending').length;
+    }
+
+    return count;
+  },
+
+  /**
+   * Check if state filing is needed
+   * @param {Object} issuance - Issuance object
+   * @param {string} stateCode - State code
+   * @returns {boolean} True if filing needed
+   */
+  needsStateFiling(issuance, stateCode) {
+    const exemptionsRequiringStateFiling = [
+      'regulation_d_506b',
+      'regulation_d_506c',
+      'regulation_a',
+      'regulation_cf'
+    ];
+
+    if (!exemptionsRequiringStateFiling.includes(issuance.exemptionType)) {
+      return false;
+    }
+
+    const existingFiling = (issuance.stateFilings || []).find(f => f.stateCode === stateCode);
+    if (existingFiling && existingFiling.filingStatus === 'filed') {
+      return false;
+    }
+
+    return true;
+  },
+
+  /**
+   * Get upcoming deadlines
+   * @param {Object} issuance - Issuance object
+   * @param {number} daysAhead - Days to look ahead
+   * @returns {Array} Upcoming deadlines
+   */
+  getUpcomingDeadlines(issuance, daysAhead = 30) {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    const deadlines = [];
+
+    // Check federal deadline
+    if (issuance.federalFilingDeadline &&
+        issuance.federalFilingStatus === 'pending' &&
+        new Date(issuance.federalFilingDeadline) <= futureDate) {
       deadlines.push({
-        type: 'state',
-        stateCode: filing.stateCode,
-        filingType: 'State Notice',
-        deadline: filing.filingDeadline,
-        daysRemaining: Math.ceil((filing.filingDeadline - now) / (24 * 60 * 60 * 1000))
+        type: 'federal',
+        filingType: 'Form D',
+        deadline: issuance.federalFilingDeadline,
+        daysRemaining: Math.ceil((new Date(issuance.federalFilingDeadline) - now) / (24 * 60 * 60 * 1000))
       });
     }
-  });
 
-  return deadlines.sort((a, b) => a.deadline - b.deadline);
-};
-
-// Instance Method: Update compliance status
-securityIssuanceSchema.methods.updateComplianceStatus = function(status, notes, reviewedBy) {
-  this.complianceStatus = status;
-  if (notes) {
-    this.complianceNotes = notes;
-  }
-  if (reviewedBy) {
-    this.reviewedBy = reviewedBy;
-  }
-  this.lastComplianceReview = new Date();
-
-  // Calculate next review date (90 days from now)
-  this.nextComplianceReview = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-
-  return this;
-};
-
-// Static Method: Find by company
-securityIssuanceSchema.statics.findByCompany = async function(companyId, options = {}) {
-  const query = { companyId };
-
-  if (options.status) {
-    query.status = options.status;
-  }
-  if (options.securityType) {
-    query.securityType = options.securityType;
-  }
-  if (options.exemptionType) {
-    query.exemptionType = options.exemptionType;
-  }
-
-  return this.find(query).sort({ issuanceDate: -1 });
-};
-
-// Static Method: Find overdue filings
-securityIssuanceSchema.statics.findOverdueFilings = async function(companyId) {
-  const now = new Date();
-
-  return this.find({
-    companyId,
-    $or: [
-      {
-        federalFilingStatus: 'pending',
-        federalFilingDeadline: { $lt: now }
-      },
-      {
-        'stateFilings.filingStatus': 'pending',
-        'stateFilings.filingDeadline': { $lt: now }
-      }
-    ]
-  });
-};
-
-// Static Method: Find by exemption type
-securityIssuanceSchema.statics.findByExemptionType = async function(exemptionType, options = {}) {
-  const query = { exemptionType };
-
-  if (options.companyId) {
-    query.companyId = options.companyId;
-  }
-  if (options.status) {
-    query.status = options.status;
-  }
-
-  return this.find(query).sort({ issuanceDate: -1 });
-};
-
-// Static Method: Get compliance summary
-securityIssuanceSchema.statics.getComplianceSummary = async function(companyId) {
-  const issuances = await this.find({ companyId });
-
-  const summary = {
-    totalIssuances: issuances.length,
-    byComplianceStatus: {
-      compliant: 0,
-      pending_review: 0,
-      non_compliant: 0,
-      remediation_required: 0
-    },
-    byFederalFilingStatus: {
-      not_required: 0,
-      pending: 0,
-      filed: 0,
-      overdue: 0,
-      exempt: 0
-    },
-    overdueFilings: 0,
-    upcomingDeadlines: []
-  };
-
-  const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  issuances.forEach(issuance => {
-    // Count by compliance status
-    if (summary.byComplianceStatus[issuance.complianceStatus] !== undefined) {
-      summary.byComplianceStatus[issuance.complianceStatus]++;
+    // Check Form D amendment deadline
+    if (issuance.formDAmendmentRequired &&
+        issuance.formDAmendmentDeadline &&
+        new Date(issuance.formDAmendmentDeadline) <= futureDate) {
+      deadlines.push({
+        type: 'federal',
+        filingType: 'Form D Amendment',
+        deadline: issuance.formDAmendmentDeadline,
+        daysRemaining: Math.ceil((new Date(issuance.formDAmendmentDeadline) - now) / (24 * 60 * 60 * 1000))
+      });
     }
 
-    // Count by federal filing status
-    if (summary.byFederalFilingStatus[issuance.federalFilingStatus] !== undefined) {
-      summary.byFederalFilingStatus[issuance.federalFilingStatus]++;
-    }
-
-    // Count overdue
-    if (issuance.isOverdue) {
-      summary.overdueFilings++;
-    }
-
-    // Collect upcoming deadlines
-    const deadlines = issuance.getUpcomingDeadlines(30);
-    summary.upcomingDeadlines.push(...deadlines.map(d => ({
-      ...d,
-      issuanceId: issuance.issuanceId
-    })));
-  });
-
-  // Sort upcoming deadlines
-  summary.upcomingDeadlines.sort((a, b) => a.deadline - b.deadline);
-
-  return summary;
-};
-
-// Indexes
-securityIssuanceSchema.index({ issuanceId: 1 }, { unique: true });
-securityIssuanceSchema.index({ companyId: 1 });
-securityIssuanceSchema.index({ stakeholderId: 1 });
-securityIssuanceSchema.index({ companyId: 1, issuanceDate: -1 });
-securityIssuanceSchema.index({ exemptionType: 1 });
-securityIssuanceSchema.index({ complianceStatus: 1 });
-securityIssuanceSchema.index({ federalFilingStatus: 1 });
-securityIssuanceSchema.index({ 'stateFilings.stateCode': 1 });
-securityIssuanceSchema.index({ 'stateFilings.filingStatus': 1 });
-
-// Pre-save middleware
-securityIssuanceSchema.pre('save', function(next) {
-  // Calculate total consideration if not set
-  if (!this.totalConsideration || this.isModified('numberOfShares') || this.isModified('pricePerShare')) {
-    this.totalConsideration = this.numberOfShares * this.pricePerShare;
-  }
-
-  // Update federal filing status to overdue if deadline passed
-  if (this.federalFilingStatus === 'pending' &&
-      this.federalFilingDeadline &&
-      this.federalFilingDeadline < new Date()) {
-    this.federalFilingStatus = 'overdue';
-  }
-
-  // Update state filing statuses
-  if (this.stateFilings && this.stateFilings.length > 0) {
-    const now = new Date();
-    this.stateFilings.forEach(filing => {
-      if (filing.filingStatus === 'pending' &&
-          filing.filingDeadline &&
-          filing.filingDeadline < now) {
-        filing.filingStatus = 'overdue';
+    // Check state deadlines
+    (issuance.stateFilings || []).forEach(filing => {
+      if (filing.filingDeadline &&
+          filing.filingStatus === 'pending' &&
+          new Date(filing.filingDeadline) <= futureDate) {
+        deadlines.push({
+          type: 'state',
+          stateCode: filing.stateCode,
+          filingType: 'State Notice',
+          deadline: filing.filingDeadline,
+          daysRemaining: Math.ceil((new Date(filing.filingDeadline) - now) / (24 * 60 * 60 * 1000))
+        });
       }
     });
-  }
 
-  next();
-});
+    return deadlines.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  },
 
-const SecurityIssuance = mongoose.model('SecurityIssuance', securityIssuanceSchema);
+  /**
+   * Update compliance status
+   * @param {string} issuanceId - Issuance ID
+   * @param {string} status - Compliance status
+   * @param {string} notes - Notes
+   * @param {string} reviewedBy - Reviewer ID
+   * @returns {Object} Updated issuance
+   */
+  async updateComplianceStatus(issuanceId, status, notes = null, reviewedBy = null) {
+    const nextReviewDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+    return baseModel.updateOne.call(baseModel,
+      { issuanceId },
+      {
+        $set: {
+          complianceStatus: status,
+          complianceNotes: notes,
+          reviewedBy,
+          lastComplianceReview: new Date().toISOString(),
+          nextComplianceReview: nextReviewDate.toISOString()
+        }
+      }
+    );
+  },
+
+  /**
+   * Find overdue filings for a company
+   * @param {string} companyId - Company ID
+   * @returns {Array} Issuances with overdue filings
+   */
+  async findOverdueFilings(companyId) {
+    const issuances = await baseModel.find.call(baseModel, { companyId });
+    return issuances.filter(i => this.isOverdue(i));
+  },
+
+  /**
+   * Get compliance summary for a company
+   * @param {string} companyId - Company ID
+   * @returns {Object} Compliance summary
+   */
+  async getComplianceSummary(companyId) {
+    const issuances = await baseModel.find.call(baseModel, { companyId });
+
+    const summary = {
+      totalIssuances: issuances.length,
+      byComplianceStatus: {
+        compliant: 0,
+        pending_review: 0,
+        non_compliant: 0,
+        remediation_required: 0
+      },
+      byFederalFilingStatus: {
+        not_required: 0,
+        pending: 0,
+        filed: 0,
+        overdue: 0,
+        exempt: 0
+      },
+      overdueFilings: 0,
+      upcomingDeadlines: []
+    };
+
+    issuances.forEach(issuance => {
+      if (summary.byComplianceStatus[issuance.complianceStatus] !== undefined) {
+        summary.byComplianceStatus[issuance.complianceStatus]++;
+      }
+
+      if (summary.byFederalFilingStatus[issuance.federalFilingStatus] !== undefined) {
+        summary.byFederalFilingStatus[issuance.federalFilingStatus]++;
+      }
+
+      if (this.isOverdue(issuance)) {
+        summary.overdueFilings++;
+      }
+
+      const deadlines = this.getUpcomingDeadlines(issuance, 30);
+      summary.upcomingDeadlines.push(...deadlines.map(d => ({
+        ...d,
+        issuanceId: issuance.issuanceId
+      })));
+    });
+
+    summary.upcomingDeadlines.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
+    return summary;
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
+};
 
 module.exports = SecurityIssuance;
-module.exports.SECURITY_TYPES = SECURITY_TYPES;
-module.exports.EXEMPTION_TYPES = EXEMPTION_TYPES;
-module.exports.ISSUANCE_STATUSES = ISSUANCE_STATUSES;
-module.exports.COMPLIANCE_STATUSES = COMPLIANCE_STATUSES;
-module.exports.FILING_STATUSES = FILING_STATUSES;
-module.exports.US_STATE_CODES = US_STATE_CODES;
-module.exports.schema = securityIssuanceSchema;

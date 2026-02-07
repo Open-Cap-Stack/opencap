@@ -8,198 +8,296 @@
  * - Status lifecycle management
  * - Participation limits
  * - Submission tracking
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-const eligibilityCriteriaSchema = new mongoose.Schema({
-  minTenureMonths: { type: Number, default: 0 },
-  minSharesHeld: { type: Number, default: 0 },
-  employeeStatus: [{
-    type: String,
-    enum: ['active', 'former', 'terminated', 'retired']
-  }],
-  excludedStakeholders: [{ type: String }],
-  customRules: { type: mongoose.Schema.Types.Mixed }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-const tenderOfferSchema = new mongoose.Schema({
-  offerId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+// Valid statuses
+const VALID_STATUSES = ['draft', 'open', 'closed', 'canceled', 'settled'];
 
-  companyId: {
-    type: String,
-    required: true,
-    index: true
-  },
+// Valid employee statuses for eligibility
+const EMPLOYEE_STATUSES = ['active', 'former', 'terminated', 'retired'];
 
-  // Offer details
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-
-  // Pricing
-  pricePerShare: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  totalBudget: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-
-  // Eligible share classes
-  shareClasses: [{
-    type: String
-  }],
-
-  // Offer period
-  startDate: {
-    type: Date
-  },
-  endDate: {
-    type: Date
-  },
-
-  // Status lifecycle
-  status: {
-    type: String,
-    enum: ['draft', 'open', 'closed', 'canceled', 'settled'],
-    default: 'draft',
-    index: true
-  },
-
-  // Participation limits per stakeholder
-  minShares: {
-    type: Number,
-    default: 1,
-    min: 0
-  },
-  maxShares: {
-    type: Number,
-    min: 0
-  },
-
-  // Eligibility criteria
+// Schema definition for documentation and validation
+const tenderOfferSchema = {
+  offerId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  name: { type: 'string', required: true },
+  description: { type: 'string', default: '' },
+  pricePerShare: { type: 'number', required: true },
+  totalBudget: { type: 'number', required: true },
+  shareClasses: { type: 'array', default: [] },
+  startDate: { type: 'date', default: null },
+  endDate: { type: 'date', default: null },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'draft' },
+  minShares: { type: 'number', default: 1 },
+  maxShares: { type: 'number', default: null },
   eligibilityCriteria: {
-    type: eligibilityCriteriaSchema,
-    default: () => ({
+    type: 'object',
+    default: {
       minTenureMonths: 0,
       minSharesHeld: 0,
       employeeStatus: ['active', 'former'],
       excludedStakeholders: [],
       customRules: {}
-    })
+    }
+  },
+  totalSharesTendered: { type: 'number', default: 0 },
+  totalSharesAccepted: { type: 'number', default: 0 },
+  totalPayoutAmount: { type: 'number', default: 0 },
+  prorataPercentage: { type: 'number', default: null },
+  isOversubscribed: { type: 'boolean', default: false },
+  publishedAt: { type: 'date', default: null },
+  closedAt: { type: 'date', default: null },
+  settledAt: { type: 'date', default: null },
+  canceledAt: { type: 'date', default: null },
+  notes: { type: 'string', default: '' },
+  metadata: { type: 'object', default: {} },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
+};
+
+// Create the base model
+const baseModel = createModel('tender_offers', tenderOfferSchema);
+
+// Extended TenderOffer model with business logic
+const TenderOffer = {
+  ...baseModel,
+  tableName: 'tender_offers',
+  schema: tenderOfferSchema,
+
+  // Export constants
+  VALID_STATUSES,
+  EMPLOYEE_STATUSES,
+
+  /**
+   * Create a new tender offer with defaults
+   * @param {Object} data - Offer data
+   * @returns {Object} Created offer
+   */
+  async create(data) {
+    if (!data.offerId) {
+      data.offerId = `offer_${uuidv4()}`;
+    }
+
+    // Validate price
+    if (data.pricePerShare < 0) {
+      throw new Error('pricePerShare cannot be negative');
+    }
+
+    // Validate budget
+    if (data.totalBudget < 0) {
+      throw new Error('totalBudget cannot be negative');
+    }
+
+    if (!data.status) {
+      data.status = 'draft';
+    }
+
+    return baseModel.create.call(baseModel, data);
   },
 
-  // Submission tracking
-  totalSharesTendered: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  totalSharesAccepted: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  totalPayoutAmount: {
-    type: Number,
-    default: 0,
-    min: 0
+  /**
+   * Find offer by offerId
+   * @param {string} offerId - Offer ID
+   * @returns {Object|null} Offer or null
+   */
+  async findByOfferId(offerId) {
+    return baseModel.findOne.call(baseModel, { offerId });
   },
 
-  // Prorata details (if oversubscribed)
-  prorataPercentage: {
-    type: Number,
-    min: 0,
-    max: 100
-  },
-  isOversubscribed: {
-    type: Boolean,
-    default: false
-  },
-
-  // Important dates
-  publishedAt: {
-    type: Date
-  },
-  closedAt: {
-    type: Date
-  },
-  settledAt: {
-    type: Date
-  },
-  canceledAt: {
-    type: Date
+  /**
+   * Find offers by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Offers for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
   },
 
-  // Notes and metadata
-  notes: {
-    type: String
+  /**
+   * Find active offers
+   * @param {string} companyId - Company ID
+   * @returns {Array} Active offers
+   */
+  async findActive(companyId) {
+    const offers = await baseModel.find.call(baseModel, { companyId, status: 'open' });
+    const now = new Date();
+    return offers.filter(offer => {
+      if (offer.startDate && now < new Date(offer.startDate)) return false;
+      if (offer.endDate && now > new Date(offer.endDate)) return false;
+      return true;
+    });
   },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
+
+  /**
+   * Get maximum purchasable shares
+   * @param {Object} offer - Offer object
+   * @returns {number} Max purchasable shares
+   */
+  getMaxPurchasableShares(offer) {
+    if (offer.pricePerShare === 0) return 0;
+    return Math.floor(offer.totalBudget / offer.pricePerShare);
   },
 
-  // Audit fields
-  createdBy: {
-    type: String
+  /**
+   * Get remaining budget
+   * @param {Object} offer - Offer object
+   * @returns {number} Remaining budget
+   */
+  getRemainingBudget(offer) {
+    return offer.totalBudget - (offer.totalPayoutAmount || 0);
   },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
 
-// Compound indexes for efficient queries
-tenderOfferSchema.index({ companyId: 1, status: 1 });
-tenderOfferSchema.index({ status: 1, startDate: 1 });
-tenderOfferSchema.index({ status: 1, endDate: 1 });
+  /**
+   * Get subscription ratio
+   * @param {Object} offer - Offer object
+   * @returns {number} Subscription ratio
+   */
+  getSubscriptionRatio(offer) {
+    const maxShares = this.getMaxPurchasableShares(offer);
+    if (maxShares === 0) return 0;
+    return (offer.totalSharesTendered || 0) / maxShares;
+  },
 
-// Virtual for maximum shares that can be purchased
-tenderOfferSchema.virtual('maxPurchasableShares').get(function() {
-  if (this.pricePerShare === 0) return 0;
-  return Math.floor(this.totalBudget / this.pricePerShare);
-});
+  /**
+   * Check if offer is active
+   * @param {Object} offer - Offer object
+   * @returns {boolean} True if active
+   */
+  isActive(offer) {
+    if (offer.status !== 'open') return false;
+    const now = new Date();
+    if (offer.startDate && now < new Date(offer.startDate)) return false;
+    if (offer.endDate && now > new Date(offer.endDate)) return false;
+    return true;
+  },
 
-// Virtual for remaining budget
-tenderOfferSchema.virtual('remainingBudget').get(function() {
-  return this.totalBudget - this.totalPayoutAmount;
-});
+  /**
+   * Publish offer
+   * @param {string} offerId - Offer ID
+   * @returns {Object} Updated offer
+   */
+  async publish(offerId) {
+    return baseModel.updateOne.call(baseModel,
+      { offerId },
+      {
+        $set: {
+          status: 'open',
+          publishedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
 
-// Virtual for subscription ratio
-tenderOfferSchema.virtual('subscriptionRatio').get(function() {
-  const maxShares = this.maxPurchasableShares;
-  if (maxShares === 0) return 0;
-  return this.totalSharesTendered / maxShares;
-});
+  /**
+   * Close offer
+   * @param {string} offerId - Offer ID
+   * @returns {Object} Updated offer
+   */
+  async close(offerId) {
+    return baseModel.updateOne.call(baseModel,
+      { offerId },
+      {
+        $set: {
+          status: 'closed',
+          closedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
 
-// Virtual to check if offer is active (open and within date range)
-tenderOfferSchema.virtual('isActive').get(function() {
-  if (this.status !== 'open') return false;
-  const now = new Date();
-  if (this.startDate && now < this.startDate) return false;
-  if (this.endDate && now > this.endDate) return false;
-  return true;
-});
+  /**
+   * Cancel offer
+   * @param {string} offerId - Offer ID
+   * @returns {Object} Updated offer
+   */
+  async cancel(offerId) {
+    return baseModel.updateOne.call(baseModel,
+      { offerId },
+      {
+        $set: {
+          status: 'canceled',
+          canceledAt: new Date().toISOString()
+        }
+      }
+    );
+  },
 
-// Ensure virtuals are included in JSON
-tenderOfferSchema.set('toJSON', { virtuals: true });
-tenderOfferSchema.set('toObject', { virtuals: true });
+  /**
+   * Settle offer
+   * @param {string} offerId - Offer ID
+   * @param {Object} settlementData - Settlement data
+   * @returns {Object} Updated offer
+   */
+  async settle(offerId, settlementData = {}) {
+    return baseModel.updateOne.call(baseModel,
+      { offerId },
+      {
+        $set: {
+          status: 'settled',
+          settledAt: new Date().toISOString(),
+          totalSharesAccepted: settlementData.totalSharesAccepted,
+          totalPayoutAmount: settlementData.totalPayoutAmount,
+          prorataPercentage: settlementData.prorataPercentage,
+          isOversubscribed: settlementData.isOversubscribed || false
+        }
+      }
+    );
+  },
 
-const TenderOffer = mongoose.model('TenderOffer', tenderOfferSchema);
+  /**
+   * Update tender totals
+   * @param {string} offerId - Offer ID
+   * @param {number} sharesTendered - Total shares tendered
+   * @returns {Object} Updated offer
+   */
+  async updateTenderTotals(offerId, sharesTendered) {
+    const offer = await this.findByOfferId(offerId);
+    if (!offer) {
+      throw new Error('Offer not found');
+    }
+
+    const maxShares = this.getMaxPurchasableShares(offer);
+    const isOversubscribed = sharesTendered > maxShares;
+
+    return baseModel.updateOne.call(baseModel,
+      { offerId },
+      {
+        $set: {
+          totalSharesTendered: sharesTendered,
+          isOversubscribed
+        }
+      }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
+};
 
 module.exports = TenderOffer;

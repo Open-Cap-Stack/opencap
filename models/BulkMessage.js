@@ -4,320 +4,246 @@
  *
  * Data model for bulk messaging with templates, scheduling,
  * recipient management, and delivery tracking.
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
+
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
 const MESSAGE_TYPES = ['email', 'sms', 'notification', 'in-app'];
 const STATUSES = ['draft', 'scheduled', 'processing', 'sent', 'partially_sent', 'failed', 'cancelled'];
 const FILTER_TYPES = ['all', 'role', 'company', 'custom'];
 const RECIPIENT_STATUSES = ['pending', 'sent', 'delivered', 'failed', 'bounced', 'opened', 'clicked'];
 
-/**
- * Recipient Schema - tracks delivery status for each recipient
- */
-const RecipientSchema = new mongoose.Schema({
-  stakeholderId: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String
-  },
-  email: {
-    type: String
-  },
-  phone: {
-    type: String
-  },
-  status: {
-    type: String,
-    enum: RECIPIENT_STATUSES,
-    default: 'pending'
-  },
-  sentAt: {
-    type: Date
-  },
-  deliveredAt: {
-    type: Date
-  },
-  openedAt: {
-    type: Date
-  },
-  clickedAt: {
-    type: Date
-  },
-  errorMessage: {
-    type: String
-  },
-  retryCount: {
-    type: Number,
-    default: 0
-  }
-}, { _id: false });
-
-/**
- * Recipient Filter Schema - defines how recipients are selected
- */
-const RecipientFilterSchema = new mongoose.Schema({
-  filterType: {
-    type: String,
-    enum: FILTER_TYPES,
-    required: true
-  },
-  roles: [{
-    type: String
-  }],
-  companyIds: [{
-    type: String
-  }],
-  stakeholderIds: [{
-    type: String
-  }],
-  customQuery: {
-    type: mongoose.Schema.Types.Mixed
-  }
-}, { _id: false });
-
-/**
- * Rate Limiting Schema - controls batch sending
- */
-const RateLimitingSchema = new mongoose.Schema({
-  batchSize: {
-    type: Number,
-    default: 100,
-    min: 1,
-    max: 1000
-  },
-  delayBetweenBatches: {
-    type: Number,
-    default: 500,
-    min: 0,
-    max: 60000
-  }
-}, { _id: false });
-
-/**
- * Delivery Stats Schema - aggregated delivery statistics
- */
-const DeliveryStatsSchema = new mongoose.Schema({
-  totalRecipients: {
-    type: Number,
-    default: 0
-  },
-  sent: {
-    type: Number,
-    default: 0
-  },
-  delivered: {
-    type: Number,
-    default: 0
-  },
-  failed: {
-    type: Number,
-    default: 0
-  },
-  bounced: {
-    type: Number,
-    default: 0
-  },
-  opened: {
-    type: Number,
-    default: 0
-  },
-  clicked: {
-    type: Number,
-    default: 0
-  }
-}, { _id: false });
-
-/**
- * BulkMessage Schema
- */
-const BulkMessageSchema = new mongoose.Schema({
-  bulkMessageId: {
-    type: String,
-    required: [true, 'bulkMessageId is required'],
-    unique: true,
-    trim: true
-  },
-  companyId: {
-    type: String,
-    required: [true, 'companyId is required'],
-    index: true
-  },
-  senderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'senderId is required'],
-    ref: 'User'
-  },
-  subject: {
-    type: String,
-    required: [true, 'subject is required'],
-    trim: true,
-    maxlength: [500, 'Subject cannot exceed 500 characters']
-  },
-  content: {
-    type: String,
-    required: [true, 'content is required'],
-    maxlength: [50000, 'Content cannot exceed 50000 characters']
-  },
-  messageType: {
-    type: String,
-    required: [true, 'messageType is required'],
-    enum: {
-      values: MESSAGE_TYPES,
-      message: `messageType must be one of: ${MESSAGE_TYPES.join(', ')}`
+// Schema definition for documentation and validation
+const bulkMessageSchema = {
+  bulkMessageId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  senderId: { type: 'string', required: true },
+  subject: { type: 'string', required: true },
+  content: { type: 'string', required: true },
+  messageType: { type: 'string', required: true, enum: MESSAGE_TYPES },
+  recipientFilter: {
+    type: 'object',
+    required: true,
+    default: {
+      filterType: 'all',
+      roles: [],
+      companyIds: [],
+      stakeholderIds: [],
+      customQuery: null
     }
   },
-  recipientFilter: {
-    type: RecipientFilterSchema,
-    required: [true, 'recipientFilter is required']
-  },
-  status: {
-    type: String,
-    enum: {
-      values: STATUSES,
-      message: `status must be one of: ${STATUSES.join(', ')}`
-    },
-    default: 'draft',
-    index: true
-  },
-  scheduledAt: {
-    type: Date,
-    index: true
-  },
-  sentAt: {
-    type: Date
-  },
-  completedAt: {
-    type: Date
-  },
-  cancelledAt: {
-    type: Date
-  },
-  templateVariables: [{
-    type: String
-  }],
-  recipients: [RecipientSchema],
+  status: { type: 'string', enum: STATUSES, default: 'draft' },
+  scheduledAt: { type: 'date', default: null },
+  sentAt: { type: 'date', default: null },
+  completedAt: { type: 'date', default: null },
+  cancelledAt: { type: 'date', default: null },
+  templateVariables: { type: 'array', default: [] },
+  recipients: { type: 'array', default: [] },
   deliveryStats: {
-    type: DeliveryStatsSchema,
-    default: () => ({})
+    type: 'object',
+    default: {
+      totalRecipients: 0,
+      sent: 0,
+      delivered: 0,
+      failed: 0,
+      bounced: 0,
+      opened: 0,
+      clicked: 0
+    }
   },
   rateLimiting: {
-    type: RateLimitingSchema,
-    default: () => ({})
+    type: 'object',
+    default: {
+      batchSize: 100,
+      delayBetweenBatches: 500
+    }
   },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  tags: [{
-    type: String
-  }]
-}, {
-  timestamps: true
-});
-
-// Indexes for performance
-BulkMessageSchema.index({ bulkMessageId: 1 }, { unique: true });
-BulkMessageSchema.index({ companyId: 1, createdAt: -1 });
-BulkMessageSchema.index({ status: 1, scheduledAt: 1 });
-BulkMessageSchema.index({ senderId: 1, createdAt: -1 });
-
-/**
- * Pre-save middleware to set sentAt when status changes to processing
- */
-BulkMessageSchema.pre('save', function(next) {
-  if (this.isModified('status')) {
-    if (this.status === 'processing' && !this.sentAt) {
-      this.sentAt = new Date();
-    }
-    if (this.status === 'sent' || this.status === 'partially_sent' || this.status === 'failed') {
-      this.completedAt = new Date();
-    }
-    if (this.status === 'cancelled') {
-      this.cancelledAt = new Date();
-    }
-  }
-  next();
-});
-
-/**
- * Instance method to update delivery statistics from recipients
- */
-BulkMessageSchema.methods.updateDeliveryStats = function() {
-  const stats = {
-    totalRecipients: this.recipients.length,
-    sent: 0,
-    delivered: 0,
-    failed: 0,
-    bounced: 0,
-    opened: 0,
-    clicked: 0
-  };
-
-  this.recipients.forEach(recipient => {
-    switch (recipient.status) {
-      case 'sent':
-        stats.sent++;
-        break;
-      case 'delivered':
-        stats.sent++;
-        stats.delivered++;
-        break;
-      case 'failed':
-        stats.failed++;
-        break;
-      case 'bounced':
-        stats.bounced++;
-        break;
-      case 'opened':
-        stats.sent++;
-        stats.delivered++;
-        stats.opened++;
-        break;
-      case 'clicked':
-        stats.sent++;
-        stats.delivered++;
-        stats.opened++;
-        stats.clicked++;
-        break;
-    }
-  });
-
-  this.deliveryStats = stats;
-  return stats;
+  metadata: { type: 'object', default: {} },
+  tags: { type: 'array', default: [] },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-/**
- * Static method to find scheduled messages ready to send
- */
-BulkMessageSchema.statics.findScheduledForProcessing = function() {
-  return this.find({
-    status: 'scheduled',
-    scheduledAt: { $lte: new Date() }
-  });
-};
+// Create the base model
+const baseModel = createModel('bulk_messages', bulkMessageSchema);
 
-/**
- * Static method to get message statistics by company
- */
-BulkMessageSchema.statics.getStatsByCompany = async function(companyId) {
-  return this.aggregate([
-    { $match: { companyId } },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-        totalRecipients: { $sum: '$deliveryStats.totalRecipients' },
-        totalSent: { $sum: '$deliveryStats.sent' },
-        totalDelivered: { $sum: '$deliveryStats.delivered' },
-        totalFailed: { $sum: '$deliveryStats.failed' }
+// Extended BulkMessage model with business logic
+const BulkMessage = {
+  ...baseModel,
+  tableName: 'bulk_messages',
+  schema: bulkMessageSchema,
+
+  // Export constants
+  MESSAGE_TYPES,
+  STATUSES,
+  FILTER_TYPES,
+  RECIPIENT_STATUSES,
+
+  /**
+   * Create a new bulk message with defaults
+   * @param {Object} data - Bulk message data
+   * @returns {Object} Created bulk message
+   */
+  async create(data) {
+    if (!data.bulkMessageId) {
+      data.bulkMessageId = `msg_${uuidv4()}`;
+    }
+
+    if (!data.status) {
+      data.status = 'draft';
+    }
+
+    if (!data.deliveryStats) {
+      data.deliveryStats = {
+        totalRecipients: 0,
+        sent: 0,
+        delivered: 0,
+        failed: 0,
+        bounced: 0,
+        opened: 0,
+        clicked: 0
+      };
+    }
+
+    if (!data.rateLimiting) {
+      data.rateLimiting = {
+        batchSize: 100,
+        delayBetweenBatches: 500
+      };
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find bulk message by bulkMessageId
+   * @param {string} bulkMessageId - Bulk message ID
+   * @returns {Object|null} Bulk message or null
+   */
+  async findByBulkMessageId(bulkMessageId) {
+    return baseModel.findOne.call(baseModel, { bulkMessageId });
+  },
+
+  /**
+   * Find bulk messages by company
+   * @param {string} companyId - Company ID
+   * @returns {Array} Bulk messages for company
+   */
+  async findByCompany(companyId) {
+    return baseModel.find.call(baseModel, { companyId });
+  },
+
+  /**
+   * Find scheduled messages ready to send
+   * @returns {Array} Scheduled messages ready for processing
+   */
+  async findScheduledForProcessing() {
+    const now = new Date().toISOString();
+    const all = await baseModel.find.call(baseModel, { status: 'scheduled' });
+    return all.filter(msg => msg.scheduledAt && msg.scheduledAt <= now);
+  },
+
+  /**
+   * Update delivery statistics from recipients
+   * @param {Object} message - Bulk message object
+   * @returns {Object} Updated stats
+   */
+  updateDeliveryStats(message) {
+    const stats = {
+      totalRecipients: message.recipients?.length || 0,
+      sent: 0,
+      delivered: 0,
+      failed: 0,
+      bounced: 0,
+      opened: 0,
+      clicked: 0
+    };
+
+    if (message.recipients) {
+      message.recipients.forEach(recipient => {
+        switch (recipient.status) {
+          case 'sent':
+            stats.sent++;
+            break;
+          case 'delivered':
+            stats.sent++;
+            stats.delivered++;
+            break;
+          case 'failed':
+            stats.failed++;
+            break;
+          case 'bounced':
+            stats.bounced++;
+            break;
+          case 'opened':
+            stats.sent++;
+            stats.delivered++;
+            stats.opened++;
+            break;
+          case 'clicked':
+            stats.sent++;
+            stats.delivered++;
+            stats.opened++;
+            stats.clicked++;
+            break;
+        }
+      });
+    }
+
+    return stats;
+  },
+
+  /**
+   * Get message statistics by company
+   * @param {string} companyId - Company ID
+   * @returns {Array} Aggregated statistics
+   */
+  async getStatsByCompany(companyId) {
+    const messages = await baseModel.find.call(baseModel, { companyId });
+    const statsByStatus = {};
+
+    messages.forEach(msg => {
+      const status = msg.status;
+      if (!statsByStatus[status]) {
+        statsByStatus[status] = {
+          _id: status,
+          count: 0,
+          totalRecipients: 0,
+          totalSent: 0,
+          totalDelivered: 0,
+          totalFailed: 0
+        };
       }
-    }
-  ]);
-};
+      statsByStatus[status].count++;
+      statsByStatus[status].totalRecipients += msg.deliveryStats?.totalRecipients || 0;
+      statsByStatus[status].totalSent += msg.deliveryStats?.sent || 0;
+      statsByStatus[status].totalDelivered += msg.deliveryStats?.delivered || 0;
+      statsByStatus[status].totalFailed += msg.deliveryStats?.failed || 0;
+    });
 
-const BulkMessage = mongoose.model('BulkMessage', BulkMessageSchema);
+    return Object.values(statsByStatus);
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
+};
 
 module.exports = BulkMessage;
 module.exports.MESSAGE_TYPES = MESSAGE_TYPES;

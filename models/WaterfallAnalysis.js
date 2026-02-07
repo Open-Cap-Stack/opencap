@@ -8,387 +8,263 @@
  * - Complex preference structures (participating, non-participating, capped)
  * - Seniority stacks for multiple preferred share classes
  * - Results tracking by stakeholder and share class
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-/**
- * Schema for share class preference details in waterfall analysis
- */
-const shareClassPreferenceSchema = new mongoose.Schema({
-  shareClassId: {
-    type: String,
-    required: [true, 'Share class ID is required']
-  },
-  name: {
-    type: String,
-    required: [true, 'Share class name is required']
-  },
-  preferenceType: {
-    type: String,
-    enum: ['common', 'non_participating', 'participating', 'participating_capped'],
-    default: 'common'
-  },
-  liquidationMultiple: {
-    type: Number,
-    default: 1,
-    min: [0, 'Liquidation multiple cannot be negative']
-  },
-  participationCap: {
-    type: Number,
-    default: null,
-    min: [0, 'Participation cap cannot be negative']
-  },
-  seniorityRank: {
-    type: Number,
-    default: 1,
-    min: [1, 'Seniority rank must be at least 1']
-  },
-  totalShares: {
-    type: Number,
-    required: [true, 'Total shares is required'],
-    min: [0, 'Total shares cannot be negative']
-  },
-  pricePerShare: {
-    type: Number,
-    required: [true, 'Price per share is required'],
-    min: [0, 'Price per share cannot be negative']
-  },
-  originalInvestment: {
-    type: Number,
-    min: [0, 'Original investment cannot be negative']
-  },
-  conversionRatio: {
-    type: Number,
-    default: 1,
-    min: [0, 'Conversion ratio cannot be negative']
-  },
-  isConverted: {
-    type: Boolean,
-    default: false
-  }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-/**
- * Schema for waterfall distribution results by stakeholder
- */
-const stakeholderResultSchema = new mongoose.Schema({
-  stakeholderId: {
-    type: String,
-    required: [true, 'Stakeholder ID is required']
-  },
-  stakeholderName: {
-    type: String
-  },
-  shareClassId: {
-    type: String,
-    required: [true, 'Share class ID is required']
-  },
-  shareClassName: {
-    type: String
-  },
-  sharesOwned: {
-    type: Number,
-    default: 0,
-    min: [0, 'Shares owned cannot be negative']
-  },
-  proceedsFromPreference: {
-    type: Number,
-    default: 0,
-    min: [0, 'Preference proceeds cannot be negative']
-  },
-  proceedsFromParticipation: {
-    type: Number,
-    default: 0,
-    min: [0, 'Participation proceeds cannot be negative']
-  },
-  proceedsFromConversion: {
-    type: Number,
-    default: 0,
-    min: [0, 'Conversion proceeds cannot be negative']
-  },
-  totalProceeds: {
-    type: Number,
-    default: 0,
-    min: [0, 'Total proceeds cannot be negative']
-  },
-  percentageOfExit: {
-    type: Number,
-    default: 0,
-    min: [0, 'Percentage cannot be negative'],
-    max: [100, 'Percentage cannot exceed 100']
-  },
-  multipleOnInvestment: {
-    type: Number,
-    default: 0
-  },
-  optedForConversion: {
-    type: Boolean,
-    default: false
-  }
-}, { _id: false });
+// Valid exit types
+const EXIT_TYPES = ['acquisition', 'ipo', 'liquidation', 'merger', 'dissolution'];
 
-/**
- * Schema for share class level results
- */
-const shareClassResultSchema = new mongoose.Schema({
-  shareClassId: {
-    type: String,
-    required: true
-  },
-  shareClassName: {
-    type: String
-  },
-  totalShares: {
-    type: Number,
-    default: 0
-  },
-  preferenceAmount: {
-    type: Number,
-    default: 0
-  },
-  participationAmount: {
-    type: Number,
-    default: 0
-  },
-  conversionAmount: {
-    type: Number,
-    default: 0
-  },
-  totalProceeds: {
-    type: Number,
-    default: 0
-  },
-  percentageOfExit: {
-    type: Number,
-    default: 0
-  },
-  effectiveMultiple: {
-    type: Number,
-    default: 0
-  },
-  conversionElected: {
-    type: Boolean,
-    default: false
-  }
-}, { _id: false });
+// Valid preference types
+const PREFERENCE_TYPES = ['common', 'non_participating', 'participating', 'participating_capped'];
 
-/**
- * Schema for waterfall summary
- */
-const waterfallSummarySchema = new mongoose.Schema({
-  totalDistributed: {
-    type: Number,
-    default: 0
-  },
-  totalToPreferred: {
-    type: Number,
-    default: 0
-  },
-  totalToCommon: {
-    type: Number,
-    default: 0
-  },
-  remainingProceeds: {
-    type: Number,
-    default: 0
-  },
-  effectiveExitMultiple: {
-    type: Number,
-    default: 0
-  },
-  fullyDilutedShares: {
-    type: Number,
-    default: 0
-  },
-  pricePerShareAtExit: {
-    type: Number,
-    default: 0
-  }
-}, { _id: false });
+// Valid statuses
+const VALID_STATUSES = ['draft', 'calculated', 'finalized', 'archived'];
 
-/**
- * Main WaterfallAnalysis schema
- */
-const waterfallAnalysisSchema = new mongoose.Schema({
-  analysisId: {
-    type: String,
-    unique: true,
-    index: true
-  },
-
-  // Company reference
-  companyId: {
-    type: String,
-    required: [true, 'Company ID is required'],
-    index: true
-  },
-
-  // Exit scenario details
-  exitValuation: {
-    type: Number,
-    required: [true, 'Exit valuation is required'],
-    min: [0, 'Exit valuation cannot be negative']
-  },
-  exitType: {
-    type: String,
-    required: [true, 'Exit type is required'],
-    enum: {
-      values: ['acquisition', 'ipo', 'liquidation', 'merger', 'dissolution'],
-      message: '{VALUE} is not a valid exit type'
+// Schema definition for documentation and validation
+const waterfallAnalysisSchema = {
+  analysisId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  exitValuation: { type: 'number', required: true },
+  exitType: { type: 'string', required: true, enum: EXIT_TYPES },
+  transactionCosts: { type: 'number', default: 0 },
+  escrowAmount: { type: 'number', default: 0 },
+  debtPayoff: { type: 'number', default: 0 },
+  netProceeds: { type: 'number', default: 0 },
+  scenarioName: { type: 'string', default: '' },
+  scenarioDescription: { type: 'string', default: '' },
+  shareClasses: { type: 'array', default: [] },
+  results: { type: 'array', default: [] },
+  shareClassResults: { type: 'array', default: [] },
+  summary: {
+    type: 'object',
+    default: {
+      totalDistributed: 0,
+      totalToPreferred: 0,
+      totalToCommon: 0,
+      remainingProceeds: 0,
+      effectiveExitMultiple: 0,
+      fullyDilutedShares: 0,
+      pricePerShareAtExit: 0
     }
   },
-
-  // Transaction costs and adjustments
-  transactionCosts: {
-    type: Number,
-    default: 0,
-    min: [0, 'Transaction costs cannot be negative']
-  },
-  escrowAmount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Escrow amount cannot be negative']
-  },
-  debtPayoff: {
-    type: Number,
-    default: 0,
-    min: [0, 'Debt payoff cannot be negative']
-  },
-  netProceeds: {
-    type: Number,
-    default: 0
-  },
-
-  // Scenario identification
-  scenarioName: {
-    type: String,
-    trim: true,
-    maxlength: [200, 'Scenario name cannot exceed 200 characters']
-  },
-  scenarioDescription: {
-    type: String,
-    trim: true,
-    maxlength: [2000, 'Scenario description cannot exceed 2000 characters']
-  },
-
-  // Share class configuration
-  shareClasses: [shareClassPreferenceSchema],
-
-  // Results
-  results: [stakeholderResultSchema],
-  shareClassResults: [shareClassResultSchema],
-  summary: waterfallSummarySchema,
-
-  // Calculation metadata
-  calculatedAt: {
-    type: Date
-  },
-  calculationVersion: {
-    type: String,
-    default: '1.0'
-  },
-
-  // Status
-  status: {
-    type: String,
-    enum: ['draft', 'calculated', 'finalized', 'archived'],
-    default: 'draft',
-    index: true
-  },
-
-  // Comparison group
-  comparisonGroupId: {
-    type: String,
-    index: true
-  },
-
-  // Notes and metadata
-  notes: {
-    type: String
-  },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  },
-
-  // Audit
-  createdBy: {
-    type: String
-  },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
-
-// Indexes for efficient queries
-waterfallAnalysisSchema.index({ companyId: 1, status: 1 });
-waterfallAnalysisSchema.index({ companyId: 1, exitType: 1 });
-waterfallAnalysisSchema.index({ comparisonGroupId: 1 });
-waterfallAnalysisSchema.index({ createdAt: -1 });
-
-// Pre-save hook to generate analysisId and calculate netProceeds
-waterfallAnalysisSchema.pre('save', function(next) {
-  // Generate analysisId if not present
-  if (!this.analysisId) {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    this.analysisId = `WF-${timestamp}-${random}`;
-  }
-
-  // Calculate net proceeds
-  this.netProceeds = this.exitValuation -
-    (this.transactionCosts || 0) -
-    (this.escrowAmount || 0) -
-    (this.debtPayoff || 0);
-
-  next();
-});
-
-// Virtual for total preference stack value
-waterfallAnalysisSchema.virtual('totalPreferenceStack').get(function() {
-  if (!this.shareClasses || this.shareClasses.length === 0) return 0;
-
-  return this.shareClasses
-    .filter(sc => sc.preferenceType !== 'common')
-    .reduce((total, sc) => {
-      const investment = sc.originalInvestment || (sc.totalShares * sc.pricePerShare);
-      return total + (investment * sc.liquidationMultiple);
-    }, 0);
-});
-
-// Virtual for whether exit covers all preferences
-waterfallAnalysisSchema.virtual('coversAllPreferences').get(function() {
-  return this.netProceeds >= this.totalPreferenceStack;
-});
-
-// Method to sort share classes by seniority
-waterfallAnalysisSchema.methods.getOrderedShareClasses = function() {
-  if (!this.shareClasses) return [];
-
-  return [...this.shareClasses].sort((a, b) => a.seniorityRank - b.seniorityRank);
+  calculatedAt: { type: 'date', default: null },
+  calculationVersion: { type: 'string', default: '1.0' },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'draft' },
+  comparisonGroupId: { type: 'string', default: null },
+  notes: { type: 'string', default: '' },
+  metadata: { type: 'object', default: {} },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Method to get preferred share classes only
-waterfallAnalysisSchema.methods.getPreferredClasses = function() {
-  if (!this.shareClasses) return [];
+// Create the base model
+const baseModel = createModel('waterfall_analyses', waterfallAnalysisSchema);
 
-  return this.shareClasses
-    .filter(sc => sc.preferenceType !== 'common')
-    .sort((a, b) => a.seniorityRank - b.seniorityRank);
+// Extended WaterfallAnalysis model with business logic
+const WaterfallAnalysis = {
+  ...baseModel,
+  tableName: 'waterfall_analyses',
+  schema: waterfallAnalysisSchema,
+
+  // Export constants
+  EXIT_TYPES,
+  PREFERENCE_TYPES,
+  VALID_STATUSES,
+
+  /**
+   * Create a new waterfall analysis with defaults
+   * @param {Object} data - Analysis data
+   * @returns {Object} Created analysis
+   */
+  async create(data) {
+    if (!data.analysisId) {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      data.analysisId = `WF-${timestamp}-${random}`;
+    }
+
+    // Validate exit valuation
+    if (data.exitValuation < 0) {
+      throw new Error('Exit valuation cannot be negative');
+    }
+
+    // Validate exit type
+    if (!EXIT_TYPES.includes(data.exitType)) {
+      throw new Error(`exitType must be one of: ${EXIT_TYPES.join(', ')}`);
+    }
+
+    // Calculate net proceeds
+    data.netProceeds = data.exitValuation -
+      (data.transactionCosts || 0) -
+      (data.escrowAmount || 0) -
+      (data.debtPayoff || 0);
+
+    if (!data.status) {
+      data.status = 'draft';
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find analysis by analysisId
+   * @param {string} analysisId - Analysis ID
+   * @returns {Object|null} Analysis or null
+   */
+  async findByAnalysisId(analysisId) {
+    return baseModel.findOne.call(baseModel, { analysisId });
+  },
+
+  /**
+   * Find analyses by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Analyses for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.exitType) {
+      query.exitType = options.exitType;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find analyses by comparison group
+   * @param {string} comparisonGroupId - Comparison group ID
+   * @returns {Array} Analyses in group
+   */
+  async findByComparisonGroup(comparisonGroupId) {
+    return baseModel.find.call(baseModel, { comparisonGroupId });
+  },
+
+  /**
+   * Get total preference stack value
+   * @param {Object} analysis - Analysis object
+   * @returns {number} Total preference stack
+   */
+  getTotalPreferenceStack(analysis) {
+    if (!analysis.shareClasses || analysis.shareClasses.length === 0) return 0;
+
+    return analysis.shareClasses
+      .filter(sc => sc.preferenceType !== 'common')
+      .reduce((total, sc) => {
+        const investment = sc.originalInvestment || (sc.totalShares * sc.pricePerShare);
+        return total + (investment * sc.liquidationMultiple);
+      }, 0);
+  },
+
+  /**
+   * Check if exit covers all preferences
+   * @param {Object} analysis - Analysis object
+   * @returns {boolean} True if covers all preferences
+   */
+  coversAllPreferences(analysis) {
+    return analysis.netProceeds >= this.getTotalPreferenceStack(analysis);
+  },
+
+  /**
+   * Get ordered share classes by seniority
+   * @param {Object} analysis - Analysis object
+   * @returns {Array} Ordered share classes
+   */
+  getOrderedShareClasses(analysis) {
+    if (!analysis.shareClasses) return [];
+    return [...analysis.shareClasses].sort((a, b) => a.seniorityRank - b.seniorityRank);
+  },
+
+  /**
+   * Get preferred share classes only
+   * @param {Object} analysis - Analysis object
+   * @returns {Array} Preferred classes
+   */
+  getPreferredClasses(analysis) {
+    if (!analysis.shareClasses) return [];
+    return analysis.shareClasses
+      .filter(sc => sc.preferenceType !== 'common')
+      .sort((a, b) => a.seniorityRank - b.seniorityRank);
+  },
+
+  /**
+   * Get common share classes only
+   * @param {Object} analysis - Analysis object
+   * @returns {Array} Common classes
+   */
+  getCommonClasses(analysis) {
+    if (!analysis.shareClasses) return [];
+    return analysis.shareClasses.filter(sc => sc.preferenceType === 'common');
+  },
+
+  /**
+   * Mark as calculated
+   * @param {string} analysisId - Analysis ID
+   * @param {Object} results - Calculation results
+   * @returns {Object} Updated analysis
+   */
+  async markCalculated(analysisId, results = {}) {
+    return baseModel.updateOne.call(baseModel,
+      { analysisId },
+      {
+        $set: {
+          status: 'calculated',
+          calculatedAt: new Date().toISOString(),
+          results: results.results || [],
+          shareClassResults: results.shareClassResults || [],
+          summary: results.summary || {}
+        }
+      }
+    );
+  },
+
+  /**
+   * Finalize analysis
+   * @param {string} analysisId - Analysis ID
+   * @returns {Object} Updated analysis
+   */
+  async finalize(analysisId) {
+    return baseModel.updateOne.call(baseModel,
+      { analysisId },
+      { $set: { status: 'finalized' } }
+    );
+  },
+
+  /**
+   * Archive analysis
+   * @param {string} analysisId - Analysis ID
+   * @returns {Object} Updated analysis
+   */
+  async archive(analysisId) {
+    return baseModel.updateOne.call(baseModel,
+      { analysisId },
+      { $set: { status: 'archived' } }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Method to get common share classes only
-waterfallAnalysisSchema.methods.getCommonClasses = function() {
-  if (!this.shareClasses) return [];
-
-  return this.shareClasses.filter(sc => sc.preferenceType === 'common');
-};
-
-// Ensure virtuals are included in JSON
-waterfallAnalysisSchema.set('toJSON', { virtuals: true });
-waterfallAnalysisSchema.set('toObject', { virtuals: true });
-
-const WaterfallAnalysis = mongoose.model('WaterfallAnalysis', waterfallAnalysisSchema);
 
 module.exports = WaterfallAnalysis;

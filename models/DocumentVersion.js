@@ -7,272 +7,269 @@
  * - File storage references (MinIO/ZeroDB)
  * - Linked list for version history navigation
  * - Status tracking and integrity verification
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
+
+const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 
-// Storage reference sub-schema
-const storageReferenceSchema = new mongoose.Schema({
-  provider: {
-    type: String,
-    enum: ['zerodb', 'minio', 's3', 'local'],
-    required: true,
-    default: 'zerodb'
-  },
-  fileKey: {
-    type: String,
-    required: true
-  },
-  bucket: {
-    type: String,
-    default: 'documents'
-  },
-  region: {
-    type: String
-  },
-  url: {
-    type: String
-  }
-}, { _id: false });
+// Valid storage providers
+const STORAGE_PROVIDERS = ['zerodb', 'minio', 's3', 'local'];
 
-// Main DocumentVersion Schema
-const documentVersionSchema = new mongoose.Schema({
-  // Unique version identifier
-  versionId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true,
-    default: () => `DV-${uuidv4().slice(0, 8).toUpperCase()}`
-  },
+// Valid statuses
+const VALID_STATUSES = ['draft', 'published', 'archived', 'deleted'];
 
-  // Reference to the original document
-  documentId: {
-    type: String,
-    required: true,
-    index: true
-  },
-
-  // Version numbering
-  versionNumber: {
-    type: Number,
-    required: true,
-    min: 1,
-    default: 1
-  },
-
-  // Semantic versioning support
-  majorVersion: {
-    type: Number,
-    default: 1,
-    min: 1
-  },
-  minorVersion: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-
-  // File storage reference
+// Schema definition for documentation and validation
+const documentVersionSchema = {
+  versionId: { type: 'string', required: true, unique: true },
+  documentId: { type: 'string', required: true },
+  versionNumber: { type: 'number', required: true, default: 1 },
+  majorVersion: { type: 'number', default: 1 },
+  minorVersion: { type: 'number', default: 0 },
   storageReference: {
-    type: storageReferenceSchema,
-    required: true
-  },
-
-  // Change tracking
-  changeSummary: {
-    type: String,
+    type: 'object',
     required: true,
-    trim: true,
-    maxlength: 500
-  },
-  changeDescription: {
-    type: String,
-    trim: true,
-    maxlength: 5000
-  },
-
-  // Author information
-  author: {
-    type: String,
-    required: true,
-    index: true
-  },
-
-  // File information
-  originalFilename: {
-    type: String,
-    required: true
-  },
-  mimeType: {
-    type: String,
-    required: true,
-    default: 'application/octet-stream'
-  },
-  fileSize: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  fileHash: {
-    type: String,
-    required: true
-  },
-
-  // Linked list references for version navigation
-  previousVersion: {
-    type: String,
-    default: null,
-    index: true
-  },
-  nextVersion: {
-    type: String,
-    default: null,
-    index: true
-  },
-
-  // Version status
-  status: {
-    type: String,
-    enum: ['draft', 'published', 'archived', 'deleted'],
-    default: 'draft',
-    required: true,
-    index: true
-  },
-
-  // Additional metadata
-  metadata: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  },
-
-  // Timestamps for when version was created/updated
-  publishedAt: {
-    type: Date
-  },
-  archivedAt: {
-    type: Date
-  },
-
-  // Audit fields
-  createdBy: {
-    type: String
-  },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Compound indexes for efficient queries
-documentVersionSchema.index({ documentId: 1, versionNumber: -1 });
-documentVersionSchema.index({ documentId: 1, status: 1 });
-documentVersionSchema.index({ documentId: 1, status: 1, versionNumber: -1 });
-documentVersionSchema.index({ author: 1, createdAt: -1 });
-
-// Virtual for semantic version string
-documentVersionSchema.virtual('semanticVersion').get(function() {
-  return `${this.majorVersion}.${this.minorVersion}`;
-});
-
-// Virtual to check if this is the first version
-documentVersionSchema.virtual('isFirstVersion').get(function() {
-  return this.previousVersion === null;
-});
-
-// Virtual to check if this is the latest version
-documentVersionSchema.virtual('isLatestVersion').get(function() {
-  return this.nextVersion === null;
-});
-
-// Virtual for display version (combines incremental and semantic)
-documentVersionSchema.virtual('displayVersion').get(function() {
-  return `v${this.versionNumber} (${this.semanticVersion})`;
-});
-
-// Pre-save hook for status change tracking
-documentVersionSchema.pre('save', function(next) {
-  // Track status change timestamps
-  if (this.isModified('status')) {
-    if (this.status === 'published' && !this.publishedAt) {
-      this.publishedAt = new Date();
+    default: {
+      provider: 'zerodb',
+      fileKey: null,
+      bucket: 'documents',
+      region: null,
+      url: null
     }
-    if (this.status === 'archived' && !this.archivedAt) {
-      this.archivedAt = new Date();
+  },
+  changeSummary: { type: 'string', required: true },
+  changeDescription: { type: 'string', default: '' },
+  author: { type: 'string', required: true },
+  originalFilename: { type: 'string', required: true },
+  mimeType: { type: 'string', required: true, default: 'application/octet-stream' },
+  fileSize: { type: 'number', required: true },
+  fileHash: { type: 'string', required: true },
+  previousVersion: { type: 'string', default: null },
+  nextVersion: { type: 'string', default: null },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'draft' },
+  metadata: { type: 'object', default: {} },
+  publishedAt: { type: 'date', default: null },
+  archivedAt: { type: 'date', default: null },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
+};
+
+// Create the base model
+const baseModel = createModel('document_versions', documentVersionSchema);
+
+// Extended DocumentVersion model with business logic
+const DocumentVersion = {
+  ...baseModel,
+  tableName: 'document_versions',
+  schema: documentVersionSchema,
+
+  // Export constants
+  STORAGE_PROVIDERS,
+  VALID_STATUSES,
+
+  /**
+   * Create a new document version with defaults
+   * @param {Object} data - Version data
+   * @returns {Object} Created version
+   */
+  async create(data) {
+    if (!data.versionId) {
+      data.versionId = `DV-${uuidv4().slice(0, 8).toUpperCase()}`;
     }
-  }
-  next();
-});
 
-// Static method to find versions by document
-documentVersionSchema.statics.findByDocument = function(documentId, options = {}) {
-  const query = { documentId };
-  if (options.status) {
-    query.status = options.status;
-  }
+    if (!data.versionNumber) {
+      data.versionNumber = 1;
+    }
 
-  let mongoQuery = this.find(query);
+    if (!data.status) {
+      data.status = 'draft';
+    }
 
-  if (options.sort) {
-    mongoQuery = mongoQuery.sort(options.sort);
-  } else {
-    mongoQuery = mongoQuery.sort({ versionNumber: -1 });
-  }
+    // Track status change timestamps
+    if (data.status === 'published' && !data.publishedAt) {
+      data.publishedAt = new Date().toISOString();
+    }
+    if (data.status === 'archived' && !data.archivedAt) {
+      data.archivedAt = new Date().toISOString();
+    }
 
-  if (options.skip) {
-    mongoQuery = mongoQuery.skip(options.skip);
-  }
+    return baseModel.create.call(baseModel, data);
+  },
 
-  if (options.limit) {
-    mongoQuery = mongoQuery.limit(options.limit);
-  }
+  /**
+   * Find version by versionId
+   * @param {string} versionId - Version ID
+   * @returns {Object|null} Version or null
+   */
+  async findByVersionId(versionId) {
+    return baseModel.findOne.call(baseModel, { versionId });
+  },
 
-  return mongoQuery;
+  /**
+   * Find versions by document
+   * @param {string} documentId - Document ID
+   * @param {Object} options - Query options
+   * @returns {Array} Versions for document
+   */
+  async findByDocument(documentId, options = {}) {
+    const query = { documentId };
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    let versions = await baseModel.find.call(baseModel, query);
+
+    // Sort by version number descending
+    versions.sort((a, b) => b.versionNumber - a.versionNumber);
+
+    if (options.skip) {
+      versions = versions.slice(options.skip);
+    }
+
+    if (options.limit) {
+      versions = versions.slice(0, options.limit);
+    }
+
+    return versions;
+  },
+
+  /**
+   * Find latest version for document
+   * @param {string} documentId - Document ID
+   * @param {Object} options - Query options
+   * @returns {Object|null} Latest version or null
+   */
+  async findLatestVersion(documentId, options = {}) {
+    const query = { documentId };
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    const versions = await baseModel.find.call(baseModel, query);
+    if (versions.length === 0) return null;
+
+    return versions.reduce((latest, v) =>
+      v.versionNumber > latest.versionNumber ? v : latest
+    );
+  },
+
+  /**
+   * Find version by number
+   * @param {string} documentId - Document ID
+   * @param {number} versionNumber - Version number
+   * @returns {Object|null} Version or null
+   */
+  async findByVersionNumber(documentId, versionNumber) {
+    return baseModel.findOne.call(baseModel, { documentId, versionNumber });
+  },
+
+  /**
+   * Get semantic version string
+   * @param {Object} version - Version object
+   * @returns {string} Semantic version
+   */
+  getSemanticVersion(version) {
+    return `${version.majorVersion}.${version.minorVersion}`;
+  },
+
+  /**
+   * Check if first version
+   * @param {Object} version - Version object
+   * @returns {boolean} True if first version
+   */
+  isFirstVersion(version) {
+    return version.previousVersion === null;
+  },
+
+  /**
+   * Check if latest version
+   * @param {Object} version - Version object
+   * @returns {boolean} True if latest version
+   */
+  isLatestVersion(version) {
+    return version.nextVersion === null;
+  },
+
+  /**
+   * Get display version
+   * @param {Object} version - Version object
+   * @returns {string} Display version
+   */
+  getDisplayVersion(version) {
+    return `v${version.versionNumber} (${this.getSemanticVersion(version)})`;
+  },
+
+  /**
+   * Publish version
+   * @param {string} versionId - Version ID
+   * @returns {Object} Updated version
+   */
+  async publish(versionId) {
+    return baseModel.updateOne.call(baseModel,
+      { versionId },
+      {
+        $set: {
+          status: 'published',
+          publishedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  /**
+   * Archive version
+   * @param {string} versionId - Version ID
+   * @returns {Object} Updated version
+   */
+  async archive(versionId) {
+    return baseModel.updateOne.call(baseModel,
+      { versionId },
+      {
+        $set: {
+          status: 'archived',
+          archivedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  /**
+   * Link versions
+   * @param {string} previousVersionId - Previous version ID
+   * @param {string} nextVersionId - Next version ID
+   * @returns {Object} Updated versions
+   */
+  async linkVersions(previousVersionId, nextVersionId) {
+    await baseModel.updateOne.call(baseModel,
+      { versionId: previousVersionId },
+      { $set: { nextVersion: nextVersionId } }
+    );
+
+    return baseModel.updateOne.call(baseModel,
+      { versionId: nextVersionId },
+      { $set: { previousVersion: previousVersionId } }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Static method to find latest version
-documentVersionSchema.statics.findLatestVersion = function(documentId, options = {}) {
-  const query = { documentId };
-  if (options.status) {
-    query.status = options.status;
-  }
-
-  return this.findOne(query).sort({ versionNumber: -1 });
-};
-
-// Static method to find version by number
-documentVersionSchema.statics.findByVersionNumber = function(documentId, versionNumber) {
-  return this.findOne({ documentId, versionNumber });
-};
-
-// Instance method to get previous version document
-documentVersionSchema.methods.getPreviousVersion = function() {
-  if (!this.previousVersion) {
-    return Promise.resolve(null);
-  }
-  return this.constructor.findById(this.previousVersion);
-};
-
-// Instance method to get next version document
-documentVersionSchema.methods.getNextVersion = function() {
-  if (!this.nextVersion) {
-    return Promise.resolve(null);
-  }
-  return this.constructor.findById(this.nextVersion);
-};
-
-// Instance method to check if content changed from previous version
-documentVersionSchema.methods.hasContentChanged = async function() {
-  const prevVersion = await this.getPreviousVersion();
-  if (!prevVersion) {
-    return true; // First version is always "changed"
-  }
-  return this.fileHash !== prevVersion.fileHash;
-};
-
-const DocumentVersion = mongoose.model('DocumentVersion', documentVersionSchema);
 
 module.exports = DocumentVersion;

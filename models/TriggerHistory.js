@@ -5,165 +5,257 @@
  *
  * Audit log for trigger executions. Records when triggers fire,
  * what messages were sent, and the outcome of each execution.
+ *
+ * Migrated to ZeroDB
  */
 
-const mongoose = require('mongoose');
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-/**
- * TriggerHistory Schema
- */
-const TriggerHistorySchema = new mongoose.Schema({
-  historyId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  triggerId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  triggerName: {
-    type: String
-  },
-  eventType: {
-    type: String,
-    required: true
-  },
-  executedAt: {
-    type: Date,
-    required: true,
-    default: Date.now,
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'success', 'partial', 'failed', 'skipped'],
-    required: true,
-    default: 'pending'
-  },
-  eventPayload: {
-    type: mongoose.Schema.Types.Mixed
-  },
+// Valid statuses
+const VALID_STATUSES = ['pending', 'success', 'partial', 'failed', 'skipped'];
+
+// Valid delivery statuses
+const DELIVERY_STATUSES = ['sent', 'delivered', 'failed', 'bounced', 'pending'];
+
+// Schema definition for documentation and validation
+const triggerHistorySchema = {
+  historyId: { type: 'string', required: true, unique: true },
+  triggerId: { type: 'string', required: true },
+  triggerName: { type: 'string', default: null },
+  eventType: { type: 'string', required: true },
+  executedAt: { type: 'date', required: true },
+  status: { type: 'string', enum: VALID_STATUSES, required: true, default: 'pending' },
+  eventPayload: { type: 'object', default: {} },
   messageGenerated: {
-    subject: String,
-    body: String,
-    channels: [String]
+    type: 'object',
+    default: {
+      subject: null,
+      body: null,
+      channels: []
+    }
   },
-  recipientCount: {
-    type: Number,
-    default: 0
-  },
-  recipientIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  deliveryResults: [{
-    channel: String,
-    recipientId: mongoose.Schema.Types.ObjectId,
-    status: {
-      type: String,
-      enum: ['sent', 'delivered', 'failed', 'bounced', 'pending']
-    },
-    deliveredAt: Date,
-    errorMessage: String
-  }],
-  ruleEvaluationResult: {
-    type: Boolean
-  },
-  rulesEvaluated: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  errorMessage: {
-    type: String
-  },
-  errorStack: {
-    type: String
-  },
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    index: true
-  },
-  executionDurationMs: {
-    type: Number
-  },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  }
-}, {
-  timestamps: true
-});
+  recipientCount: { type: 'number', default: 0 },
+  recipientIds: { type: 'array', default: [] },
+  deliveryResults: { type: 'array', default: [] },
+  ruleEvaluationResult: { type: 'boolean', default: null },
+  rulesEvaluated: { type: 'object', default: null },
+  errorMessage: { type: 'string', default: null },
+  errorStack: { type: 'string', default: null },
+  companyId: { type: 'string', default: null },
+  executionDurationMs: { type: 'number', default: null },
+  metadata: { type: 'object', default: {} },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
+};
 
-// Indexes for efficient querying
-TriggerHistorySchema.index({ triggerId: 1, executedAt: -1 });
-TriggerHistorySchema.index({ companyId: 1, executedAt: -1 });
-TriggerHistorySchema.index({ status: 1, executedAt: -1 });
-TriggerHistorySchema.index({ eventType: 1, executedAt: -1 });
+// Create the base model
+const baseModel = createModel('trigger_history', triggerHistorySchema);
 
-/**
- * Static method to get execution stats for a trigger
- * @param {string} triggerId - Trigger ID to get stats for
- * @param {Date} since - Optional start date
- * @returns {Promise<Object>} Execution statistics
- */
-TriggerHistorySchema.statics.getStats = async function(triggerId, since = null) {
-  const query = { triggerId };
-  if (since) {
-    query.executedAt = { $gte: since };
-  }
+// Extended TriggerHistory model with business logic
+const TriggerHistory = {
+  ...baseModel,
+  tableName: 'trigger_history',
+  schema: triggerHistorySchema,
 
-  const results = await this.aggregate([
-    { $match: query },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-        avgDuration: { $avg: '$executionDurationMs' },
-        totalRecipients: { $sum: '$recipientCount' }
+  // Export constants
+  VALID_STATUSES,
+  DELIVERY_STATUSES,
+
+  /**
+   * Create a new trigger history record with defaults
+   * @param {Object} data - History data
+   * @returns {Object} Created history record
+   */
+  async create(data) {
+    if (!data.historyId) {
+      data.historyId = `hist_${uuidv4()}`;
+    }
+
+    if (!data.executedAt) {
+      data.executedAt = new Date().toISOString();
+    }
+
+    if (!data.status) {
+      data.status = 'pending';
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find history by historyId
+   * @param {string} historyId - History ID
+   * @returns {Object|null} History record or null
+   */
+  async findByHistoryId(historyId) {
+    return baseModel.findOne.call(baseModel, { historyId });
+  },
+
+  /**
+   * Find history by triggerId
+   * @param {string} triggerId - Trigger ID
+   * @param {Object} options - Query options
+   * @returns {Array} History records for trigger
+   */
+  async findByTriggerId(triggerId, options = {}) {
+    let records = await baseModel.find.call(baseModel, { triggerId });
+
+    // Sort by executedAt descending
+    records.sort((a, b) => new Date(b.executedAt) - new Date(a.executedAt));
+
+    if (options.limit) {
+      records = records.slice(0, options.limit);
+    }
+
+    return records;
+  },
+
+  /**
+   * Find history by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} History records for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    let records = await baseModel.find.call(baseModel, query);
+
+    // Sort by executedAt descending
+    records.sort((a, b) => new Date(b.executedAt) - new Date(a.executedAt));
+
+    if (options.limit) {
+      records = records.slice(0, options.limit);
+    }
+
+    return records;
+  },
+
+  /**
+   * Get recent history for a company
+   * @param {string} companyId - Company ID
+   * @param {number} limit - Max records to return
+   * @returns {Array} Recent history entries
+   */
+  async getRecentByCompany(companyId, limit = 50) {
+    return this.findByCompany(companyId, { limit });
+  },
+
+  /**
+   * Get execution stats for a trigger
+   * @param {string} triggerId - Trigger ID to get stats for
+   * @param {Date} since - Optional start date
+   * @returns {Object} Execution statistics
+   */
+  async getStats(triggerId, since = null) {
+    let records = await baseModel.find.call(baseModel, { triggerId });
+
+    if (since) {
+      const sinceDate = new Date(since);
+      records = records.filter(r => new Date(r.executedAt) >= sinceDate);
+    }
+
+    const stats = {
+      total: 0,
+      byStatus: {},
+      averageDuration: 0,
+      totalRecipients: 0
+    };
+
+    let totalDuration = 0;
+    let durationCount = 0;
+
+    records.forEach(r => {
+      stats.total++;
+
+      if (!stats.byStatus[r.status]) {
+        stats.byStatus[r.status] = 0;
       }
+      stats.byStatus[r.status]++;
+
+      stats.totalRecipients += r.recipientCount || 0;
+
+      if (r.executionDurationMs) {
+        totalDuration += r.executionDurationMs;
+        durationCount++;
+      }
+    });
+
+    if (durationCount > 0) {
+      stats.averageDuration = totalDuration / durationCount;
     }
-  ]);
 
-  const stats = {
-    total: 0,
-    byStatus: {},
-    averageDuration: 0,
-    totalRecipients: 0
-  };
+    return stats;
+  },
 
-  let totalDuration = 0;
-  let durationCount = 0;
-
-  results.forEach(r => {
-    stats.total += r.count;
-    stats.byStatus[r._id] = r.count;
-    stats.totalRecipients += r.totalRecipients;
-    if (r.avgDuration) {
-      totalDuration += r.avgDuration * r.count;
-      durationCount += r.count;
+  /**
+   * Find history by status
+   * @param {string} status - Status to filter by
+   * @param {Object} options - Query options
+   * @returns {Array} History records with status
+   */
+  async findByStatus(status, options = {}) {
+    const query = { status };
+    if (options.companyId) {
+      query.companyId = options.companyId;
     }
-  });
 
-  if (durationCount > 0) {
-    stats.averageDuration = totalDuration / durationCount;
-  }
+    let records = await baseModel.find.call(baseModel, query);
 
-  return stats;
+    // Sort by executedAt descending
+    records.sort((a, b) => new Date(b.executedAt) - new Date(a.executedAt));
+
+    if (options.limit) {
+      records = records.slice(0, options.limit);
+    }
+
+    return records;
+  },
+
+  /**
+   * Find history by event type
+   * @param {string} eventType - Event type
+   * @param {Object} options - Query options
+   * @returns {Array} History records for event type
+   */
+  async findByEventType(eventType, options = {}) {
+    const query = { eventType };
+    if (options.companyId) {
+      query.companyId = options.companyId;
+    }
+
+    let records = await baseModel.find.call(baseModel, query);
+
+    // Sort by executedAt descending
+    records.sort((a, b) => new Date(b.executedAt) - new Date(a.executedAt));
+
+    if (options.limit) {
+      records = records.slice(0, options.limit);
+    }
+
+    return records;
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
 
-/**
- * Static method to get recent history for a company
- * @param {string} companyId - Company ID
- * @param {number} limit - Max records to return
- * @returns {Promise<Array>} Recent history entries
- */
-TriggerHistorySchema.statics.getRecentByCompany = function(companyId, limit = 50) {
-  return this.find({ companyId })
-    .sort({ executedAt: -1 })
-    .limit(limit)
-    .lean();
-};
-
-module.exports = mongoose.model('TriggerHistory', TriggerHistorySchema);
+module.exports = TriggerHistory;

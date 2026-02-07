@@ -7,195 +7,267 @@
  * - Notification type preferences
  * - Frequency settings
  * - Unsubscribe management
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-const FREQUENCY_OPTIONS = [
-  'immediate',
-  'daily_digest',
-  'weekly_digest'
-];
+const { createModel } = require('./base/ZeroDBModel');
 
-const CommunicationPreferencesSchema = new mongoose.Schema({
-  email: {
-    type: Boolean,
-    default: true
-  },
-  sms: {
-    type: Boolean,
-    default: false
-  },
-  portalNotifications: {
-    type: Boolean,
-    default: true
-  }
-}, { _id: false });
+// Frequency options
+const FREQUENCY_OPTIONS = ['immediate', 'daily_digest', 'weekly_digest'];
 
-const NotificationTypesSchema = new mongoose.Schema({
-  quarterlyUpdates: {
-    type: Boolean,
-    default: true
-  },
-  annualReports: {
-    type: Boolean,
-    default: true
-  },
-  documentSharing: {
-    type: Boolean,
-    default: true
-  },
-  portalAnnouncements: {
-    type: Boolean,
-    default: true
-  },
-  fundingUpdates: {
-    type: Boolean,
-    default: true
-  },
-  generalCommunications: {
-    type: Boolean,
-    default: true
-  }
-}, { _id: false });
+// Notification type to preference key mapping
+const NOTIFICATION_TYPE_MAP = {
+  'quarterly_update': 'quarterlyUpdates',
+  'annual_report': 'annualReports',
+  'document_notification': 'documentSharing',
+  'portal_announcement': 'portalAnnouncements',
+  'funding_update': 'fundingUpdates',
+  'general': 'generalCommunications'
+};
 
-const InvestorPreferenceSchema = new mongoose.Schema({
-  investorId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Investor',
-    required: [true, 'investorId is required'],
-    index: true
-  },
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: [true, 'companyId is required'],
-    index: true
-  },
+// Channel to preference key mapping
+const CHANNEL_MAP = {
+  'email': 'email',
+  'sms': 'sms',
+  'portal': 'portalNotifications'
+};
+
+// Schema definition for documentation and validation
+const investorPreferenceSchema = {
+  investorId: { type: 'string', required: true },
+  companyId: { type: 'string', required: true },
   communicationPreferences: {
-    type: CommunicationPreferencesSchema,
-    default: () => ({
+    type: 'object',
+    default: {
       email: true,
       sms: false,
       portalNotifications: true
-    })
+    }
   },
   notificationTypes: {
-    type: NotificationTypesSchema,
-    default: () => ({
+    type: 'object',
+    default: {
       quarterlyUpdates: true,
       annualReports: true,
       documentSharing: true,
       portalAnnouncements: true,
       fundingUpdates: true,
       generalCommunications: true
-    })
+    }
   },
-  frequency: {
-    type: String,
-    enum: {
-      values: FREQUENCY_OPTIONS,
-      message: `frequency must be one of: ${FREQUENCY_OPTIONS.join(', ')}`
-    },
-    default: 'immediate'
-  },
-  timezone: {
-    type: String,
-    default: 'UTC'
-  },
-  preferredLanguage: {
-    type: String,
-    default: 'en'
-  },
-  unsubscribedAll: {
-    type: Boolean,
-    default: false,
-    index: true
-  },
-  unsubscribedAt: {
-    type: Date
-  },
-  unsubscribeToken: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
-  lastUpdatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }
-}, {
-  timestamps: true
-});
-
-// Compound unique index for investor-company pair
-InvestorPreferenceSchema.index({ investorId: 1, companyId: 1 }, { unique: true });
-
-// Pre-save middleware to generate unsubscribe token
-InvestorPreferenceSchema.pre('save', function(next) {
-  if (!this.unsubscribeToken) {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 15);
-    this.unsubscribeToken = `${timestamp}${random}`;
-  }
-  next();
-});
-
-// Method to check if investor wants a specific notification type
-InvestorPreferenceSchema.methods.wantsNotificationType = function(type) {
-  if (this.unsubscribedAll) return false;
-
-  const typeMap = {
-    'quarterly_update': 'quarterlyUpdates',
-    'annual_report': 'annualReports',
-    'document_notification': 'documentSharing',
-    'portal_announcement': 'portalAnnouncements',
-    'funding_update': 'fundingUpdates',
-    'general': 'generalCommunications'
-  };
-
-  const prefKey = typeMap[type] || 'generalCommunications';
-  return this.notificationTypes[prefKey] !== false;
+  frequency: { type: 'string', enum: FREQUENCY_OPTIONS, default: 'immediate' },
+  timezone: { type: 'string', default: 'UTC' },
+  preferredLanguage: { type: 'string', default: 'en' },
+  unsubscribedAll: { type: 'boolean', default: false },
+  unsubscribedAt: { type: 'date', default: null },
+  unsubscribeToken: { type: 'string', unique: true, default: null },
+  lastUpdatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Method to check if investor wants a specific channel
-InvestorPreferenceSchema.methods.wantsChannel = function(channel) {
-  if (this.unsubscribedAll) return false;
+// Create the base model
+const baseModel = createModel('investor_preferences', investorPreferenceSchema);
 
-  const channelMap = {
-    'email': 'email',
-    'sms': 'sms',
-    'portal': 'portalNotifications'
-  };
+// Extended InvestorPreference model with business logic
+const InvestorPreference = {
+  ...baseModel,
+  tableName: 'investor_preferences',
+  schema: investorPreferenceSchema,
 
-  const prefKey = channelMap[channel];
-  return prefKey ? this.communicationPreferences[prefKey] !== false : false;
+  // Export constants
+  FREQUENCY_OPTIONS,
+  NOTIFICATION_TYPE_MAP,
+  CHANNEL_MAP,
+
+  /**
+   * Create a new investor preference with defaults
+   * @param {Object} data - Preference data
+   * @returns {Object} Created preference
+   */
+  async create(data) {
+    // Generate unsubscribe token if not provided
+    if (!data.unsubscribeToken) {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substring(2, 15);
+      data.unsubscribeToken = `${timestamp}${random}`;
+    }
+
+    // Set defaults for nested objects
+    if (!data.communicationPreferences) {
+      data.communicationPreferences = {
+        email: true,
+        sms: false,
+        portalNotifications: true
+      };
+    }
+
+    if (!data.notificationTypes) {
+      data.notificationTypes = {
+        quarterlyUpdates: true,
+        annualReports: true,
+        documentSharing: true,
+        portalAnnouncements: true,
+        fundingUpdates: true,
+        generalCommunications: true
+      };
+    }
+
+    if (!data.frequency) {
+      data.frequency = 'immediate';
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find preference by investor and company
+   * @param {string} investorId - Investor ID
+   * @param {string} companyId - Company ID
+   * @returns {Object|null} Preference or null
+   */
+  async findByInvestorAndCompany(investorId, companyId) {
+    return baseModel.findOne.call(baseModel, { investorId, companyId });
+  },
+
+  /**
+   * Find preferences by investor
+   * @param {string} investorId - Investor ID
+   * @returns {Array} Preferences for investor
+   */
+  async findByInvestor(investorId) {
+    return baseModel.find.call(baseModel, { investorId });
+  },
+
+  /**
+   * Find preferences by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Preferences for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.unsubscribedAll !== undefined) {
+      query.unsubscribedAll = options.unsubscribedAll;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find preference by unsubscribe token
+   * @param {string} token - Unsubscribe token
+   * @returns {Object|null} Preference or null
+   */
+  async findByUnsubscribeToken(token) {
+    return baseModel.findOne.call(baseModel, { unsubscribeToken: token });
+  },
+
+  /**
+   * Check if investor wants a specific notification type
+   * @param {Object} preference - Preference object
+   * @param {string} type - Notification type
+   * @returns {boolean} True if investor wants this notification type
+   */
+  wantsNotificationType(preference, type) {
+    if (preference.unsubscribedAll) return false;
+
+    const prefKey = NOTIFICATION_TYPE_MAP[type] || 'generalCommunications';
+    return preference.notificationTypes[prefKey] !== false;
+  },
+
+  /**
+   * Check if investor wants a specific channel
+   * @param {Object} preference - Preference object
+   * @param {string} channel - Channel (email, sms, portal)
+   * @returns {boolean} True if investor wants this channel
+   */
+  wantsChannel(preference, channel) {
+    if (preference.unsubscribedAll) return false;
+
+    const prefKey = CHANNEL_MAP[channel];
+    return prefKey ? preference.communicationPreferences[prefKey] !== false : false;
+  },
+
+  /**
+   * Get default preferences
+   * @returns {Object} Default preference values
+   */
+  getDefaults() {
+    return {
+      communicationPreferences: {
+        email: true,
+        sms: false,
+        portalNotifications: true
+      },
+      notificationTypes: {
+        quarterlyUpdates: true,
+        annualReports: true,
+        documentSharing: true,
+        portalAnnouncements: true,
+        fundingUpdates: true,
+        generalCommunications: true
+      },
+      frequency: 'immediate',
+      timezone: 'UTC',
+      preferredLanguage: 'en',
+      unsubscribedAll: false
+    };
+  },
+
+  /**
+   * Unsubscribe from all communications
+   * @param {string} investorId - Investor ID
+   * @param {string} companyId - Company ID
+   * @returns {Object} Updated preference
+   */
+  async unsubscribeAll(investorId, companyId) {
+    return baseModel.updateOne.call(baseModel,
+      { investorId, companyId },
+      {
+        $set: {
+          unsubscribedAll: true,
+          unsubscribedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  /**
+   * Resubscribe to communications
+   * @param {string} investorId - Investor ID
+   * @param {string} companyId - Company ID
+   * @returns {Object} Updated preference
+   */
+  async resubscribe(investorId, companyId) {
+    return baseModel.updateOne.call(baseModel,
+      { investorId, companyId },
+      {
+        $set: {
+          unsubscribedAll: false,
+          unsubscribedAt: null
+        }
+      }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
 
-// Static method to get default preferences
-InvestorPreferenceSchema.statics.getDefaults = function() {
-  return {
-    communicationPreferences: {
-      email: true,
-      sms: false,
-      portalNotifications: true
-    },
-    notificationTypes: {
-      quarterlyUpdates: true,
-      annualReports: true,
-      documentSharing: true,
-      portalAnnouncements: true,
-      fundingUpdates: true,
-      generalCommunications: true
-    },
-    frequency: 'immediate',
-    timezone: 'UTC',
-    preferredLanguage: 'en',
-    unsubscribedAll: false
-  };
-};
-
-const InvestorPreference = mongoose.model('InvestorPreference', InvestorPreferenceSchema);
-
-// Export model and constants
 module.exports = InvestorPreference;
 module.exports.FREQUENCY_OPTIONS = FREQUENCY_OPTIONS;

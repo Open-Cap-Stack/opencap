@@ -9,9 +9,11 @@
  *
  * IMPORTANT: Audit records are immutable (append-only). Updates and
  * deletes are not permitted to maintain audit integrity.
+ *
+ * Migrated to ZeroDB
  */
 
-const mongoose = require('mongoose');
+const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 
 // Valid action types for document audit
@@ -32,373 +34,349 @@ const ACTION_TYPES = [
   'unarchived'
 ];
 
-// Schema for tracking changes (for edits)
-const changeSchema = new mongoose.Schema({
-  field: {
-    type: String,
-    required: true
-  },
-  previousValue: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  newValue: {
-    type: mongoose.Schema.Types.Mixed
-  }
-}, { _id: false });
+// Valid access levels
+const ACCESS_LEVELS = ['view', 'edit', 'admin'];
 
-// Main Document Audit Trail Schema
-const documentAuditTrailSchema = new mongoose.Schema({
-  // Unique audit entry identifier
-  auditId: {
-    type: String,
-    unique: true,
-    default: () => uuidv4(),
-    index: true
-  },
-
-  // Reference to the document being audited
-  documentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Document',
-    required: true,
-    index: true
-  },
-
-  // Type of action performed
-  actionType: {
-    type: String,
-    required: true,
-    enum: ACTION_TYPES,
-    index: true
-  },
-
-  // User who performed the action
+// Schema definition for documentation and validation
+const documentAuditTrailSchema = {
+  auditId: { type: 'string', required: true, unique: true },
+  documentId: { type: 'string', required: true },
+  actionType: { type: 'string', required: true, enum: ACTION_TYPES },
   actor: {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true
-    },
-    email: {
-      type: String
-    },
-    name: {
-      type: String
-    },
-    role: {
-      type: String
+    type: 'object',
+    default: {
+      userId: null,
+      email: null,
+      name: null,
+      role: null
     }
   },
-
-  // Timestamp of the action
-  timestamp: {
-    type: Date,
-    required: true,
-    default: Date.now,
-    index: true
-  },
-
-  // Client IP address
-  ipAddress: {
-    type: String,
-    required: true
-  },
-
-  // User agent string
-  userAgent: {
-    type: String
-  },
-
-  // Changes made (for edits)
-  changes: {
-    type: [changeSchema],
-    default: []
-  },
-
-  // Previous values snapshot (for significant changes)
-  previousValues: {
-    type: mongoose.Schema.Types.Mixed
-  },
-
-  // New values snapshot (for significant changes)
-  newValues: {
-    type: mongoose.Schema.Types.Mixed
-  },
-
-  // Additional context and metadata
+  timestamp: { type: 'date', required: true },
+  ipAddress: { type: 'string', required: true },
+  userAgent: { type: 'string', default: null },
+  changes: { type: 'array', default: [] },
+  previousValues: { type: 'object', default: null },
+  newValues: { type: 'object', default: null },
   metadata: {
-    // Session information
-    sessionId: String,
-
-    // Company context
-    companyId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Company',
-      index: true
-    },
-
-    // Request context
-    requestId: String,
-
-    // Document version at time of action
-    documentVersion: Number,
-
-    // Action-specific details
-    details: {
-      type: mongoose.Schema.Types.Mixed
-    },
-
-    // Reason for action (if provided)
-    reason: String,
-
-    // Related entities
-    relatedDocuments: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Document'
-    }],
-
-    // Tags for categorization
-    tags: [String],
-
-    // Geographic location (if available)
-    location: {
-      country: String,
-      region: String,
-      city: String
+    type: 'object',
+    default: {
+      sessionId: null,
+      companyId: null,
+      requestId: null,
+      documentVersion: null,
+      details: null,
+      reason: null,
+      relatedDocuments: [],
+      tags: [],
+      location: {
+        country: null,
+        region: null,
+        city: null
+      }
     }
   },
-
-  // For shared documents - who was it shared with
   sharedWith: {
-    users: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }],
-    emails: [String],
-    accessLevel: {
-      type: String,
-      enum: ['view', 'edit', 'admin']
-    },
-    expiresAt: Date
+    type: 'object',
+    default: {
+      users: [],
+      emails: [],
+      accessLevel: null,
+      expiresAt: null
+    }
+  },
+  signatureDetails: {
+    type: 'object',
+    default: {
+      signatureId: null,
+      signatureType: null,
+      signedAt: null,
+      certificateInfo: null
+    }
+  },
+  createdAt: { type: 'date' }
+};
+
+// Create the base model
+const baseModel = createModel('document_audit_trails', documentAuditTrailSchema);
+
+// Extended DocumentAuditTrail model with business logic
+const DocumentAuditTrail = {
+  ...baseModel,
+  tableName: 'document_audit_trails',
+  schema: documentAuditTrailSchema,
+
+  // Export constants
+  ACTION_TYPES,
+  ACCESS_LEVELS,
+
+  /**
+   * Create a new audit trail entry with defaults
+   * IMPORTANT: Audit records are immutable
+   * @param {Object} data - Audit data
+   * @returns {Object} Created audit entry
+   */
+  async create(data) {
+    if (!data.auditId) {
+      data.auditId = uuidv4();
+    }
+
+    // Validate action type
+    if (!ACTION_TYPES.includes(data.actionType)) {
+      throw new Error(`actionType must be one of: ${ACTION_TYPES.join(', ')}`);
+    }
+
+    // Set timestamp if not provided
+    if (!data.timestamp) {
+      data.timestamp = new Date().toISOString();
+    }
+
+    return baseModel.create.call(baseModel, data);
   },
 
-  // Signature details (for signed action)
-  signatureDetails: {
-    signatureId: String,
-    signatureType: String,
-    signedAt: Date,
-    certificateInfo: mongoose.Schema.Types.Mixed
-  }
-}, {
-  timestamps: { createdAt: true, updatedAt: false }, // Only track creation, not updates
-  collection: 'documentaudittrails'
-});
+  /**
+   * Find audit trail by document
+   * @param {string} documentId - Document ID
+   * @param {Object} options - Query options
+   * @returns {Array} Audit entries for document
+   */
+  async findByDocument(documentId, options = {}) {
+    const entries = await baseModel.find.call(baseModel, { documentId });
 
-// Compound indexes for common queries
-documentAuditTrailSchema.index({ documentId: 1, timestamp: -1 });
-documentAuditTrailSchema.index({ 'actor.userId': 1, timestamp: -1 });
-documentAuditTrailSchema.index({ actionType: 1, timestamp: -1 });
-documentAuditTrailSchema.index({ 'metadata.companyId': 1, timestamp: -1 });
-documentAuditTrailSchema.index({ documentId: 1, actionType: 1, timestamp: -1 });
+    let filtered = entries;
 
-// Prevent updates to maintain immutability
-documentAuditTrailSchema.pre('findOneAndUpdate', function(next) {
-  const error = new Error('Audit records are immutable and cannot be updated');
-  error.name = 'ImmutabilityError';
-  next(error);
-});
-
-documentAuditTrailSchema.pre('updateOne', function(next) {
-  const error = new Error('Audit records are immutable and cannot be updated');
-  error.name = 'ImmutabilityError';
-  next(error);
-});
-
-documentAuditTrailSchema.pre('updateMany', function(next) {
-  const error = new Error('Audit records are immutable and cannot be updated');
-  error.name = 'ImmutabilityError';
-  next(error);
-});
-
-// Static method to find audit trail by document
-documentAuditTrailSchema.statics.findByDocument = function(documentId, options = {}) {
-  const query = this.find({ documentId });
-
-  if (options.actionType) {
-    query.where('actionType').equals(options.actionType);
-  }
-
-  if (options.startDate) {
-    query.where('timestamp').gte(new Date(options.startDate));
-  }
-
-  if (options.endDate) {
-    query.where('timestamp').lte(new Date(options.endDate));
-  }
-
-  if (options.limit) {
-    query.limit(options.limit);
-  }
-
-  return query.sort({ timestamp: -1 });
-};
-
-// Static method to find audit entries by user
-documentAuditTrailSchema.statics.findByUser = function(userId, options = {}) {
-  const query = this.find({ 'actor.userId': userId });
-
-  if (options.actionType) {
-    query.where('actionType').equals(options.actionType);
-  }
-
-  if (options.startDate) {
-    query.where('timestamp').gte(new Date(options.startDate));
-  }
-
-  if (options.endDate) {
-    query.where('timestamp').lte(new Date(options.endDate));
-  }
-
-  if (options.limit) {
-    query.limit(options.limit);
-  }
-
-  return query.sort({ timestamp: -1 });
-};
-
-// Static method to find audit entries by date range
-documentAuditTrailSchema.statics.findByDateRange = function(startDate, endDate, options = {}) {
-  const query = this.find({
-    timestamp: {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate)
+    if (options.actionType) {
+      filtered = filtered.filter(e => e.actionType === options.actionType);
     }
-  });
 
-  if (options.documentId) {
-    query.where('documentId').equals(options.documentId);
-  }
-
-  if (options.actionType) {
-    query.where('actionType').equals(options.actionType);
-  }
-
-  if (options.companyId) {
-    query.where('metadata.companyId').equals(options.companyId);
-  }
-
-  if (options.limit) {
-    query.limit(options.limit);
-  }
-
-  return query.sort({ timestamp: -1 });
-};
-
-// Static method to get action counts by type
-documentAuditTrailSchema.statics.getActionCounts = function(documentId, startDate = null, endDate = null) {
-  const match = { documentId: new mongoose.Types.ObjectId(documentId) };
-
-  if (startDate || endDate) {
-    match.timestamp = {};
-    if (startDate) match.timestamp.$gte = new Date(startDate);
-    if (endDate) match.timestamp.$lte = new Date(endDate);
-  }
-
-  return this.aggregate([
-    { $match: match },
-    { $group: { _id: '$actionType', count: { $sum: 1 } } },
-    { $sort: { count: -1 } }
-  ]);
-};
-
-// Static method to get recent activity summary
-documentAuditTrailSchema.statics.getRecentActivitySummary = function(companyId, days = 7) {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
-
-  return this.aggregate([
-    {
-      $match: {
-        'metadata.companyId': new mongoose.Types.ObjectId(companyId),
-        timestamp: { $gte: cutoffDate }
-      }
-    },
-    {
-      $group: {
-        _id: {
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
-          actionType: '$actionType'
-        },
-        count: { $sum: 1 }
-      }
-    },
-    { $sort: { '_id.date': -1, count: -1 } }
-  ]);
-};
-
-// Static method to search audit trail
-documentAuditTrailSchema.statics.searchAuditTrail = function(searchParams) {
-  const query = {};
-
-  if (searchParams.documentId) {
-    query.documentId = searchParams.documentId;
-  }
-
-  if (searchParams.userId) {
-    query['actor.userId'] = searchParams.userId;
-  }
-
-  if (searchParams.actionType) {
-    if (Array.isArray(searchParams.actionType)) {
-      query.actionType = { $in: searchParams.actionType };
-    } else {
-      query.actionType = searchParams.actionType;
+    if (options.startDate) {
+      const startDate = new Date(options.startDate);
+      filtered = filtered.filter(e => new Date(e.timestamp) >= startDate);
     }
-  }
 
-  if (searchParams.companyId) {
-    query['metadata.companyId'] = searchParams.companyId;
-  }
+    if (options.endDate) {
+      const endDate = new Date(options.endDate);
+      filtered = filtered.filter(e => new Date(e.timestamp) <= endDate);
+    }
 
-  if (searchParams.ipAddress) {
-    query.ipAddress = searchParams.ipAddress;
-  }
+    // Sort by timestamp descending
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  if (searchParams.startDate || searchParams.endDate) {
-    query.timestamp = {};
+    if (options.limit) {
+      filtered = filtered.slice(0, options.limit);
+    }
+
+    return filtered;
+  },
+
+  /**
+   * Find audit entries by user
+   * @param {string} userId - User ID
+   * @param {Object} options - Query options
+   * @returns {Array} Audit entries by user
+   */
+  async findByUser(userId, options = {}) {
+    const entries = await baseModel.find.call(baseModel, { 'actor.userId': userId });
+
+    let filtered = entries;
+
+    if (options.actionType) {
+      filtered = filtered.filter(e => e.actionType === options.actionType);
+    }
+
+    if (options.startDate) {
+      const startDate = new Date(options.startDate);
+      filtered = filtered.filter(e => new Date(e.timestamp) >= startDate);
+    }
+
+    if (options.endDate) {
+      const endDate = new Date(options.endDate);
+      filtered = filtered.filter(e => new Date(e.timestamp) <= endDate);
+    }
+
+    // Sort by timestamp descending
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (options.limit) {
+      filtered = filtered.slice(0, options.limit);
+    }
+
+    return filtered;
+  },
+
+  /**
+   * Find audit entries by date range
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   * @param {Object} options - Query options
+   * @returns {Array} Audit entries in range
+   */
+  async findByDateRange(startDate, endDate, options = {}) {
+    const entries = await baseModel.find.call(baseModel, {});
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    let filtered = entries.filter(e => {
+      const timestamp = new Date(e.timestamp);
+      return timestamp >= start && timestamp <= end;
+    });
+
+    if (options.documentId) {
+      filtered = filtered.filter(e => e.documentId === options.documentId);
+    }
+
+    if (options.actionType) {
+      filtered = filtered.filter(e => e.actionType === options.actionType);
+    }
+
+    if (options.companyId) {
+      filtered = filtered.filter(e => e.metadata?.companyId === options.companyId);
+    }
+
+    // Sort by timestamp descending
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (options.limit) {
+      filtered = filtered.slice(0, options.limit);
+    }
+
+    return filtered;
+  },
+
+  /**
+   * Get action counts by type for a document
+   * @param {string} documentId - Document ID
+   * @param {Date} startDate - Start date (optional)
+   * @param {Date} endDate - End date (optional)
+   * @returns {Array} Action counts
+   */
+  async getActionCounts(documentId, startDate = null, endDate = null) {
+    let entries = await baseModel.find.call(baseModel, { documentId });
+
+    if (startDate) {
+      const start = new Date(startDate);
+      entries = entries.filter(e => new Date(e.timestamp) >= start);
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      entries = entries.filter(e => new Date(e.timestamp) <= end);
+    }
+
+    const counts = {};
+    entries.forEach(e => {
+      counts[e.actionType] = (counts[e.actionType] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([actionType, count]) => ({ _id: actionType, count }))
+      .sort((a, b) => b.count - a.count);
+  },
+
+  /**
+   * Get recent activity summary
+   * @param {string} companyId - Company ID
+   * @param {number} days - Number of days
+   * @returns {Array} Activity summary
+   */
+  async getRecentActivitySummary(companyId, days = 7) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const entries = await baseModel.find.call(baseModel, { 'metadata.companyId': companyId });
+
+    const filtered = entries.filter(e => new Date(e.timestamp) >= cutoffDate);
+
+    const summary = {};
+    filtered.forEach(e => {
+      const date = new Date(e.timestamp).toISOString().split('T')[0];
+      const key = `${date}_${e.actionType}`;
+      if (!summary[key]) {
+        summary[key] = { date, actionType: e.actionType, count: 0 };
+      }
+      summary[key].count++;
+    });
+
+    return Object.values(summary).sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.count - a.count;
+    });
+  },
+
+  /**
+   * Search audit trail with multiple criteria
+   * @param {Object} searchParams - Search parameters
+   * @returns {Array} Matching entries
+   */
+  async searchAuditTrail(searchParams) {
+    let entries = await baseModel.find.call(baseModel, {});
+
+    if (searchParams.documentId) {
+      entries = entries.filter(e => e.documentId === searchParams.documentId);
+    }
+
+    if (searchParams.userId) {
+      entries = entries.filter(e => e.actor?.userId === searchParams.userId);
+    }
+
+    if (searchParams.actionType) {
+      if (Array.isArray(searchParams.actionType)) {
+        entries = entries.filter(e => searchParams.actionType.includes(e.actionType));
+      } else {
+        entries = entries.filter(e => e.actionType === searchParams.actionType);
+      }
+    }
+
+    if (searchParams.companyId) {
+      entries = entries.filter(e => e.metadata?.companyId === searchParams.companyId);
+    }
+
+    if (searchParams.ipAddress) {
+      entries = entries.filter(e => e.ipAddress === searchParams.ipAddress);
+    }
+
     if (searchParams.startDate) {
-      query.timestamp.$gte = new Date(searchParams.startDate);
+      const start = new Date(searchParams.startDate);
+      entries = entries.filter(e => new Date(e.timestamp) >= start);
     }
+
     if (searchParams.endDate) {
-      query.timestamp.$lte = new Date(searchParams.endDate);
+      const end = new Date(searchParams.endDate);
+      entries = entries.filter(e => new Date(e.timestamp) <= end);
     }
-  }
 
-  if (searchParams.keyword) {
-    query.$or = [
-      { 'metadata.reason': { $regex: searchParams.keyword, $options: 'i' } },
-      { 'actor.email': { $regex: searchParams.keyword, $options: 'i' } },
-      { 'actor.name': { $regex: searchParams.keyword, $options: 'i' } }
-    ];
-  }
+    if (searchParams.keyword) {
+      const keyword = searchParams.keyword.toLowerCase();
+      entries = entries.filter(e =>
+        (e.metadata?.reason && e.metadata.reason.toLowerCase().includes(keyword)) ||
+        (e.actor?.email && e.actor.email.toLowerCase().includes(keyword)) ||
+        (e.actor?.name && e.actor.name.toLowerCase().includes(keyword))
+      );
+    }
 
-  let queryBuilder = this.find(query);
+    // Sort by timestamp descending
+    entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  if (searchParams.skip) {
-    queryBuilder = queryBuilder.skip(searchParams.skip);
-  }
+    if (searchParams.skip) {
+      entries = entries.slice(searchParams.skip);
+    }
 
-  if (searchParams.limit) {
-    queryBuilder = queryBuilder.limit(searchParams.limit);
-  }
+    if (searchParams.limit) {
+      entries = entries.slice(0, searchParams.limit);
+    }
 
-  return queryBuilder.sort({ timestamp: -1 });
+    return entries;
+  },
+
+  // Note: Update and delete operations are intentionally omitted for immutability
+  // Only expose read operations for audit integrity
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Export action types for use in other modules
-documentAuditTrailSchema.statics.ACTION_TYPES = ACTION_TYPES;
-
-const DocumentAuditTrail = mongoose.model('DocumentAuditTrail', documentAuditTrailSchema);
 
 module.exports = DocumentAuditTrail;

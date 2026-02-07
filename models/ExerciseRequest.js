@@ -4,306 +4,421 @@
  *
  * Tracks stock option exercise requests through their complete lifecycle:
  * pending -> approved -> processed -> completed
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
+
+const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 
-const exerciseDetailsSchema = new mongoose.Schema({
-  sharesRequested: { type: Number, required: true, min: 1 },
-  exercisePrice: { type: Number, required: true, min: 0 },
-  currentFMV: { type: Number, required: true, min: 0 },
-  spread: { type: Number }, // FMV - exercise price per share
-  totalSpread: { type: Number }, // spread * shares
-  totalExerciseCost: { type: Number }, // exercisePrice * shares
-  totalValue: { type: Number }, // FMV * shares
-  isUnderwater: { type: Boolean, default: false },
-  // Partial exercise tracking
-  grantTotalShares: { type: Number }, // Total shares in the grant
-  previouslyExercised: { type: Number, default: 0 }, // Shares already exercised
-  vestedShares: { type: Number }, // Shares vested at time of request
-  remainingExercisable: { type: Number }, // Shares remaining after this exercise
-  isPartialExercise: { type: Boolean, default: false }
-}, { _id: false });
+// Valid statuses
+const VALID_STATUSES = ['pending', 'approved', 'rejected', 'processed', 'completed', 'cancelled'];
 
-const taxWithholdingSchema = new mongoose.Schema({
-  calculated: { type: Boolean, default: false },
-  totalWithholding: { type: Number, default: 0 },
-  federalWithholding: { type: Number, default: 0 },
-  stateWithholding: { type: Number, default: 0 },
-  socialSecurityWithholding: { type: Number, default: 0 },
-  medicareWithholding: { type: Number, default: 0 },
-  additionalMedicare: { type: Number, default: 0 },
-  amtWithholding: { type: Number, default: 0 },
-  sharesToWithhold: { type: Number, default: 0 }, // For sell-to-cover
-  withholdingMethod: {
-    type: String,
-    enum: ['cash', 'sell_to_cover', 'same_day_sale'],
-    default: 'cash'
-  }
-}, { _id: false });
+// Valid option types
+const OPTION_TYPES = ['ISO', 'NSO', 'RSA', 'RSU'];
 
-const paymentSchema = new mongoose.Schema({
-  paymentReceived: { type: Boolean, default: false },
-  paymentAmount: { type: Number },
-  paymentDate: { type: Date },
-  paymentReference: { type: String },
-  paymentMethod: {
-    type: String,
-    enum: ['cash', 'check', 'wire', 'cashless', 'stock_swap'],
-    default: 'cash'
-  }
-}, { _id: false });
+// Valid payment methods
+const PAYMENT_METHODS = ['cash', 'check', 'wire', 'cashless', 'stock_swap'];
 
-const certificateDataSchema = new mongoose.Schema({
-  certificateNumber: { type: String },
-  sharesIssued: { type: Number },
-  issueDate: { type: Date },
-  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-  holderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stakeholder' },
-  shareClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShareClass' },
-  restrictionPeriod: { type: Number }, // Days
-  restrictionEndDate: { type: Date },
-  legendText: { type: String }
-}, { _id: false });
+// Valid withholding methods
+const WITHHOLDING_METHODS = ['cash', 'sell_to_cover', 'same_day_sale'];
 
-const exerciseWindowSchema = new mongoose.Schema({
-  windowStart: { type: Date },
-  windowEnd: { type: Date },
-  windowType: {
-    type: String,
-    enum: ['open', 'blackout', 'limited', 'termination'],
-    default: 'open'
-  },
-  grantExpirationDate: { type: Date },
-  daysUntilExpiration: { type: Number }
-}, { _id: false });
+// Valid filing statuses
+const FILING_STATUSES = ['single', 'married_filing_jointly', 'married_filing_separately', 'head_of_household'];
 
-const employeeProfileSchema = new mongoose.Schema({
-  filingStatus: {
-    type: String,
-    enum: ['single', 'married_filing_jointly', 'married_filing_separately', 'head_of_household'],
-    default: 'single'
-  },
-  federalAllowances: { type: Number, default: 0 },
-  stateCode: { type: String, required: true },
-  stateAllowances: { type: Number, default: 0 },
-  additionalWithholding: { type: Number, default: 0 },
-  isSubjectToAMT: { type: Boolean, default: false },
-  ytdWages: { type: Number, default: 0 },
-  ytdSocialSecurity: { type: Number, default: 0 }
-}, { _id: false });
+// Valid exercise window types
+const WINDOW_TYPES = ['open', 'blackout', 'limited', 'termination'];
 
-const ExerciseRequestSchema = new mongoose.Schema({
-  // Unique identifier
-  exerciseRequestId: {
-    type: String,
-    unique: true,
-    default: () => `exr_${uuidv4()}`,
-    index: true
-  },
-
-  // References
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: true,
-    index: true
-  },
-  stakeholderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Stakeholder',
-    required: true,
-    index: true
-  },
-  equityGrantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'EquityGrant',
-    required: true,
-    index: true
-  },
-
-  // Option type
-  optionType: {
-    type: String,
-    enum: ['ISO', 'NSO', 'RSA', 'RSU'],
-    required: true
-  },
-
-  // Exercise details
-  exerciseDetails: exerciseDetailsSchema,
-
-  // Exercise window tracking
-  exerciseWindow: exerciseWindowSchema,
-
-  // Payment information
-  paymentMethod: {
-    type: String,
-    enum: ['cash', 'check', 'wire', 'cashless', 'stock_swap'],
-    default: 'cash'
-  },
-  payment: paymentSchema,
-
-  // Tax withholding
-  employeeProfile: employeeProfileSchema,
-  taxWithholding: taxWithholdingSchema,
-
-  // Certificate data (populated upon completion)
-  certificateData: certificateDataSchema,
-
-  // Workflow status
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'processed', 'completed', 'cancelled'],
-    default: 'pending',
-    index: true
-  },
-
-  // Audit trail - request
-  requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  requestedAt: { type: Date, default: Date.now },
-  requestNotes: { type: String },
-
-  // Audit trail - approval
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  approvedAt: { type: Date },
-  approvalNotes: { type: String },
-
-  // Audit trail - rejection
-  rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  rejectedAt: { type: Date },
-  rejectionReason: { type: String },
-
-  // Audit trail - processing
-  processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  processedAt: { type: Date },
-  processingNotes: { type: String },
-
-  // Audit trail - completion
-  completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  completedAt: { type: Date },
-  completionNotes: { type: String },
-
-  // Audit trail - cancellation
-  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  cancelledAt: { type: Date },
-  cancellationReason: { type: String },
-
-  // Form 3921 reference (for ISO exercises)
-  form3921Id: { type: mongoose.Schema.Types.ObjectId, ref: 'Form3921' },
-  form3921Generated: { type: Boolean, default: false },
-  form3921GeneratedAt: { type: Date },
-
-  // General
-  notes: { type: String },
-  metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Indexes for efficient querying
-ExerciseRequestSchema.index({ companyId: 1, status: 1 });
-ExerciseRequestSchema.index({ stakeholderId: 1, status: 1 });
-ExerciseRequestSchema.index({ equityGrantId: 1 });
-ExerciseRequestSchema.index({ requestedAt: -1 });
-ExerciseRequestSchema.index({ 'exerciseWindow.windowEnd': 1 });
-
-// Virtual for net shares after withholding
-ExerciseRequestSchema.virtual('netShares').get(function() {
-  if (!this.exerciseDetails || !this.taxWithholding) return null;
-  return this.exerciseDetails.sharesRequested - (this.taxWithholding.sharesToWithhold || 0);
-});
-
-// Instance methods
-ExerciseRequestSchema.methods.canBeApproved = function() {
-  return this.status === 'pending';
-};
-
-ExerciseRequestSchema.methods.canBeRejected = function() {
-  return this.status === 'pending';
-};
-
-ExerciseRequestSchema.methods.canBeProcessed = function() {
-  return this.status === 'approved';
-};
-
-ExerciseRequestSchema.methods.canBeCompleted = function() {
-  return this.status === 'processed';
-};
-
-ExerciseRequestSchema.methods.canBeCancelled = function() {
-  return ['pending', 'approved'].includes(this.status);
-};
-
-// Static methods
-ExerciseRequestSchema.statics.findByCompany = function(companyId, status = null) {
-  const query = { companyId };
-  if (status) query.status = status;
-  return this.find(query).sort({ requestedAt: -1 });
-};
-
-ExerciseRequestSchema.statics.findByStakeholder = function(stakeholderId, status = null) {
-  const query = { stakeholderId };
-  if (status) query.status = status;
-  return this.find(query).sort({ requestedAt: -1 });
-};
-
-ExerciseRequestSchema.statics.findPendingByGrant = function(equityGrantId) {
-  return this.find({
-    equityGrantId,
-    status: { $in: ['pending', 'approved'] }
-  });
-};
-
-ExerciseRequestSchema.statics.getCompanySummary = async function(companyId) {
-  return this.aggregate([
-    { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-        totalShares: { $sum: '$exerciseDetails.sharesRequested' },
-        totalValue: { $sum: '$exerciseDetails.totalValue' }
-      }
+// Schema definition for documentation and validation
+const exerciseRequestSchema = {
+  exerciseRequestId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  stakeholderId: { type: 'string', required: true },
+  equityGrantId: { type: 'string', required: true },
+  optionType: { type: 'string', required: true, enum: OPTION_TYPES },
+  exerciseDetails: {
+    type: 'object',
+    default: {
+      sharesRequested: 0,
+      exercisePrice: 0,
+      currentFMV: 0,
+      spread: 0,
+      totalSpread: 0,
+      totalExerciseCost: 0,
+      totalValue: 0,
+      isUnderwater: false,
+      grantTotalShares: 0,
+      previouslyExercised: 0,
+      vestedShares: 0,
+      remainingExercisable: 0,
+      isPartialExercise: false
     }
-  ]);
+  },
+  exerciseWindow: {
+    type: 'object',
+    default: {
+      windowStart: null,
+      windowEnd: null,
+      windowType: 'open',
+      grantExpirationDate: null,
+      daysUntilExpiration: null
+    }
+  },
+  paymentMethod: { type: 'string', enum: PAYMENT_METHODS, default: 'cash' },
+  payment: {
+    type: 'object',
+    default: {
+      paymentReceived: false,
+      paymentAmount: 0,
+      paymentDate: null,
+      paymentReference: null,
+      paymentMethod: 'cash'
+    }
+  },
+  employeeProfile: {
+    type: 'object',
+    default: {
+      filingStatus: 'single',
+      federalAllowances: 0,
+      stateCode: null,
+      stateAllowances: 0,
+      additionalWithholding: 0,
+      isSubjectToAMT: false,
+      ytdWages: 0,
+      ytdSocialSecurity: 0
+    }
+  },
+  taxWithholding: {
+    type: 'object',
+    default: {
+      calculated: false,
+      totalWithholding: 0,
+      federalWithholding: 0,
+      stateWithholding: 0,
+      socialSecurityWithholding: 0,
+      medicareWithholding: 0,
+      additionalMedicare: 0,
+      amtWithholding: 0,
+      sharesToWithhold: 0,
+      withholdingMethod: 'cash'
+    }
+  },
+  certificateData: {
+    type: 'object',
+    default: {
+      certificateNumber: null,
+      sharesIssued: 0,
+      issueDate: null,
+      companyId: null,
+      holderId: null,
+      shareClassId: null,
+      restrictionPeriod: null,
+      restrictionEndDate: null,
+      legendText: null
+    }
+  },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'pending' },
+  requestedBy: { type: 'string', required: true },
+  requestedAt: { type: 'date', default: null },
+  requestNotes: { type: 'string', default: '' },
+  approvedBy: { type: 'string', default: null },
+  approvedAt: { type: 'date', default: null },
+  approvalNotes: { type: 'string', default: '' },
+  rejectedBy: { type: 'string', default: null },
+  rejectedAt: { type: 'date', default: null },
+  rejectionReason: { type: 'string', default: '' },
+  processedBy: { type: 'string', default: null },
+  processedAt: { type: 'date', default: null },
+  processingNotes: { type: 'string', default: '' },
+  completedBy: { type: 'string', default: null },
+  completedAt: { type: 'date', default: null },
+  completionNotes: { type: 'string', default: '' },
+  cancelledBy: { type: 'string', default: null },
+  cancelledAt: { type: 'date', default: null },
+  cancellationReason: { type: 'string', default: '' },
+  form3921Id: { type: 'string', default: null },
+  form3921Generated: { type: 'boolean', default: false },
+  form3921GeneratedAt: { type: 'date', default: null },
+  notes: { type: 'string', default: '' },
+  metadata: { type: 'object', default: {} },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-ExerciseRequestSchema.statics.getExerciseSummaryByGrant = async function(equityGrantId) {
-  const exercises = await this.find({
-    equityGrantId,
-    status: { $in: ['completed', 'processed'] }
-  });
+// Create the base model
+const baseModel = createModel('exercise_requests', exerciseRequestSchema);
 
-  return {
-    totalExercisedShares: exercises.reduce((sum, e) => sum + e.exerciseDetails.sharesRequested, 0),
-    exerciseCount: exercises.length,
-    exercises: exercises.map(e => ({
-      exerciseRequestId: e.exerciseRequestId,
-      sharesExercised: e.exerciseDetails.sharesRequested,
-      exerciseDate: e.completedAt || e.processedAt,
-      status: e.status
-    }))
-  };
+// Extended ExerciseRequest model with business logic
+const ExerciseRequest = {
+  ...baseModel,
+  tableName: 'exercise_requests',
+  schema: exerciseRequestSchema,
+
+  // Export constants
+  VALID_STATUSES,
+  OPTION_TYPES,
+  PAYMENT_METHODS,
+  WITHHOLDING_METHODS,
+  FILING_STATUSES,
+  WINDOW_TYPES,
+
+  /**
+   * Create a new exercise request with defaults
+   * @param {Object} data - Request data
+   * @returns {Object} Created request
+   */
+  async create(data) {
+    if (!data.exerciseRequestId) {
+      data.exerciseRequestId = `exr_${uuidv4()}`;
+    }
+
+    // Validate option type
+    if (!OPTION_TYPES.includes(data.optionType)) {
+      throw new Error(`optionType must be one of: ${OPTION_TYPES.join(', ')}`);
+    }
+
+    if (!data.requestedAt) {
+      data.requestedAt = new Date().toISOString();
+    }
+
+    if (!data.status) {
+      data.status = 'pending';
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find request by exerciseRequestId
+   * @param {string} exerciseRequestId - Request ID
+   * @returns {Object|null} Request or null
+   */
+  async findByExerciseRequestId(exerciseRequestId) {
+    return baseModel.findOne.call(baseModel, { exerciseRequestId });
+  },
+
+  /**
+   * Find requests by company
+   * @param {string} companyId - Company ID
+   * @param {string} status - Optional status filter
+   * @returns {Array} Requests for company
+   */
+  async findByCompany(companyId, status = null) {
+    const query = { companyId };
+    if (status) query.status = status;
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find requests by stakeholder
+   * @param {string} stakeholderId - Stakeholder ID
+   * @param {string} status - Optional status filter
+   * @returns {Array} Requests for stakeholder
+   */
+  async findByStakeholder(stakeholderId, status = null) {
+    const query = { stakeholderId };
+    if (status) query.status = status;
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find pending requests by grant
+   * @param {string} equityGrantId - Grant ID
+   * @returns {Array} Pending requests
+   */
+  async findPendingByGrant(equityGrantId) {
+    const requests = await baseModel.find.call(baseModel, { equityGrantId });
+    return requests.filter(r => ['pending', 'approved'].includes(r.status));
+  },
+
+  /**
+   * Find requests by equity grant
+   * @param {string} equityGrantId - Grant ID
+   * @param {string} status - Optional status filter
+   * @returns {Array} Requests for grant
+   */
+  async findByEquityGrant(equityGrantId, status = null) {
+    const query = { equityGrantId };
+    if (status) query.status = status;
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Get net shares after withholding
+   * @param {Object} request - Request object
+   * @returns {number|null} Net shares
+   */
+  getNetShares(request) {
+    if (!request.exerciseDetails || !request.taxWithholding) return null;
+    return request.exerciseDetails.sharesRequested - (request.taxWithholding.sharesToWithhold || 0);
+  },
+
+  /**
+   * Check if request can be approved
+   * @param {Object} request - Request object
+   * @returns {boolean} True if can be approved
+   */
+  canBeApproved(request) {
+    return request.status === 'pending';
+  },
+
+  /**
+   * Check if request can be rejected
+   * @param {Object} request - Request object
+   * @returns {boolean} True if can be rejected
+   */
+  canBeRejected(request) {
+    return request.status === 'pending';
+  },
+
+  /**
+   * Check if request can be processed
+   * @param {Object} request - Request object
+   * @returns {boolean} True if can be processed
+   */
+  canBeProcessed(request) {
+    return request.status === 'approved';
+  },
+
+  /**
+   * Check if request can be completed
+   * @param {Object} request - Request object
+   * @returns {boolean} True if can be completed
+   */
+  canBeCompleted(request) {
+    return request.status === 'processed';
+  },
+
+  /**
+   * Check if request can be cancelled
+   * @param {Object} request - Request object
+   * @returns {boolean} True if can be cancelled
+   */
+  canBeCancelled(request) {
+    return ['pending', 'approved'].includes(request.status);
+  },
+
+  /**
+   * Approve request
+   * @param {string} exerciseRequestId - Request ID
+   * @param {string} approvedBy - User ID
+   * @param {string} notes - Approval notes
+   * @returns {Object} Updated request
+   */
+  async approve(exerciseRequestId, approvedBy, notes = '') {
+    return baseModel.updateOne.call(baseModel,
+      { exerciseRequestId },
+      {
+        $set: {
+          status: 'approved',
+          approvedBy,
+          approvedAt: new Date().toISOString(),
+          approvalNotes: notes
+        }
+      }
+    );
+  },
+
+  /**
+   * Reject request
+   * @param {string} exerciseRequestId - Request ID
+   * @param {string} rejectedBy - User ID
+   * @param {string} reason - Rejection reason
+   * @returns {Object} Updated request
+   */
+  async reject(exerciseRequestId, rejectedBy, reason = '') {
+    return baseModel.updateOne.call(baseModel,
+      { exerciseRequestId },
+      {
+        $set: {
+          status: 'rejected',
+          rejectedBy,
+          rejectedAt: new Date().toISOString(),
+          rejectionReason: reason
+        }
+      }
+    );
+  },
+
+  /**
+   * Process request
+   * @param {string} exerciseRequestId - Request ID
+   * @param {string} processedBy - User ID
+   * @param {string} notes - Processing notes
+   * @returns {Object} Updated request
+   */
+  async process(exerciseRequestId, processedBy, notes = '') {
+    return baseModel.updateOne.call(baseModel,
+      { exerciseRequestId },
+      {
+        $set: {
+          status: 'processed',
+          processedBy,
+          processedAt: new Date().toISOString(),
+          processingNotes: notes
+        }
+      }
+    );
+  },
+
+  /**
+   * Complete request
+   * @param {string} exerciseRequestId - Request ID
+   * @param {string} completedBy - User ID
+   * @param {string} notes - Completion notes
+   * @returns {Object} Updated request
+   */
+  async complete(exerciseRequestId, completedBy, notes = '') {
+    return baseModel.updateOne.call(baseModel,
+      { exerciseRequestId },
+      {
+        $set: {
+          status: 'completed',
+          completedBy,
+          completedAt: new Date().toISOString(),
+          completionNotes: notes
+        }
+      }
+    );
+  },
+
+  /**
+   * Cancel request
+   * @param {string} exerciseRequestId - Request ID
+   * @param {string} cancelledBy - User ID
+   * @param {string} reason - Cancellation reason
+   * @returns {Object} Updated request
+   */
+  async cancel(exerciseRequestId, cancelledBy, reason = '') {
+    return baseModel.updateOne.call(baseModel,
+      { exerciseRequestId },
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledBy,
+          cancelledAt: new Date().toISOString(),
+          cancellationReason: reason
+        }
+      }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
 
-ExerciseRequestSchema.statics.findByEquityGrant = function(equityGrantId, status = null) {
-  const query = { equityGrantId };
-  if (status) query.status = status;
-  return this.find(query).sort({ requestedAt: -1 });
-};
-
-ExerciseRequestSchema.statics.getISOExercisesForTaxYear = function(companyId, taxYear) {
-  const yearStart = new Date(taxYear, 0, 1);
-  const yearEnd = new Date(taxYear + 1, 0, 1);
-
-  return this.find({
-    companyId,
-    optionType: 'ISO',
-    status: 'completed',
-    completedAt: { $gte: yearStart, $lt: yearEnd }
-  }).sort({ completedAt: 1 });
-};
-
-module.exports = mongoose.model('ExerciseRequest', ExerciseRequestSchema);
+module.exports = ExerciseRequest;

@@ -7,276 +7,345 @@
  * - Tender offers
  * - ROFR (Right of First Refusal) exercises
  * - Gift transfers
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-// Fee structure sub-schema
-const transactionFeesSchema = new mongoose.Schema({
-  platformFee: { type: Number, default: 0, min: 0 },
-  legalFees: { type: Number, default: 0, min: 0 },
-  transferAgentFee: { type: Number, default: 0, min: 0 },
-  escrowFee: { type: Number, default: 0, min: 0 },
-  otherFees: { type: Number, default: 0, min: 0 },
-  feesPaidBy: {
-    type: String,
-    enum: ['seller', 'buyer', 'split', 'company'],
-    default: 'seller'
-  }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-// Document reference sub-schema
-const documentReferenceSchema = new mongoose.Schema({
-  documentId: { type: String, required: true },
-  documentType: {
-    type: String,
-    enum: ['purchase_agreement', 'board_consent', 'rofr_waiver', 'transfer_notice', 'tax_form', 'other'],
-    required: true
-  },
-  uploadedAt: { type: Date, default: Date.now },
-  uploadedBy: { type: String }
-}, { _id: false });
+// Valid statuses
+const VALID_STATUSES = ['pending', 'approved', 'in_escrow', 'completed', 'canceled', 'failed', 'rejected'];
 
-// Secondary Transaction schema
-const secondaryTransactionSchema = new mongoose.Schema({
-  transactionId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+// Valid transaction types
+const TRANSACTION_TYPES = ['private_sale', 'tender_offer', 'rofr_exercise', 'gift', 'estate_transfer', 'company_buyback'];
 
-  // Company reference
-  companyId: {
-    type: String,
-    required: true,
-    index: true
-  },
+// Valid document types
+const DOCUMENT_TYPES = ['purchase_agreement', 'board_consent', 'rofr_waiver', 'transfer_notice', 'tax_form', 'other'];
 
-  // Seller and Buyer (Stakeholder IDs)
-  sellerId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  buyerId: {
-    type: String,
-    required: true,
-    index: true
-  },
+// Valid fee payers
+const FEE_PAYERS = ['seller', 'buyer', 'split', 'company'];
 
-  // Share details
-  shareClassId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  numberOfShares: {
-    type: Number,
-    required: true,
-    min: 1
-  },
+// Valid approver types
+const APPROVER_TYPES = ['board', 'company_admin', 'legal', 'transfer_agent'];
 
-  // Pricing
-  pricePerShare: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  totalAmount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  currency: {
-    type: String,
-    default: 'USD',
-    uppercase: true
-  },
-
-  // Dates
-  transactionDate: {
-    type: Date,
-    required: true
-  },
-  settlementDate: {
-    type: Date
-  },
-  initiatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  completedAt: {
-    type: Date
-  },
-
-  // Status tracking
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'in_escrow', 'completed', 'canceled', 'failed', 'rejected'],
-    default: 'pending',
-    index: true
-  },
-
-  // Transaction type
-  transactionType: {
-    type: String,
-    enum: ['private_sale', 'tender_offer', 'rofr_exercise', 'gift', 'estate_transfer', 'company_buyback'],
-    required: true,
-    index: true
-  },
-
-  // Transfer approval workflow reference
-  transferRequestId: {
-    type: String,
-    index: true
-  },
-
-  // ROFR details (if applicable)
+// Schema definition for documentation and validation
+const secondaryTransactionSchema = {
+  transactionId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  sellerId: { type: 'string', required: true },
+  buyerId: { type: 'string', required: true },
+  shareClassId: { type: 'string', required: true },
+  numberOfShares: { type: 'number', required: true },
+  pricePerShare: { type: 'number', required: true },
+  totalAmount: { type: 'number', required: true },
+  currency: { type: 'string', default: 'USD' },
+  transactionDate: { type: 'date', required: true },
+  settlementDate: { type: 'date', default: null },
+  initiatedAt: { type: 'date', default: null },
+  completedAt: { type: 'date', default: null },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'pending' },
+  transactionType: { type: 'string', required: true, enum: TRANSACTION_TYPES },
+  transferRequestId: { type: 'string', default: null },
   rofrDetails: {
-    rofrHolderId: { type: String },
-    rofrExercised: { type: Boolean, default: false },
-    rofrWaived: { type: Boolean, default: false },
-    rofrDeadline: { type: Date },
-    originalBuyerId: { type: String }
+    type: 'object',
+    default: {
+      rofrHolderId: null,
+      rofrExercised: false,
+      rofrWaived: false,
+      rofrDeadline: null,
+      originalBuyerId: null
+    }
   },
-
-  // Documents
-  documents: [documentReferenceSchema],
-
-  // Fees
+  documents: { type: 'array', default: [] },
   fees: {
-    type: transactionFeesSchema,
-    default: () => ({})
+    type: 'object',
+    default: {
+      platformFee: 0,
+      legalFees: 0,
+      transferAgentFee: 0,
+      escrowFee: 0,
+      otherFees: 0,
+      feesPaidBy: 'seller'
+    }
   },
-
-  // Escrow information
   escrow: {
-    escrowAgentId: { type: String },
-    escrowAccountNumber: { type: String },
-    fundsReceivedAt: { type: Date },
-    fundsReleasedAt: { type: Date }
+    type: 'object',
+    default: {
+      escrowAgentId: null,
+      escrowAccountNumber: null,
+      fundsReceivedAt: null,
+      fundsReleasedAt: null
+    }
   },
-
-  // Approval tracking
-  approvals: [{
-    approverType: {
-      type: String,
-      enum: ['board', 'company_admin', 'legal', 'transfer_agent']
-    },
-    approverId: { type: String },
-    approvedAt: { type: Date },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected']
-    },
-    notes: { type: String }
-  }],
-
-  // Notes and metadata
-  notes: {
-    type: String
-  },
-  internalNotes: {
-    type: String
-  },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
-  },
-
-  // Cancellation/Failure tracking
-  cancellationReason: {
-    type: String
-  },
-  failureReason: {
-    type: String
-  },
-  canceledBy: {
-    type: String
-  },
-  canceledAt: {
-    type: Date
-  },
-
-  // Audit
-  createdBy: {
-    type: String
-  },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
-
-// Compound indexes for efficient queries
-secondaryTransactionSchema.index({ companyId: 1, status: 1 });
-secondaryTransactionSchema.index({ sellerId: 1, status: 1 });
-secondaryTransactionSchema.index({ buyerId: 1, status: 1 });
-secondaryTransactionSchema.index({ companyId: 1, transactionDate: -1 });
-secondaryTransactionSchema.index({ shareClassId: 1, status: 1 });
-
-// Pre-save hook to calculate totalAmount if not set
-secondaryTransactionSchema.pre('save', function(next) {
-  // Calculate total amount if not explicitly set
-  if (this.numberOfShares && this.pricePerShare && !this.totalAmount) {
-    this.totalAmount = this.numberOfShares * this.pricePerShare;
-  }
-
-  // Set completedAt when status changes to completed
-  if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
-    this.completedAt = new Date();
-  }
-
-  // Set canceledAt when status changes to canceled
-  if (this.isModified('status') && this.status === 'canceled' && !this.canceledAt) {
-    this.canceledAt = new Date();
-  }
-
-  next();
-});
-
-// Virtual for net amount after fees
-secondaryTransactionSchema.virtual('netAmount').get(function() {
-  const totalFees = (this.fees?.platformFee || 0) +
-                    (this.fees?.legalFees || 0) +
-                    (this.fees?.transferAgentFee || 0) +
-                    (this.fees?.escrowFee || 0) +
-                    (this.fees?.otherFees || 0);
-  return this.totalAmount - totalFees;
-});
-
-// Virtual for total fees
-secondaryTransactionSchema.virtual('totalFees').get(function() {
-  return (this.fees?.platformFee || 0) +
-         (this.fees?.legalFees || 0) +
-         (this.fees?.transferAgentFee || 0) +
-         (this.fees?.escrowFee || 0) +
-         (this.fees?.otherFees || 0);
-});
-
-// Method to check if all required approvals are obtained
-secondaryTransactionSchema.methods.hasAllApprovals = function() {
-  if (!this.approvals || this.approvals.length === 0) {
-    return false;
-  }
-  return this.approvals.every(approval => approval.status === 'approved');
+  approvals: { type: 'array', default: [] },
+  notes: { type: 'string', default: '' },
+  internalNotes: { type: 'string', default: '' },
+  metadata: { type: 'object', default: {} },
+  cancellationReason: { type: 'string', default: null },
+  failureReason: { type: 'string', default: null },
+  canceledBy: { type: 'string', default: null },
+  canceledAt: { type: 'date', default: null },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-// Method to add an approval
-secondaryTransactionSchema.methods.addApproval = function(approval) {
-  this.approvals.push({
-    approverType: approval.approverType,
-    approverId: approval.approverId,
-    approvedAt: approval.status === 'approved' ? new Date() : null,
-    status: approval.status,
-    notes: approval.notes
-  });
+// Create the base model
+const baseModel = createModel('secondary_transactions', secondaryTransactionSchema);
+
+// Extended SecondaryTransaction model with business logic
+const SecondaryTransaction = {
+  ...baseModel,
+  tableName: 'secondary_transactions',
+  schema: secondaryTransactionSchema,
+
+  // Export constants
+  VALID_STATUSES,
+  TRANSACTION_TYPES,
+  DOCUMENT_TYPES,
+  FEE_PAYERS,
+  APPROVER_TYPES,
+
+  /**
+   * Create a new secondary transaction with defaults
+   * @param {Object} data - Transaction data
+   * @returns {Object} Created transaction
+   */
+  async create(data) {
+    if (!data.transactionId) {
+      data.transactionId = `stx_${uuidv4()}`;
+    }
+
+    // Validate shares
+    if (data.numberOfShares < 1) {
+      throw new Error('numberOfShares must be at least 1');
+    }
+
+    // Validate price
+    if (data.pricePerShare < 0) {
+      throw new Error('pricePerShare cannot be negative');
+    }
+
+    // Calculate total amount if not set
+    if (!data.totalAmount) {
+      data.totalAmount = data.numberOfShares * data.pricePerShare;
+    }
+
+    // Validate transaction type
+    if (!TRANSACTION_TYPES.includes(data.transactionType)) {
+      throw new Error(`transactionType must be one of: ${TRANSACTION_TYPES.join(', ')}`);
+    }
+
+    if (!data.status) {
+      data.status = 'pending';
+    }
+
+    if (!data.initiatedAt) {
+      data.initiatedAt = new Date().toISOString();
+    }
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find transaction by transactionId
+   * @param {string} transactionId - Transaction ID
+   * @returns {Object|null} Transaction or null
+   */
+  async findByTransactionId(transactionId) {
+    return baseModel.findOne.call(baseModel, { transactionId });
+  },
+
+  /**
+   * Find transactions by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Transactions for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.transactionType) {
+      query.transactionType = options.transactionType;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find transactions by seller
+   * @param {string} sellerId - Seller ID
+   * @param {Object} options - Query options
+   * @returns {Array} Transactions by seller
+   */
+  async findBySeller(sellerId, options = {}) {
+    const query = { sellerId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find transactions by buyer
+   * @param {string} buyerId - Buyer ID
+   * @param {Object} options - Query options
+   * @returns {Array} Transactions by buyer
+   */
+  async findByBuyer(buyerId, options = {}) {
+    const query = { buyerId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Get net amount after fees
+   * @param {Object} transaction - Transaction object
+   * @returns {number} Net amount
+   */
+  getNetAmount(transaction) {
+    const totalFees = this.getTotalFees(transaction);
+    return transaction.totalAmount - totalFees;
+  },
+
+  /**
+   * Get total fees
+   * @param {Object} transaction - Transaction object
+   * @returns {number} Total fees
+   */
+  getTotalFees(transaction) {
+    const fees = transaction.fees || {};
+    return (fees.platformFee || 0) +
+           (fees.legalFees || 0) +
+           (fees.transferAgentFee || 0) +
+           (fees.escrowFee || 0) +
+           (fees.otherFees || 0);
+  },
+
+  /**
+   * Check if all required approvals are obtained
+   * @param {Object} transaction - Transaction object
+   * @returns {boolean} True if all approvals obtained
+   */
+  hasAllApprovals(transaction) {
+    if (!transaction.approvals || transaction.approvals.length === 0) {
+      return false;
+    }
+    return transaction.approvals.every(approval => approval.status === 'approved');
+  },
+
+  /**
+   * Add an approval
+   * @param {string} transactionId - Transaction ID
+   * @param {Object} approval - Approval data
+   * @returns {Object} Updated transaction
+   */
+  async addApproval(transactionId, approval) {
+    const transaction = await this.findByTransactionId(transactionId);
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    const approvals = transaction.approvals || [];
+    approvals.push({
+      approverType: approval.approverType,
+      approverId: approval.approverId,
+      approvedAt: approval.status === 'approved' ? new Date().toISOString() : null,
+      status: approval.status,
+      notes: approval.notes
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { transactionId },
+      { $set: { approvals } }
+    );
+  },
+
+  /**
+   * Add document
+   * @param {string} transactionId - Transaction ID
+   * @param {Object} document - Document data
+   * @returns {Object} Updated transaction
+   */
+  async addDocument(transactionId, document) {
+    const transaction = await this.findByTransactionId(transactionId);
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    const documents = transaction.documents || [];
+    documents.push({
+      documentId: document.documentId,
+      documentType: document.documentType,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: document.uploadedBy
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { transactionId },
+      { $set: { documents } }
+    );
+  },
+
+  /**
+   * Complete transaction
+   * @param {string} transactionId - Transaction ID
+   * @returns {Object} Updated transaction
+   */
+  async complete(transactionId) {
+    return baseModel.updateOne.call(baseModel,
+      { transactionId },
+      {
+        $set: {
+          status: 'completed',
+          completedAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  /**
+   * Cancel transaction
+   * @param {string} transactionId - Transaction ID
+   * @param {string} reason - Cancellation reason
+   * @param {string} canceledBy - User ID
+   * @returns {Object} Updated transaction
+   */
+  async cancel(transactionId, reason, canceledBy) {
+    return baseModel.updateOne.call(baseModel,
+      { transactionId },
+      {
+        $set: {
+          status: 'canceled',
+          cancellationReason: reason,
+          canceledBy,
+          canceledAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Ensure virtuals are included in JSON
-secondaryTransactionSchema.set('toJSON', { virtuals: true });
-secondaryTransactionSchema.set('toObject', { virtuals: true });
-
-const SecondaryTransaction = mongoose.model('SecondaryTransaction', secondaryTransactionSchema);
 
 module.exports = SecondaryTransaction;

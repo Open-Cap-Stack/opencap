@@ -7,310 +7,370 @@
  * - Visibility controls
  * - Interested buyer tracking
  * - Expiration handling
+ *
+ * Migrated to ZeroDB
  */
-const mongoose = require('mongoose');
 
-// Interested buyer sub-schema
-const interestedBuyerSchema = new mongoose.Schema({
-  buyerId: { type: String, required: true },
-  buyerName: { type: String },
-  expressedAt: { type: Date, default: Date.now },
-  offeredPrice: { type: Number, min: 0 },
-  offeredShares: { type: Number, min: 1 },
-  status: {
-    type: String,
-    enum: ['interested', 'negotiating', 'accepted', 'rejected', 'withdrawn'],
-    default: 'interested'
-  },
-  message: { type: String },
-  respondedAt: { type: Date },
-  responseMessage: { type: String }
-}, { _id: false });
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-// Invited stakeholder sub-schema (for private/invited_only listings)
-const invitedStakeholderSchema = new mongoose.Schema({
-  stakeholderId: { type: String, required: true },
-  invitedAt: { type: Date, default: Date.now },
-  invitedBy: { type: String },
-  viewed: { type: Boolean, default: false },
-  viewedAt: { type: Date }
-}, { _id: false });
+// Valid statuses
+const VALID_STATUSES = ['draft', 'active', 'pending_approval', 'sold', 'partially_sold', 'expired', 'withdrawn', 'suspended'];
 
-// Secondary Market Listing schema
-const secondaryMarketListingSchema = new mongoose.Schema({
-  listingId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+// Valid visibility options
+const VISIBILITY_OPTIONS = ['public', 'private', 'invited_only'];
 
-  // Company reference
-  companyId: {
-    type: String,
-    required: true,
-    index: true
-  },
+// Valid buyer interest statuses
+const BUYER_STATUSES = ['interested', 'negotiating', 'accepted', 'rejected', 'withdrawn'];
 
-  // Seller (Stakeholder ID)
-  sellerId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  sellerName: {
-    type: String
-  },
-
-  // Share details
-  shareClassId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  shareClassName: {
-    type: String
-  },
-  numberOfShares: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  sharesAvailable: {
-    type: Number,
-    min: 0
-  },
-
-  // Pricing
-  askingPrice: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  minPrice: {
-    type: Number,
-    min: 0
-  },
-  pricePerShare: {
-    type: Number,
-    min: 0
-  },
-  currency: {
-    type: String,
-    default: 'USD',
-    uppercase: true
-  },
-  negotiable: {
-    type: Boolean,
-    default: true
-  },
-
-  // Status
-  status: {
-    type: String,
-    enum: ['draft', 'active', 'pending_approval', 'sold', 'partially_sold', 'expired', 'withdrawn', 'suspended'],
-    default: 'active',
-    index: true
-  },
-
-  // Dates
-  listedAt: {
-    type: Date,
-    default: Date.now
-  },
-  expiresAt: {
-    type: Date,
-    index: true
-  },
-  soldAt: {
-    type: Date
-  },
-  withdrawnAt: {
-    type: Date
-  },
-
-  // Visibility controls
-  visibility: {
-    type: String,
-    enum: ['public', 'private', 'invited_only'],
-    default: 'private',
-    index: true
-  },
-
-  // Invited stakeholders (for private/invited_only listings)
-  invitedStakeholders: [invitedStakeholderSchema],
-
-  // Interested buyers tracking
-  interestedBuyers: [interestedBuyerSchema],
-
-  // Completed transactions from this listing
-  completedTransactions: [{
-    transactionId: { type: String },
-    buyerId: { type: String },
-    numberOfShares: { type: Number },
-    pricePerShare: { type: Number },
-    completedAt: { type: Date }
-  }],
-
-  // Listing restrictions
+// Schema definition for documentation and validation
+const secondaryMarketListingSchema = {
+  listingId: { type: 'string', required: true, unique: true },
+  companyId: { type: 'string', required: true },
+  sellerId: { type: 'string', required: true },
+  sellerName: { type: 'string', default: null },
+  shareClassId: { type: 'string', required: true },
+  shareClassName: { type: 'string', default: null },
+  numberOfShares: { type: 'number', required: true },
+  sharesAvailable: { type: 'number', default: null },
+  askingPrice: { type: 'number', required: true },
+  minPrice: { type: 'number', default: null },
+  pricePerShare: { type: 'number', default: null },
+  currency: { type: 'string', default: 'USD' },
+  negotiable: { type: 'boolean', default: true },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'active' },
+  listedAt: { type: 'date', default: null },
+  expiresAt: { type: 'date', default: null },
+  soldAt: { type: 'date', default: null },
+  withdrawnAt: { type: 'date', default: null },
+  visibility: { type: 'string', enum: VISIBILITY_OPTIONS, default: 'private' },
+  invitedStakeholders: { type: 'array', default: [] },
+  interestedBuyers: { type: 'array', default: [] },
+  completedTransactions: { type: 'array', default: [] },
   restrictions: {
-    minPurchaseShares: { type: Number, min: 1, default: 1 },
-    maxPurchaseShares: { type: Number },
-    accreditedInvestorsOnly: { type: Boolean, default: false },
-    existingStakeholdersOnly: { type: Boolean, default: false },
-    requiresCompanyApproval: { type: Boolean, default: true }
+    type: 'object',
+    default: {
+      minPurchaseShares: 1,
+      maxPurchaseShares: null,
+      accreditedInvestorsOnly: false,
+      existingStakeholdersOnly: false,
+      requiresCompanyApproval: true
+    }
   },
-
-  // Description and notes
-  description: {
-    type: String
-  },
-  sellerNotes: {
-    type: String
-  },
-  termsAndConditions: {
-    type: String
-  },
-
-  // Valuation context (optional)
+  description: { type: 'string', default: '' },
+  sellerNotes: { type: 'string', default: '' },
+  termsAndConditions: { type: 'string', default: '' },
   valuationContext: {
-    lastValuationPrice: { type: Number },
-    lastValuationDate: { type: Date },
-    valuationSource: { type: String }
+    type: 'object',
+    default: {
+      lastValuationPrice: null,
+      lastValuationDate: null,
+      valuationSource: null
+    }
+  },
+  metadata: { type: 'object', default: {} },
+  createdBy: { type: 'string', default: null },
+  updatedBy: { type: 'string', default: null },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
+};
+
+// Create the base model
+const baseModel = createModel('secondary_market_listings', secondaryMarketListingSchema);
+
+// Extended SecondaryMarketListing model with business logic
+const SecondaryMarketListing = {
+  ...baseModel,
+  tableName: 'secondary_market_listings',
+  schema: secondaryMarketListingSchema,
+
+  // Export constants
+  VALID_STATUSES,
+  VISIBILITY_OPTIONS,
+  BUYER_STATUSES,
+
+  /**
+   * Create a new listing with defaults
+   * @param {Object} data - Listing data
+   * @returns {Object} Created listing
+   */
+  async create(data) {
+    if (!data.listingId) {
+      data.listingId = `lst_${uuidv4()}`;
+    }
+
+    // Validate shares
+    if (data.numberOfShares < 1) {
+      throw new Error('numberOfShares must be at least 1');
+    }
+
+    // Validate asking price
+    if (data.askingPrice < 0) {
+      throw new Error('askingPrice cannot be negative');
+    }
+
+    // Initialize shares available
+    if (data.sharesAvailable === undefined || data.sharesAvailable === null) {
+      data.sharesAvailable = data.numberOfShares;
+    }
+
+    // Calculate price per share
+    if (!data.pricePerShare && data.askingPrice && data.numberOfShares) {
+      data.pricePerShare = data.askingPrice / data.numberOfShares;
+    }
+
+    if (!data.status) {
+      data.status = 'active';
+    }
+
+    if (!data.listedAt) {
+      data.listedAt = new Date().toISOString();
+    }
+
+    return baseModel.create.call(baseModel, data);
   },
 
-  // Metadata
-  metadata: {
-    type: mongoose.Schema.Types.Mixed
+  /**
+   * Find listing by listingId
+   * @param {string} listingId - Listing ID
+   * @returns {Object|null} Listing or null
+   */
+  async findByListingId(listingId) {
+    return baseModel.findOne.call(baseModel, { listingId });
   },
 
-  // Audit
-  createdBy: {
-    type: String
+  /**
+   * Find listings by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Listings for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.visibility) {
+      query.visibility = options.visibility;
+    }
+    return baseModel.find.call(baseModel, query);
   },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
 
-// Compound indexes for efficient queries
-secondaryMarketListingSchema.index({ companyId: 1, status: 1 });
-secondaryMarketListingSchema.index({ sellerId: 1, status: 1 });
-secondaryMarketListingSchema.index({ shareClassId: 1, status: 1 });
-secondaryMarketListingSchema.index({ status: 1, expiresAt: 1 });
-secondaryMarketListingSchema.index({ visibility: 1, status: 1 });
+  /**
+   * Find listings by seller
+   * @param {string} sellerId - Seller ID
+   * @param {Object} options - Query options
+   * @returns {Array} Listings by seller
+   */
+  async findBySeller(sellerId, options = {}) {
+    const query = { sellerId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    return baseModel.find.call(baseModel, query);
+  },
 
-// Pre-save hook to initialize values
-secondaryMarketListingSchema.pre('save', function(next) {
-  // Initialize sharesAvailable to numberOfShares if not set
-  if (this.isNew && this.sharesAvailable === undefined) {
-    this.sharesAvailable = this.numberOfShares;
-  }
+  /**
+   * Find active listings
+   * @param {string} companyId - Company ID
+   * @returns {Array} Active listings
+   */
+  async findActive(companyId) {
+    return baseModel.find.call(baseModel, { companyId, status: 'active' });
+  },
 
-  // Calculate price per share if not set
-  if (this.askingPrice && this.numberOfShares && !this.pricePerShare) {
-    this.pricePerShare = this.askingPrice / this.numberOfShares;
-  }
+  /**
+   * Get interested buyers count
+   * @param {Object} listing - Listing object
+   * @returns {number} Number of interested buyers
+   */
+  getInterestedBuyersCount(listing) {
+    return listing.interestedBuyers ? listing.interestedBuyers.length : 0;
+  },
 
-  // Set soldAt when status changes to sold
-  if (this.isModified('status') && this.status === 'sold' && !this.soldAt) {
-    this.soldAt = new Date();
-  }
+  /**
+   * Get total asking value
+   * @param {Object} listing - Listing object
+   * @returns {number} Total asking value
+   */
+  getTotalAskingValue(listing) {
+    return listing.askingPrice || (listing.pricePerShare * listing.numberOfShares);
+  },
 
-  // Set withdrawnAt when status changes to withdrawn
-  if (this.isModified('status') && this.status === 'withdrawn' && !this.withdrawnAt) {
-    this.withdrawnAt = new Date();
-  }
+  /**
+   * Get sold percentage
+   * @param {Object} listing - Listing object
+   * @returns {number} Sold percentage
+   */
+  getSoldPercentage(listing) {
+    if (listing.numberOfShares === 0) return 0;
+    const soldShares = listing.numberOfShares - (listing.sharesAvailable || 0);
+    return (soldShares / listing.numberOfShares) * 100;
+  },
 
-  // Update status to partially_sold if some shares are sold
-  if (this.sharesAvailable < this.numberOfShares && this.sharesAvailable > 0 && this.status === 'active') {
-    this.status = 'partially_sold';
-  }
+  /**
+   * Check if listing is expired
+   * @param {Object} listing - Listing object
+   * @returns {boolean} True if expired
+   */
+  isExpired(listing) {
+    if (!listing.expiresAt) return false;
+    return new Date() > new Date(listing.expiresAt);
+  },
 
-  // Update status to sold if all shares are sold
-  if (this.sharesAvailable === 0 && this.status !== 'sold') {
-    this.status = 'sold';
-    this.soldAt = new Date();
-  }
+  /**
+   * Add interested buyer
+   * @param {string} listingId - Listing ID
+   * @param {Object} buyerInfo - Buyer information
+   * @returns {Object} Updated listing
+   */
+  async addInterestedBuyer(listingId, buyerInfo) {
+    const listing = await this.findByListingId(listingId);
+    if (!listing) {
+      throw new Error('Listing not found');
+    }
 
-  next();
-});
+    const interestedBuyers = listing.interestedBuyers || [];
+    const existingIndex = interestedBuyers.findIndex(b => b.buyerId === buyerInfo.buyerId);
 
-// Virtual for total interested buyers count
-secondaryMarketListingSchema.virtual('interestedBuyersCount').get(function() {
-  return this.interestedBuyers ? this.interestedBuyers.length : 0;
-});
+    if (existingIndex >= 0) {
+      // Update existing interest
+      interestedBuyers[existingIndex] = {
+        ...interestedBuyers[existingIndex],
+        offeredPrice: buyerInfo.offeredPrice || interestedBuyers[existingIndex].offeredPrice,
+        offeredShares: buyerInfo.offeredShares || interestedBuyers[existingIndex].offeredShares,
+        message: buyerInfo.message || interestedBuyers[existingIndex].message,
+        expressedAt: new Date().toISOString()
+      };
+    } else {
+      // Add new interest
+      interestedBuyers.push({
+        buyerId: buyerInfo.buyerId,
+        buyerName: buyerInfo.buyerName,
+        expressedAt: new Date().toISOString(),
+        offeredPrice: buyerInfo.offeredPrice,
+        offeredShares: buyerInfo.offeredShares,
+        status: 'interested',
+        message: buyerInfo.message
+      });
+    }
 
-// Virtual for total asking value
-secondaryMarketListingSchema.virtual('totalAskingValue').get(function() {
-  return this.askingPrice || (this.pricePerShare * this.numberOfShares);
-});
+    return baseModel.updateOne.call(baseModel,
+      { listingId },
+      { $set: { interestedBuyers } }
+    );
+  },
 
-// Virtual for sold percentage
-secondaryMarketListingSchema.virtual('soldPercentage').get(function() {
-  if (this.numberOfShares === 0) return 0;
-  const soldShares = this.numberOfShares - (this.sharesAvailable || 0);
-  return (soldShares / this.numberOfShares) * 100;
-});
+  /**
+   * Respond to interested buyer
+   * @param {string} listingId - Listing ID
+   * @param {string} buyerId - Buyer ID
+   * @param {Object} response - Response data
+   * @returns {Object} Updated listing
+   */
+  async respondToBuyer(listingId, buyerId, response) {
+    const listing = await this.findByListingId(listingId);
+    if (!listing) {
+      throw new Error('Listing not found');
+    }
 
-// Virtual to check if listing is expired
-secondaryMarketListingSchema.virtual('isExpired').get(function() {
-  if (!this.expiresAt) return false;
-  return new Date() > this.expiresAt;
-});
+    const interestedBuyers = listing.interestedBuyers || [];
+    const buyerIndex = interestedBuyers.findIndex(b => b.buyerId === buyerId);
 
-// Method to express interest from a buyer
-secondaryMarketListingSchema.methods.addInterestedBuyer = function(buyerInfo) {
-  const existingBuyer = this.interestedBuyers.find(b => b.buyerId === buyerInfo.buyerId);
-  if (existingBuyer) {
-    // Update existing interest
-    existingBuyer.offeredPrice = buyerInfo.offeredPrice || existingBuyer.offeredPrice;
-    existingBuyer.offeredShares = buyerInfo.offeredShares || existingBuyer.offeredShares;
-    existingBuyer.message = buyerInfo.message || existingBuyer.message;
-    existingBuyer.expressedAt = new Date();
-  } else {
-    // Add new interest
-    this.interestedBuyers.push({
-      buyerId: buyerInfo.buyerId,
-      buyerName: buyerInfo.buyerName,
-      offeredPrice: buyerInfo.offeredPrice,
-      offeredShares: buyerInfo.offeredShares,
-      message: buyerInfo.message,
-      status: 'interested'
+    if (buyerIndex < 0) {
+      throw new Error('Buyer not found');
+    }
+
+    interestedBuyers[buyerIndex].status = response.status;
+    interestedBuyers[buyerIndex].responseMessage = response.message;
+    interestedBuyers[buyerIndex].respondedAt = new Date().toISOString();
+
+    return baseModel.updateOne.call(baseModel,
+      { listingId },
+      { $set: { interestedBuyers } }
+    );
+  },
+
+  /**
+   * Record completed transaction
+   * @param {string} listingId - Listing ID
+   * @param {Object} transaction - Transaction data
+   * @returns {Object} Updated listing
+   */
+  async recordTransaction(listingId, transaction) {
+    const listing = await this.findByListingId(listingId);
+    if (!listing) {
+      throw new Error('Listing not found');
+    }
+
+    const completedTransactions = listing.completedTransactions || [];
+    completedTransactions.push({
+      transactionId: transaction.transactionId,
+      buyerId: transaction.buyerId,
+      numberOfShares: transaction.numberOfShares,
+      pricePerShare: transaction.pricePerShare,
+      completedAt: new Date().toISOString()
     });
-  }
+
+    const sharesAvailable = Math.max(0, (listing.sharesAvailable || listing.numberOfShares) - transaction.numberOfShares);
+    let status = listing.status;
+
+    // Update status based on shares available
+    if (sharesAvailable === 0) {
+      status = 'sold';
+    } else if (sharesAvailable < listing.numberOfShares) {
+      status = 'partially_sold';
+    }
+
+    const updateData = {
+      completedTransactions,
+      sharesAvailable,
+      status
+    };
+
+    if (status === 'sold') {
+      updateData.soldAt = new Date().toISOString();
+    }
+
+    return baseModel.updateOne.call(baseModel,
+      { listingId },
+      { $set: updateData }
+    );
+  },
+
+  /**
+   * Withdraw listing
+   * @param {string} listingId - Listing ID
+   * @returns {Object} Updated listing
+   */
+  async withdraw(listingId) {
+    return baseModel.updateOne.call(baseModel,
+      { listingId },
+      {
+        $set: {
+          status: 'withdrawn',
+          withdrawnAt: new Date().toISOString()
+        }
+      }
+    );
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Method to respond to an interested buyer
-secondaryMarketListingSchema.methods.respondToBuyer = function(buyerId, response) {
-  const buyer = this.interestedBuyers.find(b => b.buyerId === buyerId);
-  if (buyer) {
-    buyer.status = response.status;
-    buyer.responseMessage = response.message;
-    buyer.respondedAt = new Date();
-    return true;
-  }
-  return false;
-};
-
-// Method to record a completed transaction
-secondaryMarketListingSchema.methods.recordTransaction = function(transaction) {
-  this.completedTransactions.push({
-    transactionId: transaction.transactionId,
-    buyerId: transaction.buyerId,
-    numberOfShares: transaction.numberOfShares,
-    pricePerShare: transaction.pricePerShare,
-    completedAt: new Date()
-  });
-  this.sharesAvailable = Math.max(0, (this.sharesAvailable || this.numberOfShares) - transaction.numberOfShares);
-};
-
-// Ensure virtuals are included in JSON
-secondaryMarketListingSchema.set('toJSON', { virtuals: true });
-secondaryMarketListingSchema.set('toObject', { virtuals: true });
-
-const SecondaryMarketListing = mongoose.model('SecondaryMarketListing', secondaryMarketListingSchema);
 
 module.exports = SecondaryMarketListing;

@@ -10,364 +10,463 @@
  * - Anti-dilution protections
  * - Veto rights
  * - And other investor preferences
+ *
+ * Migrated to ZeroDB
  */
 
-const mongoose = require('mongoose');
+const { createModel } = require('./base/ZeroDBModel');
+const { v4: uuidv4 } = require('uuid');
 
-// Schema for exercise history entries
-const exerciseHistorySchema = new mongoose.Schema({
-  exerciseDate: {
-    type: Date,
-    required: true
-  },
-  exerciseAmount: {
-    type: Number
-  },
-  exercisedBy: {
-    type: String,
-    required: true
-  },
-  notes: {
-    type: String
-  },
-  documentReference: {
-    type: String
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  }
-}, { _id: true });
+// Valid right types
+const RIGHT_TYPES = [
+  'PRO_RATA',
+  'INFORMATION_RIGHTS',
+  'BOARD_SEAT',
+  'OBSERVER_SEAT',
+  'ANTI_DILUTION',
+  'VETO_RIGHTS',
+  'DRAG_ALONG',
+  'TAG_ALONG',
+  'PREEMPTIVE',
+  'FIRST_REFUSAL',
+  'CO_SALE',
+  'REDEMPTION',
+  'REGISTRATION'
+];
 
-// Schema for audit log entries
-const auditLogSchema = new mongoose.Schema({
-  action: {
-    type: String,
-    enum: ['CREATED', 'UPDATED', 'EXERCISED', 'WAIVED', 'EXPIRED', 'SUSPENDED', 'REACTIVATED'],
-    required: true
-  },
-  userId: {
-    type: String,
-    required: true
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  },
-  previousValues: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  newValues: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  changes: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  reason: {
-    type: String
-  }
-}, { _id: true });
+// Valid statuses
+const VALID_STATUSES = ['ACTIVE', 'EXPIRED', 'EXERCISED', 'WAIVED', 'PENDING', 'SUSPENDED'];
 
-// Main InvestorRights schema
-const investorRightsSchema = new mongoose.Schema({
-  rightId: {
-    type: String,
-    required: [true, 'Right ID is required'],
-    unique: true,
-    trim: true
-  },
-  investorId: {
-    type: String,
-    required: [true, 'Investor ID is required'],
-    trim: true
-  },
-  companyId: {
-    type: String,
-    required: [true, 'Company ID is required'],
-    trim: true
-  },
-  shareClassId: {
-    type: String,
-    trim: true
-  },
-  rightType: {
-    type: String,
-    required: [true, 'Right type is required'],
-    enum: {
-      values: [
-        'PRO_RATA',
-        'INFORMATION_RIGHTS',
-        'BOARD_SEAT',
-        'OBSERVER_SEAT',
-        'ANTI_DILUTION',
-        'VETO_RIGHTS',
-        'DRAG_ALONG',
-        'TAG_ALONG',
-        'PREEMPTIVE',
-        'FIRST_REFUSAL',
-        'CO_SALE',
-        'REDEMPTION',
-        'REGISTRATION'
-      ],
-      message: '{VALUE} is not a valid right type'
-    }
-  },
-  status: {
-    type: String,
-    enum: {
-      values: ['ACTIVE', 'EXPIRED', 'EXERCISED', 'WAIVED', 'PENDING', 'SUSPENDED'],
-      message: '{VALUE} is not a valid status'
-    },
-    default: 'ACTIVE'
-  },
-  terms: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  },
-  expirationDate: {
-    type: Date
-  },
-  effectiveDate: {
-    type: Date,
-    default: Date.now
-  },
-  sourceDocument: {
-    type: String,
-    trim: true
-  },
-  sourceDocumentType: {
-    type: String,
-    enum: ['INVESTOR_RIGHTS_AGREEMENT', 'VOTING_AGREEMENT', 'ROFR_AGREEMENT', 'SIDE_LETTER', 'TERM_SHEET', 'OTHER'],
-    default: 'INVESTOR_RIGHTS_AGREEMENT'
-  },
-  exerciseHistory: [exerciseHistorySchema],
-  auditLog: [auditLogSchema],
+// Valid source document types
+const SOURCE_DOCUMENT_TYPES = ['INVESTOR_RIGHTS_AGREEMENT', 'VOTING_AGREEMENT', 'ROFR_AGREEMENT', 'SIDE_LETTER', 'TERM_SHEET', 'OTHER'];
+
+// Valid audit actions
+const AUDIT_ACTIONS = ['CREATED', 'UPDATED', 'EXERCISED', 'WAIVED', 'EXPIRED', 'SUSPENDED', 'REACTIVATED'];
+
+// Schema definition for documentation and validation
+const investorRightsSchema = {
+  rightId: { type: 'string', required: true, unique: true },
+  investorId: { type: 'string', required: true },
+  companyId: { type: 'string', required: true },
+  shareClassId: { type: 'string', default: null },
+  rightType: { type: 'string', required: true, enum: RIGHT_TYPES },
+  status: { type: 'string', enum: VALID_STATUSES, default: 'ACTIVE' },
+  terms: { type: 'object', default: {} },
+  expirationDate: { type: 'date', default: null },
+  effectiveDate: { type: 'date', default: null },
+  sourceDocument: { type: 'string', default: null },
+  sourceDocumentType: { type: 'string', enum: SOURCE_DOCUMENT_TYPES, default: 'INVESTOR_RIGHTS_AGREEMENT' },
+  exerciseHistory: { type: 'array', default: [] },
+  auditLog: { type: 'array', default: [] },
   waiveDetails: {
-    reason: String,
-    documentReference: String,
-    waivedBy: String,
-    waivedAt: Date
-  },
-  notes: {
-    type: String
-  },
-  metadata: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Indexes for efficient querying
-investorRightsSchema.index({ investorId: 1, companyId: 1 });
-investorRightsSchema.index({ companyId: 1, rightType: 1 });
-investorRightsSchema.index({ shareClassId: 1 });
-investorRightsSchema.index({ expirationDate: 1 });
-investorRightsSchema.index({ status: 1 });
-investorRightsSchema.index({ rightId: 1 }, { unique: true });
-
-// Virtual to check if right is currently expired
-investorRightsSchema.virtual('isCurrentlyExpired').get(function() {
-  if (!this.expirationDate) return false;
-  return new Date() > this.expirationDate;
-});
-
-/**
- * Instance method to check if the right is expired
- * @returns {boolean} True if the right is expired
- */
-investorRightsSchema.methods.isExpired = function() {
-  if (!this.expirationDate) return false;
-  return new Date() > this.expirationDate;
-};
-
-/**
- * Instance method to check if the right can be exercised
- * @returns {boolean} True if the right can be exercised
- */
-investorRightsSchema.methods.canExercise = function() {
-  // Cannot exercise if not active
-  if (this.status !== 'ACTIVE') return false;
-
-  // Cannot exercise if expired
-  if (this.isExpired()) return false;
-
-  // Check if effective date has passed
-  if (this.effectiveDate && new Date() < this.effectiveDate) return false;
-
-  return true;
-};
-
-/**
- * Instance method to add an audit entry
- * @param {string} action - The action being recorded
- * @param {string} userId - ID of the user performing the action
- * @param {Object} options - Additional options (previousValues, newValues, reason)
- */
-investorRightsSchema.methods.addAuditEntry = function(action, userId, options = {}) {
-  const entry = {
-    action,
-    userId,
-    timestamp: new Date(),
-    previousValues: options.previousValues,
-    newValues: options.newValues,
-    changes: options.changes,
-    reason: options.reason
-  };
-
-  this.auditLog.push(entry);
-};
-
-/**
- * Static method to find rights by investor
- * @param {string} investorId - The investor ID
- * @param {Object} options - Query options (status, companyId)
- * @returns {Promise<Array>} Array of investor rights
- */
-investorRightsSchema.statics.findByInvestor = function(investorId, options = {}) {
-  const query = { investorId };
-
-  if (options.status) query.status = options.status;
-  if (options.companyId) query.companyId = options.companyId;
-
-  return this.find(query).sort({ createdAt: -1 });
-};
-
-/**
- * Static method to find rights by company
- * @param {string} companyId - The company ID
- * @param {Object} options - Query options (status, rightType)
- * @returns {Promise<Array>} Array of investor rights
- */
-investorRightsSchema.statics.findByCompany = function(companyId, options = {}) {
-  const query = { companyId };
-
-  if (options.status) query.status = options.status;
-  if (options.rightType) query.rightType = options.rightType;
-
-  return this.find(query).sort({ createdAt: -1 });
-};
-
-/**
- * Static method to find rights by share class
- * @param {string} shareClassId - The share class ID
- * @param {Object} options - Query options
- * @returns {Promise<Array>} Array of investor rights
- */
-investorRightsSchema.statics.findByShareClass = function(shareClassId, options = {}) {
-  const query = { shareClassId };
-
-  if (options.status) query.status = options.status;
-
-  return this.find(query).sort({ createdAt: -1 });
-};
-
-/**
- * Static method to find rights expiring within a specified number of days
- * @param {number} days - Number of days to look ahead
- * @param {Object} options - Query options (companyId, investorId)
- * @returns {Promise<Array>} Array of expiring investor rights
- */
-investorRightsSchema.statics.findExpiring = function(days = 30, options = {}) {
-  const now = new Date();
-  const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const query = {
-    status: 'ACTIVE',
-    expirationDate: {
-      $gte: now,
-      $lte: futureDate
+    type: 'object',
+    default: {
+      reason: null,
+      documentReference: null,
+      waivedBy: null,
+      waivedAt: null
     }
-  };
-
-  if (options.companyId) query.companyId = options.companyId;
-  if (options.investorId) query.investorId = options.investorId;
-
-  return this.find(query).sort({ expirationDate: 1 });
+  },
+  notes: { type: 'string', default: null },
+  metadata: { type: 'object', default: {} },
+  createdAt: { type: 'date' },
+  updatedAt: { type: 'date' }
 };
 
-/**
- * Static method to check for conflicts with existing rights
- * @param {Object} newRight - The new right to check
- * @returns {Promise<Array>} Array of conflicts found
- */
-investorRightsSchema.statics.checkConflicts = async function(newRight) {
-  const conflicts = [];
-  const { companyId, rightType, terms } = newRight;
+// Create the base model
+const baseModel = createModel('investor_rights', investorRightsSchema);
 
-  // Find existing active rights of the same type for this company
-  const existingRights = await this.find({
-    companyId,
-    rightType,
-    status: 'ACTIVE'
-  });
+// Extended InvestorRights model with business logic
+const InvestorRights = {
+  ...baseModel,
+  tableName: 'investor_rights',
+  schema: investorRightsSchema,
 
-  // Check for board seat conflicts
-  if (rightType === 'BOARD_SEAT') {
-    const totalSeats = existingRights.reduce((sum, r) => {
-      return sum + (r.terms?.totalSeats || 0);
-    }, 0);
-    const assignedSeats = existingRights.reduce((sum, r) => {
-      return sum + (r.terms?.assignedSeats || 0);
-    }, 0);
+  // Export constants
+  RIGHT_TYPES,
+  VALID_STATUSES,
+  SOURCE_DOCUMENT_TYPES,
+  AUDIT_ACTIONS,
 
-    if (assignedSeats >= totalSeats) {
-      conflicts.push({
-        type: 'BOARD_SEAT_LIMIT',
-        message: 'All board seats are already assigned',
-        existingRights: existingRights.map(r => r.rightId)
-      });
+  /**
+   * Create a new investor right with defaults
+   * @param {Object} data - Right data
+   * @returns {Object} Created right
+   */
+  async create(data) {
+    if (!data.rightId) {
+      data.rightId = `right_${uuidv4()}`;
     }
-  }
 
-  // Check for veto rights conflicts
-  if (rightType === 'VETO_RIGHTS' && terms?.vetoScope) {
-    const overlappingVeto = existingRights.find(r =>
-      r.terms?.vetoScope === terms.vetoScope ||
-      r.terms?.vetoScope === 'ALL_DECISIONS' ||
-      terms.vetoScope === 'ALL_DECISIONS'
+    // Validate right type
+    if (!RIGHT_TYPES.includes(data.rightType)) {
+      throw new Error(`rightType must be one of: ${RIGHT_TYPES.join(', ')}`);
+    }
+
+    if (!data.status) {
+      data.status = 'ACTIVE';
+    }
+
+    if (!data.effectiveDate) {
+      data.effectiveDate = new Date().toISOString();
+    }
+
+    // Auto-expire if past expiration date
+    if (data.expirationDate && new Date() > new Date(data.expirationDate) && data.status === 'ACTIVE') {
+      data.status = 'EXPIRED';
+    }
+
+    // Add creation audit entry
+    if (!data.auditLog) {
+      data.auditLog = [];
+    }
+    data.auditLog.push({
+      action: 'CREATED',
+      userId: data.createdBy || 'system',
+      timestamp: new Date().toISOString(),
+      newValues: data
+    });
+
+    return baseModel.create.call(baseModel, data);
+  },
+
+  /**
+   * Find right by rightId
+   * @param {string} rightId - Right ID
+   * @returns {Object|null} Right or null
+   */
+  async findByRightId(rightId) {
+    return baseModel.findOne.call(baseModel, { rightId });
+  },
+
+  /**
+   * Find rights by investor
+   * @param {string} investorId - Investor ID
+   * @param {Object} options - Query options
+   * @returns {Array} Rights for investor
+   */
+  async findByInvestor(investorId, options = {}) {
+    const query = { investorId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.companyId) {
+      query.companyId = options.companyId;
+    }
+
+    let records = await baseModel.find.call(baseModel, query);
+
+    // Sort by createdAt descending
+    records.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return records;
+  },
+
+  /**
+   * Find rights by company
+   * @param {string} companyId - Company ID
+   * @param {Object} options - Query options
+   * @returns {Array} Rights for company
+   */
+  async findByCompany(companyId, options = {}) {
+    const query = { companyId };
+    if (options.status) {
+      query.status = options.status;
+    }
+    if (options.rightType) {
+      query.rightType = options.rightType;
+    }
+
+    let records = await baseModel.find.call(baseModel, query);
+
+    // Sort by createdAt descending
+    records.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return records;
+  },
+
+  /**
+   * Find rights by share class
+   * @param {string} shareClassId - Share class ID
+   * @param {Object} options - Query options
+   * @returns {Array} Rights for share class
+   */
+  async findByShareClass(shareClassId, options = {}) {
+    const query = { shareClassId };
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    let records = await baseModel.find.call(baseModel, query);
+
+    // Sort by createdAt descending
+    records.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return records;
+  },
+
+  /**
+   * Find rights expiring within days
+   * @param {number} days - Days to look ahead
+   * @param {Object} options - Query options
+   * @returns {Array} Expiring rights
+   */
+  async findExpiring(days = 30, options = {}) {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    const query = { status: 'ACTIVE' };
+    if (options.companyId) {
+      query.companyId = options.companyId;
+    }
+    if (options.investorId) {
+      query.investorId = options.investorId;
+    }
+
+    const records = await baseModel.find.call(baseModel, query);
+
+    return records
+      .filter(r => {
+        if (!r.expirationDate) return false;
+        const expDate = new Date(r.expirationDate);
+        return expDate >= now && expDate <= futureDate;
+      })
+      .sort((a, b) => new Date(a.expirationDate) - new Date(b.expirationDate));
+  },
+
+  /**
+   * Check if right is expired
+   * @param {Object} right - Right object
+   * @returns {boolean} True if expired
+   */
+  isExpired(right) {
+    if (!right.expirationDate) return false;
+    return new Date() > new Date(right.expirationDate);
+  },
+
+  /**
+   * Check if right is currently expired (virtual)
+   * @param {Object} right - Right object
+   * @returns {boolean} True if currently expired
+   */
+  isCurrentlyExpired(right) {
+    if (!right.expirationDate) return false;
+    return new Date() > new Date(right.expirationDate);
+  },
+
+  /**
+   * Check if right can be exercised
+   * @param {Object} right - Right object
+   * @returns {boolean} True if can exercise
+   */
+  canExercise(right) {
+    // Cannot exercise if not active
+    if (right.status !== 'ACTIVE') return false;
+
+    // Cannot exercise if expired
+    if (this.isExpired(right)) return false;
+
+    // Check if effective date has passed
+    if (right.effectiveDate && new Date() < new Date(right.effectiveDate)) return false;
+
+    return true;
+  },
+
+  /**
+   * Add audit entry to right
+   * @param {string} rightId - Right ID
+   * @param {string} action - Audit action
+   * @param {string} userId - User ID
+   * @param {Object} options - Additional options
+   * @returns {Object} Updated right
+   */
+  async addAuditEntry(rightId, action, userId, options = {}) {
+    const right = await this.findByRightId(rightId);
+    if (!right) {
+      throw new Error('Right not found');
+    }
+
+    const auditLog = right.auditLog || [];
+    auditLog.push({
+      action,
+      userId,
+      timestamp: new Date().toISOString(),
+      previousValues: options.previousValues,
+      newValues: options.newValues,
+      changes: options.changes,
+      reason: options.reason
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { rightId },
+      { $set: { auditLog } }
     );
+  },
 
-    if (overlappingVeto) {
-      conflicts.push({
-        type: 'VETO_OVERLAP',
-        message: 'Veto rights overlap with existing rights',
-        existingRight: overlappingVeto.rightId
-      });
+  /**
+   * Record exercise of right
+   * @param {string} rightId - Right ID
+   * @param {Object} exerciseData - Exercise details
+   * @returns {Object} Updated right
+   */
+  async recordExercise(rightId, exerciseData) {
+    const right = await this.findByRightId(rightId);
+    if (!right) {
+      throw new Error('Right not found');
     }
-  }
 
-  // Check for pro-rata percentage exceeding 100%
-  if (rightType === 'PRO_RATA' && terms?.percentage) {
-    const totalPercentage = existingRights.reduce((sum, r) => {
-      return sum + (r.terms?.percentage || 0);
-    }, terms.percentage);
+    const exerciseHistory = right.exerciseHistory || [];
+    exerciseHistory.push({
+      exerciseDate: exerciseData.exerciseDate || new Date().toISOString(),
+      exerciseAmount: exerciseData.exerciseAmount,
+      exercisedBy: exerciseData.exercisedBy,
+      notes: exerciseData.notes,
+      documentReference: exerciseData.documentReference,
+      timestamp: new Date().toISOString()
+    });
 
-    if (totalPercentage > 100) {
-      conflicts.push({
-        type: 'PRO_RATA_EXCEEDS_100',
-        message: `Total pro-rata percentage would exceed 100% (${totalPercentage}%)`,
-        totalPercentage
-      });
+    const auditLog = right.auditLog || [];
+    auditLog.push({
+      action: 'EXERCISED',
+      userId: exerciseData.exercisedBy,
+      timestamp: new Date().toISOString(),
+      newValues: exerciseData
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { rightId },
+      {
+        $set: {
+          exerciseHistory,
+          auditLog,
+          status: 'EXERCISED'
+        }
+      }
+    );
+  },
+
+  /**
+   * Waive right
+   * @param {string} rightId - Right ID
+   * @param {Object} waiveData - Waive details
+   * @returns {Object} Updated right
+   */
+  async waive(rightId, waiveData) {
+    const right = await this.findByRightId(rightId);
+    if (!right) {
+      throw new Error('Right not found');
     }
-  }
 
-  return conflicts;
+    const auditLog = right.auditLog || [];
+    auditLog.push({
+      action: 'WAIVED',
+      userId: waiveData.waivedBy,
+      timestamp: new Date().toISOString(),
+      reason: waiveData.reason
+    });
+
+    return baseModel.updateOne.call(baseModel,
+      { rightId },
+      {
+        $set: {
+          status: 'WAIVED',
+          waiveDetails: {
+            reason: waiveData.reason,
+            documentReference: waiveData.documentReference,
+            waivedBy: waiveData.waivedBy,
+            waivedAt: new Date().toISOString()
+          },
+          auditLog
+        }
+      }
+    );
+  },
+
+  /**
+   * Check for conflicts with existing rights
+   * @param {Object} newRight - New right to check
+   * @returns {Array} Conflicts found
+   */
+  async checkConflicts(newRight) {
+    const conflicts = [];
+    const { companyId, rightType, terms } = newRight;
+
+    // Find existing active rights of the same type for this company
+    const existingRights = await baseModel.find.call(baseModel, {
+      companyId,
+      rightType,
+      status: 'ACTIVE'
+    });
+
+    // Check for board seat conflicts
+    if (rightType === 'BOARD_SEAT') {
+      const totalSeats = existingRights.reduce((sum, r) => {
+        return sum + (r.terms?.totalSeats || 0);
+      }, 0);
+      const assignedSeats = existingRights.reduce((sum, r) => {
+        return sum + (r.terms?.assignedSeats || 0);
+      }, 0);
+
+      if (assignedSeats >= totalSeats) {
+        conflicts.push({
+          type: 'BOARD_SEAT_LIMIT',
+          message: 'All board seats are already assigned',
+          existingRights: existingRights.map(r => r.rightId)
+        });
+      }
+    }
+
+    // Check for veto rights conflicts
+    if (rightType === 'VETO_RIGHTS' && terms?.vetoScope) {
+      const overlappingVeto = existingRights.find(r =>
+        r.terms?.vetoScope === terms.vetoScope ||
+        r.terms?.vetoScope === 'ALL_DECISIONS' ||
+        terms.vetoScope === 'ALL_DECISIONS'
+      );
+
+      if (overlappingVeto) {
+        conflicts.push({
+          type: 'VETO_OVERLAP',
+          message: 'Veto rights overlap with existing rights',
+          existingRight: overlappingVeto.rightId
+        });
+      }
+    }
+
+    // Check for pro-rata percentage exceeding 100%
+    if (rightType === 'PRO_RATA' && terms?.percentage) {
+      const totalPercentage = existingRights.reduce((sum, r) => {
+        return sum + (r.terms?.percentage || 0);
+      }, terms.percentage);
+
+      if (totalPercentage > 100) {
+        conflicts.push({
+          type: 'PRO_RATA_EXCEEDS_100',
+          message: `Total pro-rata percentage would exceed 100% (${totalPercentage}%)`,
+          totalPercentage
+        });
+      }
+    }
+
+    return conflicts;
+  },
+
+  // Expose base model methods
+  find: baseModel.find.bind(baseModel),
+  findOne: baseModel.findOne.bind(baseModel),
+  findById: baseModel.findById.bind(baseModel),
+  updateOne: baseModel.updateOne.bind(baseModel),
+  updateMany: baseModel.updateMany.bind(baseModel),
+  findOneAndUpdate: baseModel.findOneAndUpdate.bind(baseModel),
+  findByIdAndUpdate: baseModel.findByIdAndUpdate.bind(baseModel),
+  deleteOne: baseModel.deleteOne.bind(baseModel),
+  deleteMany: baseModel.deleteMany.bind(baseModel),
+  findOneAndDelete: baseModel.findOneAndDelete.bind(baseModel),
+  findByIdAndDelete: baseModel.findByIdAndDelete.bind(baseModel),
+  countDocuments: baseModel.countDocuments.bind(baseModel),
+  exists: baseModel.exists.bind(baseModel),
+  distinct: baseModel.distinct.bind(baseModel),
+  aggregate: baseModel.aggregate.bind(baseModel)
 };
-
-// Pre-save middleware to update timestamps and validate
-investorRightsSchema.pre('save', function(next) {
-  // Auto-expire if past expiration date
-  if (this.expirationDate && new Date() > this.expirationDate && this.status === 'ACTIVE') {
-    this.status = 'EXPIRED';
-  }
-
-  next();
-});
-
-const InvestorRights = mongoose.model('InvestorRights', investorRightsSchema);
 
 module.exports = InvestorRights;
