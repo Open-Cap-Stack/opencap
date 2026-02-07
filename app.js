@@ -213,6 +213,7 @@ const routes = {
   billingRoutes: safeRequire(path.join(__dirname, 'routes/v1/billingRoutes')), // Issue #201: Billing Dashboard APIs
   stakeholderReportRoutes: safeRequire(path.join(__dirname, 'routes/v1/stakeholderReportRoutes')), // Issue #198: Stakeholder Report Generation
   accessPolicyRoutes: safeRequire(path.join(__dirname, 'routes/v1/accessPolicyRoutes')), // Issue #247: Access Policies Endpoints
+  accessGroupRoutes: safeRequire(path.join(__dirname, 'routes/v1/accessGroupRoutes')), // Issue #274: Access Groups Endpoints
   taxDocumentRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxDocumentRoutes')), // Issue #246: Tax Document Download Endpoint
   bulkReportsRoutes: safeRequire(path.join(__dirname, 'routes/v1/bulkReportsRoutes')), // Issue #238: Bulk Reports Endpoint
   // Optional routes that may not exist in all environments
@@ -346,6 +347,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/users';
     } else if (key === 'accessPolicyRoutes') {
       path = '/api/v1/access-policies'; // Issue #247: Access Policies Endpoints
+    } else if (key === 'accessGroupRoutes') {
+      path = '/api/v1/access-groups'; // Issue #274: Access Groups Endpoints
     } else if (key === 'taxDocumentRoutes') {
       path = '/api/v1/tax-documents'; // Issue #246: Tax Document Download Endpoint
     } else if (key === 'bulkReportsRoutes') {
