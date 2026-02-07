@@ -1,283 +1,194 @@
 /**
  * InvestorPreference Model Unit Tests
  * Issue #91: Build Investor Communication System
- * TDD Red Phase: Tests written before implementation
+ *
+ * Tests for ZeroDB-based InvestorPreference model
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
+const InvestorPreference = require('../../../models/InvestorPreference');
 
 describe('InvestorPreference Model', () => {
-  let InvestorPreference;
+  describe('Schema Definition', () => {
+    it('should have correct table name', () => {
+      expect(InvestorPreference.tableName).toBe('investor_preferences');
+    });
 
-  beforeAll(() => {
-    InvestorPreference = require('../../../models/InvestorPreference');
-  });
-
-  describe('Schema Validation', () => {
     it('should have required fields defined', () => {
       const schema = InvestorPreference.schema;
-
-      expect(schema.paths.investorId).toBeDefined();
-      expect(schema.paths.companyId).toBeDefined();
-      expect(schema.paths.communicationPreferences).toBeDefined();
+      expect(schema.investorId).toBeDefined();
+      expect(schema.companyId).toBeDefined();
+      expect(schema.communicationPreferences).toBeDefined();
     });
 
-    it('should have communication channel preferences', () => {
+    it('should mark required fields as required', () => {
       const schema = InvestorPreference.schema;
-
-      // Nested schema paths are accessed through the parent path's schema
-      expect(schema.paths.communicationPreferences).toBeDefined();
-      const commPrefSchema = schema.paths.communicationPreferences.schema;
-      expect(commPrefSchema.paths.email).toBeDefined();
-      expect(commPrefSchema.paths.sms).toBeDefined();
-      expect(commPrefSchema.paths.portalNotifications).toBeDefined();
+      expect(schema.investorId.required).toBe(true);
+      expect(schema.companyId.required).toBe(true);
     });
 
-    it('should have notification type preferences', () => {
+    it('should have communicationPreferences as object field', () => {
       const schema = InvestorPreference.schema;
-
-      // Nested schema paths are accessed through the parent path's schema
-      expect(schema.paths.notificationTypes).toBeDefined();
-      const notifTypeSchema = schema.paths.notificationTypes.schema;
-      expect(notifTypeSchema.paths.quarterlyUpdates).toBeDefined();
-      expect(notifTypeSchema.paths.annualReports).toBeDefined();
-      expect(notifTypeSchema.paths.documentSharing).toBeDefined();
-      expect(notifTypeSchema.paths.portalAnnouncements).toBeDefined();
-      expect(notifTypeSchema.paths.fundingUpdates).toBeDefined();
+      expect(schema.communicationPreferences.type).toBe('object');
     });
 
-    it('should have frequency preference', () => {
-      const schema = InvestorPreference.schema;
-      const enumValues = schema.paths.frequency.enumValues;
-
-      expect(enumValues).toContain('immediate');
-      expect(enumValues).toContain('daily_digest');
-      expect(enumValues).toContain('weekly_digest');
+    it('should have default communication preferences', () => {
+      const commDefault = InvestorPreference.schema.communicationPreferences.default;
+      expect(commDefault.email).toBe(true);
+      expect(commDefault.sms).toBe(false);
+      expect(commDefault.portalNotifications).toBe(true);
     });
 
-    it('should have timezone preference', () => {
+    it('should have notificationTypes as object field', () => {
       const schema = InvestorPreference.schema;
-
-      expect(schema.paths.timezone).toBeDefined();
+      expect(schema.notificationTypes).toBeDefined();
+      expect(schema.notificationTypes.type).toBe('object');
     });
 
-    it('should have unsubscribe tracking', () => {
-      const schema = InvestorPreference.schema;
+    it('should have default notification types', () => {
+      const notifDefault = InvestorPreference.schema.notificationTypes.default;
+      expect(notifDefault.quarterlyUpdates).toBe(true);
+      expect(notifDefault.annualReports).toBe(true);
+      expect(notifDefault.documentSharing).toBe(true);
+      expect(notifDefault.portalAnnouncements).toBe(true);
+      expect(notifDefault.fundingUpdates).toBe(true);
+    });
 
-      expect(schema.paths.unsubscribedAll).toBeDefined();
-      expect(schema.paths.unsubscribedAt).toBeDefined();
+    it('should have frequency with enum values', () => {
+      const schema = InvestorPreference.schema;
+      expect(schema.frequency.enum).toContain('immediate');
+      expect(schema.frequency.enum).toContain('daily_digest');
+      expect(schema.frequency.enum).toContain('weekly_digest');
+    });
+
+    it('should default frequency to immediate', () => {
+      expect(InvestorPreference.schema.frequency.default).toBe('immediate');
+    });
+
+    it('should have timezone field with default UTC', () => {
+      expect(InvestorPreference.schema.timezone).toBeDefined();
+      expect(InvestorPreference.schema.timezone.default).toBe('UTC');
+    });
+
+    it('should have unsubscribe tracking fields', () => {
+      const schema = InvestorPreference.schema;
+      expect(schema.unsubscribedAll).toBeDefined();
+      expect(schema.unsubscribedAll.default).toBe(false);
+      expect(schema.unsubscribedAt).toBeDefined();
     });
   });
 
-  describe('Document Creation', () => {
-    it('should create a valid preference document', () => {
-      const prefData = {
-        investorId: new mongoose.Types.ObjectId(),
-        companyId: new mongoose.Types.ObjectId(),
+  describe('wantsNotificationType', () => {
+    it('should return true for enabled notification types', () => {
+      const preference = {
+        notificationTypes: {
+          quarterlyUpdates: true,
+          annualReports: true,
+          documentSharing: true,
+          portalAnnouncements: true,
+          fundingUpdates: true,
+          generalCommunications: true
+        },
+        unsubscribedAll: false
+      };
+
+      expect(InvestorPreference.wantsNotificationType(preference, 'quarterly_update')).toBe(true);
+      expect(InvestorPreference.wantsNotificationType(preference, 'annual_report')).toBe(true);
+      expect(InvestorPreference.wantsNotificationType(preference, 'document_notification')).toBe(true);
+      expect(InvestorPreference.wantsNotificationType(preference, 'portal_announcement')).toBe(true);
+      expect(InvestorPreference.wantsNotificationType(preference, 'funding_update')).toBe(true);
+      expect(InvestorPreference.wantsNotificationType(preference, 'general')).toBe(true);
+    });
+
+    it('should return false for disabled notification types', () => {
+      const preference = {
+        notificationTypes: {
+          quarterlyUpdates: false,
+          annualReports: true
+        },
+        unsubscribedAll: false
+      };
+
+      expect(InvestorPreference.wantsNotificationType(preference, 'quarterly_update')).toBe(false);
+    });
+
+    it('should return false when unsubscribedAll is true', () => {
+      const preference = {
+        notificationTypes: {
+          quarterlyUpdates: true
+        },
+        unsubscribedAll: true
+      };
+
+      expect(InvestorPreference.wantsNotificationType(preference, 'quarterly_update')).toBe(false);
+    });
+
+    it('should default to generalCommunications for unknown types', () => {
+      const preference = {
+        notificationTypes: {
+          generalCommunications: true
+        },
+        unsubscribedAll: false
+      };
+
+      expect(InvestorPreference.wantsNotificationType(preference, 'unknown_type')).toBe(true);
+    });
+  });
+
+  describe('wantsChannel', () => {
+    it('should return true for enabled channels', () => {
+      const preference = {
+        communicationPreferences: {
+          email: true,
+          sms: true,
+          portalNotifications: true
+        },
+        unsubscribedAll: false
+      };
+
+      expect(InvestorPreference.wantsChannel(preference, 'email')).toBe(true);
+      expect(InvestorPreference.wantsChannel(preference, 'sms')).toBe(true);
+      expect(InvestorPreference.wantsChannel(preference, 'portal')).toBe(true);
+    });
+
+    it('should return false for disabled channels', () => {
+      const preference = {
         communicationPreferences: {
           email: true,
           sms: false,
           portalNotifications: true
         },
-        notificationTypes: {
-          quarterlyUpdates: true,
-          annualReports: true,
-          documentSharing: true,
-          portalAnnouncements: false,
-          fundingUpdates: true
+        unsubscribedAll: false
+      };
+
+      expect(InvestorPreference.wantsChannel(preference, 'sms')).toBe(false);
+    });
+
+    it('should return false when unsubscribedAll is true', () => {
+      const preference = {
+        communicationPreferences: {
+          email: true
         },
-        frequency: 'immediate'
+        unsubscribedAll: true
       };
 
-      const preference = new InvestorPreference(prefData);
-
-      expect(preference.communicationPreferences.email).toBe(true);
-      expect(preference.communicationPreferences.sms).toBe(false);
-      expect(preference.notificationTypes.quarterlyUpdates).toBe(true);
-      expect(preference.frequency).toBe('immediate');
+      expect(InvestorPreference.wantsChannel(preference, 'email')).toBe(false);
     });
 
-    it('should have default values for boolean preferences', () => {
-      const prefData = {
-        investorId: new mongoose.Types.ObjectId(),
-        companyId: new mongoose.Types.ObjectId()
+    it('should return false for unknown channels', () => {
+      const preference = {
+        communicationPreferences: {
+          email: true
+        },
+        unsubscribedAll: false
       };
 
-      const preference = new InvestorPreference(prefData);
-
-      expect(preference.communicationPreferences.email).toBe(true);
-      expect(preference.unsubscribedAll).toBe(false);
-    });
-
-    it('should have default frequency of immediate', () => {
-      const prefData = {
-        investorId: new mongoose.Types.ObjectId(),
-        companyId: new mongoose.Types.ObjectId()
-      };
-
-      const preference = new InvestorPreference(prefData);
-
-      expect(preference.frequency).toBe('immediate');
-    });
-
-    it('should have default timezone of UTC', () => {
-      const prefData = {
-        investorId: new mongoose.Types.ObjectId(),
-        companyId: new mongoose.Types.ObjectId()
-      };
-
-      const preference = new InvestorPreference(prefData);
-
-      expect(preference.timezone).toBe('UTC');
+      expect(InvestorPreference.wantsChannel(preference, 'unknown')).toBe(false);
     });
   });
 
-  describe('Instance Methods', () => {
-    describe('wantsNotificationType', () => {
-      it('should return true for enabled notification types', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          notificationTypes: {
-            quarterlyUpdates: true,
-            annualReports: true,
-            documentSharing: true,
-            portalAnnouncements: true,
-            fundingUpdates: true,
-            generalCommunications: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsNotificationType('quarterly_update')).toBe(true);
-        expect(preference.wantsNotificationType('annual_report')).toBe(true);
-        expect(preference.wantsNotificationType('document_notification')).toBe(true);
-        expect(preference.wantsNotificationType('portal_announcement')).toBe(true);
-        expect(preference.wantsNotificationType('funding_update')).toBe(true);
-        expect(preference.wantsNotificationType('general')).toBe(true);
-      });
-
-      it('should return false for disabled notification types', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          notificationTypes: {
-            quarterlyUpdates: false,
-            annualReports: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsNotificationType('quarterly_update')).toBe(false);
-      });
-
-      it('should return false when unsubscribedAll is true', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          notificationTypes: {
-            quarterlyUpdates: true
-          },
-          unsubscribedAll: true
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsNotificationType('quarterly_update')).toBe(false);
-      });
-
-      it('should default to generalCommunications for unknown types', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          notificationTypes: {
-            generalCommunications: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsNotificationType('unknown_type')).toBe(true);
-      });
-    });
-
-    describe('wantsChannel', () => {
-      it('should return true for enabled channels', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          communicationPreferences: {
-            email: true,
-            sms: true,
-            portalNotifications: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsChannel('email')).toBe(true);
-        expect(preference.wantsChannel('sms')).toBe(true);
-        expect(preference.wantsChannel('portal')).toBe(true);
-      });
-
-      it('should return false for disabled channels', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          communicationPreferences: {
-            email: true,
-            sms: false,
-            portalNotifications: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsChannel('sms')).toBe(false);
-      });
-
-      it('should return false when unsubscribedAll is true', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          communicationPreferences: {
-            email: true
-          },
-          unsubscribedAll: true
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsChannel('email')).toBe(false);
-      });
-
-      it('should return false for unknown channels', () => {
-        const prefData = {
-          investorId: new mongoose.Types.ObjectId(),
-          companyId: new mongoose.Types.ObjectId(),
-          communicationPreferences: {
-            email: true
-          },
-          unsubscribedAll: false
-        };
-
-        const preference = new InvestorPreference(prefData);
-
-        expect(preference.wantsChannel('unknown')).toBe(false);
-      });
-    });
-  });
-
-  describe('Static Methods', () => {
-    it('should return default preferences using getDefaults', () => {
+  describe('getDefaults', () => {
+    it('should return default preferences', () => {
       const defaults = InvestorPreference.getDefaults();
 
       expect(defaults).toHaveProperty('communicationPreferences');
@@ -291,10 +202,61 @@ describe('InvestorPreference Model', () => {
     });
   });
 
-  describe('Model Exports', () => {
+  describe('Constants', () => {
     it('should export FREQUENCY_OPTIONS constant', () => {
       expect(InvestorPreference.FREQUENCY_OPTIONS).toBeDefined();
       expect(InvestorPreference.FREQUENCY_OPTIONS).toContain('immediate');
+      expect(InvestorPreference.FREQUENCY_OPTIONS).toContain('daily_digest');
+      expect(InvestorPreference.FREQUENCY_OPTIONS).toContain('weekly_digest');
+    });
+
+    it('should export NOTIFICATION_TYPE_MAP constant', () => {
+      expect(InvestorPreference.NOTIFICATION_TYPE_MAP).toBeDefined();
+      expect(InvestorPreference.NOTIFICATION_TYPE_MAP['quarterly_update']).toBe('quarterlyUpdates');
+    });
+
+    it('should export CHANNEL_MAP constant', () => {
+      expect(InvestorPreference.CHANNEL_MAP).toBeDefined();
+      expect(InvestorPreference.CHANNEL_MAP['email']).toBe('email');
+      expect(InvestorPreference.CHANNEL_MAP['portal']).toBe('portalNotifications');
+    });
+  });
+
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof InvestorPreference.create).toBe('function');
+    });
+
+    it('should have find method', () => {
+      expect(typeof InvestorPreference.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof InvestorPreference.findOne).toBe('function');
+    });
+
+    it('should have findByInvestorAndCompany method', () => {
+      expect(typeof InvestorPreference.findByInvestorAndCompany).toBe('function');
+    });
+
+    it('should have findByInvestor method', () => {
+      expect(typeof InvestorPreference.findByInvestor).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof InvestorPreference.findByCompany).toBe('function');
+    });
+
+    it('should have findByUnsubscribeToken method', () => {
+      expect(typeof InvestorPreference.findByUnsubscribeToken).toBe('function');
+    });
+
+    it('should have unsubscribeAll method', () => {
+      expect(typeof InvestorPreference.unsubscribeAll).toBe('function');
+    });
+
+    it('should have resubscribe method', () => {
+      expect(typeof InvestorPreference.resubscribe).toBe('function');
     });
   });
 });

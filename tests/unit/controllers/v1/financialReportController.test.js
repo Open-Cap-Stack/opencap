@@ -3,6 +3,7 @@
  *
  * Tests for all Financial Report controller methods including validation,
  * error handling, and edge cases. Issue #39: Controller Test Coverage
+ * Updated for ZeroDB migration
  */
 
 // Mock mongoose before any imports
@@ -20,8 +21,21 @@ jest.mock('mongoose', () => {
   };
 });
 
-// Mock the dependencies
-jest.mock('../../../../models/financialReport');
+// Mock the FinancialReport model as a constructor function with static methods
+jest.mock('../../../../models/financialReport', () => {
+  const mockConstructor = jest.fn();
+  mockConstructor.find = jest.fn();
+  mockConstructor.findOne = jest.fn();
+  mockConstructor.findById = jest.fn();
+  mockConstructor.findByIdAndUpdate = jest.fn();
+  mockConstructor.findByIdAndDelete = jest.fn();
+  mockConstructor.create = jest.fn();
+  mockConstructor.aggregate = jest.fn();
+  mockConstructor.countDocuments = jest.fn();
+  mockConstructor.deleteMany = jest.fn();
+  return mockConstructor;
+});
+
 jest.mock('../../../../services/vectorService');
 jest.mock('../../../../services/streamingService');
 jest.mock('../../../../services/memoryService');
@@ -64,7 +78,7 @@ describe('Financial Report Controller', () => {
 
       const mockReport = {
         ...validReportData,
-        _id: 'report-123',
+        _id: { toString: () => 'report-123' },
         userId: 'user-123',
         totalRevenue: 155000,
         totalExpenses: 100000,
@@ -305,17 +319,18 @@ describe('Financial Report Controller', () => {
     it('should apply pagination parameters', async () => {
       req.query = { page: 2, limit: 10 };
 
+      const mockSkip = jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([])
+      });
       const mockSort = jest.fn().mockReturnValue({
-        skip: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue([])
-        })
+        skip: mockSkip
       });
 
       FinancialReport.find.mockReturnValue({ sort: mockSort });
 
       await financialReportController.getAllFinancialReports(req, res);
 
-      expect(mockSort().skip).toHaveBeenCalledWith(10); // (page-1) * limit
+      expect(mockSkip).toHaveBeenCalledWith(10); // (page-1) * limit
     });
 
     it('should handle database errors', async () => {
@@ -682,13 +697,6 @@ describe('Financial Report Controller', () => {
 
     it('should create multiple financial reports', async () => {
       req.body = bulkReports;
-
-      const mockCreatedReports = bulkReports.map((r, i) => ({
-        ...r,
-        _id: `report-${i}`,
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockResolvedValue(true)
-      }));
 
       FinancialReport.mockImplementation((data) => {
         const report = { ...data, calculateTotals: jest.fn(), save: jest.fn().mockResolvedValue(true) };

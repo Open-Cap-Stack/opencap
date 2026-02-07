@@ -1,14 +1,11 @@
 /**
  * Analytics Controller Test Suite
- * 
+ *
  * [Feature] OCAE-401: Advanced Analytics Testing
  * Comprehensive test coverage for predictive modeling, risk assessment,
  * performance benchmarking, and anomaly detection
  */
 
-const request = require('supertest');
-const mongoose = require('mongoose');
-const app = require('../../../app');
 const analyticsController = require('../../../controllers/analyticsController');
 const FinancialReport = require('../../../models/financialReport');
 const Company = require('../../../models/Company');
@@ -21,58 +18,52 @@ const streamingService = require('../../../services/streamingService');
 jest.mock('../../../services/memoryService');
 jest.mock('../../../services/streamingService');
 
-// Mock MongoDB models
+// Mock models
 jest.mock('../../../models/financialReport');
 jest.mock('../../../models/Company');
 jest.mock('../../../models/Document');
 jest.mock('../../../models/SecurityAudit');
 
+// Helper to create chainable mock for .find().sort().limit().skip() patterns
+function createChainableMock(resolvedValue) {
+  const chain = {
+    sort: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    then: jest.fn((resolve) => resolve(resolvedValue)),
+    // Make it thenable so await works
+    [Symbol.toStringTag]: 'Promise'
+  };
+  // Override then to make it properly awaitable
+  chain.then = (resolve, reject) => Promise.resolve(resolvedValue).then(resolve, reject);
+  chain.catch = (reject) => Promise.resolve(resolvedValue).catch(reject);
+  return chain;
+}
+
+// Helper to create mock req/res
+function createMockReqRes(body = {}) {
+  const req = { body };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn().mockReturnThis()
+  };
+  return { req, res };
+}
+
 describe('Analytics Controller', () => {
   let companyId;
   let mockFinancialData;
-  let mockCompanyData;
 
-  beforeAll(async () => {
-    // Skip database connection for unit tests
-    if (mongoose.connection.readyState === 0) {
-      const mongoUri = process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/opencap_test';
-      try {
-        await mongoose.connect(mongoUri);
-      } catch (error) {
-        console.warn('MongoDB connection failed, using mocks only');
-      }
-    }
-  });
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-  afterAll(async () => {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
-  });
+    companyId = 'test-company-id-123';
 
-  beforeEach(async () => {
-    // Clean up test data
-    await Promise.all([
-      FinancialReport.deleteMany({}),
-      Company.deleteMany({}),
-      Document.deleteMany({}),
-      SecurityAudit.deleteMany({})
-    ]);
-
-    // Create test company
-    const company = new Company({
-      name: 'Test Analytics Company',
-      industry: 'Technology',
-      size: 'medium',
-      status: 'active'
-    });
-    await company.save();
-    companyId = company._id.toString();
-
-    // Create mock financial data
+    // Create realistic mock financial data (12 months)
     mockFinancialData = [];
     for (let i = 0; i < 12; i++) {
-      const report = new FinancialReport({
+      mockFinancialData.push({
+        _id: `report-${i}`,
         companyId,
         reportType: 'monthly',
         reportingPeriod: `2023-${String(i + 1).padStart(2, '0')}`,
@@ -82,103 +73,91 @@ describe('Analytics Controller', () => {
         currentLiabilities: 300000 + (i * 30000),
         createdAt: new Date(2023, i, 1)
       });
-      await report.save();
-      mockFinancialData.push(report);
     }
 
-    mockCompanyData = company;
-
-    // Mock service responses
-    memoryService.storeAnalytics.mockResolvedValue(true);
-    streamingService.publishEvent.mockResolvedValue(true);
+    // Default mock service responses
+    memoryService.storeAnalytics = jest.fn().mockResolvedValue(true);
+    memoryService.getAnalytics = jest.fn().mockResolvedValue(null);
+    streamingService.publishEvent = jest.fn().mockResolvedValue(true);
   });
 
   describe('Predictive Financial Modeling', () => {
+    beforeEach(() => {
+      // Mock FinancialReport.find() returning chainable with sort
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
+    });
+
     it('should generate financial predictions with valid data', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 6,
         modelType: 'linear'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-      expect(response.body).toHaveProperty('predictions');
-      expect(response.body).toHaveProperty('riskMetrics');
-      expect(response.body).toHaveProperty('benchmarkData');
-      expect(response.body).toHaveProperty('modelMetadata');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
-      expect(response.body.predictions).toHaveLength(6);
-      expect(response.body.predictions[0]).toHaveProperty('period');
-      expect(response.body.predictions[0]).toHaveProperty('predictedRevenue');
-      expect(response.body.predictions[0]).toHaveProperty('predictedExpenses');
-      expect(response.body.predictions[0]).toHaveProperty('confidence');
+      expect(response).toHaveProperty('predictions');
+      expect(response).toHaveProperty('riskMetrics');
+      expect(response).toHaveProperty('benchmarkData');
+      expect(response).toHaveProperty('modelMetadata');
 
-      expect(response.body.riskMetrics).toHaveProperty('volatility');
-      expect(response.body.riskMetrics).toHaveProperty('overallRisk');
-      expect(['low', 'medium', 'high']).toContain(response.body.riskMetrics.overallRisk);
+      expect(response.predictions).toHaveLength(6);
+      expect(response.predictions[0]).toHaveProperty('period');
+      expect(response.predictions[0]).toHaveProperty('predictedRevenue');
+      expect(response.predictions[0]).toHaveProperty('predictedExpenses');
+      expect(response.predictions[0]).toHaveProperty('confidence');
+
+      expect(response.riskMetrics).toHaveProperty('volatility');
+      expect(response.riskMetrics).toHaveProperty('overallRisk');
+      expect(['low', 'medium', 'high']).toContain(response.riskMetrics.overallRisk);
     });
 
     it('should handle insufficient historical data', async () => {
-      // Delete most financial reports
-      await FinancialReport.deleteMany({ companyId });
-      
-      // Keep only 3 reports (below minimum requirement)
-      for (let i = 0; i < 3; i++) {
-        const report = new FinancialReport({
-          companyId,
-          reportType: 'monthly',
-          reportingPeriod: `2023-${String(i + 1).padStart(2, '0')}`,
-          totalRevenue: 100000,
-          totalExpenses: 70000,
-          createdAt: new Date(2023, i, 1)
-        });
-        await report.save();
-      }
+      // Only 3 reports - below minimum of 6
+      const shortData = mockFinancialData.slice(0, 3);
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(shortData)
+      );
 
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 6,
         modelType: 'linear'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-      expect(response.body.error).toContain('Insufficient historical data');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Insufficient historical data');
     });
 
     it('should require companyId parameter', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         periods: 6,
         modelType: 'linear'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-      expect(response.body.error).toContain('Company ID is required');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
     });
 
     it('should store prediction results in memory service', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 3,
         modelType: 'linear'
-      };
+      });
 
-      await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(memoryService.storeAnalytics).toHaveBeenCalledWith(
         companyId,
         'financial_predictions',
@@ -191,17 +170,15 @@ describe('Analytics Controller', () => {
     });
 
     it('should publish analytics events', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 3,
         modelType: 'linear'
-      };
+      });
 
-      await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(streamingService.publishEvent).toHaveBeenCalledWith(
         'analytics.prediction.generated',
         expect.objectContaining({
@@ -214,10 +191,13 @@ describe('Analytics Controller', () => {
   });
 
   describe('Risk Assessment', () => {
-    beforeEach(async () => {
-      // Create test security audits
-      const securityAudits = [
+    let mockSecurityAudits;
+    let mockDocuments;
+
+    beforeEach(() => {
+      mockSecurityAudits = [
         {
+          _id: 'audit-1',
           companyId,
           auditType: 'security',
           severity: 'high',
@@ -226,6 +206,7 @@ describe('Analytics Controller', () => {
           createdAt: new Date()
         },
         {
+          _id: 'audit-2',
           companyId,
           auditType: 'compliance',
           severity: 'medium',
@@ -235,80 +216,87 @@ describe('Analytics Controller', () => {
         }
       ];
 
-      for (const audit of securityAudits) {
-        await new SecurityAudit(audit).save();
-      }
-
-      // Create test documents
-      const documents = [
+      mockDocuments = [
         {
+          _id: 'doc-1',
           companyId,
           title: 'Test Document 1',
           documentType: 'financial',
           confidentialityLevel: 'high',
-          status: 'active',
-          uploadedBy: new mongoose.Types.ObjectId(),
-          filename: 'test1.pdf',
-          filePath: '/test/path1'
+          status: 'active'
         },
         {
+          _id: 'doc-2',
           companyId,
           title: 'Test Document 2',
           documentType: 'legal',
           confidentialityLevel: 'medium',
-          status: 'active',
-          uploadedBy: new mongoose.Types.ObjectId(),
-          filename: 'test2.pdf',
-          filePath: '/test/path2'
+          status: 'active'
         }
       ];
 
-      for (const doc of documents) {
-        await new Document(doc).save();
-      }
+      const mockCompanyData = {
+        _id: companyId,
+        name: 'Test Analytics Company',
+        industry: 'Technology',
+        size: 'medium',
+        status: 'active'
+      };
+
+      // Mock chainable patterns used in riskAssessment
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
+      Company.findById = jest.fn().mockResolvedValue(mockCompanyData);
+      SecurityAudit.find = jest.fn().mockReturnValue(
+        createChainableMock(mockSecurityAudits)
+      );
+      Document.find = jest.fn().mockReturnValue(
+        createChainableMock(mockDocuments)
+      );
     });
 
     it('should perform comprehensive risk assessment', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         assessmentType: 'comprehensive'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/risk-assessment')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.riskAssessment(req, res);
 
-      expect(response.body).toHaveProperty('riskAssessment');
-      expect(response.body).toHaveProperty('recommendations');
-      expect(response.body).toHaveProperty('anomalies');
-      expect(response.body).toHaveProperty('metadata');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
-      const riskAssessment = response.body.riskAssessment;
-      expect(riskAssessment).toHaveProperty('financialRisk');
-      expect(riskAssessment).toHaveProperty('operationalRisk');
-      expect(riskAssessment).toHaveProperty('complianceRisk');
-      expect(riskAssessment).toHaveProperty('marketRisk');
-      expect(riskAssessment).toHaveProperty('overallRisk');
+      expect(response).toHaveProperty('riskAssessment');
+      expect(response).toHaveProperty('recommendations');
+      expect(response).toHaveProperty('anomalies');
+      expect(response).toHaveProperty('metadata');
 
-      expect(['low', 'medium', 'high']).toContain(riskAssessment.overallRisk);
+      const riskResult = response.riskAssessment;
+      expect(riskResult).toHaveProperty('financialRisk');
+      expect(riskResult).toHaveProperty('operationalRisk');
+      expect(riskResult).toHaveProperty('complianceRisk');
+      expect(riskResult).toHaveProperty('marketRisk');
+      expect(riskResult).toHaveProperty('overallRisk');
+
+      expect(['low', 'medium', 'high']).toContain(riskResult.overallRisk);
     });
 
     it('should generate risk mitigation recommendations', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         assessmentType: 'comprehensive'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/risk-assessment')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.riskAssessment(req, res);
 
-      expect(response.body.recommendations).toBeInstanceOf(Array);
-      
-      if (response.body.recommendations.length > 0) {
-        const recommendation = response.body.recommendations[0];
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+
+      expect(response.recommendations).toBeInstanceOf(Array);
+
+      if (response.recommendations.length > 0) {
+        const recommendation = response.recommendations[0];
         expect(recommendation).toHaveProperty('category');
         expect(recommendation).toHaveProperty('priority');
         expect(recommendation).toHaveProperty('recommendation');
@@ -317,20 +305,20 @@ describe('Analytics Controller', () => {
     });
 
     it('should detect anomalies in risk patterns', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         assessmentType: 'comprehensive'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/risk-assessment')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.riskAssessment(req, res);
 
-      expect(response.body.anomalies).toBeInstanceOf(Array);
-      
-      if (response.body.anomalies.length > 0) {
-        const anomaly = response.body.anomalies[0];
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+
+      expect(response.anomalies).toBeInstanceOf(Array);
+
+      if (response.anomalies.length > 0) {
+        const anomaly = response.anomalies[0];
         expect(anomaly).toHaveProperty('type');
         expect(anomaly).toHaveProperty('severity');
         expect(anomaly).toHaveProperty('description');
@@ -339,88 +327,100 @@ describe('Analytics Controller', () => {
     });
 
     it('should require companyId parameter', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         assessmentType: 'comprehensive'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/risk-assessment')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.riskAssessment(req, res);
 
-      expect(response.body.error).toContain('Company ID is required');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
     });
   });
 
   describe('Performance Benchmarking', () => {
+    beforeEach(() => {
+      const mockCompanyData = {
+        _id: companyId,
+        name: 'Test Analytics Company',
+        industry: 'Technology',
+        size: 'medium',
+        status: 'active'
+      };
+
+      Company.findById = jest.fn().mockResolvedValue(mockCompanyData);
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
+    });
+
     it('should generate performance benchmarks', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         industry: 'Technology',
         companySize: 'medium'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/benchmark')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.performanceBenchmarking(req, res);
 
-      expect(response.body).toHaveProperty('companyMetrics');
-      expect(response.body).toHaveProperty('industryBenchmarks');
-      expect(response.body).toHaveProperty('peerComparison');
-      expect(response.body).toHaveProperty('insights');
-      expect(response.body).toHaveProperty('metadata');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
-      const companyMetrics = response.body.companyMetrics;
+      expect(response).toHaveProperty('companyMetrics');
+      expect(response).toHaveProperty('industryBenchmarks');
+      expect(response).toHaveProperty('peerComparison');
+      expect(response).toHaveProperty('insights');
+      expect(response).toHaveProperty('metadata');
+
+      const companyMetrics = response.companyMetrics;
       expect(companyMetrics).toHaveProperty('revenueGrowth');
       expect(companyMetrics).toHaveProperty('profitMargin');
       expect(companyMetrics).toHaveProperty('overallScore');
 
-      const industryBenchmarks = response.body.industryBenchmarks;
+      const industryBenchmarks = response.industryBenchmarks;
       expect(industryBenchmarks).toHaveProperty('revenueGrowth');
       expect(industryBenchmarks).toHaveProperty('profitMargin');
       expect(industryBenchmarks).toHaveProperty('riskLevel');
 
-      const peerComparison = response.body.peerComparison;
+      const peerComparison = response.peerComparison;
       expect(peerComparison).toHaveProperty('ranking');
       expect(peerComparison).toHaveProperty('totalPeers');
       expect(peerComparison).toHaveProperty('performanceScore');
     });
 
     it('should handle companies with no financial data', async () => {
-      // Delete all financial reports
-      await FinancialReport.deleteMany({ companyId });
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock([])
+      );
 
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         industry: 'Technology',
         companySize: 'medium'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/benchmark')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.performanceBenchmarking(req, res);
 
-      expect(response.body.error).toContain('No financial data available');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('No financial data available');
     });
 
     it('should generate performance insights', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         industry: 'Technology',
         companySize: 'medium'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/benchmark')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.performanceBenchmarking(req, res);
 
-      expect(response.body.insights).toBeInstanceOf(Array);
-      
-      if (response.body.insights.length > 0) {
-        const insight = response.body.insights[0];
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+
+      expect(response.insights).toBeInstanceOf(Array);
+
+      if (response.insights.length > 0) {
+        const insight = response.insights[0];
         expect(insight).toHaveProperty('type');
         expect(insight).toHaveProperty('category');
         expect(insight).toHaveProperty('message');
@@ -430,42 +430,35 @@ describe('Analytics Controller', () => {
   });
 
   describe('Automated Report Generation', () => {
-    beforeEach(async () => {
-      // Create additional test data for comprehensive reports
-      const securityAudit = new SecurityAudit({
-        companyId,
-        auditType: 'security',
-        severity: 'medium',
-        status: 'passed',
-        findings: ['Security checks passed'],
-        createdAt: new Date()
-      });
-      await securityAudit.save();
+    beforeEach(() => {
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
     });
 
     it('should generate comprehensive automated reports', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         reportType: 'comprehensive',
         format: 'json'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/generate-report')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.automatedReportGeneration(req, res);
 
-      expect(response.body).toHaveProperty('executiveSummary');
-      expect(response.body).toHaveProperty('reports');
-      expect(response.body).toHaveProperty('metadata');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
-      const reports = response.body.reports;
+      expect(response).toHaveProperty('executiveSummary');
+      expect(response).toHaveProperty('reports');
+      expect(response).toHaveProperty('metadata');
+
+      const reports = response.reports;
       expect(reports).toHaveProperty('financial');
       expect(reports).toHaveProperty('risk');
       expect(reports).toHaveProperty('performance');
       expect(reports).toHaveProperty('compliance');
 
-      const executiveSummary = response.body.executiveSummary;
+      const executiveSummary = response.executiveSummary;
       expect(executiveSummary).toHaveProperty('overallHealth');
       expect(executiveSummary).toHaveProperty('keyMetrics');
       expect(executiveSummary).toHaveProperty('recommendations');
@@ -473,82 +466,107 @@ describe('Analytics Controller', () => {
     });
 
     it('should generate specific report types', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         reportType: 'financial',
         format: 'json'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/generate-report')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.automatedReportGeneration(req, res);
 
-      expect(response.body.reports).toHaveProperty('financial');
-      expect(response.body.reports).not.toHaveProperty('risk');
-      expect(response.body.reports).not.toHaveProperty('performance');
-      expect(response.body.reports).not.toHaveProperty('compliance');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+
+      expect(response.reports).toHaveProperty('financial');
+      expect(response.reports).not.toHaveProperty('risk');
+      expect(response.reports).not.toHaveProperty('performance');
+      expect(response.reports).not.toHaveProperty('compliance');
     });
 
     it('should require companyId parameter', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         reportType: 'comprehensive',
         format: 'json'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/generate-report')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.automatedReportGeneration(req, res);
 
-      expect(response.body.error).toContain('Company ID is required');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
     });
   });
 
   describe('Anomaly Detection', () => {
-    beforeEach(async () => {
-      // Create test data with anomalies
-      const anomalousReport = new FinancialReport({
+    let mockSecurityAudits;
+    let mockDocuments;
+
+    beforeEach(() => {
+      // Create data with anomalies
+      const anomalousData = [...mockFinancialData];
+      anomalousData.unshift({
+        _id: 'anomalous-report',
         companyId,
         reportType: 'monthly',
         reportingPeriod: '2023-13',
-        totalRevenue: -50000, // Negative revenue anomaly
-        totalExpenses: 1000000, // Unusually high expenses
+        totalRevenue: -50000,
+        totalExpenses: 1000000,
         createdAt: new Date()
       });
-      await anomalousReport.save();
 
-      const criticalAudit = new SecurityAudit({
-        companyId,
-        auditType: 'security',
-        severity: 'critical',
-        status: 'failed',
-        findings: ['Critical security breach detected'],
-        createdAt: new Date()
-      });
-      await criticalAudit.save();
+      mockSecurityAudits = [
+        {
+          _id: 'critical-audit',
+          companyId,
+          auditType: 'security',
+          severity: 'critical',
+          status: 'failed',
+          findings: ['Critical security breach detected'],
+          issueType: 'breach',
+          createdAt: new Date()
+        }
+      ];
+
+      mockDocuments = [
+        {
+          _id: 'doc-1',
+          companyId,
+          title: 'Test Document',
+          status: 'active'
+        }
+      ];
+
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(anomalousData)
+      );
+      SecurityAudit.find = jest.fn().mockReturnValue(
+        createChainableMock(mockSecurityAudits)
+      );
+      Document.find = jest.fn().mockReturnValue(
+        createChainableMock(mockDocuments)
+      );
+      memoryService.getAnalytics = jest.fn().mockResolvedValue(null);
     });
 
     it('should detect comprehensive anomalies', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         analysisType: 'comprehensive',
         sensitivity: 'medium'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/anomaly-detection')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.anomalyDetection(req, res);
 
-      expect(response.body).toHaveProperty('anomalies');
-      expect(response.body).toHaveProperty('recommendations');
-      expect(response.body).toHaveProperty('summary');
-      expect(response.body).toHaveProperty('metadata');
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
-      const anomalies = response.body.anomalies;
+      expect(response).toHaveProperty('anomalies');
+      expect(response).toHaveProperty('recommendations');
+      expect(response).toHaveProperty('summary');
+      expect(response).toHaveProperty('metadata');
+
+      const anomalies = response.anomalies;
       expect(anomalies).toBeInstanceOf(Array);
-      
+
       if (anomalies.length > 0) {
         const anomaly = anomalies[0];
         expect(anomaly).toHaveProperty('type');
@@ -559,7 +577,7 @@ describe('Analytics Controller', () => {
         expect(['critical', 'high', 'medium', 'low']).toContain(anomaly.severity);
       }
 
-      const summary = response.body.summary;
+      const summary = response.summary;
       expect(summary).toHaveProperty('total');
       expect(summary).toHaveProperty('critical');
       expect(summary).toHaveProperty('high');
@@ -568,21 +586,21 @@ describe('Analytics Controller', () => {
     });
 
     it('should generate anomaly resolution recommendations', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         analysisType: 'comprehensive',
         sensitivity: 'high'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/anomaly-detection')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.anomalyDetection(req, res);
 
-      expect(response.body.recommendations).toBeInstanceOf(Array);
-      
-      if (response.body.recommendations.length > 0) {
-        const recommendation = response.body.recommendations[0];
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+
+      expect(response.recommendations).toBeInstanceOf(Array);
+
+      if (response.recommendations.length > 0) {
+        const recommendation = response.recommendations[0];
         expect(recommendation).toHaveProperty('anomalyId');
         expect(recommendation).toHaveProperty('recommendation');
         expect(recommendation).toHaveProperty('priority');
@@ -591,20 +609,20 @@ describe('Analytics Controller', () => {
     });
 
     it('should publish critical anomaly alerts', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         analysisType: 'comprehensive',
         sensitivity: 'high'
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/anomaly-detection')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.anomalyDetection(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
 
       // Check if critical anomalies triggered alerts
-      const criticalAnomalies = response.body.anomalies.filter(a => a.severity === 'critical');
-      
+      const criticalAnomalies = response.anomalies.filter(a => a.severity === 'critical');
+
       if (criticalAnomalies.length > 0) {
         expect(streamingService.publishEvent).toHaveBeenCalledWith(
           'analytics.anomaly.critical',
@@ -620,90 +638,165 @@ describe('Analytics Controller', () => {
 
     it('should handle different sensitivity levels', async () => {
       const sensitivities = ['low', 'medium', 'high'];
-      
+
       for (const sensitivity of sensitivities) {
-        const requestBody = {
+        jest.clearAllMocks();
+
+        // Re-setup mocks after clearAllMocks
+        const anomalousData = [...mockFinancialData];
+        anomalousData.unshift({
+          _id: 'anomalous-report',
+          companyId,
+          reportType: 'monthly',
+          reportingPeriod: '2023-13',
+          totalRevenue: -50000,
+          totalExpenses: 1000000,
+          createdAt: new Date()
+        });
+
+        FinancialReport.find = jest.fn().mockReturnValue(
+          createChainableMock(anomalousData)
+        );
+        SecurityAudit.find = jest.fn().mockReturnValue(
+          createChainableMock(mockSecurityAudits)
+        );
+        Document.find = jest.fn().mockReturnValue(
+          createChainableMock(mockDocuments)
+        );
+        memoryService.getAnalytics = jest.fn().mockResolvedValue(null);
+        memoryService.storeAnalytics = jest.fn().mockResolvedValue(true);
+        streamingService.publishEvent = jest.fn().mockResolvedValue(true);
+
+        const { req, res } = createMockReqRes({
           companyId,
           analysisType: 'comprehensive',
           sensitivity
-        };
+        });
 
-        const response = await request(app)
-          .post('/api/v1/analytics/anomaly-detection')
-          .send(requestBody)
-          .expect(200);
+        await analyticsController.anomalyDetection(req, res);
 
-        expect(response.body.metadata.sensitivity).toBe(sensitivity);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json.mock.calls[0][0].metadata.sensitivity).toBe(sensitivity);
       }
+    });
+
+    it('should require companyId parameter', async () => {
+      const { req, res } = createMockReqRes({
+        analysisType: 'comprehensive',
+        sensitivity: 'medium'
+      });
+
+      await analyticsController.anomalyDetection(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle invalid company ID', async () => {
-      const invalidCompanyId = new mongoose.Types.ObjectId().toString();
-      
-      const requestBody = {
+    it('should handle invalid company ID with no data', async () => {
+      const invalidCompanyId = 'nonexistent-company-id';
+
+      // Return empty data for unknown company
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock([])
+      );
+
+      const { req, res } = createMockReqRes({
         companyId: invalidCompanyId,
         periods: 6
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(400);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-      expect(response.body.error).toContain('Insufficient historical data');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Insufficient historical data');
     });
 
     it('should handle service errors gracefully', async () => {
-      // Mock service error
-      memoryService.storeAnalytics.mockRejectedValue(new Error('Service unavailable'));
+      // Set up valid data first
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
 
-      const requestBody = {
+      // Then make memoryService fail
+      memoryService.storeAnalytics = jest.fn().mockRejectedValue(
+        new Error('Service unavailable')
+      );
+
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 3
-      };
+      });
 
-      const response = await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(500);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-      expect(response.body.error).toContain('Failed to generate financial predictions');
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json.mock.calls[0][0].error).toContain('Failed to generate financial predictions');
     });
 
-    it('should handle missing required parameters', async () => {
-      const endpoints = [
-        '/api/v1/analytics/predict',
-        '/api/v1/analytics/risk-assessment',
-        '/api/v1/analytics/benchmark',
-        '/api/v1/analytics/generate-report',
-        '/api/v1/analytics/anomaly-detection'
-      ];
+    it('should handle missing required parameters for predictions', async () => {
+      const { req, res } = createMockReqRes({});
 
-      for (const endpoint of endpoints) {
-        const response = await request(app)
-          .post(endpoint)
-          .send({})
-          .expect(400);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
-        expect(response.body.error).toContain('Company ID is required');
-      }
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
+    });
+
+    it('should handle missing required parameters for risk assessment', async () => {
+      const { req, res } = createMockReqRes({});
+
+      await analyticsController.riskAssessment(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
+    });
+
+    it('should handle missing required parameters for benchmarking', async () => {
+      const { req, res } = createMockReqRes({});
+
+      await analyticsController.performanceBenchmarking(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
+    });
+
+    it('should handle missing required parameters for report generation', async () => {
+      const { req, res } = createMockReqRes({});
+
+      await analyticsController.automatedReportGeneration(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
+    });
+
+    it('should handle missing required parameters for anomaly detection', async () => {
+      const { req, res } = createMockReqRes({});
+
+      await analyticsController.anomalyDetection(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain('Company ID is required');
     });
   });
 
   describe('Integration with External Services', () => {
+    beforeEach(() => {
+      FinancialReport.find = jest.fn().mockReturnValue(
+        createChainableMock(mockFinancialData)
+      );
+    });
+
     it('should integrate with memory service for data persistence', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 3
-      };
+      });
 
-      await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(memoryService.storeAnalytics).toHaveBeenCalledWith(
         companyId,
         'financial_predictions',
@@ -712,16 +805,14 @@ describe('Analytics Controller', () => {
     });
 
     it('should integrate with streaming service for real-time events', async () => {
-      const requestBody = {
+      const { req, res } = createMockReqRes({
         companyId,
         periods: 3
-      };
+      });
 
-      await request(app)
-        .post('/api/v1/analytics/predict')
-        .send(requestBody)
-        .expect(200);
+      await analyticsController.predictiveFinancialModeling(req, res);
 
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(streamingService.publishEvent).toHaveBeenCalledWith(
         'analytics.prediction.generated',
         expect.objectContaining({
@@ -742,14 +833,14 @@ describe('Analytics Helper Functions', () => {
         if (idx === 0) return sum;
         return sum + (val - data[idx - 1]);
       }, 0) / (data.length - 1);
-      
+
       expect(trend).toBe(10); // Expected trend
     });
 
     it('should handle empty data arrays', () => {
       const data = [];
       const trend = data.length < 2 ? 0 : 10; // Mock implementation
-      
+
       expect(trend).toBe(0);
     });
   });
@@ -762,13 +853,13 @@ describe('Analytics Helper Functions', () => {
         { totalRevenue: 90000 },
         { totalRevenue: 120000 }
       ];
-      
+
       const revenues = data.map(d => d.totalRevenue);
       const mean = revenues.reduce((sum, val) => sum + val, 0) / revenues.length;
       const variance = revenues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / revenues.length;
       const stdDev = Math.sqrt(variance);
       const coefficientOfVariation = stdDev / mean;
-      
+
       expect(coefficientOfVariation).toBeGreaterThan(0);
       expect(coefficientOfVariation).toBeLessThan(1);
     });
@@ -781,16 +872,16 @@ describe('Analytics Helper Functions', () => {
         operationalRisk: 'low',
         complianceRisk: 'high'
       };
-      
+
       const riskValues = { low: 1, medium: 2, high: 3 };
       const scores = Object.values(risks).map(risk => riskValues[risk]);
       const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-      
+
       let overallRisk;
       if (avgScore >= 2.5) overallRisk = 'high';
       else if (avgScore >= 1.5) overallRisk = 'medium';
       else overallRisk = 'low';
-      
+
       expect(overallRisk).toBe('medium');
     });
   });

@@ -3,292 +3,235 @@
  *
  * Issue #92: Implement Investor Rights Tracking
  *
- * TDD: Writing tests FIRST before implementation
- * Tests for the InvestorRights model schema and validation
+ * Tests for ZeroDB-based InvestorRights model
  */
+process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock InvestorRights model - will be implemented after tests
-let InvestorRights;
+const InvestorRights = require('../../../models/InvestorRights');
 
 describe('InvestorRights Model', () => {
-  beforeAll(async () => {
-    // Dynamic import to handle the model not existing yet
-    try {
-      InvestorRights = require('../../../models/InvestorRights');
-    } catch (error) {
-      // Model doesn't exist yet - this is expected in TDD
-      InvestorRights = null;
-    }
-  });
+  describe('Schema Definition', () => {
+    it('should have correct table name', () => {
+      expect(InvestorRights.tableName).toBe('investor_rights');
+    });
 
-  describe('Schema Validation', () => {
     it('should have required fields', () => {
       expect(InvestorRights).not.toBeNull();
       const schema = InvestorRights.schema;
-      expect(schema.path('rightId')).toBeDefined();
-      expect(schema.path('investorId')).toBeDefined();
-      expect(schema.path('companyId')).toBeDefined();
-      expect(schema.path('rightType')).toBeDefined();
-      expect(schema.path('status')).toBeDefined();
+      expect(schema.rightId).toBeDefined();
+      expect(schema.investorId).toBeDefined();
+      expect(schema.companyId).toBeDefined();
+      expect(schema.rightType).toBeDefined();
+      expect(schema.status).toBeDefined();
+    });
+
+    it('should mark required fields as required', () => {
+      const schema = InvestorRights.schema;
+      expect(schema.rightId.required).toBe(true);
+      expect(schema.investorId.required).toBe(true);
+      expect(schema.companyId.required).toBe(true);
+      expect(schema.rightType.required).toBe(true);
     });
 
     it('should validate rightType enum values', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      const rightTypePath = schema.path('rightType');
-      expect(rightTypePath.enumValues).toContain('PRO_RATA');
-      expect(rightTypePath.enumValues).toContain('INFORMATION_RIGHTS');
-      expect(rightTypePath.enumValues).toContain('BOARD_SEAT');
-      expect(rightTypePath.enumValues).toContain('OBSERVER_SEAT');
-      expect(rightTypePath.enumValues).toContain('ANTI_DILUTION');
-      expect(rightTypePath.enumValues).toContain('VETO_RIGHTS');
-      expect(rightTypePath.enumValues).toContain('DRAG_ALONG');
-      expect(rightTypePath.enumValues).toContain('TAG_ALONG');
-      expect(rightTypePath.enumValues).toContain('PREEMPTIVE');
-      expect(rightTypePath.enumValues).toContain('FIRST_REFUSAL');
-      expect(rightTypePath.enumValues).toContain('CO_SALE');
-      expect(rightTypePath.enumValues).toContain('REDEMPTION');
-      expect(rightTypePath.enumValues).toContain('REGISTRATION');
+      const enumValues = InvestorRights.schema.rightType.enum;
+      expect(enumValues).toContain('PRO_RATA');
+      expect(enumValues).toContain('INFORMATION_RIGHTS');
+      expect(enumValues).toContain('BOARD_SEAT');
+      expect(enumValues).toContain('OBSERVER_SEAT');
+      expect(enumValues).toContain('ANTI_DILUTION');
+      expect(enumValues).toContain('VETO_RIGHTS');
+      expect(enumValues).toContain('DRAG_ALONG');
+      expect(enumValues).toContain('TAG_ALONG');
+      expect(enumValues).toContain('PREEMPTIVE');
+      expect(enumValues).toContain('FIRST_REFUSAL');
+      expect(enumValues).toContain('CO_SALE');
+      expect(enumValues).toContain('REDEMPTION');
+      expect(enumValues).toContain('REGISTRATION');
     });
 
     it('should validate status enum values', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      const statusPath = schema.path('status');
-      expect(statusPath.enumValues).toContain('ACTIVE');
-      expect(statusPath.enumValues).toContain('EXPIRED');
-      expect(statusPath.enumValues).toContain('EXERCISED');
-      expect(statusPath.enumValues).toContain('WAIVED');
-      expect(statusPath.enumValues).toContain('PENDING');
-      expect(statusPath.enumValues).toContain('SUSPENDED');
-    });
-
-    it('should have shareClass reference field', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.path('shareClassId')).toBeDefined();
-    });
-
-    it('should have expiration date field', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.path('expirationDate')).toBeDefined();
-    });
-
-    it('should have terms object for right-specific details', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.path('terms')).toBeDefined();
-    });
-
-    it('should have exerciseHistory array for tracking exercises', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.path('exerciseHistory')).toBeDefined();
-    });
-
-    it('should have auditLog array for historical changes', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.path('auditLog')).toBeDefined();
-    });
-
-    it('should have timestamps enabled', () => {
-      expect(InvestorRights).not.toBeNull();
-      const schema = InvestorRights.schema;
-      expect(schema.options.timestamps).toBe(true);
-    });
-  });
-
-  describe('Validation Rules', () => {
-    it('should require rightId', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE'
-      });
-
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.rightId).toBeDefined();
-    });
-
-    it('should require investorId', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE'
-      });
-
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.investorId).toBeDefined();
-    });
-
-    it('should require companyId', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE'
-      });
-
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.companyId).toBeDefined();
-    });
-
-    it('should require rightType', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        status: 'ACTIVE'
-      });
-
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.rightType).toBeDefined();
+      const enumValues = InvestorRights.schema.status.enum;
+      expect(enumValues).toContain('ACTIVE');
+      expect(enumValues).toContain('EXPIRED');
+      expect(enumValues).toContain('EXERCISED');
+      expect(enumValues).toContain('WAIVED');
+      expect(enumValues).toContain('PENDING');
+      expect(enumValues).toContain('SUSPENDED');
     });
 
     it('should default status to ACTIVE', () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA'
-      });
-
-      expect(right.status).toBe('ACTIVE');
+      expect(InvestorRights.schema.status.default).toBe('ACTIVE');
     });
 
-    it('should reject invalid rightType', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'INVALID_TYPE',
-        status: 'ACTIVE'
-      });
-
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.rightType).toBeDefined();
+    it('should have shareClass reference field', () => {
+      expect(InvestorRights.schema.shareClassId).toBeDefined();
     });
 
-    it('should reject invalid status', async () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'INVALID_STATUS'
-      });
+    it('should have expiration date field', () => {
+      expect(InvestorRights.schema.expirationDate).toBeDefined();
+      expect(InvestorRights.schema.expirationDate.type).toBe('date');
+    });
 
-      const validationError = right.validateSync();
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.status).toBeDefined();
+    it('should have terms object for right-specific details', () => {
+      expect(InvestorRights.schema.terms).toBeDefined();
+      expect(InvestorRights.schema.terms.type).toBe('object');
+    });
+
+    it('should have exerciseHistory array for tracking exercises', () => {
+      expect(InvestorRights.schema.exerciseHistory).toBeDefined();
+      expect(InvestorRights.schema.exerciseHistory.type).toBe('array');
+    });
+
+    it('should have auditLog array for historical changes', () => {
+      expect(InvestorRights.schema.auditLog).toBeDefined();
+      expect(InvestorRights.schema.auditLog.type).toBe('array');
+    });
+
+    it('should have timestamp fields', () => {
+      expect(InvestorRights.schema.createdAt).toBeDefined();
+      expect(InvestorRights.schema.updatedAt).toBeDefined();
     });
   });
 
-  describe('Instance Methods', () => {
-    it('should have isExpired method', () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE',
-        expirationDate: new Date(Date.now() - 86400000) // Yesterday
-      });
-
-      expect(typeof right.isExpired).toBe('function');
-      expect(right.isExpired()).toBe(true);
+  describe('isExpired', () => {
+    it('should return true for expired right', () => {
+      const right = {
+        expirationDate: new Date(Date.now() - 86400000).toISOString() // Yesterday
+      };
+      expect(InvestorRights.isExpired(right)).toBe(true);
     });
 
-    it('should have canExercise method', () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE',
-        expirationDate: new Date(Date.now() + 86400000) // Tomorrow
-      });
-
-      expect(typeof right.canExercise).toBe('function');
-      expect(right.canExercise()).toBe(true);
+    it('should return false for non-expired right', () => {
+      const right = {
+        expirationDate: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+      };
+      expect(InvestorRights.isExpired(right)).toBe(false);
     });
 
-    it('should have addAuditEntry method', () => {
-      expect(InvestorRights).not.toBeNull();
-      const right = new InvestorRights({
-        rightId: 'RIGHT-001',
-        investorId: 'INV-001',
-        companyId: 'COMP-001',
-        rightType: 'PRO_RATA',
-        status: 'ACTIVE'
-      });
+    it('should return false when no expiration date', () => {
+      const right = {};
+      expect(InvestorRights.isExpired(right)).toBe(false);
+    });
+  });
 
-      expect(typeof right.addAuditEntry).toBe('function');
+  describe('canExercise', () => {
+    it('should return true for active, non-expired right', () => {
+      const right = {
+        status: 'ACTIVE',
+        expirationDate: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+      };
+      expect(InvestorRights.canExercise(right)).toBe(true);
+    });
+
+    it('should return false for expired right', () => {
+      const right = {
+        status: 'ACTIVE',
+        expirationDate: new Date(Date.now() - 86400000).toISOString() // Yesterday
+      };
+      expect(InvestorRights.canExercise(right)).toBe(false);
+    });
+
+    it('should return false for non-active right', () => {
+      const right = {
+        status: 'WAIVED',
+        expirationDate: new Date(Date.now() + 86400000).toISOString()
+      };
+      expect(InvestorRights.canExercise(right)).toBe(false);
+    });
+
+    it('should return false if effective date has not passed', () => {
+      const right = {
+        status: 'ACTIVE',
+        effectiveDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+        expirationDate: new Date(Date.now() + 2 * 86400000).toISOString()
+      };
+      expect(InvestorRights.canExercise(right)).toBe(false);
+    });
+  });
+
+  describe('Constants', () => {
+    it('should export RIGHT_TYPES constant', () => {
+      expect(InvestorRights.RIGHT_TYPES).toBeDefined();
+      expect(InvestorRights.RIGHT_TYPES).toContain('PRO_RATA');
+      expect(InvestorRights.RIGHT_TYPES).toContain('BOARD_SEAT');
+    });
+
+    it('should export VALID_STATUSES constant', () => {
+      expect(InvestorRights.VALID_STATUSES).toBeDefined();
+      expect(InvestorRights.VALID_STATUSES).toContain('ACTIVE');
+      expect(InvestorRights.VALID_STATUSES).toContain('EXPIRED');
+    });
+
+    it('should export SOURCE_DOCUMENT_TYPES constant', () => {
+      expect(InvestorRights.SOURCE_DOCUMENT_TYPES).toBeDefined();
+      expect(InvestorRights.SOURCE_DOCUMENT_TYPES).toContain('INVESTOR_RIGHTS_AGREEMENT');
+    });
+
+    it('should export AUDIT_ACTIONS constant', () => {
+      expect(InvestorRights.AUDIT_ACTIONS).toBeDefined();
+      expect(InvestorRights.AUDIT_ACTIONS).toContain('CREATED');
+      expect(InvestorRights.AUDIT_ACTIONS).toContain('EXERCISED');
     });
   });
 
   describe('Static Methods', () => {
-    it('should have findByInvestor static method', () => {
-      expect(InvestorRights).not.toBeNull();
+    it('should have findByInvestor method', () => {
       expect(typeof InvestorRights.findByInvestor).toBe('function');
     });
 
-    it('should have findByCompany static method', () => {
-      expect(InvestorRights).not.toBeNull();
+    it('should have findByCompany method', () => {
       expect(typeof InvestorRights.findByCompany).toBe('function');
     });
 
-    it('should have findByShareClass static method', () => {
-      expect(InvestorRights).not.toBeNull();
+    it('should have findByShareClass method', () => {
       expect(typeof InvestorRights.findByShareClass).toBe('function');
     });
 
-    it('should have findExpiring static method', () => {
-      expect(InvestorRights).not.toBeNull();
+    it('should have findExpiring method', () => {
       expect(typeof InvestorRights.findExpiring).toBe('function');
     });
 
-    it('should have checkConflicts static method', () => {
-      expect(InvestorRights).not.toBeNull();
+    it('should have checkConflicts method', () => {
       expect(typeof InvestorRights.checkConflicts).toBe('function');
+    });
+
+    it('should have addAuditEntry method', () => {
+      expect(typeof InvestorRights.addAuditEntry).toBe('function');
+    });
+
+    it('should have recordExercise method', () => {
+      expect(typeof InvestorRights.recordExercise).toBe('function');
+    });
+
+    it('should have waive method', () => {
+      expect(typeof InvestorRights.waive).toBe('function');
     });
   });
 
-  describe('Indexes', () => {
-    it('should have compound index on investorId and companyId', () => {
-      expect(InvestorRights).not.toBeNull();
-      const indexes = InvestorRights.schema.indexes();
-      const compoundIndex = indexes.find(idx =>
-        idx[0].investorId && idx[0].companyId
-      );
-      expect(compoundIndex).toBeDefined();
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof InvestorRights.create).toBe('function');
     });
 
-    it('should have index on expirationDate for expiration queries', () => {
-      expect(InvestorRights).not.toBeNull();
-      const indexes = InvestorRights.schema.indexes();
-      const expirationIndex = indexes.find(idx => idx[0].expirationDate);
-      expect(expirationIndex).toBeDefined();
+    it('should have find method', () => {
+      expect(typeof InvestorRights.find).toBe('function');
+    });
+
+    it('should have findOne method', () => {
+      expect(typeof InvestorRights.findOne).toBe('function');
+    });
+
+    it('should have findById method', () => {
+      expect(typeof InvestorRights.findById).toBe('function');
+    });
+
+    it('should have updateOne method', () => {
+      expect(typeof InvestorRights.updateOne).toBe('function');
+    });
+
+    it('should have deleteOne method', () => {
+      expect(typeof InvestorRights.deleteOne).toBe('function');
     });
   });
 });

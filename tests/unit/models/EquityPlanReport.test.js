@@ -1,31 +1,22 @@
 /**
  * EquityPlanReport Model Unit Tests
  * Issue #110: Implement Equity Plan Reports
- * TDD Red Phase: Tests written before implementation
+ * Rewritten for ZeroDB model compatibility
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock mongoose to avoid database connection
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    connect: jest.fn().mockResolvedValue({}),
-    connection: {
-      readyState: 1,
-      on: jest.fn(),
-      once: jest.fn()
-    }
-  };
-});
+// Mock zerodbService to prevent real API calls
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  projectId: 'test-project'
+}));
 
 describe('EquityPlanReport Model', () => {
   let EquityPlanReport;
 
   beforeAll(() => {
-    // Clear module cache to ensure fresh model load
     jest.resetModules();
     EquityPlanReport = require('../../../models/EquityPlanReport');
   });
@@ -36,385 +27,240 @@ describe('EquityPlanReport Model', () => {
 
   describe('Schema Definition', () => {
     it('should have reportId field', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('reportId')).toBeDefined();
+      expect(EquityPlanReport.schema.reportId).toBeDefined();
     });
 
     it('should have reportType field with valid enum values', () => {
-      const schema = EquityPlanReport.schema;
-      const reportTypePath = schema.path('reportType');
-      expect(reportTypePath).toBeDefined();
-      expect(reportTypePath.enumValues).toContain('option_pool_summary');
-      expect(reportTypePath.enumValues).toContain('grant_status');
-      expect(reportTypePath.enumValues).toContain('vesting_schedule');
-      expect(reportTypePath.enumValues).toContain('dilution_analysis');
+      const reportTypeField = EquityPlanReport.schema.reportType;
+      expect(reportTypeField).toBeDefined();
+      expect(reportTypeField.enum).toContain('option_pool_summary');
+      expect(reportTypeField.enum).toContain('grant_status');
+      expect(reportTypeField.enum).toContain('vesting_schedule');
+      expect(reportTypeField.enum).toContain('dilution_analysis');
     });
 
     it('should have companyId field', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('companyId')).toBeDefined();
+      expect(EquityPlanReport.schema.companyId).toBeDefined();
     });
 
     it('should have date range fields (startDate, endDate)', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('startDate')).toBeDefined();
-      expect(schema.path('endDate')).toBeDefined();
+      expect(EquityPlanReport.schema.startDate).toBeDefined();
+      expect(EquityPlanReport.schema.endDate).toBeDefined();
     });
 
     it('should have generatedData field for storing report results', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('generatedData')).toBeDefined();
+      expect(EquityPlanReport.schema.generatedData).toBeDefined();
     });
 
     it('should have format field with valid enum values', () => {
-      const schema = EquityPlanReport.schema;
-      const formatPath = schema.path('format');
-      expect(formatPath).toBeDefined();
-      expect(formatPath.enumValues).toContain('pdf');
-      expect(formatPath.enumValues).toContain('excel');
-      expect(formatPath.enumValues).toContain('csv');
-      expect(formatPath.enumValues).toContain('json');
+      const formatField = EquityPlanReport.schema.format;
+      expect(formatField).toBeDefined();
+      expect(formatField.enum).toContain('pdf');
+      expect(formatField.enum).toContain('excel');
+      expect(formatField.enum).toContain('csv');
+      expect(formatField.enum).toContain('json');
     });
 
     it('should have status field with valid enum values', () => {
-      const schema = EquityPlanReport.schema;
-      const statusPath = schema.path('status');
-      expect(statusPath).toBeDefined();
-      expect(statusPath.enumValues).toContain('pending');
-      expect(statusPath.enumValues).toContain('generating');
-      expect(statusPath.enumValues).toContain('completed');
-      expect(statusPath.enumValues).toContain('failed');
+      const statusField = EquityPlanReport.schema.status;
+      expect(statusField).toBeDefined();
+      expect(statusField.enum).toContain('pending');
+      expect(statusField.enum).toContain('generating');
+      expect(statusField.enum).toContain('completed');
+      expect(statusField.enum).toContain('failed');
     });
 
-    it('should have timestamps', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.options.timestamps).toBe(true);
+    it('should have timestamps (createdAt and updatedAt)', () => {
+      expect(EquityPlanReport.schema.createdAt).toBeDefined();
+      expect(EquityPlanReport.schema.updatedAt).toBeDefined();
     });
 
     it('should have requestedBy field', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('requestedBy')).toBeDefined();
+      expect(EquityPlanReport.schema.requestedBy).toBeDefined();
     });
 
     it('should have generatedAt field', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('generatedAt')).toBeDefined();
+      expect(EquityPlanReport.schema.generatedAt).toBeDefined();
     });
 
     it('should have errorMessage field for failed reports', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('errorMessage')).toBeDefined();
+      expect(EquityPlanReport.schema.errorMessage).toBeDefined();
     });
 
     it('should have fileUrl field for storing exported file URL', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('fileUrl')).toBeDefined();
+      expect(EquityPlanReport.schema.fileUrl).toBeDefined();
     });
 
     it('should have parameters field for report configuration', () => {
-      const schema = EquityPlanReport.schema;
-      expect(schema.path('parameters')).toBeDefined();
+      expect(EquityPlanReport.schema.parameters).toBeDefined();
+    });
+  });
+
+  describe('Field Properties', () => {
+    it('should require reportId', () => {
+      expect(EquityPlanReport.schema.reportId.required).toBe(true);
+    });
+
+    it('should require reportType', () => {
+      expect(EquityPlanReport.schema.reportType.required).toBe(true);
+    });
+
+    it('should require companyId', () => {
+      expect(EquityPlanReport.schema.companyId.required).toBe(true);
+    });
+
+    it('should have reportId marked as unique', () => {
+      expect(EquityPlanReport.schema.reportId.unique).toBe(true);
     });
   });
 
   describe('Default Values', () => {
     it('should have default status of pending', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001'
-      });
-      expect(report.status).toBe('pending');
+      expect(EquityPlanReport.schema.status.default).toBe('pending');
     });
 
     it('should have default format of json', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001'
-      });
-      expect(report.format).toBe('json');
+      expect(EquityPlanReport.schema.format.default).toBe('json');
     });
   });
 
-  describe('Validation', () => {
-    it('should require reportId', async () => {
-      const report = new EquityPlanReport({
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.reportId).toBeDefined();
+  describe('Enum Validation', () => {
+    it('should only allow valid reportType values', () => {
+      const validTypes = ['option_pool_summary', 'grant_status', 'vesting_schedule', 'dilution_analysis'];
+      expect(EquityPlanReport.schema.reportType.enum).toEqual(validTypes);
     });
 
-    it('should require reportType', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        companyId: 'COMP-001'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.reportType).toBeDefined();
+    it('should only allow valid status values', () => {
+      const validStatuses = ['pending', 'generating', 'completed', 'failed'];
+      expect(EquityPlanReport.schema.status.enum).toEqual(validStatuses);
     });
 
-    it('should require companyId', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.companyId).toBeDefined();
+    it('should only allow valid format values', () => {
+      const validFormats = ['pdf', 'excel', 'csv', 'json'];
+      expect(EquityPlanReport.schema.format.enum).toEqual(validFormats);
     });
 
-    it('should reject invalid reportType', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'invalid_type',
-        companyId: 'COMP-001'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.reportType).toBeDefined();
+    it('should not include invalid reportType values', () => {
+      expect(EquityPlanReport.schema.reportType.enum).not.toContain('invalid_type');
     });
 
-    it('should reject invalid status', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'invalid_status'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.status).toBeDefined();
+    it('should not include invalid status values', () => {
+      expect(EquityPlanReport.schema.status.enum).not.toContain('invalid_status');
     });
 
-    it('should reject invalid format', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        format: 'invalid_format'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeDefined();
-      expect(validationError.errors.format).toBeDefined();
-    });
-
-    it('should validate successfully with all required fields', async () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001'
-      });
-
-      let validationError;
-      try {
-        await report.validate();
-      } catch (error) {
-        validationError = error;
-      }
-
-      expect(validationError).toBeUndefined();
+    it('should not include invalid format values', () => {
+      expect(EquityPlanReport.schema.format.enum).not.toContain('invalid_format');
     });
   });
 
-  describe('Instance Creation', () => {
-    it('should create a valid option pool summary report', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-12-31'),
-        format: 'pdf',
-        requestedBy: 'USER-001'
-      });
-
-      expect(report.reportId).toBe('RPT-001');
-      expect(report.reportType).toBe('option_pool_summary');
-      expect(report.companyId).toBe('COMP-001');
-      expect(report.format).toBe('pdf');
+  describe('Business Logic - isReady', () => {
+    it('should return true when status is completed', () => {
+      const report = { status: 'completed' };
+      expect(EquityPlanReport.isReady(report)).toBe(true);
     });
 
-    it('should create a valid grant status report', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-002',
-        reportType: 'grant_status',
-        companyId: 'COMP-001',
-        parameters: {
-          includeTerminated: false,
-          grantTypes: ['ISO', 'NSO']
-        }
-      });
-
-      expect(report.reportType).toBe('grant_status');
-      expect(report.parameters.grantTypes).toContain('ISO');
+    it('should return false when status is not completed', () => {
+      const report = { status: 'pending' };
+      expect(EquityPlanReport.isReady(report)).toBe(false);
     });
 
-    it('should create a valid vesting schedule report', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-003',
-        reportType: 'vesting_schedule',
-        companyId: 'COMP-001',
-        parameters: {
-          forecastMonths: 12
-        }
-      });
-
-      expect(report.reportType).toBe('vesting_schedule');
+    it('should return false when status is generating', () => {
+      const report = { status: 'generating' };
+      expect(EquityPlanReport.isReady(report)).toBe(false);
     });
 
-    it('should create a valid dilution analysis report', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-004',
-        reportType: 'dilution_analysis',
-        companyId: 'COMP-001',
-        parameters: {
-          includeOptions: true,
-          includeWarrants: true
-        }
-      });
-
-      expect(report.reportType).toBe('dilution_analysis');
+    it('should return false when status is failed', () => {
+      const report = { status: 'failed' };
+      expect(EquityPlanReport.isReady(report)).toBe(false);
     });
   });
 
-  describe('Indexes', () => {
-    it('should have index on reportId', () => {
-      const indexes = EquityPlanReport.schema.indexes();
-      const reportIdIndex = indexes.find(idx => idx[0].reportId);
-      expect(reportIdIndex).toBeDefined();
+  describe('Business Logic - hasFailed', () => {
+    it('should return true when status is failed', () => {
+      const report = { status: 'failed' };
+      expect(EquityPlanReport.hasFailed(report)).toBe(true);
     });
 
-    it('should have index on companyId', () => {
-      const indexes = EquityPlanReport.schema.indexes();
-      const companyIdIndex = indexes.find(idx => idx[0].companyId);
-      expect(companyIdIndex).toBeDefined();
+    it('should return false when status is not failed', () => {
+      const report = { status: 'completed' };
+      expect(EquityPlanReport.hasFailed(report)).toBe(false);
     });
 
-    it('should have index on status', () => {
-      const indexes = EquityPlanReport.schema.indexes();
-      const statusIndex = indexes.find(idx => idx[0].status);
-      expect(statusIndex).toBeDefined();
+    it('should return false when status is pending', () => {
+      const report = { status: 'pending' };
+      expect(EquityPlanReport.hasFailed(report)).toBe(false);
     });
   });
 
-  describe('Virtual Properties', () => {
-    it('should have isReady virtual that returns true when status is completed', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'completed'
-      });
-
-      expect(report.isReady).toBe(true);
+  describe('Exported Constants', () => {
+    it('should export REPORT_TYPES', () => {
+      expect(EquityPlanReport.REPORT_TYPES).toBeDefined();
+      expect(EquityPlanReport.REPORT_TYPES).toContain('option_pool_summary');
+      expect(EquityPlanReport.REPORT_TYPES).toContain('grant_status');
+      expect(EquityPlanReport.REPORT_TYPES).toContain('vesting_schedule');
+      expect(EquityPlanReport.REPORT_TYPES).toContain('dilution_analysis');
     });
 
-    it('should have isReady virtual that returns false when status is not completed', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'pending'
-      });
-
-      expect(report.isReady).toBe(false);
+    it('should export REPORT_FORMATS', () => {
+      expect(EquityPlanReport.REPORT_FORMATS).toBeDefined();
+      expect(EquityPlanReport.REPORT_FORMATS).toContain('pdf');
+      expect(EquityPlanReport.REPORT_FORMATS).toContain('excel');
+      expect(EquityPlanReport.REPORT_FORMATS).toContain('csv');
+      expect(EquityPlanReport.REPORT_FORMATS).toContain('json');
     });
 
-    it('should have hasFailed virtual that returns true when status is failed', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'failed'
-      });
-
-      expect(report.hasFailed).toBe(true);
-    });
-
-    it('should have hasFailed virtual that returns false when status is not failed', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'completed'
-      });
-
-      expect(report.hasFailed).toBe(false);
+    it('should export VALID_STATUSES', () => {
+      expect(EquityPlanReport.VALID_STATUSES).toBeDefined();
+      expect(EquityPlanReport.VALID_STATUSES).toContain('pending');
+      expect(EquityPlanReport.VALID_STATUSES).toContain('generating');
+      expect(EquityPlanReport.VALID_STATUSES).toContain('completed');
+      expect(EquityPlanReport.VALID_STATUSES).toContain('failed');
     });
   });
 
-  describe('toJSON and toObject', () => {
-    it('should include virtuals in JSON output', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'completed'
-      });
-
-      const json = report.toJSON();
-      expect(json.isReady).toBe(true);
-      expect(json.hasFailed).toBe(false);
+  describe('Model Methods', () => {
+    it('should have create method', () => {
+      expect(typeof EquityPlanReport.create).toBe('function');
     });
 
-    it('should include virtuals in object output', () => {
-      const report = new EquityPlanReport({
-        reportId: 'RPT-001',
-        reportType: 'option_pool_summary',
-        companyId: 'COMP-001',
-        status: 'failed'
-      });
+    it('should have find method', () => {
+      expect(typeof EquityPlanReport.find).toBe('function');
+    });
 
-      const obj = report.toObject();
-      expect(obj.isReady).toBe(false);
-      expect(obj.hasFailed).toBe(true);
+    it('should have findOne method', () => {
+      expect(typeof EquityPlanReport.findOne).toBe('function');
+    });
+
+    it('should have findById method', () => {
+      expect(typeof EquityPlanReport.findById).toBe('function');
+    });
+
+    it('should have findByReportId method', () => {
+      expect(typeof EquityPlanReport.findByReportId).toBe('function');
+    });
+
+    it('should have findByCompany method', () => {
+      expect(typeof EquityPlanReport.findByCompany).toBe('function');
+    });
+
+    it('should have isReady method', () => {
+      expect(typeof EquityPlanReport.isReady).toBe('function');
+    });
+
+    it('should have hasFailed method', () => {
+      expect(typeof EquityPlanReport.hasFailed).toBe('function');
+    });
+
+    it('should have startGenerating method', () => {
+      expect(typeof EquityPlanReport.startGenerating).toBe('function');
+    });
+
+    it('should have complete method', () => {
+      expect(typeof EquityPlanReport.complete).toBe('function');
+    });
+
+    it('should have fail method', () => {
+      expect(typeof EquityPlanReport.fail).toBe('function');
     });
   });
 });
