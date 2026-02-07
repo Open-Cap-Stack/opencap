@@ -9,6 +9,7 @@
  */
 
 const User = require('../models/User');
+const { isValidObjectId } = require('../utils/inputSanitizer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
@@ -131,11 +132,8 @@ const registerUser = async (req, res) => {
       userData.verificationTokenExpires = verificationTokenExpires;
     }
 
-    // Create user
-    const user = new User(userData);
-
-    // Save user to database
-    await user.save();
+    // Create user using ZeroDB pattern
+    const user = await User.create(userData);
 
     // Send verification email in background if not in development
     if (!isDevelopment) {
@@ -221,9 +219,8 @@ const loginUser = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'Login successful',
@@ -272,10 +269,10 @@ const oauthLogin = async (req, res) => {
 
     // Create user if not exists
     if (!user) {
-      // Create a new user
-      const userId = new mongoose.Types.ObjectId().toString();
-      user = new User({
-        userId,
+      // Create a new user using ZeroDB pattern
+      const { v4: uuidv4 } = require('uuid');
+      user = await User.create({
+        userId: uuidv4(),
         firstName: userInfo.given_name,
         lastName: userInfo.family_name,
         email: userInfo.email,
@@ -286,8 +283,6 @@ const oauthLogin = async (req, res) => {
         oauthProvider: provider,
         oauthId: userInfo.sub
       });
-
-      await user.save();
     }
 
     // Generate tokens
@@ -303,9 +298,8 @@ const oauthLogin = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'OAuth login successful',
@@ -604,11 +598,17 @@ const getUserProfile = async (req, res) => {
     let user;
     
     // Try finding by userId field first (for string userIds like "admin-001")
-    user = await User.findOne({ userId: userId }).select('-password');
-    
+    let foundUser = await User.findOne({ userId: userId });
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId).select('-password');
+    if (!foundUser && isValidObjectId(userId)) {
+      foundUser = await User.findById(userId);
+    }
+
+    // Remove password from response (ZeroDB returns plain objects)
+    if (foundUser) {
+      const { password: _, ...userWithoutPassword } = foundUser;
+      user = userWithoutPassword;
     }
     
     if (!user) {
@@ -635,12 +635,12 @@ const updateUserProfile = async (req, res) => {
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
-    
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+    if (!user && isValidObjectId(userId)) {
       user = await User.findById(userId);
     }
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -686,9 +686,8 @@ const updateUserProfile = async (req, res) => {
     // Save updates
     await user.save();
 
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Remove password from response (ZeroDB returns plain objects)
+    const { password: _, ...userResponse } = user;
 
     return res.status(200).json({
       message: 'Profile updated successfully',
@@ -712,12 +711,12 @@ const sendVerificationEmail = async (req, res) => {
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
-    
+
     // If not found and userId looks like an ObjectId, try _id field
-    if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+    if (!user && isValidObjectId(userId)) {
       user = await User.findById(userId);
     }
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
