@@ -1,484 +1,662 @@
 /**
  * Comprehensive Stakeholder Model Unit Tests
  *
- * Tests for the Stakeholder model including validation, methods, schema behavior
+ * Tests for the ZeroDB-migrated Stakeholder model
+ * Migrated from Mongoose to ZeroDB patterns
  */
 
-const mongoose = require('mongoose');
+// Mock ZeroDB service
+jest.mock('../../../services/zerodbService', () => ({
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRows: jest.fn(),
+  initialize: jest.fn(),
+  projectId: 'mock-project-id'
+}));
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+const zerodbService = require('../../../services/zerodbService');
+const Stakeholder = require('../../../models/Stakeholder');
 
-describe('Stakeholder Model', () => {
-  let Stakeholder;
-
-  beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockStakeholder(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.stakeholderId) {
-            errors.stakeholderId = { message: 'stakeholderId is required' };
-          }
-          if (!this.name) {
-            errors.name = { message: 'name is required' };
-          }
-          if (!this.role) {
-            errors.role = { message: 'role is required' };
-          }
-          if (!this.projectId) {
-            errors.projectId = { message: 'projectId is required' };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-        this.toObject = jest.fn(() => ({ ...data }));
-      }
-
-      // Add static methods
-      MockStakeholder.findById = jest.fn();
-      MockStakeholder.find = jest.fn();
-      MockStakeholder.findOne = jest.fn();
-      MockStakeholder.create = jest.fn();
-      MockStakeholder.findByIdAndUpdate = jest.fn();
-      MockStakeholder.findByIdAndDelete = jest.fn();
-      MockStakeholder.countDocuments = jest.fn();
-
-      return MockStakeholder;
-    });
-
-    // Now require the Stakeholder model
-    Stakeholder = require('../../../models/Stakeholder');
-  });
-
+describe('Stakeholder Model (ZeroDB)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('Schema Validation', () => {
-    describe('Required Fields', () => {
-      it('should create stakeholder with all required fields', () => {
+  describe('Model Structure', () => {
+    it('should have correct table name', () => {
+      expect(Stakeholder.tableName).toBe('stakeholders');
+    });
+
+    it('should have schema defined with required fields', () => {
+      expect(Stakeholder.schema).toBeDefined();
+      expect(Stakeholder.schema._id).toBeDefined();
+      expect(Stakeholder.schema.stakeholderId).toBeDefined();
+      expect(Stakeholder.schema.name).toBeDefined();
+      expect(Stakeholder.schema.email).toBeDefined();
+      expect(Stakeholder.schema.role).toBeDefined();
+    });
+
+    it('should have required fields marked as required', () => {
+      expect(Stakeholder.schema._id.required).toBe(true);
+      expect(Stakeholder.schema.stakeholderId.required).toBe(true);
+      expect(Stakeholder.schema.name.required).toBe(true);
+      expect(Stakeholder.schema.email.required).toBe(true);
+      expect(Stakeholder.schema.role.required).toBe(true);
+    });
+
+    it('should have optional fields defined', () => {
+      expect(Stakeholder.schema.phone).toBeDefined();
+      expect(Stakeholder.schema.equity).toBeDefined();
+      expect(Stakeholder.schema.shares).toBeDefined();
+      expect(Stakeholder.schema.type).toBeDefined();
+      expect(Stakeholder.schema.status).toBeDefined();
+      expect(Stakeholder.schema.location).toBeDefined();
+      expect(Stakeholder.schema.department).toBeDefined();
+      expect(Stakeholder.schema.vestingSchedule).toBeDefined();
+      expect(Stakeholder.schema.companyId).toBeDefined();
+      expect(Stakeholder.schema.projectId).toBeDefined();
+      expect(Stakeholder.schema.userId).toBeDefined();
+    });
+  });
+
+  describe('CRUD Methods', () => {
+    describe('create', () => {
+      it('should create a stakeholder with provided data', async () => {
         const stakeholderData = {
           stakeholderId: 'stake-123',
           name: 'John Doe',
+          email: 'john@example.com',
           role: 'Investor',
           projectId: 'proj-456'
         };
 
-        const stakeholder = new Stakeholder(stakeholderData);
+        const mockResult = {
+          data: [{
+            row_id: 'uuid-123',
+            row_data: {
+              _id: 'uuid-123',
+              ...stakeholderData,
+              createdAt: '2026-02-07T00:00:00.000Z',
+              updatedAt: '2026-02-07T00:00:00.000Z'
+            }
+          }]
+        };
 
-        expect(stakeholder.stakeholderId).toBe(stakeholderData.stakeholderId);
-        expect(stakeholder.name).toBe(stakeholderData.name);
-        expect(stakeholder.role).toBe(stakeholderData.role);
-        expect(stakeholder.projectId).toBe(stakeholderData.projectId);
+        zerodbService.insertRow.mockResolvedValue(mockResult);
+
+        const result = await Stakeholder.create(stakeholderData);
+
+        expect(zerodbService.insertRow).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            stakeholderId: 'stake-123',
+            name: 'John Doe',
+            email: 'john@example.com',
+            role: 'Investor',
+            projectId: 'proj-456'
+          })
+        );
+        expect(result).toBeDefined();
       });
 
-      it('should reject stakeholder without stakeholderId', () => {
-        const stakeholder = new Stakeholder({
+      it('should generate stakeholderId if not provided', async () => {
+        const stakeholderData = {
           name: 'John Doe',
+          email: 'john@example.com',
           role: 'Investor',
           projectId: 'proj-456'
+        };
+
+        zerodbService.insertRow.mockResolvedValue({
+          data: [{
+            row_id: 'uuid-123',
+            row_data: { ...stakeholderData, stakeholderId: 'stakeholder_uuid-gen' }
+          }]
         });
 
-        const validationError = stakeholder.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.stakeholderId).toBeTruthy();
+        await Stakeholder.create(stakeholderData);
+
+        expect(zerodbService.insertRow).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            stakeholderId: expect.stringMatching(/^stakeholder_/)
+          })
+        );
+      });
+    });
+
+    describe('find', () => {
+      it('should find stakeholders matching query', async () => {
+        const mockStakeholders = [
+          { row_data: { stakeholderId: 'stake-1', name: 'Stakeholder 1', role: 'Investor' } },
+          { row_data: { stakeholderId: 'stake-2', name: 'Stakeholder 2', role: 'Investor' } }
+        ];
+
+        zerodbService.queryTable.mockResolvedValue({ data: mockStakeholders });
+
+        const result = await Stakeholder.find({ role: 'Investor' });
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { role: 'Investor' }
+          })
+        );
+        expect(result.length).toBe(2);
       });
 
-      it('should reject stakeholder without name', () => {
-        const stakeholder = new Stakeholder({
-          stakeholderId: 'stake-123',
-          role: 'Investor',
-          projectId: 'proj-456'
-        });
+      it('should return empty array when no stakeholders match', async () => {
+        zerodbService.queryTable.mockResolvedValue({ data: [] });
 
-        const validationError = stakeholder.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.name).toBeTruthy();
+        const result = await Stakeholder.find({ role: 'NonExistentRole' });
+
+        expect(result).toEqual([]);
       });
+    });
 
-      it('should reject stakeholder without role', () => {
-        const stakeholder = new Stakeholder({
+    describe('findOne', () => {
+      it('should find a single stakeholder', async () => {
+        const mockStakeholder = {
           stakeholderId: 'stake-123',
-          name: 'John Doe',
-          projectId: 'proj-456'
-        });
-
-        const validationError = stakeholder.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.role).toBeTruthy();
-      });
-
-      it('should reject stakeholder without projectId', () => {
-        const stakeholder = new Stakeholder({
-          stakeholderId: 'stake-123',
-          name: 'John Doe',
+          name: 'Found Stakeholder',
           role: 'Investor'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
         });
 
-        const validationError = stakeholder.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.projectId).toBeTruthy();
+        const result = await Stakeholder.findOne({ stakeholderId: 'stake-123' });
+
+        expect(result).toEqual(mockStakeholder);
+      });
+
+      it('should return null when stakeholder not found', async () => {
+        zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+        const result = await Stakeholder.findOne({ stakeholderId: 'non-existent' });
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('findById', () => {
+      it('should find stakeholder by _id', async () => {
+        const mockStakeholder = {
+          _id: 'uuid-123',
+          stakeholderId: 'stake-123',
+          name: 'Found Stakeholder'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
+        });
+
+        const result = await Stakeholder.findById('uuid-123');
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { _id: 'uuid-123' }
+          })
+        );
+        expect(result).toEqual(mockStakeholder);
+      });
+    });
+
+    describe('updateOne', () => {
+      it('should update a stakeholder', async () => {
+        zerodbService.updateRows.mockResolvedValue({
+          modified_count: 1,
+          matched_count: 1
+        });
+
+        const result = await Stakeholder.updateOne(
+          { stakeholderId: 'stake-123' },
+          { $set: { name: 'Updated Name' } }
+        );
+
+        expect(zerodbService.updateRows).toHaveBeenCalled();
+        expect(result.modifiedCount).toBe(1);
+      });
+    });
+
+    describe('findOneAndUpdate', () => {
+      it('should find and update a stakeholder', async () => {
+        const originalStakeholder = {
+          _id: 'uuid-123',
+          stakeholderId: 'stake-123',
+          name: 'Original Name'
+        };
+
+        const updatedStakeholder = {
+          ...originalStakeholder,
+          name: 'Updated Name'
+        };
+
+        // First call for finding
+        zerodbService.queryTable
+          .mockResolvedValueOnce({ data: [{ row_data: originalStakeholder }] })
+          // Second call after update for returning new
+          .mockResolvedValueOnce({ data: [{ row_data: updatedStakeholder }] });
+
+        zerodbService.updateRows.mockResolvedValue({
+          modified_count: 1
+        });
+
+        const result = await Stakeholder.findOneAndUpdate(
+          { stakeholderId: 'stake-123' },
+          { $set: { name: 'Updated Name' } },
+          { new: true }
+        );
+
+        expect(result).toEqual(updatedStakeholder);
+      });
+
+      it('should return null when stakeholder not found', async () => {
+        zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+        const result = await Stakeholder.findOneAndUpdate(
+          { stakeholderId: 'non-existent' },
+          { $set: { name: 'Updated Name' } }
+        );
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('findByIdAndUpdate', () => {
+      it('should find by ID and update', async () => {
+        const mockStakeholder = {
+          _id: 'uuid-123',
+          stakeholderId: 'stake-123',
+          name: 'Original Name'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
+        });
+
+        zerodbService.updateRows.mockResolvedValue({
+          modified_count: 1
+        });
+
+        const result = await Stakeholder.findByIdAndUpdate(
+          'uuid-123',
+          { $set: { name: 'Updated Name' } }
+        );
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { _id: 'uuid-123' }
+          })
+        );
+        expect(result).toEqual(mockStakeholder);
+      });
+    });
+
+    describe('deleteOne', () => {
+      it('should delete a stakeholder', async () => {
+        zerodbService.deleteRows.mockResolvedValue({
+          deleted_count: 1
+        });
+
+        const result = await Stakeholder.deleteOne({ stakeholderId: 'stake-123' });
+
+        expect(zerodbService.deleteRows).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { stakeholderId: 'stake-123' }
+          })
+        );
+        expect(result.deletedCount).toBe(1);
+      });
+    });
+
+    describe('findOneAndDelete', () => {
+      it('should find and delete a stakeholder', async () => {
+        const mockStakeholder = {
+          _id: 'uuid-123',
+          stakeholderId: 'stake-123',
+          name: 'To Delete'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
+        });
+
+        zerodbService.deleteRows.mockResolvedValue({
+          deleted_count: 1
+        });
+
+        const result = await Stakeholder.findOneAndDelete({ stakeholderId: 'stake-123' });
+
+        expect(result).toEqual(mockStakeholder);
+        expect(zerodbService.deleteRows).toHaveBeenCalled();
+      });
+
+      it('should return null when stakeholder not found', async () => {
+        zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+        const result = await Stakeholder.findOneAndDelete({ stakeholderId: 'non-existent' });
+
+        expect(result).toBeNull();
+        expect(zerodbService.deleteRows).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('findByIdAndDelete', () => {
+      it('should find by ID and delete', async () => {
+        const mockStakeholder = {
+          _id: 'uuid-123',
+          stakeholderId: 'stake-123',
+          name: 'To Delete'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
+        });
+
+        zerodbService.deleteRows.mockResolvedValue({
+          deleted_count: 1
+        });
+
+        const result = await Stakeholder.findByIdAndDelete('uuid-123');
+
+        expect(result).toEqual(mockStakeholder);
+      });
+    });
+
+    describe('countDocuments', () => {
+      it('should count documents matching query', async () => {
+        zerodbService.queryTable.mockResolvedValue({
+          total: 5,
+          data: []
+        });
+
+        const count = await Stakeholder.countDocuments({ projectId: 'proj-123' });
+
+        expect(count).toBe(5);
+      });
+    });
+
+    describe('exists', () => {
+      it('should return true if documents exist', async () => {
+        zerodbService.queryTable.mockResolvedValue({
+          total: 1,
+          data: []
+        });
+
+        const exists = await Stakeholder.exists({ stakeholderId: 'stake-123' });
+
+        expect(exists).toBe(true);
+      });
+
+      it('should return false if no documents exist', async () => {
+        zerodbService.queryTable.mockResolvedValue({
+          total: 0,
+          data: []
+        });
+
+        const exists = await Stakeholder.exists({ stakeholderId: 'non-existent' });
+
+        expect(exists).toBe(false);
+      });
+    });
+
+    describe('distinct', () => {
+      it('should return distinct values for a field', async () => {
+        zerodbService.queryTable.mockResolvedValue({
+          data: [
+            { row_data: { role: 'Investor' } },
+            { row_data: { role: 'Founder' } },
+            { row_data: { role: 'Investor' } },
+            { row_data: { role: 'Employee' } }
+          ]
+        });
+
+        const result = await Stakeholder.distinct('role');
+
+        expect(result).toContain('Investor');
+        expect(result).toContain('Founder');
+        expect(result).toContain('Employee');
+        expect(result.length).toBe(3);
+      });
+    });
+  });
+
+  describe('Custom Methods', () => {
+    describe('findByStakeholderId', () => {
+      it('should find stakeholder by stakeholderId', async () => {
+        const mockStakeholder = {
+          stakeholderId: 'stake-123',
+          name: 'Test Stakeholder'
+        };
+
+        zerodbService.queryTable.mockResolvedValue({
+          data: [{ row_data: mockStakeholder }]
+        });
+
+        const result = await Stakeholder.findByStakeholderId('stake-123');
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { stakeholderId: 'stake-123' }
+          })
+        );
+        expect(result).toEqual(mockStakeholder);
+      });
+    });
+
+    describe('findByProject', () => {
+      it('should find stakeholders by projectId', async () => {
+        const mockStakeholders = [
+          { row_data: { stakeholderId: 'stake-1', projectId: 'proj-123' } },
+          { row_data: { stakeholderId: 'stake-2', projectId: 'proj-123' } }
+        ];
+
+        zerodbService.queryTable.mockResolvedValue({ data: mockStakeholders });
+
+        const result = await Stakeholder.findByProject('proj-123');
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { projectId: 'proj-123' }
+          })
+        );
+        expect(result.length).toBe(2);
+      });
+    });
+
+    describe('findByRole', () => {
+      it('should find stakeholders by role', async () => {
+        const mockStakeholders = [
+          { row_data: { stakeholderId: 'stake-1', role: 'Investor' } },
+          { row_data: { stakeholderId: 'stake-2', role: 'Investor' } }
+        ];
+
+        zerodbService.queryTable.mockResolvedValue({ data: mockStakeholders });
+
+        const result = await Stakeholder.findByRole('Investor');
+
+        expect(zerodbService.queryTable).toHaveBeenCalledWith(
+          'stakeholders',
+          expect.objectContaining({
+            filter: { role: 'Investor' }
+          })
+        );
+        expect(result.length).toBe(2);
       });
     });
   });
 
   describe('Stakeholder Roles', () => {
-    it('should accept Investor role', () => {
-      const stakeholder = new Stakeholder({
+    it('should handle Investor role', async () => {
+      const stakeholderData = {
         stakeholderId: 'stake-inv-123',
         name: 'Investor Name',
+        email: 'investor@example.com',
         role: 'Investor',
         projectId: 'proj-456'
+      };
+
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Investor');
+      await Stakeholder.create(stakeholderData);
+
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ role: 'Investor' })
+      );
     });
 
-    it('should accept Founder role', () => {
-      const stakeholder = new Stakeholder({
+    it('should handle Founder role', async () => {
+      const stakeholderData = {
         stakeholderId: 'stake-founder-123',
         name: 'Founder Name',
+        email: 'founder@example.com',
         role: 'Founder',
         projectId: 'proj-456'
+      };
+
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Founder');
+      await Stakeholder.create(stakeholderData);
+
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ role: 'Founder' })
+      );
     });
 
-    it('should accept Employee role', () => {
-      const stakeholder = new Stakeholder({
+    it('should handle Employee role', async () => {
+      const stakeholderData = {
         stakeholderId: 'stake-emp-123',
         name: 'Employee Name',
+        email: 'employee@example.com',
         role: 'Employee',
         projectId: 'proj-456'
+      };
+
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Employee');
-    });
+      await Stakeholder.create(stakeholderData);
 
-    it('should accept Advisor role', () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-adv-123',
-        name: 'Advisor Name',
-        role: 'Advisor',
-        projectId: 'proj-456'
-      });
-
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Advisor');
-    });
-
-    it('should accept Board Member role', () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-board-123',
-        name: 'Board Member Name',
-        role: 'Board Member',
-        projectId: 'proj-456'
-      });
-
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Board Member');
-    });
-
-    it('should accept Consultant role', () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-consult-123',
-        name: 'Consultant Name',
-        role: 'Consultant',
-        projectId: 'proj-456'
-      });
-
-      const validationError = stakeholder.validateSync();
-      expect(validationError).toBeNull();
-      expect(stakeholder.role).toBe('Consultant');
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ role: 'Employee' })
+      );
     });
   });
 
-  describe('Stakeholder Data Handling', () => {
-    it('should handle full name with multiple words', () => {
+  describe('Data Handling', () => {
+    it('should handle full name with multiple words', async () => {
       const fullName = 'Dr. John Michael Doe Jr.';
-      const stakeholder = new Stakeholder({
+      const stakeholderData = {
         stakeholderId: 'stake-123',
         name: fullName,
+        email: 'dr.john@example.com',
         role: 'Advisor',
         projectId: 'proj-456'
+      };
+
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      expect(stakeholder.name).toBe(fullName);
+      await Stakeholder.create(stakeholderData);
+
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ name: fullName })
+      );
     });
 
-    it('should handle names with special characters', () => {
+    it('should handle names with special characters', async () => {
       const specialName = "Mary O'Brien-Smith";
-      const stakeholder = new Stakeholder({
+      const stakeholderData = {
         stakeholderId: 'stake-special-123',
         name: specialName,
+        email: 'mary@example.com',
         role: 'Investor',
         projectId: 'proj-456'
+      };
+
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      expect(stakeholder.name).toBe(specialName);
+      await Stakeholder.create(stakeholderData);
+
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ name: specialName })
+      );
     });
 
-    it('should handle international names', () => {
-      const internationalNames = [
-        'Muller',
-        'Nakamura',
-        'Garcia-Rodriguez'
-      ];
-
-      internationalNames.forEach((name, index) => {
-        const stakeholder = new Stakeholder({
-          stakeholderId: `stake-intl-${index}`,
-          name: name,
-          role: 'Investor',
-          projectId: 'proj-456'
-        });
-
-        expect(stakeholder.name).toBe(name);
-      });
-    });
-
-    it('should handle UUID-style stakeholderId', () => {
+    it('should handle UUID-style stakeholderId', async () => {
       const uuidId = '550e8400-e29b-41d4-a716-446655440000';
-      const stakeholder = new Stakeholder({
+      const stakeholderData = {
         stakeholderId: uuidId,
         name: 'UUID Stakeholder',
+        email: 'uuid@example.com',
         role: 'Investor',
         projectId: 'proj-456'
-      });
-
-      expect(stakeholder.stakeholderId).toBe(uuidId);
-    });
-
-    it('should handle different projectId formats', () => {
-      const projectIds = [
-        'proj-123',
-        'project_456',
-        '507f1f77bcf86cd799439011',
-        'company-proj-789'
-      ];
-
-      projectIds.forEach(projectId => {
-        const stakeholder = new Stakeholder({
-          stakeholderId: `stake-${projectId}`,
-          name: 'Test Stakeholder',
-          role: 'Employee',
-          projectId: projectId
-        });
-
-        expect(stakeholder.projectId).toBe(projectId);
-      });
-    });
-  });
-
-  describe('Static Methods', () => {
-    it('should call findById correctly', async () => {
-      const mockStakeholder = {
-        stakeholderId: 'stake-123',
-        name: 'Found Stakeholder'
-      };
-      Stakeholder.findById.mockResolvedValue(mockStakeholder);
-
-      const result = await Stakeholder.findById('507f1f77bcf86cd799439011');
-
-      expect(Stakeholder.findById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
-      expect(result).toEqual(mockStakeholder);
-    });
-
-    it('should call find correctly with query', async () => {
-      const mockStakeholders = [
-        { stakeholderId: 'stake-1', name: 'Stakeholder 1', role: 'Investor' },
-        { stakeholderId: 'stake-2', name: 'Stakeholder 2', role: 'Investor' }
-      ];
-      Stakeholder.find.mockResolvedValue(mockStakeholders);
-
-      const result = await Stakeholder.find({ role: 'Investor' });
-
-      expect(Stakeholder.find).toHaveBeenCalledWith({ role: 'Investor' });
-      expect(result).toEqual(mockStakeholders);
-    });
-
-    it('should call find by projectId correctly', async () => {
-      const mockStakeholders = [
-        { stakeholderId: 'stake-1', name: 'Stakeholder 1', projectId: 'proj-123' },
-        { stakeholderId: 'stake-2', name: 'Stakeholder 2', projectId: 'proj-123' }
-      ];
-      Stakeholder.find.mockResolvedValue(mockStakeholders);
-
-      const result = await Stakeholder.find({ projectId: 'proj-123' });
-
-      expect(Stakeholder.find).toHaveBeenCalledWith({ projectId: 'proj-123' });
-      expect(result).toEqual(mockStakeholders);
-      expect(result.length).toBe(2);
-    });
-
-    it('should call findOne correctly', async () => {
-      const mockStakeholder = {
-        stakeholderId: 'stake-123',
-        name: 'Found Stakeholder'
-      };
-      Stakeholder.findOne.mockResolvedValue(mockStakeholder);
-
-      const result = await Stakeholder.findOne({ stakeholderId: 'stake-123' });
-
-      expect(Stakeholder.findOne).toHaveBeenCalledWith({ stakeholderId: 'stake-123' });
-      expect(result).toEqual(mockStakeholder);
-    });
-
-    it('should call create correctly', async () => {
-      const stakeholderData = {
-        stakeholderId: 'stake-123',
-        name: 'New Stakeholder',
-        role: 'Founder',
-        projectId: 'proj-456'
-      };
-      Stakeholder.create.mockResolvedValue(stakeholderData);
-
-      const result = await Stakeholder.create(stakeholderData);
-
-      expect(Stakeholder.create).toHaveBeenCalledWith(stakeholderData);
-      expect(result).toEqual(stakeholderData);
-    });
-
-    it('should call countDocuments correctly', async () => {
-      Stakeholder.countDocuments.mockResolvedValue(5);
-
-      const count = await Stakeholder.countDocuments({ projectId: 'proj-123' });
-
-      expect(Stakeholder.countDocuments).toHaveBeenCalledWith({ projectId: 'proj-123' });
-      expect(count).toBe(5);
-    });
-  });
-
-  describe('Instance Methods', () => {
-    it('should save stakeholder successfully', async () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-123',
-        name: 'Save Test Stakeholder',
-        role: 'Investor',
-        projectId: 'proj-456'
-      });
-
-      stakeholder.save.mockResolvedValue(stakeholder);
-      const savedStakeholder = await stakeholder.save();
-
-      expect(stakeholder.save).toHaveBeenCalled();
-      expect(savedStakeholder).toBe(stakeholder);
-    });
-
-    it('should handle save errors', async () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-duplicate',
-        name: 'Duplicate Stakeholder',
-        role: 'Investor',
-        projectId: 'proj-456'
-      });
-
-      const duplicateError = new Error('E11000 duplicate key error');
-      stakeholder.save.mockRejectedValue(duplicateError);
-
-      await expect(stakeholder.save()).rejects.toThrow('E11000 duplicate key error');
-    });
-
-    it('should convert stakeholder to object', () => {
-      const stakeholderData = {
-        stakeholderId: 'stake-123',
-        name: 'Object Test Stakeholder',
-        role: 'Employee',
-        projectId: 'proj-456'
       };
 
-      const stakeholder = new Stakeholder(stakeholderData);
-      const stakeholderObject = stakeholder.toObject();
-
-      expect(stakeholderObject).toEqual(stakeholderData);
-    });
-
-    it('should check if stakeholder is modified', () => {
-      const stakeholder = new Stakeholder({
-        stakeholderId: 'stake-123',
-        name: 'Modified Test Stakeholder',
-        role: 'Advisor',
-        projectId: 'proj-456'
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'uuid-123', row_data: stakeholderData }]
       });
 
-      stakeholder.isModified.mockReturnValue(true);
+      await Stakeholder.create(stakeholderData);
 
-      expect(stakeholder.isModified('name')).toBe(true);
-      expect(stakeholder.isModified).toHaveBeenCalledWith('name');
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'stakeholders',
+        expect.objectContaining({ stakeholderId: uuidId })
+      );
     });
   });
 
   describe('Complex Scenarios', () => {
-    it('should handle complete stakeholder profile', () => {
-      const stakeholderData = {
-        stakeholderId: 'stake-complete-123',
-        name: 'Jane Smith, Ph.D.',
-        role: 'Board Member',
-        projectId: 'proj-board-789'
-      };
-
-      const stakeholder = new Stakeholder(stakeholderData);
-
-      expect(stakeholder.stakeholderId).toBe(stakeholderData.stakeholderId);
-      expect(stakeholder.name).toBe(stakeholderData.name);
-      expect(stakeholder.role).toBe(stakeholderData.role);
-      expect(stakeholder.projectId).toBe(stakeholderData.projectId);
-    });
-
-    it('should handle stakeholder with minimal data', () => {
-      const minimalData = {
-        stakeholderId: 'stake-min',
-        name: 'Min',
-        role: 'Employee',
-        projectId: 'p'
-      };
-
-      const stakeholder = new Stakeholder(minimalData);
-      const validationError = stakeholder.validateSync();
-
-      expect(validationError).toBeNull();
-      expect(stakeholder.stakeholderId).toBe(minimalData.stakeholderId);
-    });
-
-    it('should handle empty stakeholder object', () => {
-      const stakeholder = new Stakeholder({});
-      const validationError = stakeholder.validateSync();
-
-      expect(validationError).toBeTruthy();
-      expect(Object.keys(validationError.errors).length).toBe(4); // All 4 required fields
-    });
-
     it('should handle multiple stakeholders for same project', async () => {
       const stakeholders = [
-        { stakeholderId: 'stake-1', name: 'CEO', role: 'Founder', projectId: 'proj-123' },
-        { stakeholderId: 'stake-2', name: 'CTO', role: 'Founder', projectId: 'proj-123' },
-        { stakeholderId: 'stake-3', name: 'Investor A', role: 'Investor', projectId: 'proj-123' }
+        { row_data: { stakeholderId: 'stake-1', name: 'CEO', role: 'Founder', projectId: 'proj-123' } },
+        { row_data: { stakeholderId: 'stake-2', name: 'CTO', role: 'Founder', projectId: 'proj-123' } },
+        { row_data: { stakeholderId: 'stake-3', name: 'Investor A', role: 'Investor', projectId: 'proj-123' } }
       ];
 
-      Stakeholder.find.mockResolvedValue(stakeholders);
+      zerodbService.queryTable.mockResolvedValue({ data: stakeholders });
 
       const result = await Stakeholder.find({ projectId: 'proj-123' });
 
       expect(result.length).toBe(3);
       expect(result.filter(s => s.role === 'Founder').length).toBe(2);
       expect(result.filter(s => s.role === 'Investor').length).toBe(1);
+    });
+
+    it('should handle aggregate operations', async () => {
+      const stakeholders = [
+        { row_data: { stakeholderId: 'stake-1', role: 'Investor', shares: '1000' } },
+        { row_data: { stakeholderId: 'stake-2', role: 'Founder', shares: '5000' } }
+      ];
+
+      zerodbService.queryTable.mockResolvedValue({ data: stakeholders });
+
+      const result = await Stakeholder.aggregate([
+        { $match: { role: 'Investor' } }
+      ]);
+
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 });
