@@ -35,6 +35,19 @@ exports.calculate = async (req, res) => {
       });
     }
 
+    // Validate positive numbers to prevent division by zero and invalid calculations
+    if (existingShares <= 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: existingShares must be a positive number'
+      });
+    }
+
+    if (preMoney < 0 || newInvestment < 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: preMoney and newInvestment cannot be negative'
+      });
+    }
+
     const results = await DilutionCalculatorService.calculateFundingRound({
       companyId,
       scenarioId,
@@ -87,6 +100,31 @@ exports.calculateSAFE = async (req, res) => {
       });
     }
 
+    // Validate positive numbers to prevent invalid calculations
+    if (existingShares <= 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: existingShares must be a positive number'
+      });
+    }
+
+    if (safeAmount < 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: safeAmount cannot be negative'
+      });
+    }
+
+    if (valuationCap !== undefined && valuationCap <= 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: valuationCap must be a positive number'
+      });
+    }
+
+    if (discountRate !== undefined && (discountRate < 0 || discountRate > 100)) {
+      return res.status(400).json({
+        error: 'Invalid calculation: discountRate must be between 0 and 100'
+      });
+    }
+
     const results = await SAFEDilutionService.calculateSAFEDilution({
       companyId,
       scenarioId,
@@ -131,6 +169,25 @@ exports.calculateOptionPool = async (req, res) => {
       });
     }
 
+    // Validate positive numbers to prevent division by zero and invalid calculations
+    if (currentTotalShares <= 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: currentTotalShares must be a positive number'
+      });
+    }
+
+    if (targetPoolPercentage < 0 || targetPoolPercentage > 100) {
+      return res.status(400).json({
+        error: 'Invalid calculation: targetPoolPercentage must be between 0 and 100'
+      });
+    }
+
+    if (currentPoolShares !== undefined && currentPoolShares < 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: currentPoolShares cannot be negative'
+      });
+    }
+
     const results = await OptionPoolCalculatorService.calculateOptionPoolDilution({
       companyId,
       scenarioId,
@@ -170,8 +227,29 @@ exports.calculateMultiRound = async (req, res) => {
     let currentShares = rounds[0].existingShares || 0;
     const results = [];
 
+    // Validate initial shares are positive
+    if (currentShares <= 0) {
+      return res.status(400).json({
+        error: 'Invalid calculation: initial existingShares must be a positive number'
+      });
+    }
+
     // Calculate each round sequentially
     for (const round of rounds) {
+      // Validate round values
+      if (round.preMoney < 0 || round.newInvestment < 0) {
+        return res.status(400).json({
+          error: `Invalid calculation: preMoney and newInvestment cannot be negative in round ${results.length + 1}`
+        });
+      }
+
+      // Prevent division by zero when calculating share price
+      if (currentShares <= 0) {
+        return res.status(400).json({
+          error: `Invalid calculation: total shares cannot be zero at round ${results.length + 1}`
+        });
+      }
+
       const roundResult = await DilutionCalculatorService.calculateFundingRound({
         companyId,
         preMoney: round.preMoney,
