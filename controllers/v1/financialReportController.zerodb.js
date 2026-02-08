@@ -47,6 +47,11 @@ const calculateTotals = (data) => {
  */
 const createFinancialReport = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { companyId, reportingPeriod, reportType } = req.body;
 
     // Validate required fields
@@ -176,6 +181,11 @@ const getFinancialReportById = async (req, res) => {
  */
 const updateFinancialReport = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { id } = req.params;
 
     // Validate ID format
@@ -396,6 +406,11 @@ const getFinancialReportAnalytics = async (req, res) => {
  */
 const bulkCreateFinancialReports = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     if (!Array.isArray(req.body)) {
       return res.status(400).json({
         error: 'Bulk operation requires an array of financial reports'

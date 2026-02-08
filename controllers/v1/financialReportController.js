@@ -20,15 +20,20 @@ const memoryService = require('../../services/memoryService');
  */
 const createFinancialReport = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     // Validate required fields
     const { companyId, reportingPeriod, reportType } = req.body;
-    
+
     if (!companyId || !reportingPeriod || !reportType) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Required fields missing: companyId, reportingPeriod, and reportType are required'
       });
     }
-    
+
     // Add user ID from JWT token
     req.body.userId = req.user.id;
     
@@ -192,19 +197,24 @@ const getFinancialReportById = async (req, res) => {
  */
 const updateFinancialReport = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { id } = req.params;
-    
+
     // Validate MongoDB ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
-    
+
     // Find existing financial report
     const existingReport = await FinancialReport.findById(id);
     if (!existingReport) {
       return res.status(404).json({ error: 'Financial report not found' });
     }
-    
+
     // Add last modified info
     req.body.lastModifiedBy = req.user.id;
     req.body.updatedAt = new Date();
@@ -391,10 +401,15 @@ const getFinancialReportAnalytics = async (req, res) => {
  */
 const bulkCreateFinancialReports = async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     if (!Array.isArray(req.body)) {
       return res.status(400).json({ error: 'Bulk operation requires an array of financial reports' });
     }
-    
+
     // Add user ID to each financial report
     const reportsWithUser = req.body.map(report => ({
       ...report,
