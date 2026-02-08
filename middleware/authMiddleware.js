@@ -97,10 +97,12 @@ const authenticateToken = async (req, res, next) => {
     );
     
     // Try to find or provision user in our database
-    let user = await User.findOne({ userId: decoded.userId });
+    // Support both 'userId' and 'sub' (standard JWT claim) for user ID
+    const tokenUserId = decoded.userId || decoded.sub;
+    let user = await User.findOne({ userId: tokenUserId });
 
     // If user not found but token has user info, provision them
-    if (!user && decoded.userId && decoded.email) {
+    if (!user && tokenUserId && decoded.email) {
       console.log(`Provisioning user from JWT: ${decoded.email}`);
       user = await provisionUserFromToken(decoded);
     }
@@ -108,7 +110,7 @@ const authenticateToken = async (req, res, next) => {
     // If still no user, check if token has role (test/admin tokens)
     if (!user && decoded.role) {
       req.user = {
-        userId: decoded.userId,
+        userId: tokenUserId,
         email: decoded.email,
         role: decoded.role,
         permissions: decoded.permissions || [],
