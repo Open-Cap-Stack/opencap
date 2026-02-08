@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const databaseAdapter = require('./databaseAdapter');
+const { validateWebhookUrl } = require('../utils/urlValidator');
 
 class WebhookService {
   /**
@@ -20,10 +21,9 @@ class WebhookService {
    * @returns {Object} Created webhook with secret
    */
   async registerWebhook(webhookData) {
-    // Validate URL
-    if (!this._isValidUrl(webhookData.url)) {
-      throw new Error('Invalid webhook URL');
-    }
+    // Validate URL with SSRF protection
+    const validatedUrl = validateWebhookUrl(webhookData.url);
+    webhookData.url = validatedUrl;
 
     // Validate events
     if (!webhookData.events || webhookData.events.length === 0) {
@@ -503,9 +503,9 @@ class WebhookService {
       throw new Error('Cannot update secret directly');
     }
 
-    // Validate URL if being updated
-    if (updates.url && !this._isValidUrl(updates.url)) {
-      throw new Error('Invalid webhook URL');
+    // Validate URL if being updated (with SSRF protection)
+    if (updates.url) {
+      updates.url = validateWebhookUrl(updates.url);
     }
 
     return await databaseAdapter.findByIdAndUpdate(
@@ -596,18 +596,6 @@ class WebhookService {
     return crypto.randomBytes(32).toString('hex');
   }
 
-  /**
-   * Validate URL format
-   * @private
-   */
-  _isValidUrl(url) {
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
-    } catch {
-      return false;
-    }
-  }
 }
 
 module.exports = new WebhookService();
