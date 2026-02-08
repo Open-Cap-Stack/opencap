@@ -17,6 +17,12 @@ const rolePermissions = {
     'financialReports.view',
     'admin:all'
   ],
+  'founder': [
+    'read:users', 'write:users', 'delete:users',
+    'read:companies', 'write:companies', 'delete:companies',
+    'financialReports.view',
+    'admin:all'
+  ],
   'manager': [
     'read:users', 'write:users',
     'read:companies', 'write:companies'
