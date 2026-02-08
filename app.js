@@ -358,6 +358,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/reports/bulk'; // Issue #238: Bulk Reports Endpoint
     } else if (key === 'notificationRoutes') {
       path = '/api/v1/notifications';
+    } else if (key === 'companyRoutes') {
+      path = '/api/v1/companies';
     } else if (key === 'fundraiseModelRoutes') {
       path = '/api/v1/fundraise-models'; // Issue #195: Fundraising Modeling Engine
     } else {
