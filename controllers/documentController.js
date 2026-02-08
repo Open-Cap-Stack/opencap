@@ -536,7 +536,8 @@ exports.searchDocuments = async (req, res) => {
 
         // Add company filter
         if (req.user?.companyId && req.user?.role !== 'admin') {
-            documents = documents.filter(doc => doc.companyId === req.user.companyId);
+            const userCompanyId = req.user.companyId;
+            documents = documents.filter(doc => doc.companyId === userCompanyId);
         }
 
         // Combine documents with relevance scores
@@ -635,7 +636,8 @@ exports.findSimilarDocuments = async (req, res) => {
         }
 
         if (req.user?.companyId && req.user?.role !== 'admin') {
-            docsData = docsData.filter(doc => doc.companyId === req.user.companyId);
+            const userCompanyId = req.user.companyId;
+            docsData = docsData.filter(doc => doc.companyId === userCompanyId);
         }
 
         // Combine with similarity scores
@@ -1185,7 +1187,10 @@ exports.getDocumentAccess = async (req, res) => {
         res.status(200).json(response);
     } catch (error) {
         console.error('Document access error:', error.message);
-        res.status(500).json({ message: 'Failed to get document access info' });
+        res.status(500).json({
+            message: 'Failed to get document access info',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
@@ -1262,7 +1267,10 @@ exports.logDocumentAccess = async (req, res) => {
         res.status(201).json(accessLog);
     } catch (error) {
         console.error('Log document access error:', error.message);
-        res.status(500).json({ message: 'Failed to log document access' });
+        res.status(500).json({
+            message: 'Failed to log document access',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
