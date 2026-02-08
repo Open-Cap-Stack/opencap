@@ -261,14 +261,21 @@ exports.getExpiringExerciseWindows = async (req, res) => {
     const now = new Date();
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + days);
+    const nowTime = now.getTime();
+    const expiryTime = expiryDate.getTime();
 
-    const terminations = await databaseAdapter.find('Termination', {
+    // ZeroDB: Fetch all terminations with matching status, then filter dates in-memory
+    // (ZeroDB doesn't support $gte/$lte operators)
+    let terminations = await databaseAdapter.find('Termination', {
       companyId,
-      status: 'exercise_window_open',
-      exerciseWindowEndDate: {
-        $gte: now,
-        $lte: expiryDate
-      }
+      status: 'exercise_window_open'
+    });
+
+    // Apply date range filtering in-memory
+    terminations = terminations.filter(term => {
+      if (!term.exerciseWindowEndDate) return false;
+      const windowEndTime = new Date(term.exerciseWindowEndDate).getTime();
+      return windowEndTime >= nowTime && windowEndTime <= expiryTime;
     });
 
     res.status(200).json(terminations);

@@ -237,10 +237,11 @@ const updateSecurityIssuanceById = async (req, res) => {
     // Update timestamp
     updateData.updatedAt = new Date().toISOString();
 
+    // ZeroDB: Use direct update without MongoDB $set operator
     const result = await zerodbService.updateRows(
       TABLE_NAME,
       { id },
-      { $set: updateData }
+      updateData
     );
 
     if (!result || result.modifiedCount === 0) {
@@ -426,18 +427,27 @@ const addStateFiling = async (req, res) => {
     // Normalize state code
     stateFilingData.stateCode = stateFilingData.stateCode.toUpperCase();
 
-    const result = await zerodbService.updateRows(
-      TABLE_NAME,
-      { id },
-      { $push: { stateFilings: stateFilingData } }
-    );
+    // ZeroDB: Use read-modify-write pattern instead of MongoDB $push operator
+    const currentResults = await zerodbService.queryTable(TABLE_NAME, {
+      filter: { id }
+    });
 
-    if (!result || result.modifiedCount === 0) {
+    if (!currentResults || currentResults.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Security issuance not found'
       });
     }
+
+    const currentIssuance = currentResults[0];
+    const currentFilings = currentIssuance.stateFilings || [];
+    const updatedFilings = [...currentFilings, stateFilingData];
+
+    const result = await zerodbService.updateRows(
+      TABLE_NAME,
+      { id },
+      { stateFilings: updatedFilings, updatedAt: new Date().toISOString() }
+    );
 
     const updatedIssuance = result.rows ? result.rows[0] : result;
 
@@ -496,10 +506,11 @@ const updateStateFiling = async (req, res) => {
       stateCode: stateCode.toUpperCase()
     };
 
+    // ZeroDB: Use direct update without MongoDB $set operator
     const result = await zerodbService.updateRows(
       TABLE_NAME,
       { id },
-      { $set: { stateFilings, updatedAt: new Date().toISOString() } }
+      { stateFilings, updatedAt: new Date().toISOString() }
     );
 
     const updatedIssuance = result.rows ? result.rows[0] : result;

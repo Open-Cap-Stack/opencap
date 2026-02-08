@@ -80,9 +80,10 @@ exports.getStakeholderById = async (req, res) => {
  */
 exports.updateStakeholderById = async (req, res) => {
   try {
+    // ZeroDB: Use direct update without MongoDB $set operator
     const stakeholder = await Stakeholder.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      req.body,
       { new: true }
     );
 

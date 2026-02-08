@@ -267,9 +267,10 @@ const uploadProfilePhoto = async (req, res) => {
       'profile.avatarThumbnailFileId': thumbnailResult.id
     };
 
+    // ZeroDB: Use direct update without MongoDB $set operator
     const updatedUser = await User.findOneAndUpdate(
       { userId },
-      { $set: updateData },
+      updateData,
       { new: true }
     );
 
@@ -277,7 +278,7 @@ const uploadProfilePhoto = async (req, res) => {
     if (!updatedUser && user._id) {
       await User.findByIdAndUpdate(
         user._id,
-        { $set: updateData },
+        updateData,
         { new: true }
       );
     }
@@ -373,9 +374,10 @@ const deleteProfilePhoto = async (req, res) => {
       'profile.avatarThumbnailFileId': null
     };
 
+    // ZeroDB: Use direct update without MongoDB $set operator
     await User.findOneAndUpdate(
       { userId },
-      { $set: updateData },
+      updateData,
       { new: true }
     );
 

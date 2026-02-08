@@ -171,21 +171,28 @@ const listTransactions = async (req, res, next) => {
     if (status) filter.status = status;
     if (type) filter.type = type;
 
-    // Date range filter
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate).toISOString();
-      if (endDate) filter.createdAt.$lte = new Date(endDate).toISOString();
-    }
-
-    const transactions = await zerodbService.queryTable('transactions', {
+    // ZeroDB: Fetch all matching transactions first, then apply date filtering in-memory
+    let transactions = await zerodbService.queryTable('transactions', {
       filter,
-      skip,
-      limit: limitNum,
       sort: { createdAt: -1 }
     });
 
-    const totalCount = await zerodbService.countRows('transactions', filter);
+    // Apply date range filtering in-memory (ZeroDB doesn't support $gte/$lte operators)
+    if (startDate || endDate) {
+      const startTime = startDate ? new Date(startDate).getTime() : null;
+      const endTime = endDate ? new Date(endDate).getTime() : null;
+      transactions = transactions.filter(txn => {
+        const txnTime = new Date(txn.createdAt).getTime();
+        if (startTime && txnTime < startTime) return false;
+        if (endTime && txnTime > endTime) return false;
+        return true;
+      });
+    }
+
+    const totalCount = transactions.length;
+
+    // Apply pagination in-memory
+    transactions = transactions.slice(skip, skip + limitNum);
     const totalPages = Math.ceil(totalCount / limitNum);
 
     return res.status(200).json({
@@ -241,9 +248,8 @@ const updateTransaction = async (req, res, next) => {
       updatedAt: new Date().toISOString()
     };
 
-    await zerodbService.updateRows('transactions', { transactionId: id }, {
-      $set: updateData
-    });
+    // ZeroDB: Use direct update without MongoDB $set operator
+    await zerodbService.updateRows('transactions', { transactionId: id }, updateData);
 
     const updatedTransactions = await zerodbService.queryTable('transactions', {
       filter: { transactionId: id }
@@ -348,16 +354,22 @@ const getTransactionSummary = async (req, res, next) => {
 
     const filter = { companyId };
 
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate).toISOString();
-      if (endDate) filter.createdAt.$lte = new Date(endDate).toISOString();
-    }
-
-    const transactions = await zerodbService.queryTable('transactions', {
+    let transactions = await zerodbService.queryTable('transactions', {
       filter,
       sort: { createdAt: -1 }
     });
+
+    // ZeroDB: Apply date range filtering in-memory (doesn't support $gte/$lte operators)
+    if (startDate || endDate) {
+      const startTime = startDate ? new Date(startDate).getTime() : null;
+      const endTime = endDate ? new Date(endDate).getTime() : null;
+      transactions = transactions.filter(txn => {
+        const txnTime = new Date(txn.createdAt).getTime();
+        if (startTime && txnTime < startTime) return false;
+        if (endTime && txnTime > endTime) return false;
+        return true;
+      });
+    }
 
     // Calculate summary
     const summary = {
@@ -431,12 +443,10 @@ const processTransaction = async (req, res, next) => {
       });
     }
 
-    // Update to processing status
+    // ZeroDB: Use direct update without MongoDB $set operator
     await zerodbService.updateRows('transactions', { transactionId: id }, {
-      $set: {
-        status: 'processing',
-        updatedAt: new Date().toISOString()
-      }
+      status: 'processing',
+      updatedAt: new Date().toISOString()
     });
 
     const updatedTransactions = await zerodbService.queryTable('transactions', {
@@ -516,12 +526,10 @@ const refundTransaction = async (req, res, next) => {
 
     const result = await zerodbService.insertRow('transactions', refundTransaction);
 
-    // Update original transaction status
+    // ZeroDB: Use direct update without MongoDB $set operator
     await zerodbService.updateRows('transactions', { transactionId: id }, {
-      $set: {
-        status: 'refunded',
-        updatedAt: new Date().toISOString()
-      }
+      status: 'refunded',
+      updatedAt: new Date().toISOString()
     });
 
     const createdRefund = result.rows && result.rows[0] ? result.rows[0] : refundTransaction;

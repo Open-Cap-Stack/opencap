@@ -195,13 +195,16 @@ exports.exerciseGrant = async (req, res) => {
       newStatus = 'exercised';
     }
 
-    // Update the grant
+    // ZeroDB: Use read-modify-write pattern instead of MongoDB $push operator
+    const currentHistory = grant.exerciseHistory || [];
+    const updatedHistory = [...currentHistory, exerciseRecord];
+
     const updatedGrant = await databaseAdapter.findByIdAndUpdate(
       'EquityGrant',
       req.params.id,
       {
         exercisedShares: newExercisedShares,
-        $push: { exerciseHistory: exerciseRecord },
+        exerciseHistory: updatedHistory,
         status: newStatus
       },
       { new: true }

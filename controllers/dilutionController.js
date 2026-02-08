@@ -448,9 +448,10 @@ exports.updateScenario = async (req, res) => {
     const { scenarioId } = req.params;
     const updateData = req.body;
 
+    // ZeroDB: Use direct update without MongoDB $set operator
     const result = await DilutionScenario.updateOne(
       { scenarioId },
-      { $set: updateData }
+      updateData
     );
 
     if (result.modifiedCount === 0) {
