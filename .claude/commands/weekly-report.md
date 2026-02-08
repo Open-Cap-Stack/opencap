@@ -1,10 +1,10 @@
 ---
-description: Generate comprehensive weekly progress report for AINative platform
+description: Generate comprehensive weekly progress report for OpenCap Stack
 ---
 
 # Weekly Report Generator
 
-Generate a comprehensive weekly progress report summarizing all development activity.
+Generate a comprehensive weekly progress report summarizing all development activity across the OpenCap Stack repositories (opencapstack backend and opencap-frontend).
 
 ## Usage
 
@@ -27,28 +27,37 @@ When invoked, gather data from these sources:
 ### Git Commits (Past 7 Days)
 
 ```bash
-# Core repo commits
-cd /Users/ranveerdeshmukh/AINative-core/core
-git log --since="7 days ago" --pretty=format:"%h|%ad|%s|%an" --date=short --no-merges
+# Backend repo commits (opencapstack)
+gh api repos/Open-Cap-Stack/opencapstack/commits --paginate -q '.[] | [.sha[:7], .commit.author.date[:10], .commit.message | split("\n")[0], .commit.author.name] | @tsv' --method GET -f since="$(date -v-7d +%Y-%m-%dT00:00:00Z)"
 
-# Commit count by date
-git log --since="7 days ago" --format="%ad" --date=short | sort | uniq -c
+# Frontend repo commits (opencap-frontend)
+gh api repos/Open-Cap-Stack/opencap-frontend/commits --paginate -q '.[] | [.sha[:7], .commit.author.date[:10], .commit.message | split("\n")[0], .commit.author.name] | @tsv' --method GET -f since="$(date -v-7d +%Y-%m-%dT00:00:00Z)"
 ```
 
 ### GitHub Issues
 
 ```bash
-# Closed issues
-gh issue list --repo AINative-Studio/core --state closed --limit 100 --json number,title,closedAt,labels
+# Backend - Closed issues
+gh issue list --repo Open-Cap-Stack/opencapstack --state closed --limit 100 --json number,title,closedAt,labels
 
-# All recent issues
-gh issue list --repo AINative-Studio/core --state all --limit 100 --json number,title,state,createdAt
+# Backend - All recent issues
+gh issue list --repo Open-Cap-Stack/opencapstack --state all --limit 100 --json number,title,state,createdAt
+
+# Frontend - Closed issues
+gh issue list --repo Open-Cap-Stack/opencap-frontend --state closed --limit 100 --json number,title,closedAt,labels
+
+# Frontend - All recent issues
+gh issue list --repo Open-Cap-Stack/opencap-frontend --state all --limit 100 --json number,title,state,createdAt
 ```
 
 ### PRs Merged
 
 ```bash
-gh pr list --repo AINative-Studio/core --state merged --limit 50 --json number,title,mergedAt
+# Backend PRs
+gh pr list --repo Open-Cap-Stack/opencapstack --state merged --limit 50 --json number,title,mergedAt
+
+# Frontend PRs
+gh pr list --repo Open-Cap-Stack/opencap-frontend --state merged --limit 50 --json number,title,mergedAt
 ```
 
 ## Report Sections
@@ -93,11 +102,11 @@ docs/reports/WEEKLY_REPORT_YYYY-MM-DD_username.md
 ## Example Output Structure
 
 ```markdown
-# AINative Platform - Weekly Progress Report
+# OpenCap Stack - Weekly Progress Report
 ## January 6, 2026 - January 13, 2026
 
 ## Executive Summary
-This reporting period saw **85 commits** across 4 repositories...
+This reporting period saw **85 commits** across the OpenCap Stack repositories...
 
 ## Major Features Implemented
 ### 1. Feature Name
@@ -115,7 +124,7 @@ This reporting period saw **85 commits** across 4 repositories...
 ## Workflow
 
 1. Run `/weekly-report`
-2. Gather commit data from all repos
+2. Gather commit data from opencapstack backend and opencap-frontend repos
 3. Fetch GitHub issues and PRs
 4. Categorize and analyze changes
 5. Calculate statistics
@@ -127,7 +136,7 @@ This reporting period saw **85 commits** across 4 repositories...
 
 Before completing:
 
-- [ ] All repos analyzed (core, website, live, chatwoot)
+- [ ] All repos analyzed (opencapstack backend, opencap-frontend)
 - [ ] Commits linked with hashes
 - [ ] Issues referenced with #numbers
 - [ ] Impact levels assigned
