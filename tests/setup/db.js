@@ -1,8 +1,8 @@
 /**
  * Test Database Setup and Utilities
  *
- * Provides database connection management for testing.
- * Supports both MongoDB Memory Server (legacy) and ZeroDB mocks (migration target).
+ * Provides database connection management for testing using ZeroDB mocks.
+ * MongoDB has been removed - all tests use ZeroDB mocks.
  *
  * Usage:
  *   const { connectDB, closeDB, clearDB, createTestData } = require('./db');
@@ -12,46 +12,19 @@
  *   beforeEach(async () => await clearDB());
  */
 
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+// Load ZeroDB mocks
+const zerodbMocksModule = require('../utils/zerodbMocks');
 
-// Try to load ZeroDB mocks - they may not exist in all environments
-let zerodbMocksModule;
-try {
-  zerodbMocksModule = require('../utils/zerodbMocks');
-} catch (error) {
-  // ZeroDB mocks not available
-  zerodbMocksModule = null;
-}
-
-// Determine test mode from environment
-const useZeroDB = process.env.USE_ZERODB_TESTS === 'true';
-
-let mongoServer;
 let zerodbMocks;
 
 /**
- * Connect to the in-memory database
- */
-async function connectDB() {
-  if (useZeroDB && zerodbMocksModule) {
-    return connectZeroDB();
-  }
-  return connectMongoDB();
-}
-
-/**
- * Connect to ZeroDB mock environment
+ * Connect to the ZeroDB mock database
  * @returns {Object} ZeroDB mock service
  */
-async function connectZeroDB() {
-  if (!zerodbMocksModule) {
-    throw new Error('ZeroDB mocks not available');
-  }
-
+async function connectDB() {
   try {
     zerodbMocks = zerodbMocksModule.createZeroDBMocks();
-    await zerodbMocks.initialize('test-token-db');
+    await zerodbMocks.initialize('test-project-db');
     console.log('ZeroDB mock database connected successfully');
     return zerodbMocks;
   } catch (error) {
@@ -61,49 +34,24 @@ async function connectZeroDB() {
 }
 
 /**
- * Connect to MongoDB in-memory database
- * @returns {Object} Mongoose connection
+ * @deprecated Use connectDB() instead
+ */
+async function connectZeroDB() {
+  return connectDB();
+}
+
+/**
+ * @deprecated MongoDB has been removed. Returns null.
  */
 async function connectMongoDB() {
-  try {
-    // Start in-memory MongoDB instance
-    mongoServer = await MongoMemoryServer.create({
-      instance: {
-        port: 27018, // Use different port for tests
-        dbName: 'opencap_test'
-      }
-    });
-
-    const mongoUri = mongoServer.getUri();
-
-    // Connect to the in-memory database
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    console.log('Test database connected successfully');
-    return mongoose.connection;
-  } catch (error) {
-    console.error('Error connecting to test database:', error);
-    throw error;
-  }
+  console.warn('connectMongoDB is deprecated. MongoDB has been removed. Using ZeroDB mocks instead.');
+  return connectDB();
 }
 
 /**
- * Close database connection and stop in-memory server
+ * Close database connection
  */
 async function closeDB() {
-  if (useZeroDB && zerodbMocksModule) {
-    return closeZeroDB();
-  }
-  return closeMongoDB();
-}
-
-/**
- * Close ZeroDB mock environment
- */
-async function closeZeroDB() {
   try {
     if (zerodbMocksModule) {
       zerodbMocksModule.resetZeroDBMocks();
@@ -117,40 +65,24 @@ async function closeZeroDB() {
 }
 
 /**
- * Close MongoDB connection
+ * @deprecated Use closeDB() instead
+ */
+async function closeZeroDB() {
+  return closeDB();
+}
+
+/**
+ * @deprecated MongoDB has been removed. Use closeDB().
  */
 async function closeMongoDB() {
-  try {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.dropDatabase();
-      await mongoose.connection.close();
-    }
-
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
-
-    console.log('Test database disconnected successfully');
-  } catch (error) {
-    console.error('Error closing test database:', error);
-    throw error;
-  }
+  console.warn('closeMongoDB is deprecated. MongoDB has been removed.');
+  return closeDB();
 }
 
 /**
- * Clear all collections in the database
+ * Clear all data in the database
  */
 async function clearDB() {
-  if (useZeroDB && zerodbMocksModule) {
-    return clearZeroDB();
-  }
-  return clearMongoDB();
-}
-
-/**
- * Clear ZeroDB mock data
- */
-async function clearZeroDB() {
   try {
     if (zerodbMocksModule) {
       zerodbMocksModule.clearAllMockTables();
@@ -163,42 +95,32 @@ async function clearZeroDB() {
 }
 
 /**
- * Clear MongoDB collections
+ * @deprecated Use clearDB() instead
+ */
+async function clearZeroDB() {
+  return clearDB();
+}
+
+/**
+ * @deprecated MongoDB has been removed. Use clearDB().
  */
 async function clearMongoDB() {
-  try {
-    const collections = mongoose.connection.collections;
-
-    for (const key in collections) {
-      const collection = collections[key];
-      await collection.deleteMany({});
-    }
-
-    console.log('Test database cleared');
-  } catch (error) {
-    console.error('Error clearing test database:', error);
-    throw error;
-  }
+  console.warn('clearMongoDB is deprecated. MongoDB has been removed.');
+  return clearDB();
 }
 
 /**
- * Create test data for a given model
- */
-async function createTestData(Model, data) {
-  if (useZeroDB && zerodbMocksModule && typeof Model === 'string') {
-    return createZeroDBTestData(Model, data);
-  }
-  return createMongoDBTestData(Model, data);
-}
-
-/**
- * Create test data in ZeroDB mock
- * @param {string} tableName - Table name
+ * Create test data for a given table/model
+ * @param {string} tableNameOrModel - Table name or model (string for ZeroDB)
  * @param {Object|Array} data - Data to insert
- * @returns {Object} Insert result
+ * @returns {Object|Array} Inserted data
  */
-async function createZeroDBTestData(tableName, data) {
+async function createTestData(tableNameOrModel, data) {
   try {
+    const tableName = typeof tableNameOrModel === 'string'
+      ? tableNameOrModel
+      : tableNameOrModel.modelName || tableNameOrModel.collection?.name || 'unknown';
+
     if (Array.isArray(data)) {
       zerodbMocksModule.seedMockData(tableName, data);
       return data;
@@ -207,58 +129,50 @@ async function createZeroDBTestData(tableName, data) {
       return data;
     }
   } catch (error) {
-    console.error('Error creating ZeroDB test data:', error);
-    throw error;
-  }
-}
-
-/**
- * Create test data in MongoDB
- * @param {Object} Model - Mongoose model
- * @param {Object|Array} data - Data to insert
- * @returns {Object|Array} Created documents
- */
-async function createMongoDBTestData(Model, data) {
-  try {
-    if (Array.isArray(data)) {
-      return await Model.insertMany(data);
-    } else {
-      return await Model.create(data);
-    }
-  } catch (error) {
     console.error('Error creating test data:', error);
     throw error;
   }
 }
 
 /**
+ * @deprecated Use createTestData() instead
+ */
+async function createZeroDBTestData(tableName, data) {
+  return createTestData(tableName, data);
+}
+
+/**
+ * @deprecated MongoDB has been removed. Use createTestData().
+ */
+async function createMongoDBTestData(Model, data) {
+  console.warn('createMongoDBTestData is deprecated. Using ZeroDB mock.');
+  const tableName = Model.modelName || Model.collection?.name || 'unknown';
+  return createTestData(tableName, data);
+}
+
+/**
  * Get the current database service
- * @returns {Object} ZeroDB mocks or Mongoose connection
+ * @returns {Object} ZeroDB mocks
  */
 function getDBService() {
-  if (useZeroDB && zerodbMocks) {
-    return zerodbMocks;
-  }
-  return mongoose.connection;
+  return zerodbMocks || zerodbMocksModule.createZeroDBMocks();
 }
 
 /**
  * Check if using ZeroDB test mode
+ * Always returns true since MongoDB has been removed
  * @returns {boolean}
  */
 function isUsingZeroDB() {
-  return useZeroDB;
+  return true;
 }
 
 /**
  * Get mock storage for ZeroDB assertions
- * @returns {Object|null} Mock storage or null if using MongoDB
+ * @returns {Object} Mock storage
  */
 function getZeroDBMockStorage() {
-  if (useZeroDB && zerodbMocksModule) {
-    return zerodbMocksModule.getMockStorage();
-  }
-  return null;
+  return zerodbMocksModule.getMockStorage();
 }
 
 /**
@@ -267,11 +181,15 @@ function getZeroDBMockStorage() {
  * @param {Array} data - Array of rows
  */
 function seedZeroDBData(tableName, data) {
-  if (useZeroDB && zerodbMocksModule) {
-    zerodbMocksModule.seedMockData(tableName, data);
-  } else {
-    console.warn('seedZeroDBData called but not using ZeroDB test mode');
-  }
+  zerodbMocksModule.seedMockData(tableName, data);
+}
+
+/**
+ * Get the ZeroDB mocks module for advanced usage
+ * @returns {Object} ZeroDB mocks module
+ */
+function getZeroDBMocksModule() {
+  return zerodbMocksModule;
 }
 
 module.exports = {
@@ -283,12 +201,13 @@ module.exports = {
   isUsingZeroDB,
   getZeroDBMockStorage,
   seedZeroDBData,
-  // Legacy exports for backward compatibility
+  getZeroDBMocksModule,
+  // Legacy exports for backward compatibility (deprecated)
   connectMongoDB,
   closeMongoDB,
   clearMongoDB,
   createMongoDBTestData,
-  // ZeroDB specific exports
+  // ZeroDB specific exports (deprecated - use main functions)
   connectZeroDB,
   closeZeroDB,
   clearZeroDB,
