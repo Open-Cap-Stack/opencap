@@ -235,6 +235,10 @@ npm test
 
 This command runs all the test cases defined in the `tests` directory.
 
+### Test Database
+
+Tests use ZeroDB mocks provided by `tests/setup.js` and `tests/setup/db.js`. No external database connection (MongoDB, ZeroDB, etc.) is required to run the unit test suite.
+
 ### Code Coverage
 
 We measure test coverage locally for development purposes only:
