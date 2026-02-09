@@ -154,7 +154,28 @@ describe('WebhookService', () => {
       const invalidWebhook = { ...validWebhookData, url: 'not-a-valid-url' };
 
       await expect(webhookService.registerWebhook(invalidWebhook))
-        .rejects.toThrow('Invalid webhook URL');
+        .rejects.toThrow('Invalid URL format');
+    });
+
+    it('should throw error for localhost URLs (SSRF protection)', async () => {
+      const localhostWebhook = { ...validWebhookData, url: 'https://localhost/webhook' };
+
+      await expect(webhookService.registerWebhook(localhostWebhook))
+        .rejects.toThrow('Internal URLs not allowed');
+    });
+
+    it('should throw error for private IP URLs (SSRF protection)', async () => {
+      const privateIpWebhook = { ...validWebhookData, url: 'https://192.168.1.1/webhook' };
+
+      await expect(webhookService.registerWebhook(privateIpWebhook))
+        .rejects.toThrow('Internal URLs not allowed');
+    });
+
+    it('should throw error for AWS metadata URL (SSRF protection)', async () => {
+      const metadataWebhook = { ...validWebhookData, url: 'http://169.254.169.254/latest/meta-data/' };
+
+      await expect(webhookService.registerWebhook(metadataWebhook))
+        .rejects.toThrow('Internal URLs not allowed');
     });
 
     it('should throw error for empty events array', async () => {
