@@ -10,6 +10,7 @@ const DilutionCalculation = require('../models/DilutionCalculation');
 const DilutionCalculatorService = require('../services/dilutionCalculationService');
 const SAFEDilutionService = require('../services/safeDilutionService');
 const OptionPoolCalculatorService = require('../services/optionPoolCalculatorService');
+const { parsePagination } = require('../middleware/pagination');
 
 /**
  * Calculate dilution for a funding round
@@ -411,7 +412,8 @@ exports.getScenario = async (req, res) => {
 exports.getScenarios = async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { type, limit, skip } = req.query;
+    const { type } = req.query;
+    const { limit, skip } = parsePagination(req.query);
 
     const query = { companyId };
     if (type) {
@@ -419,8 +421,8 @@ exports.getScenarios = async (req, res) => {
     }
 
     const options = {
-      limit: parseInt(limit) || 100,
-      skip: parseInt(skip) || 0,
+      limit,
+      skip,
       sort: { createdAt: -1 }
     };
 

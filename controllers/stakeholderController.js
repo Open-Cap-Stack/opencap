@@ -7,6 +7,7 @@
  */
 
 const Stakeholder = require('../models/Stakeholder');
+const { parsePagination } = require('../middleware/pagination');
 
 /**
  * Create a new stakeholder
@@ -45,7 +46,8 @@ exports.getAllStakeholders = async (req, res) => {
       filter.status = req.query.status;
     }
 
-    const stakeholders = await Stakeholder.find(filter);
+    const { limit, skip } = parsePagination(req.query);
+    const stakeholders = await Stakeholder.find(filter, { limit, skip });
     res.status(200).json(stakeholders);
   } catch (error) {
     console.error('Error fetching stakeholders:', error);

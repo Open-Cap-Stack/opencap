@@ -3,6 +3,7 @@
  * Issue #20: Migrate to ZeroDB via DatabaseAdapter
  */
 const databaseAdapter = require('../services/databaseAdapter');
+const { parsePagination } = require('../middleware/pagination');
 
 // Create a new communication
 exports.createCommunication = async (req, res) => {
@@ -33,7 +34,8 @@ exports.createCommunication = async (req, res) => {
 // Get all communications
 exports.getCommunications = async (req, res) => {
     try {
-        const communications = await databaseAdapter.find('Communication', {});
+        const { limit, skip } = parsePagination(req.query);
+        const communications = await databaseAdapter.find('Communication', {}, { limit, skip });
         if (communications.length === 0) {
             return res.status(404).json({ message: 'No communications found' });
         }
