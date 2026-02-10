@@ -5,7 +5,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const dataRoomController = require('../../controllers/dataRoomController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 router.get('/stats', dataRoomController.getDataRoomStats);
 router.get('/:id/external', dataRoomController.validateExternalAccess);

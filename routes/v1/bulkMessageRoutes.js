@@ -6,8 +6,12 @@
  * sending, scheduling, and delivery tracking.
  */
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const bulkMessageController = require('../../controllers/bulkMessageController');
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * POST /api/v1/bulk-messages

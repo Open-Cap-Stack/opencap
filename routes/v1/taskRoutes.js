@@ -9,7 +9,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const taskController = require('../../controllers/taskController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Task CRUD routes
 router.post('/', taskController.createTask);

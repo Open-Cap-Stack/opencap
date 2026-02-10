@@ -4,7 +4,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const integrationMarketplaceController = require('../../controllers/integrationMarketplaceController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Get all marketplace listings
 // GET /api/v1/integrations/marketplace

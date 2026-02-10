@@ -6,7 +6,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const activityController = require('../../controllers/activityController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * POST /api/v1/activities

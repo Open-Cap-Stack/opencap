@@ -6,8 +6,12 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const multer = require('multer');
 const documentVersionController = require('../../controllers/documentVersionController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({

@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const graphAnalyticsController = require('../../controllers/graphAnalyticsController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // ==================== Node Operations ====================
 

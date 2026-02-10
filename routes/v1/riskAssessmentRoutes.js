@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const riskAssessmentController = require('../../controllers/riskAssessmentController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @route GET /api/v1/risk-assessment/score/:companyId

@@ -9,7 +9,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const emailTrackingController = require('../../controllers/emailTrackingController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @swagger

@@ -8,7 +8,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const terminationController = require('../../controllers/terminationController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @swagger

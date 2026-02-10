@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const { authenticateToken } = require("../../middleware/authMiddleware");
 const inviteManagementController = require("../../controllers/inviteManagementController");
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Route for creating an invite
 router.post("/invites", inviteManagementController.createInvite);

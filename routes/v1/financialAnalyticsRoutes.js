@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const financialAnalyticsController = require('../../controllers/financialAnalyticsController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @route POST /api/v1/financial-analytics/trends

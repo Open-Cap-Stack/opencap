@@ -6,7 +6,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const webhookController = require('../../controllers/webhookController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 const { createRouteRateLimit } = require('../../middleware/security/rateLimit');
 
 // Rate limiting: general webhook limit (100 requests per 15 minutes)

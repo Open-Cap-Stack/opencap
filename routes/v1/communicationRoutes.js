@@ -1,7 +1,11 @@
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const Communication = require('../../models/Communication');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // POST /api/communications - Create a new communication
 router.post('/', async (req, res) => {

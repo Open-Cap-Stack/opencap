@@ -7,6 +7,18 @@ process.env.SKIP_DB_SETUP = 'true';
 const request = require('supertest');
 const express = require('express');
 
+// Mock auth middleware before requiring routes
+jest.mock('../../../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  },
+  authenticate: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
 // Mock the controller
 jest.mock('../../../../controllers/vestingScheduleController', () => ({
   createVestingSchedule: jest.fn((req, res) => res.status(201).json({ _id: 'schedule123' })),

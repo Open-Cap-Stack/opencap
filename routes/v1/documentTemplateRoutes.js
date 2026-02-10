@@ -18,7 +18,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const documentTemplateController = require('../../controllers/documentTemplateController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Create a new template
 router.post(

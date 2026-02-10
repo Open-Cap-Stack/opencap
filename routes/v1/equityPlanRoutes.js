@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const equityPlanController = require('../../controllers/equityPlanController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 router.post('/equity-plans', equityPlanController.createEquityPlan);
 router.get('/equity-plans', equityPlanController.getEquityPlans);

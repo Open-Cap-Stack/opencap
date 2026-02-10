@@ -8,6 +8,19 @@
 
 const request = require('supertest');
 const express = require('express');
+
+// Mock auth middleware before requiring routes
+jest.mock('../../../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  },
+  authenticate: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
 const taskRoutes = require('../../../../routes/v1/taskRoutes');
 const taskController = require('../../../../controllers/taskController');
 

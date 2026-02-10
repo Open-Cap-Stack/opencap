@@ -8,6 +8,19 @@
 
 const express = require('express');
 const request = require('supertest');
+
+// Mock auth middleware before requiring routes
+jest.mock('../../../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  },
+  authenticate: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
 const documentAuditRoutes = require('../../../../routes/v1/documentAuditRoutes');
 const documentAuditController = require('../../../../controllers/documentAuditController');
 
