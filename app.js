@@ -26,6 +26,17 @@ const { databaseMonitor, metricsMiddleware } = require('./middleware/databaseMon
 // Initialize dotenv to load environment variables
 dotenv.config();
 
+// Validate environment variables before anything else
+const { validateEnvironment } = require('./config/validateEnv');
+try {
+  validateEnvironment();
+} catch (err) {
+  console.error(err.message);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
 // Initialize the Express app
 const app = express();
 
