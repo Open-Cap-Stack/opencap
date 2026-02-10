@@ -7,6 +7,7 @@
  * Supports filtering by companyId, type, unread status with pagination.
  */
 const databaseAdapter = require('../services/databaseAdapter');
+const { parsePagination } = require('../middleware/pagination');
 
 /**
  * Build query filter from request query parameters
@@ -98,9 +99,12 @@ exports.getNotifications = async (req, res) => {
     // Build filter from query parameters
     const filter = buildNotificationFilter(req.query);
 
-    // Handle pagination
-    const limit = Math.max(parseInt(req.query.limit) || 100, 1);
-    const skip = Math.max(parseInt(req.query.offset) || 0, 0);
+    // Handle pagination with enforced limits
+    const { limit, skip } = parsePagination({
+      limit: req.query.limit,
+      skip: req.query.offset,
+      page: req.query.page
+    });
 
     // Get notifications with filter and pagination
     const notifications = await databaseAdapter.find('Notification', filter, {
