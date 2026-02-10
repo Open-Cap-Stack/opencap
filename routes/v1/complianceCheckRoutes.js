@@ -1,7 +1,11 @@
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const mongoose = require('mongoose');
 const ComplianceCheck = require('../../models/ComplianceCheck');
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Create a new compliance check
 router.post('/', async (req, res) => {

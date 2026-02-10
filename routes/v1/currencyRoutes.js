@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const currencyController = require('../../controllers/currencyController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @route POST /api/v1/currency/convert

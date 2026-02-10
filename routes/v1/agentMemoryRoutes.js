@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const agentMemoryController = require('../../controllers/agentMemoryController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 router.post('/', agentMemoryController.storeMemory);
 router.get('/', agentMemoryController.getMemories);

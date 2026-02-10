@@ -9,7 +9,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const documentAuditController = require('../../controllers/documentAuditController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * GET /api/v1/audit/action-types

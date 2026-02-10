@@ -7,6 +7,10 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Monitoring services will be injected by app.js
 let monitoringDashboard;

@@ -6,7 +6,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const tenderOfferController = require('../../controllers/tenderOfferController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Tender Offer CRUD
 router.post('/tender-offers', tenderOfferController.createTenderOffer);

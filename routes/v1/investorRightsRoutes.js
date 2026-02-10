@@ -13,7 +13,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const investorRightsController = require('../../controllers/investorRightsController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @route GET /api/v1/investor-rights

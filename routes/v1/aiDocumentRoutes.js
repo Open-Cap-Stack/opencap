@@ -7,8 +7,12 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 const documentProcessingController = require('../../controllers/documentProcessingController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 const documentClassificationController = require('../../controllers/documentClassificationController');
 const documentSummaryController = require('../../controllers/documentSummaryController');
 const documentAnalysisController = require('../../controllers/documentAnalysisController');

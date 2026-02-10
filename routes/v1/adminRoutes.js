@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const adminController = require('../../controllers/adminController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Route for creating a new admin
 router.post('/admins', adminController.createAdmin);

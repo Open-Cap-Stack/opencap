@@ -12,7 +12,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const investorCommunicationController = require('../../controllers/investorCommunicationController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Investor segmentation (must be before /:id routes)
 router.post('/segment', investorCommunicationController.segmentInvestors);

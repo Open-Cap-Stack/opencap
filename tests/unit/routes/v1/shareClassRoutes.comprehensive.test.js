@@ -6,6 +6,19 @@
 
 const request = require('supertest');
 const express = require('express');
+
+// Mock auth middleware before requiring routes
+jest.mock('../../../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  },
+  authenticate: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
 const shareClassRoutes = require('../../../../routes/v1/shareClassRoutes');
 const ShareClass = require('../../../../models/ShareClass');
 

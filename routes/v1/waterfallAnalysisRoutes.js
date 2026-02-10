@@ -6,7 +6,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const waterfallAnalysisController = require('../../controllers/waterfallAnalysisController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // CRUD operations
 router.post('/waterfall-analyses', waterfallAnalysisController.createAnalysis);

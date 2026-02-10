@@ -6,7 +6,11 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const subscriptionController = require('../../controllers/subscriptionController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Subscription CRUD operations
 router.post('/subscriptions', subscriptionController.createSubscription);

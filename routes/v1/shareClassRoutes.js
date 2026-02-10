@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const ShareClass = require('../../models/ShareClass');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // GET /api/v1/share-classes - Get all share classes
 router.get('/', async (req, res) => {

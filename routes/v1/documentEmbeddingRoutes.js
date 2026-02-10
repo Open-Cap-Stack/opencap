@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const documentEmbeddingController = require('../../controllers/documentEmbeddingController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 router.post('/document-embeddings', documentEmbeddingController.createDocumentEmbedding);
 router.get('/document-embeddings', documentEmbeddingController.getDocumentEmbeddings);

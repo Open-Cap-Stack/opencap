@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const equityGrantController = require('../../controllers/equityGrantController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Grant Templates
 router.get('/templates', equityGrantController.getGrantTemplates);

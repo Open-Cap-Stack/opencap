@@ -5,8 +5,12 @@
  * Routes for notification management with filtering support.
  */
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const notificationController = require('../../controllers/Notification');
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * POST /api/v1/notifications

@@ -7,8 +7,12 @@
  */
 
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const messageTriggerController = require('../../controllers/messageTriggerController');
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * GET /api/v1/message-triggers/event-types

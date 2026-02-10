@@ -4,11 +4,15 @@
  * Previously tracked as OCAE-003
  */
 const express = require('express');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const SPVAsset = require('../../models/SPVAssetModel');
 const router = express.Router();
 const mongoose = require('mongoose');
 const SPVAssetController = require('../../controllers/SPVasset');
 const responseDebugger = require('../../middleware/responseDebugger');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 // Note: Auth removed to match SPV routes behavior
 // TODO: Re-enable authentication once auth flow is stabilized

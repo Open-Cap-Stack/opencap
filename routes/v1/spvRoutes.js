@@ -8,8 +8,12 @@
  */
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const SPVController = require('../../controllers/SPV');
 const SPVNestedController = require('../../controllers/SPVNested');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * @route POST /api/spvs

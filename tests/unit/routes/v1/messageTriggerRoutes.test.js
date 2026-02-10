@@ -9,6 +9,19 @@
 
 const express = require('express');
 const request = require('supertest');
+
+// Mock auth middleware before requiring routes
+jest.mock('../../../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  },
+  authenticate: (req, res, next) => {
+    req.user = { userId: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
 const messageTriggerRoutes = require('../../../../routes/v1/messageTriggerRoutes');
 const messageTriggerController = require('../../../../controllers/messageTriggerController');
 

@@ -7,7 +7,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const documentAccessController = require('../../controllers/documentAccessController');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 const {
     validateDocumentAccessCreation,
     validateDocumentAccessUpdate
