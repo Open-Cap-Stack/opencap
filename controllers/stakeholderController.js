@@ -62,7 +62,10 @@ exports.getAllStakeholders = async (req, res) => {
  */
 exports.getStakeholderById = async (req, res) => {
   try {
-    const stakeholder = await Stakeholder.findById(req.params.id);
+    let stakeholder = await Stakeholder.findById(req.params.id);
+    if (!stakeholder) {
+      stakeholder = await Stakeholder.findOne({ stakeholderId: req.params.id });
+    }
 
     if (!stakeholder) {
       return res.status(404).json({ error: 'Stakeholder not found' });
@@ -82,12 +85,18 @@ exports.getStakeholderById = async (req, res) => {
  */
 exports.updateStakeholderById = async (req, res) => {
   try {
-    // ZeroDB: Use direct update without MongoDB $set operator
-    const stakeholder = await Stakeholder.findByIdAndUpdate(
+    let stakeholder = await Stakeholder.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
+    if (!stakeholder) {
+      stakeholder = await Stakeholder.findOneAndUpdate(
+        { stakeholderId: req.params.id },
+        req.body,
+        { new: true }
+      );
+    }
 
     if (!stakeholder) {
       return res.status(404).json({ error: 'Stakeholder not found' });
@@ -107,7 +116,10 @@ exports.updateStakeholderById = async (req, res) => {
  */
 exports.deleteStakeholderById = async (req, res) => {
   try {
-    const stakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
+    let stakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
+    if (!stakeholder) {
+      stakeholder = await Stakeholder.findOneAndDelete({ stakeholderId: req.params.id });
+    }
 
     if (!stakeholder) {
       return res.status(404).json({ error: 'Stakeholder not found' });
