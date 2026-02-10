@@ -8,6 +8,7 @@
  */
 
 const databaseAdapter = require('../services/databaseAdapter');
+const { errorResponse } = require('../middleware/errorResponse');
 
 /**
  * Create a new investor
@@ -30,7 +31,7 @@ exports.createInvestor = async (req, res) => {
     !investorType ||
     !relatedFundraisingRound
   ) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return errorResponse(res, 400, 'All fields are required');
   }
 
   try {
@@ -43,7 +44,7 @@ exports.createInvestor = async (req, res) => {
     });
     res.status(201).json(investor);
   } catch (error) {
-    res.status(500).json({ error: 'Error creating investor' });
+    errorResponse(res, 500, 'Error creating investor', error);
   }
 };
 
@@ -56,11 +57,11 @@ exports.getInvestorById = async (req, res) => {
   try {
     const investor = await databaseAdapter.findById('Investor', req.params.id);
     if (!investor) {
-      return res.status(404).json({ error: 'Investor not found' });
+      return errorResponse(res, 404, 'Investor not found');
     }
     res.status(200).json({ investor });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching investor' });
+    errorResponse(res, 500, 'Error fetching investor', error);
   }
 };
 
@@ -74,7 +75,7 @@ exports.getAllInvestors = async (req, res) => {
     const investors = await databaseAdapter.find('Investor', {}, {});
     res.status(200).json({ investors });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching investors' });
+    errorResponse(res, 500, 'Error fetching investors', error);
   }
 };
 
@@ -99,7 +100,7 @@ exports.updateInvestor = async (req, res) => {
     !investorType ||
     !relatedFundraisingRound
   ) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return errorResponse(res, 400, 'All fields are required');
   }
 
   try {
@@ -117,12 +118,12 @@ exports.updateInvestor = async (req, res) => {
     );
 
     if (!investor) {
-      return res.status(404).json({ error: 'Investor not found' });
+      return errorResponse(res, 404, 'Investor not found');
     }
 
     res.status(200).json(investor);
   } catch (error) {
-    res.status(500).json({ error: 'Error updating investor' });
+    errorResponse(res, 500, 'Error updating investor', error);
   }
 };
 
@@ -136,11 +137,11 @@ exports.deleteInvestor = async (req, res) => {
     const investor = await databaseAdapter.findByIdAndDelete('Investor', req.params.id);
 
     if (!investor) {
-      return res.status(404).json({ error: 'Investor not found' });
+      return errorResponse(res, 404, 'Investor not found');
     }
 
     res.status(200).json({ message: 'Investor deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Error deleting investor' });
+    errorResponse(res, 500, 'Error deleting investor', error);
   }
 };

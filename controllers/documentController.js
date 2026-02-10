@@ -11,6 +11,7 @@ const websocketService = require('../services/websocketService');
 const fileStorageService = require('../services/fileStorageService');
 const eventStreamingService = require('../services/eventStreamingService');
 const DocumentFolder = require('../models/DocumentFolder');
+const { errorResponse } = require('../middleware/errorResponse');
 
 const TABLE_NAME = 'documents';
 
@@ -62,7 +63,7 @@ exports.createDocument = async (req, res) => {
         if (req.body.folderId) {
             const folder = await DocumentFolder.findByFolderId(req.body.folderId);
             if (!folder) {
-                return res.status(400).json({ message: 'Folder not found' });
+                return errorResponse(res, 400, 'Folder not found');
             }
             console.log('Document will be saved to folder:', { folderId: folder.folderId, folderName: folder.name });
         }
@@ -119,10 +120,7 @@ exports.createDocument = async (req, res) => {
                     // Clean up the temp file
                     const fs = require('fs');
                     fs.unlink(file.path, () => {});
-                    return res.status(500).json({
-                        message: 'Failed to upload file to storage. Please try again.',
-                        error: uploadError.message
-                    });
+                    return errorResponse(res, 500, 'Failed to upload file to storage. Please try again.', uploadError);
                 }
                 // On local dev, keep local file as fallback
                 console.warn('Keeping local file as fallback (development only)');
@@ -191,7 +189,7 @@ exports.createDocument = async (req, res) => {
 
         res.status(201).json(savedDocument);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        errorResponse(res, 400, error.message, error);
     }
 };
 
@@ -318,7 +316,7 @@ exports.getDocuments = async (req, res) => {
         });
     } catch (error) {
         console.error('Error getting documents:', error.message);
-        res.status(500).json({ message: error.message });
+        errorResponse(res, 500, error.message, error);
     }
 };
 
@@ -362,12 +360,12 @@ exports.getDocumentById = async (req, res) => {
         const document = await findDocumentById(req.params.id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         res.status(200).json(document);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        errorResponse(res, 500, error.message, error);
     }
 };
 
@@ -397,7 +395,7 @@ exports.updateDocumentById = async (req, res) => {
         const document = documents[0];
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Re-index document for vector search if content changed
@@ -433,7 +431,7 @@ exports.updateDocumentById = async (req, res) => {
 
         res.status(200).json(document);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        errorResponse(res, 400, error.message, error);
     }
 };
 
@@ -446,7 +444,7 @@ exports.deleteDocumentById = async (req, res) => {
         const document = await findDocumentById(req.params.id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Delete from ZeroDB - use row_id if available for direct deletion
@@ -478,7 +476,7 @@ exports.deleteDocumentById = async (req, res) => {
 
         res.status(200).json({ message: 'Document deleted' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        errorResponse(res, 500, error.message, error);
     }
 };
 
@@ -490,7 +488,7 @@ exports.searchDocuments = async (req, res) => {
         const { query, limit = 10, threshold = 0.3, namespace = 'documents' } = req.body;
 
         if (!query) {
-            return res.status(400).json({ message: 'Search query is required' });
+            return errorResponse(res, 400, 'Search query is required');
         }
 
         // Perform vector search
@@ -562,7 +560,7 @@ exports.searchDocuments = async (req, res) => {
         });
     } catch (error) {
         console.error('Document search error:', error.message);
-        res.status(500).json({ message: 'Search failed', error: error.message });
+        errorResponse(res, 500, 'Search failed', error);
     }
 };
 
@@ -584,7 +582,7 @@ exports.findSimilarDocuments = async (req, res) => {
         const referenceDoc = documents[0];
 
         if (!referenceDoc) {
-            return res.status(404).json({ message: 'Reference document not found' });
+            return errorResponse(res, 404, 'Reference document not found');
         }
 
         // Check access permissions
@@ -594,7 +592,7 @@ exports.findSimilarDocuments = async (req, res) => {
                              (referenceDoc.sharedWith && referenceDoc.sharedWith.includes(req.user?.userId));
 
             if (!hasAccess) {
-                return res.status(403).json({ message: 'Access denied to reference document' });
+                return errorResponse(res, 403, 'Access denied to reference document');
             }
         }
 
@@ -659,7 +657,7 @@ exports.findSimilarDocuments = async (req, res) => {
         });
     } catch (error) {
         console.error('Similar documents error:', error.message);
-        res.status(500).json({ message: 'Failed to find similar documents', error: error.message });
+        errorResponse(res, 500, 'Failed to find similar documents', error);
     }
 };
 
@@ -680,7 +678,7 @@ exports.getDocumentAnalytics = async (req, res) => {
         const document = documents[0];
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Check access permissions
@@ -690,7 +688,7 @@ exports.getDocumentAnalytics = async (req, res) => {
                              (document.sharedWith && document.sharedWith.includes(req.user?.userId));
 
             if (!hasAccess) {
-                return res.status(403).json({ message: 'Access denied' });
+                return errorResponse(res, 403, 'Access denied');
             }
         }
 
@@ -707,7 +705,7 @@ exports.getDocumentAnalytics = async (req, res) => {
         });
     } catch (error) {
         console.error('Document analytics error:', error.message);
-        res.status(500).json({ message: 'Failed to get document analytics', error: error.message });
+        errorResponse(res, 500, 'Failed to get document analytics', error);
     }
 };
 
@@ -767,7 +765,7 @@ exports.getGeneralAnalytics = async (req, res) => {
         });
     } catch (error) {
         console.error('General analytics error:', error.message);
-        res.status(500).json({ message: 'Failed to get document analytics', error: error.message });
+        errorResponse(res, 500, 'Failed to get document analytics', error);
     }
 };
 
@@ -778,7 +776,7 @@ exports.bulkIndexDocuments = async (req, res) => {
     try {
         // Check admin permissions
         if (req.user?.role !== 'admin') {
-            return res.status(403).json({ message: 'Admin access required' });
+            return errorResponse(res, 403, 'Admin access required');
         }
 
         const { force = 'false' } = req.query;
@@ -843,7 +841,7 @@ exports.bulkIndexDocuments = async (req, res) => {
         });
     } catch (error) {
         console.error('Bulk indexing error:', error.message);
-        res.status(500).json({ message: 'Bulk indexing failed', error: error.message });
+        errorResponse(res, 500, 'Bulk indexing failed', error);
     }
 };
 
@@ -934,12 +932,12 @@ exports.downloadDocument = async (req, res) => {
 
         if (!document) {
             console.warn(`Document not found: ${id}`);
-            return res.status(404).json({ message: 'Document not found', documentId: id });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Check access permissions
         if (!checkDocumentAccess(document, req.user)) {
-            return res.status(403).json({ message: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied');
         }
 
         // Check if document has a file attached (local path or fileId)
@@ -957,11 +955,7 @@ exports.downloadDocument = async (req, res) => {
 
         if (!hasLocalFile && !hasRemoteFile) {
             console.error(`No file attached to document ${id}. Local path: ${localFilePath}, FileId: ${document.fileId}`);
-            return res.status(404).json({
-                message: 'File not available. The file may have been deleted or failed to upload.',
-                documentId: id,
-                hint: 'Try re-uploading the document'
-            });
+            return errorResponse(res, 404, 'File not available. The file may have been deleted or failed to upload.');
         }
 
         const contentType = document.contentType || document.mimeType || 'application/octet-stream';
@@ -1011,16 +1005,9 @@ exports.downloadDocument = async (req, res) => {
             console.error(`File download error for fileId ${document.fileId}:`, fileError.message);
             // Check if it's a "not found" error
             if (fileError.message.includes('not found') || fileError.message.includes('404')) {
-                return res.status(404).json({
-                    message: 'File not found in storage. It may have been deleted.',
-                    documentId: id,
-                    fileId: document.fileId
-                });
+                return errorResponse(res, 404, 'File not found in storage. It may have been deleted.');
             }
-            return res.status(500).json({
-                message: 'Failed to download file from storage',
-                error: fileError.message
-            });
+            return errorResponse(res, 500, 'Failed to download file from storage', fileError);
         }
 
         // Set response headers
@@ -1056,7 +1043,7 @@ exports.downloadDocument = async (req, res) => {
         res.status(200).send(fileData.data);
     } catch (error) {
         console.error('Document download error:', error.message);
-        res.status(500).json({ message: 'Failed to download document', error: error.message });
+        errorResponse(res, 500, 'Failed to download document', error);
     }
 };
 
@@ -1072,12 +1059,12 @@ exports.getDocumentPreview = async (req, res) => {
         const document = await findDocumentById(id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Check access permissions
         if (!checkDocumentAccess(document, req.user)) {
-            return res.status(403).json({ message: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied');
         }
 
         // Check if document has a file attached (local path or fileId)
@@ -1086,7 +1073,7 @@ exports.getDocumentPreview = async (req, res) => {
         const hasRemoteFile = document.fileId;
 
         if (!hasLocalFile && !hasRemoteFile) {
-            return res.status(404).json({ message: 'No file attached to document' });
+            return errorResponse(res, 404, 'No file attached to document');
         }
 
         let contentType = document.contentType || document.mimeType;
@@ -1130,7 +1117,7 @@ exports.getDocumentPreview = async (req, res) => {
         res.status(200).json(response);
     } catch (error) {
         console.error('Document preview error:', error.message);
-        res.status(500).json({ message: 'Failed to get document preview', error: error.message });
+        errorResponse(res, 500, 'Failed to get document preview', error);
     }
 };
 
@@ -1146,7 +1133,7 @@ exports.getDocumentAccess = async (req, res) => {
         const document = await findDocumentById(id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Check if user has any access to view access info
@@ -1154,7 +1141,7 @@ exports.getDocumentAccess = async (req, res) => {
         const hasBasicAccess = checkDocumentAccess(document, req.user);
 
         if (!hasBasicAccess) {
-            return res.status(403).json({ message: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied');
         }
 
         // Determine current user's permissions
@@ -1187,10 +1174,7 @@ exports.getDocumentAccess = async (req, res) => {
         res.status(200).json(response);
     } catch (error) {
         console.error('Document access error:', error.message);
-        res.status(500).json({
-            message: 'Failed to get document access info',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        errorResponse(res, 500, 'Failed to get document access info', error);
     }
 };
 
@@ -1206,21 +1190,19 @@ exports.logDocumentAccess = async (req, res) => {
         // Validate access type
         const validAccessTypes = ['view', 'download', 'edit'];
         if (!accessType || !validAccessTypes.includes(accessType)) {
-            return res.status(400).json({
-                message: 'Invalid access type. Must be one of: view, download, edit'
-            });
+            return errorResponse(res, 400, 'Invalid access type. Must be one of: view, download, edit');
         }
 
         // Get document from ZeroDB using findDocumentById helper
         const document = await findDocumentById(id);
 
         if (!document) {
-            return res.status(404).json({ message: 'Document not found' });
+            return errorResponse(res, 404, 'Document not found');
         }
 
         // Check if user has access to the document
         if (!checkDocumentAccess(document, req.user)) {
-            return res.status(403).json({ message: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied');
         }
 
         // Create access log entry
@@ -1267,10 +1249,7 @@ exports.logDocumentAccess = async (req, res) => {
         res.status(201).json(accessLog);
     } catch (error) {
         console.error('Log document access error:', error.message);
-        res.status(500).json({
-            message: 'Failed to log document access',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        errorResponse(res, 500, 'Failed to log document access', error);
     }
 };
 
@@ -1298,7 +1277,7 @@ exports.createFolder = async (req, res) => {
         res.status(201).json(folder);
     } catch (error) {
         console.error('Create folder error:', error.message);
-        res.status(400).json({ message: error.message });
+        errorResponse(res, 400, error.message, error);
     }
 };
 
@@ -1321,7 +1300,7 @@ exports.getFolders = async (req, res) => {
         res.status(200).json({ folders });
     } catch (error) {
         console.error('Get folders error:', error.message);
-        res.status(500).json({ message: error.message });
+        errorResponse(res, 500, error.message, error);
     }
 };
 
@@ -1335,7 +1314,7 @@ exports.getFolderById = async (req, res) => {
         const folder = await DocumentFolder.findByFolderId(id);
 
         if (!folder) {
-            return res.status(404).json({ message: 'Folder not found' });
+            return errorResponse(res, 404, 'Folder not found');
         }
 
         // Get breadcrumbs for navigation
@@ -1347,7 +1326,7 @@ exports.getFolderById = async (req, res) => {
         });
     } catch (error) {
         console.error('Get folder error:', error.message);
-        res.status(500).json({ message: error.message });
+        errorResponse(res, 500, error.message, error);
     }
 };
 
@@ -1374,7 +1353,7 @@ exports.updateFolderById = async (req, res) => {
         res.status(200).json(updatedFolder);
     } catch (error) {
         console.error('Update folder error:', error.message);
-        res.status(400).json({ message: error.message });
+        errorResponse(res, 400, error.message, error);
     }
 };
 
@@ -1390,7 +1369,7 @@ exports.deleteFolderById = async (req, res) => {
         res.status(200).json({ message: 'Folder deleted successfully' });
     } catch (error) {
         console.error('Delete folder error:', error.message);
-        res.status(400).json({ message: error.message });
+        errorResponse(res, 400, error.message, error);
     }
 };
 
@@ -1407,9 +1386,9 @@ exports.getFolderContents = async (req, res) => {
     } catch (error) {
         console.error('Get folder contents error:', error.message);
         if (error.message === 'Folder not found') {
-            res.status(404).json({ message: error.message });
+            errorResponse(res, 404, error.message);
         } else {
-            res.status(500).json({ message: error.message });
+            errorResponse(res, 500, error.message, error);
         }
     }
 };
