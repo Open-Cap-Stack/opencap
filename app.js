@@ -405,18 +405,18 @@ app.get('/health/zerodb', async (req, res) => {
   }
 });
 
-// Error handling middleware
+// Global error handler - must be after all routes (Issue #357)
+const { errorResponse } = require('./middleware/errorResponse');
 app.use((err, req, res, next) => {
-  console.error("Error:", err.message);
-  res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
+  console.error('Unhandled error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'Internal server error';
+  errorResponse(res, status, message, err);
 });
 
 // 404 handler - must be last
 app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+  errorResponse(res, 404, 'Route not found');
 });
 
 // Set up server and start listening
