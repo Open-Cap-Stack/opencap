@@ -10,6 +10,16 @@ const Stakeholder = require('../../../models/Stakeholder');
 // Mock Stakeholder model
 jest.mock('../../../models/Stakeholder');
 
+// Mock pagination middleware
+jest.mock('../../../middleware/pagination', () => ({
+  parsePagination: jest.fn((query) => ({
+    limit: parseInt(query.limit) || 20,
+    skip: parseInt(query.skip) || 0
+  }))
+}));
+
+const { parsePagination } = require('../../../middleware/pagination');
+
 // Import controller after mocking
 const stakeholderController = require('../../../controllers/stakeholderController');
 
@@ -79,7 +89,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   });
 
   describe('getAllStakeholders', () => {
-    it('should return all stakeholders successfully', async () => {
+    it('should return all stakeholders with pagination', async () => {
       const mockStakeholders = [
         { _id: '1', stakeholderId: 'STK-001', name: 'John Doe', role: 'Investor', projectId: 'PRJ-001' },
         { _id: '2', stakeholderId: 'STK-002', name: 'Jane Smith', role: 'Founder', projectId: 'PRJ-001' }
@@ -89,7 +99,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({});
+      expect(parsePagination).toHaveBeenCalledWith({});
+      expect(Stakeholder.find).toHaveBeenCalledWith({}, { limit: 20, skip: 0 });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(expect.arrayContaining([
         expect.objectContaining({ stakeholderId: 'STK-001' }),
@@ -104,7 +115,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'COMP-001' });
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        { companyId: 'COMP-001' },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
     });
 
     it('should filter by projectId when provided', async () => {
@@ -114,7 +128,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({ projectId: 'PRJ-001' });
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        { projectId: 'PRJ-001' },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
     });
 
     it('should filter by role when provided', async () => {
@@ -124,7 +141,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({ role: 'Investor' });
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        { role: 'Investor' },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
     });
 
     it('should filter by status when provided', async () => {
@@ -134,7 +154,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({ status: 'Active' });
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        { status: 'Active' },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
     });
 
     it('should return empty array when no stakeholders exist', async () => {
@@ -154,10 +177,21 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       expect(mockRes.status).toHaveBeenCalledWith(500);
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'Error fetching stakeholders' });
     });
+
+    it('should pass custom pagination params', async () => {
+      mockReq.query = { limit: '10', skip: '5' };
+
+      Stakeholder.find.mockResolvedValue([]);
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(parsePagination).toHaveBeenCalledWith({ limit: '10', skip: '5' });
+      expect(Stakeholder.find).toHaveBeenCalledWith({}, { limit: 10, skip: 5 });
+    });
   });
 
   describe('getStakeholderById', () => {
-    it('should return a stakeholder by id successfully', async () => {
+    it('should return a stakeholder by _id successfully', async () => {
       const stakeholderId = 'zerodb-id-123';
       mockReq.params.id = stakeholderId;
 
@@ -180,10 +214,34 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       });
     });
 
-    it('should return 404 when stakeholder is not found', async () => {
+    it('should fall back to stakeholderId lookup when _id not found', async () => {
+      mockReq.params.id = 'STK-001';
+
+      const mockStakeholder = {
+        _id: 'zerodb-id-123',
+        stakeholderId: 'STK-001',
+        name: 'John Doe',
+        role: 'Investor'
+      };
+
+      Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue(mockStakeholder);
+
+      await stakeholderController.getStakeholderById(mockReq, mockRes);
+
+      expect(Stakeholder.findById).toHaveBeenCalledWith('STK-001');
+      expect(Stakeholder.findOne).toHaveBeenCalledWith({ stakeholderId: 'STK-001' });
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        stakeholder: expect.objectContaining({ stakeholderId: 'STK-001' })
+      });
+    });
+
+    it('should return 404 when stakeholder is not found by either id', async () => {
       mockReq.params.id = 'non-existent-id';
 
       Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue(null);
 
       await stakeholderController.getStakeholderById(mockReq, mockRes);
 
@@ -204,7 +262,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   });
 
   describe('updateStakeholderById', () => {
-    it('should update a stakeholder successfully', async () => {
+    it('should update a stakeholder by _id successfully', async () => {
       const stakeholderId = 'zerodb-id-123';
       mockReq.params.id = stakeholderId;
       mockReq.body = {
@@ -226,7 +284,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.findByIdAndUpdate).toHaveBeenCalledWith(
         stakeholderId,
-        { $set: mockReq.body },
+        mockReq.body,
         { new: true }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -235,11 +293,36 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       });
     });
 
+    it('should fall back to stakeholderId lookup for update', async () => {
+      mockReq.params.id = 'STK-001';
+      mockReq.body = { name: 'Updated Name' };
+
+      const mockUpdatedStakeholder = {
+        _id: 'zerodb-id-123',
+        stakeholderId: 'STK-001',
+        name: 'Updated Name'
+      };
+
+      Stakeholder.findByIdAndUpdate.mockResolvedValue(null);
+      Stakeholder.findOneAndUpdate.mockResolvedValue(mockUpdatedStakeholder);
+
+      await stakeholderController.updateStakeholderById(mockReq, mockRes);
+
+      expect(Stakeholder.findByIdAndUpdate).toHaveBeenCalledWith('STK-001', mockReq.body, { new: true });
+      expect(Stakeholder.findOneAndUpdate).toHaveBeenCalledWith(
+        { stakeholderId: 'STK-001' },
+        mockReq.body,
+        { new: true }
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
+
     it('should return 404 when stakeholder to update is not found', async () => {
       mockReq.params.id = 'non-existent-id';
       mockReq.body = { name: 'Updated Name' };
 
       Stakeholder.findByIdAndUpdate.mockResolvedValue(null);
+      Stakeholder.findOneAndUpdate.mockResolvedValue(null);
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
@@ -261,7 +344,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   });
 
   describe('deleteStakeholderById', () => {
-    it('should delete a stakeholder successfully', async () => {
+    it('should delete a stakeholder by _id successfully', async () => {
       const stakeholderId = 'zerodb-id-123';
       mockReq.params.id = stakeholderId;
 
@@ -281,10 +364,31 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Stakeholder deleted' });
     });
 
+    it('should fall back to stakeholderId lookup for delete', async () => {
+      mockReq.params.id = 'STK-001';
+
+      const mockDeletedStakeholder = {
+        _id: 'zerodb-id-123',
+        stakeholderId: 'STK-001',
+        name: 'John Doe'
+      };
+
+      Stakeholder.findByIdAndDelete.mockResolvedValue(null);
+      Stakeholder.findOneAndDelete.mockResolvedValue(mockDeletedStakeholder);
+
+      await stakeholderController.deleteStakeholderById(mockReq, mockRes);
+
+      expect(Stakeholder.findByIdAndDelete).toHaveBeenCalledWith('STK-001');
+      expect(Stakeholder.findOneAndDelete).toHaveBeenCalledWith({ stakeholderId: 'STK-001' });
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({ message: 'Stakeholder deleted' });
+    });
+
     it('should return 404 when stakeholder to delete is not found', async () => {
       mockReq.params.id = 'non-existent-id';
 
       Stakeholder.findByIdAndDelete.mockResolvedValue(null);
+      Stakeholder.findOneAndDelete.mockResolvedValue(null);
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
@@ -316,12 +420,11 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
-      // The controller now accepts any body (model handles defaults)
       expect(Stakeholder.create).toHaveBeenCalledWith({});
       expect(mockRes.status).toHaveBeenCalledWith(201);
     });
 
-    it('should handle multiple query filters', async () => {
+    it('should handle multiple query filters with pagination', async () => {
       mockReq.query = {
         companyId: 'COMP-001',
         projectId: 'PRJ-001',
@@ -333,12 +436,15 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
-      expect(Stakeholder.find).toHaveBeenCalledWith({
-        companyId: 'COMP-001',
-        projectId: 'PRJ-001',
-        role: 'Investor',
-        status: 'Active'
-      });
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        {
+          companyId: 'COMP-001',
+          projectId: 'PRJ-001',
+          role: 'Investor',
+          status: 'Active'
+        },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
     });
   });
 
@@ -376,7 +482,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.findByIdAndUpdate).toHaveBeenCalledWith(
         'zerodb-id-123',
-        { $set: { name: 'Updated Name' } },
+        { name: 'Updated Name' },
         { new: true }
       );
     });
