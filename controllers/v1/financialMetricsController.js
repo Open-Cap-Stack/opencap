@@ -5,7 +5,7 @@
  * Versioned controller for financial metrics calculations with JWT auth
  */
 
-const mongoose = require('mongoose');
+const { isValidObjectId } = require('../../utils/inputSanitizer');
 const FinancialReport = require('../../models/financialReport');
 const Company = require('../../models/Company');
 
@@ -62,7 +62,7 @@ const calculateProfitabilityMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -192,7 +192,7 @@ const calculateLiquidityMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -283,7 +283,7 @@ const calculateSolvencyMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -382,7 +382,7 @@ const calculateEfficiencyMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -523,7 +523,7 @@ const calculateGrowthMetrics = async (req, res) => {
     const compareWith = req.query.compareWith; // e.g., 'previous-year' or 'previous-quarter'
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -651,7 +651,7 @@ const calculateValuationMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Validate input parameters
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     
@@ -744,7 +744,7 @@ const calculateComprehensiveMetrics = async (req, res) => {
     const period = parsePeriod(req.query.period);
     
     // Input validation
-    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+    if (!companyId || !isValidObjectId(companyId)) {
       return res.status(400).json({ error: 'Invalid company ID' });
     }
     

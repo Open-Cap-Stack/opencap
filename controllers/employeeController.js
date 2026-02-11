@@ -8,6 +8,7 @@
  */
 
 const databaseAdapter = require('../services/databaseAdapter');
+const { isValidObjectId } = require('../utils/inputSanitizer');
 
 /**
  * Create a new employee
@@ -86,7 +87,7 @@ exports.getEmployees = async (req, res) => {
  */
 exports.getEmployeeById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({
         error: 'Validation error',
         message: 'Invalid employee ID format'
@@ -117,7 +118,7 @@ exports.getEmployeeById = async (req, res) => {
 exports.updateEmployee = async (req, res) => {
   try {
     // Check for valid ID
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({
         error: 'Validation error',
         message: 'Invalid employee ID format',
@@ -194,7 +195,7 @@ exports.updateEmployee = async (req, res) => {
  */
 exports.deleteEmployee = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({
         error: 'Validation error',
         message: 'Invalid employee ID format'

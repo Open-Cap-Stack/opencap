@@ -18,8 +18,10 @@ const { OAuth2Client } = require('google-auth-library');
 const { blacklistToken } = require('../middleware/authMiddleware');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 
-// Initialize Google OAuth client
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Initialize Google OAuth client only when configured
+const googleClient = process.env.GOOGLE_CLIENT_ID
+  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+  : null;
 
 /**
  * Create transporter for sending emails
@@ -252,6 +254,9 @@ const oauthLogin = async (req, res) => {
 
     // Verify token based on provider
     if (provider === 'google') {
+      if (!googleClient) {
+        return res.status(503).json({ message: 'OAuth not configured' });
+      }
       try {
         const ticket = await googleClient.verifyIdToken({
           idToken: token,
@@ -265,16 +270,16 @@ const oauthLogin = async (req, res) => {
       return res.status(400).json({ message: 'Unsupported OAuth provider' });
     }
 
-    // Use atomic upsert to prevent race conditions (Issue #382)
-    // This ensures that even if multiple OAuth requests come simultaneously,
-    // only one user record is created
-    const { v4: uuidv4 } = require('uuid');
+    // Check if user already exists (Issue #382 - race condition fix)
+    let user = await User.findOne({ email: userInfo.email });
 
-    const user = await User.findOneAndUpdate(
-      { email: userInfo.email },
-      {
-        $setOnInsert: {
-          userId: uuidv4(),
+    if (!user) {
+      // User does not exist yet - create a new account.
+      // Wrap in try/catch to handle race condition:
+      // If two concurrent OAuth requests both pass the findOne check,
+      // the second create will fail. We catch that and re-fetch instead.
+      try {
+        user = await User.create({
           firstName: userInfo.given_name,
           lastName: userInfo.family_name,
           email: userInfo.email,
@@ -283,20 +288,30 @@ const oauthLogin = async (req, res) => {
           status: 'active',
           emailVerified: true,
           oauthProvider: provider,
-          oauthId: userInfo.sub,
-          createdAt: new Date()
-        },
-        $set: {
-          // Update last login even if user exists
-          lastLogin: new Date()
+          oauthId: userInfo.sub
+        });
+      } catch (createError) {
+        // If creation failed due to a duplicate (race condition),
+        // the other request already created the user - fetch it
+        console.warn('OAuth user creation conflict, re-fetching existing user:', createError.message);
+        user = await User.findOne({ email: userInfo.email });
+        if (!user) {
+          // If we still cannot find the user, something else went wrong
+          throw createError;
         }
-      },
-      {
-        upsert: true,
-        new: true,
-        setDefaultsOnInsert: true
       }
-    );
+    }
+
+    // Update last login timestamp for both new and existing users
+    try {
+      await User.updateOne(
+        { email: userInfo.email },
+        { $set: { lastLogin: new Date() } }
+      );
+    } catch (updateError) {
+      // Non-critical: log but do not fail the login
+      console.warn('Failed to update lastLogin for OAuth user:', updateError.message);
+    }
 
     // Generate tokens
     const accessToken = jwt.sign(

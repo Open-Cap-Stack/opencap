@@ -1,7 +1,6 @@
 const FinancialReport = require("../models/financialReport");
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const mongoose = require('mongoose');
 
 // Constants
 const METHOD_PERMISSION_MAP = {
@@ -297,14 +296,7 @@ class FinancialReportController {
   static async createFinancialReport(req, res, next) {
     let session;
     try {
-      // Check if Mongoose connection is ready and supports transactions
-      if (mongoose.connection.readyState === 1 && 
-          mongoose.connection.db && 
-          mongoose.connection.db.serverConfig && 
-          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
-        session = await mongoose.startSession();
-        session.startTransaction();
-      }
+      // ZeroDB handles transactions internally - no session management needed
 
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {
@@ -371,14 +363,7 @@ class FinancialReportController {
   static async updateFinancialReport(req, res, next) {
     let session;
     try {
-      // Check if Mongoose connection is ready and supports transactions
-      if (mongoose.connection.readyState === 1 && 
-          mongoose.connection.db && 
-          mongoose.connection.db.serverConfig && 
-          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
-        session = await mongoose.startSession();
-        session.startTransaction();
-      }
+      // ZeroDB handles transactions internally - no session management needed
 
       if (!req.params.id) {
         return res.status(400).json({ message: 'Report ID is required' });
@@ -427,14 +412,7 @@ class FinancialReportController {
   static async deleteFinancialReport(req, res, next) {
     let session;
     try {
-      // Check if Mongoose connection is ready and supports transactions
-      if (mongoose.connection.readyState === 1 && 
-          mongoose.connection.db && 
-          mongoose.connection.db.serverConfig && 
-          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
-        session = await mongoose.startSession();
-        session.startTransaction();
-      }
+      // ZeroDB handles transactions internally - no session management needed
 
       if (!req.params.id) {
         return res.status(400).json({ message: 'Report ID is required' });
@@ -466,14 +444,7 @@ class FinancialReportController {
   static async generateReport(req, res, next) {
     let session;
     try {
-      // Check if Mongoose connection is ready and supports transactions
-      if (mongoose.connection.readyState === 1 && 
-          mongoose.connection.db && 
-          mongoose.connection.db.serverConfig && 
-          mongoose.connection.db.serverConfig.hasOwnProperty('replset')) {
-        session = await mongoose.startSession();
-        session.startTransaction();
-      }
+      // ZeroDB handles transactions internally - no session management needed
 
       const validation = this.validateFinancialReport(req.body);
       if (!validation.isValid) {

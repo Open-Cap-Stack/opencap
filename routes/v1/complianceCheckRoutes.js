@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const ComplianceCheck = require('../../models/ComplianceCheck');
+const { isValidObjectId } = require('../../utils/inputSanitizer');
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -94,7 +95,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: 'Invalid compliance check ID format'
       });
@@ -123,7 +124,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
 
     // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: 'Invalid compliance check ID format'
       });
@@ -178,7 +179,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: 'Invalid compliance check ID format'
       });
