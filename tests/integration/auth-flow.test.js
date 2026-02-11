@@ -12,7 +12,6 @@
 
 const request = require('supertest');
 const { createApp } = require('../setup/app');
-const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -45,13 +44,7 @@ describe('Authentication Flow Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    // Clear collections before each test if mongoose is connected
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      const collections = await mongoose.connection.db.collections();
-      for (const collection of collections) {
-        await collection.deleteMany({});
-      }
-    }
+    // No-op: ZeroDB handles data isolation
   });
 
   describe('Complete Authentication Workflow', () => {

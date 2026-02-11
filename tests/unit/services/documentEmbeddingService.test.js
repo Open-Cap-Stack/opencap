@@ -11,7 +11,7 @@ const documentEmbeddingService = require('../../../services/documentEmbeddingSer
 const zerodbService = require('../../../services/zerodbService');
 const Document = require('../../../models/Document');
 const DocumentEmbedding = require('../../../models/DocumentEmbeddingModel');
-const mongoose = require('mongoose');
+const generateObjectId = () => { const hex = '0123456789abcdef'; let id = ''; for(let i=0;i<24;i++) id += hex[Math.floor(Math.random()*16)]; return id; };
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
@@ -51,7 +51,7 @@ describe('DocumentEmbeddingService', () => {
   describe('Text Extraction', () => {
     describe('extractTextFromDocument', () => {
       it('should extract text from PDF documents', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         // Test that PDF extraction handles missing files properly
         // Since we don't have an actual PDF, we test the error handling
@@ -65,7 +65,7 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should extract text from DOCX documents', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         // Test that DOCX extraction handles missing files properly
         await expect(
@@ -78,7 +78,7 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should extract text from plain text files', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         const result = await documentEmbeddingService.extractTextFromDocument(
           documentId,
@@ -94,7 +94,7 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should throw error for unsupported file types', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         await expect(
           documentEmbeddingService.extractTextFromDocument(
@@ -106,7 +106,7 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should handle extraction errors gracefully', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         await expect(
           documentEmbeddingService.extractTextFromDocument(
@@ -229,12 +229,12 @@ describe('DocumentEmbeddingService', () => {
   describe('ZeroDB Vector Storage', () => {
     describe('storeEmbedding', () => {
       it('should store embedding in ZeroDB', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
         const embedding = new Array(768).fill(0.1);
         const metadata = {
           documentId,
           title: 'Test Document',
-          companyId: new mongoose.Types.ObjectId().toString(),
+          companyId: generateObjectId(),
           category: 'financial_report'
         };
 
@@ -464,13 +464,13 @@ describe('DocumentEmbeddingService', () => {
   describe('Document Embedding Pipeline', () => {
     describe('processDocument', () => {
       it('should complete full embedding pipeline for a document', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
         const document = {
           _id: documentId,
           name: 'Test Financial Report',
           storagePath: '/path/to/test.txt',
           mimeType: 'text/plain',
-          ownerCompany: new mongoose.Types.ObjectId().toString(),
+          ownerCompany: generateObjectId(),
           category: 'financial_report',
           content: 'This is test content for the financial report.'
         };
@@ -492,13 +492,13 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should update DocumentEmbedding model after processing', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
         const document = {
           _id: documentId,
           name: 'Test Document',
           storagePath: '/path/to/test.txt',
           mimeType: 'text/plain',
-          ownerCompany: new mongoose.Types.ObjectId().toString(),
+          ownerCompany: generateObjectId(),
           category: 'general',
           content: 'Test content'
         };
@@ -511,13 +511,13 @@ describe('DocumentEmbeddingService', () => {
       });
 
       it('should handle document without content gracefully', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
         const document = {
           _id: documentId,
           name: 'Empty Document',
           storagePath: '/path/to/empty.txt',
           mimeType: 'text/plain',
-          ownerCompany: new mongoose.Types.ObjectId().toString(),
+          ownerCompany: generateObjectId(),
           category: 'general',
           content: ''
         };
@@ -531,7 +531,7 @@ describe('DocumentEmbeddingService', () => {
 
     describe('reprocessDocument', () => {
       it('should regenerate embeddings for existing document', async () => {
-        const documentId = new mongoose.Types.ObjectId().toString();
+        const documentId = generateObjectId();
 
         zerodbService.upsertVector.mockResolvedValue({ id: 'vector-456' });
 

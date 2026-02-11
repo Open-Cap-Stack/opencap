@@ -12,7 +12,6 @@
 
 const request = require('supertest');
 const { createApp } = require('../setup/app');
-const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
 describe('Financial Reports Lifecycle Integration Tests', () => {
@@ -80,12 +79,7 @@ describe('Financial Reports Lifecycle Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      const collections = await mongoose.connection.db.collections();
-      for (const collection of collections) {
-        await collection.deleteMany({});
-      }
-    }
+    // No-op: ZeroDB handles data isolation
   });
 
   describe('Financial Report CRUD Operations', () => {

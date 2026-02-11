@@ -4,7 +4,7 @@
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
+const generateObjectId = () => { const hex = '0123456789abcdef'; let id = ''; for(let i=0;i<24;i++) id += hex[Math.floor(Math.random()*16)]; return id; };
 
 // Mock the database adapter
 jest.mock('../../../services/databaseAdapter', () => ({
@@ -32,15 +32,15 @@ describe('DocumentTemplateService', () => {
   describe('createTemplate', () => {
     it('should create a new template', async () => {
       const templateData = {
-        companyId: new mongoose.Types.ObjectId().toString(),
+        companyId: generateObjectId(),
         name: 'Stock Option Agreement',
         category: 'Legal',
         content: 'This agreement is between {{companyName}} and {{employeeName}}.',
-        createdBy: new mongoose.Types.ObjectId().toString()
+        createdBy: generateObjectId()
       };
 
       const expectedResult = {
-        _id: new mongoose.Types.ObjectId().toString(),
+        _id: generateObjectId(),
         templateId: 'TMPL-ABC123',
         ...templateData,
         isActive: true,
@@ -65,17 +65,17 @@ describe('DocumentTemplateService', () => {
 
     it('should auto-generate templateId if not provided', async () => {
       const templateData = {
-        companyId: new mongoose.Types.ObjectId().toString(),
+        companyId: generateObjectId(),
         name: 'Test Template',
         category: 'General',
         content: 'Content here',
-        createdBy: new mongoose.Types.ObjectId().toString()
+        createdBy: generateObjectId()
       };
 
       databaseAdapter.create.mockImplementation((model, data) => {
         return Promise.resolve({
           ...data,
-          _id: new mongoose.Types.ObjectId().toString(),
+          _id: generateObjectId(),
           templateId: data.templateId || 'TMPL-AUTO123'
         });
       });
@@ -98,7 +98,7 @@ describe('DocumentTemplateService', () => {
 
   describe('getTemplates', () => {
     it('should return all templates for a company', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const templates = [
         { _id: '1', name: 'Template 1', companyId },
         { _id: '2', name: 'Template 2', companyId }
@@ -117,7 +117,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should filter templates by category', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const templates = [
         { _id: '1', name: 'Legal Template', companyId, category: 'Legal' }
       ];
@@ -138,7 +138,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should support pagination', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const templates = [
         { _id: '1', name: 'Template 1' }
       ];
@@ -159,7 +159,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should filter by tags', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const templates = [
         { _id: '1', name: 'Template with tag', tags: ['equity'] }
       ];
@@ -179,7 +179,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should filter by isActive status', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
 
       databaseAdapter.find.mockResolvedValue([]);
 
@@ -198,7 +198,7 @@ describe('DocumentTemplateService', () => {
 
   describe('getTemplateById', () => {
     it('should return a template by ID', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const template = {
         _id: templateId,
         name: 'Test Template',
@@ -224,11 +224,11 @@ describe('DocumentTemplateService', () => {
 
   describe('updateTemplate', () => {
     it('should update a template', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const updateData = {
         name: 'Updated Template Name',
         content: 'Updated content',
-        updatedBy: new mongoose.Types.ObjectId().toString()
+        updatedBy: generateObjectId()
       };
 
       const updatedTemplate = {
@@ -250,7 +250,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should increment version on update', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const updateData = {
         content: 'New content'
       };
@@ -280,7 +280,7 @@ describe('DocumentTemplateService', () => {
 
   describe('deleteTemplate', () => {
     it('should soft delete a template by default', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
 
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({
         _id: templateId,
@@ -299,7 +299,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should hard delete a template when specified', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
 
       databaseAdapter.findByIdAndDelete.mockResolvedValue({
         _id: templateId,
@@ -325,7 +325,7 @@ describe('DocumentTemplateService', () => {
 
   describe('generateDocument', () => {
     it('should generate a document from a template with variables', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const template = {
         _id: templateId,
         name: 'Test Template',
@@ -361,7 +361,7 @@ describe('DocumentTemplateService', () => {
     });
 
     it('should throw error if required variables are missing', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const template = {
         _id: templateId,
         content: '{{requiredVar}}',
@@ -395,7 +395,7 @@ describe('DocumentTemplateService', () => {
 
   describe('getCategoriesWithCounts', () => {
     it('should return categories with template counts', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
 
       databaseAdapter.find.mockResolvedValue([
         { category: 'Legal' },
@@ -414,7 +414,7 @@ describe('DocumentTemplateService', () => {
 
   describe('previewTemplate', () => {
     it('should generate a preview with sample values', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const template = {
         _id: templateId,
         content: 'Amount: {{amount}}',
@@ -443,11 +443,11 @@ describe('DocumentTemplateService', () => {
 
   describe('cloneTemplate', () => {
     it('should clone a template with a new name', async () => {
-      const sourceTemplateId = new mongoose.Types.ObjectId().toString();
+      const sourceTemplateId = generateObjectId();
       const sourceTemplate = {
         _id: sourceTemplateId,
         templateId: 'TMPL-SOURCE',
-        companyId: new mongoose.Types.ObjectId().toString(),
+        companyId: generateObjectId(),
         name: 'Original Template',
         category: 'Legal',
         content: 'Original content',
@@ -456,7 +456,7 @@ describe('DocumentTemplateService', () => {
       };
 
       const clonedTemplate = {
-        _id: new mongoose.Types.ObjectId().toString(),
+        _id: generateObjectId(),
         templateId: 'TMPL-CLONE123',
         name: 'Copy of Original Template',
         category: 'Legal',
@@ -469,7 +469,7 @@ describe('DocumentTemplateService', () => {
 
       const result = await documentTemplateService.cloneTemplate(sourceTemplateId, {
         name: 'Copy of Original Template',
-        createdBy: new mongoose.Types.ObjectId().toString()
+        createdBy: generateObjectId()
       });
 
       expect(databaseAdapter.create).toHaveBeenCalled();
@@ -479,7 +479,7 @@ describe('DocumentTemplateService', () => {
 
   describe('searchTemplates', () => {
     it('should search templates by name', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const searchTerm = 'option';
 
       databaseAdapter.find.mockResolvedValue([

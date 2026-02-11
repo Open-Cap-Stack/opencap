@@ -3,35 +3,52 @@
  * Issue #103: Create Secondary Transaction Model
  */
 
-const mongoose = require('mongoose');
+// Lightweight schema helper to replace mongoose.Schema for testing
+function createTestSchema(definition, schemaOptions = {}) {
+  const paths = {};
+  const compoundIndexes = [];
 
-// Define sub-schemas for testing
-const interestedBuyerSchema = new mongoose.Schema({
-  buyerId: { type: String, required: true },
-  buyerName: { type: String },
-  expressedAt: { type: Date, default: Date.now },
-  offeredPrice: { type: Number, min: 0 },
-  offeredShares: { type: Number, min: 1 },
-  status: {
-    type: String,
-    enum: ['interested', 'negotiating', 'accepted', 'rejected', 'withdrawn'],
-    default: 'interested'
-  },
-  message: { type: String },
-  respondedAt: { type: Date },
-  responseMessage: { type: String }
-}, { _id: false });
+  function processField(fieldName, fieldDef) {
+    if (Array.isArray(fieldDef)) {
+      paths[fieldName] = { options: {}, isRequired: false };
+      return;
+    }
+    if (fieldDef && typeof fieldDef === 'object' && fieldDef.type !== undefined) {
+      const pathObj = {
+        options: { ...fieldDef },
+        isRequired: fieldDef.required || false,
+        defaultValue: fieldDef.default,
+        enumValues: fieldDef.enum || undefined
+      };
+      paths[fieldName] = pathObj;
+    } else if (fieldDef && typeof fieldDef === 'object' && !fieldDef.type) {
+      paths[fieldName] = { options: fieldDef };
+    } else {
+      paths[fieldName] = { options: { type: fieldDef } };
+    }
+  }
 
-const invitedStakeholderSchema = new mongoose.Schema({
-  stakeholderId: { type: String, required: true },
-  invitedAt: { type: Date, default: Date.now },
-  invitedBy: { type: String },
-  viewed: { type: Boolean, default: false },
-  viewedAt: { type: Date }
-}, { _id: false });
+  for (const [key, value] of Object.entries(definition)) {
+    processField(key, value);
+  }
+
+  return {
+    paths,
+    options: schemaOptions,
+    path(fieldName) {
+      return paths[fieldName] || undefined;
+    },
+    index(indexDef) {
+      compoundIndexes.push([indexDef]);
+    },
+    indexes() {
+      return compoundIndexes;
+    }
+  };
+}
 
 // Define schema for testing
-const secondaryMarketListingSchema = new mongoose.Schema({
+const secondaryMarketListingSchema = createTestSchema({
   listingId: {
     type: String,
     required: true,
@@ -116,21 +133,11 @@ const secondaryMarketListingSchema = new mongoose.Schema({
     default: 'private',
     index: true
   },
-  invitedStakeholders: [invitedStakeholderSchema],
-  interestedBuyers: [interestedBuyerSchema],
-  completedTransactions: [{
-    transactionId: { type: String },
-    buyerId: { type: String },
-    numberOfShares: { type: Number },
-    pricePerShare: { type: Number },
-    completedAt: { type: Date }
-  }],
+  invitedStakeholders: [{ stakeholderId: String }],
+  interestedBuyers: [{ buyerId: String }],
+  completedTransactions: [{ transactionId: String }],
   restrictions: {
-    minPurchaseShares: { type: Number, min: 1, default: 1 },
-    maxPurchaseShares: { type: Number },
-    accreditedInvestorsOnly: { type: Boolean, default: false },
-    existingStakeholdersOnly: { type: Boolean, default: false },
-    requiresCompanyApproval: { type: Boolean, default: true }
+    type: Object
   },
   description: {
     type: String
@@ -142,12 +149,10 @@ const secondaryMarketListingSchema = new mongoose.Schema({
     type: String
   },
   valuationContext: {
-    lastValuationPrice: { type: Number },
-    lastValuationDate: { type: Date },
-    valuationSource: { type: String }
+    type: Object
   },
   metadata: {
-    type: mongoose.Schema.Types.Mixed
+    type: Object
   },
   createdBy: {
     type: String

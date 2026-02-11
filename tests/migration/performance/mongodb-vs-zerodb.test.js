@@ -5,16 +5,13 @@
  * Measures startup time, concurrent operations, and memory usage
  * Provides performance benchmarks for decision-making
  *
- * CRITICAL: Run these tests to validate that ZeroDB performance is acceptable
+ * SKIPPED: These tests require mongoose and MongoMemoryServer which have been
+ * removed from the project as part of the ZeroDB migration. The performance
+ * comparison is no longer applicable since MongoDB has been fully removed.
  */
 
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const zerodbService = require('../../../services/zerodbService');
-const databaseAdapter = require('../../../services/databaseAdapter');
-const User = require('../../../models/User');
-
-describe('MongoDB vs ZeroDB Performance Comparison', () => {
+// Skip entire suite - mongoose is no longer available
+describe.skip('MongoDB vs ZeroDB Performance Comparison (requires mongoose)', () => {
   let mongoServer;
   const performanceMetrics = {
     mongodb: {},

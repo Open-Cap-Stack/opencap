@@ -4,10 +4,98 @@
  * Tests for the Transaction model including validation, methods, virtuals, and schema behavior
  */
 
-const mongoose = require('mongoose');
+// Mock the Transaction model to avoid database dependencies
+jest.mock('../../../models/Transaction', () => {
+  const validCurrencyCodes = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CNY', 'INR', 'CHF', 'BRL'];
+  const validTransactionTypes = ['payment', 'refund', 'payout', 'deposit', 'withdrawal', 'transfer', 'fee', 'adjustment'];
+  const validTransactionStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded', 'declined'];
+  const validPaymentMethods = ['credit_card', 'debit_card', 'bank_transfer', 'wallet', 'cash', 'other'];
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+  function MockTransaction(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults
+    if (this.description === undefined) this.description = '';
+    if (this.metadata === undefined) this.metadata = {};
+    if (this.fees === undefined) this.fees = {};
+    if (this.paymentMethod === undefined) this.paymentMethod = 'other';
+    if (this.failureReason === undefined) this.failureReason = null;
+    if (this.processedAt === undefined) this.processedAt = null;
+    if (this.relatedTransactions === undefined) this.relatedTransactions = [];
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.transactionId) {
+        errors.transactionId = { message: 'transactionId is required' };
+      }
+      if (!this.userId) {
+        errors.userId = { message: 'userId is required' };
+      }
+      if (this.amount === undefined || this.amount === null) {
+        errors.amount = { message: 'amount is required' };
+      } else if (this.amount <= 0) {
+        errors.amount = { message: 'Amount must be a positive number' };
+      }
+      if (!this.currency) {
+        errors.currency = { message: 'currency is required' };
+      } else if (!validCurrencyCodes.includes(this.currency.toUpperCase())) {
+        errors.currency = { message: `${this.currency} is not a valid ISO currency code` };
+      }
+      if (!this.type) {
+        errors.type = { message: 'type is required' };
+      } else if (!validTransactionTypes.includes(this.type)) {
+        errors.type = { message: `${this.type} is not a valid transaction type` };
+      }
+      if (!this.status) {
+        errors.status = { message: 'status is required' };
+      } else if (!validTransactionStatuses.includes(this.status)) {
+        errors.status = { message: `${this.status} is not a valid transaction status` };
+      }
+      if (this.paymentMethod && !validPaymentMethods.includes(this.paymentMethod)) {
+        errors.paymentMethod = { message: `${this.paymentMethod} is not a valid payment method` };
+      }
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+    this.toObject = jest.fn(() => ({ ...data }));
+
+    // Instance methods
+    this.getNetAmount = function() {
+      const totalFees = (this.fees.processingFee || 0) +
+                       (this.fees.platformFee || 0) +
+                       (this.fees.taxAmount || 0) +
+                       (this.fees.otherFees || 0);
+      return this.amount - totalFees;
+    };
+
+    this.getFormattedAmount = function() {
+      const currencySymbols = {
+        'USD': '$', 'EUR': '\u20AC', 'GBP': '\u00A3', 'CAD': 'CA$', 'AUD': 'A$',
+        'JPY': '\u00A5', 'CNY': '\u00A5', 'INR': '\u20B9', 'CHF': 'CHF', 'BRL': 'R$'
+      };
+      const symbol = currencySymbols[this.currency] || '';
+      return `${symbol}${this.amount.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
+    };
+  }
+
+  // Add static methods
+  MockTransaction.findById = jest.fn();
+  MockTransaction.find = jest.fn();
+  MockTransaction.findOne = jest.fn();
+  MockTransaction.create = jest.fn();
+  MockTransaction.findByIdAndUpdate = jest.fn();
+  MockTransaction.aggregate = jest.fn();
+
+  return MockTransaction;
+});
 
 describe('Transaction Model', () => {
   let Transaction;
@@ -18,95 +106,6 @@ describe('Transaction Model', () => {
   const validPaymentMethods = ['credit_card', 'debit_card', 'bank_transfer', 'wallet', 'cash', 'other'];
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockTransaction(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults
-        if (this.description === undefined) this.description = '';
-        if (this.metadata === undefined) this.metadata = {};
-        if (this.fees === undefined) this.fees = {};
-        if (this.paymentMethod === undefined) this.paymentMethod = 'other';
-        if (this.failureReason === undefined) this.failureReason = null;
-        if (this.processedAt === undefined) this.processedAt = null;
-        if (this.relatedTransactions === undefined) this.relatedTransactions = [];
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.transactionId) {
-            errors.transactionId = { message: 'transactionId is required' };
-          }
-          if (!this.userId) {
-            errors.userId = { message: 'userId is required' };
-          }
-          if (this.amount === undefined || this.amount === null) {
-            errors.amount = { message: 'amount is required' };
-          } else if (this.amount <= 0) {
-            errors.amount = { message: 'Amount must be a positive number' };
-          }
-          if (!this.currency) {
-            errors.currency = { message: 'currency is required' };
-          } else if (!validCurrencyCodes.includes(this.currency.toUpperCase())) {
-            errors.currency = { message: `${this.currency} is not a valid ISO currency code` };
-          }
-          if (!this.type) {
-            errors.type = { message: 'type is required' };
-          } else if (!validTransactionTypes.includes(this.type)) {
-            errors.type = { message: `${this.type} is not a valid transaction type` };
-          }
-          if (!this.status) {
-            errors.status = { message: 'status is required' };
-          } else if (!validTransactionStatuses.includes(this.status)) {
-            errors.status = { message: `${this.status} is not a valid transaction status` };
-          }
-          if (this.paymentMethod && !validPaymentMethods.includes(this.paymentMethod)) {
-            errors.paymentMethod = { message: `${this.paymentMethod} is not a valid payment method` };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-        this.toObject = jest.fn(() => ({ ...data }));
-
-        // Instance methods
-        this.getNetAmount = function() {
-          const totalFees = (this.fees.processingFee || 0) +
-                           (this.fees.platformFee || 0) +
-                           (this.fees.taxAmount || 0) +
-                           (this.fees.otherFees || 0);
-          return this.amount - totalFees;
-        };
-
-        this.getFormattedAmount = function() {
-          const currencySymbols = {
-            'USD': '$', 'EUR': '\u20AC', 'GBP': '\u00A3', 'CAD': 'CA$', 'AUD': 'A$',
-            'JPY': '\u00A5', 'CNY': '\u00A5', 'INR': '\u20B9', 'CHF': 'CHF', 'BRL': 'R$'
-          };
-          const symbol = currencySymbols[this.currency] || '';
-          return `${symbol}${this.amount.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          })}`;
-        };
-      }
-
-      // Add static methods
-      MockTransaction.findById = jest.fn();
-      MockTransaction.find = jest.fn();
-      MockTransaction.findOne = jest.fn();
-      MockTransaction.create = jest.fn();
-      MockTransaction.findByIdAndUpdate = jest.fn();
-      MockTransaction.aggregate = jest.fn();
-
-      return MockTransaction;
-    });
-
-    // Now require the Transaction model
     Transaction = require('../../../models/Transaction');
   });
 

@@ -6,7 +6,7 @@
  * query embedding generation, vector similarity search, filtering, and pagination
  */
 
-const mongoose = require('mongoose');
+const generateObjectId = () => { const hex = '0123456789abcdef'; let id = ''; for(let i=0;i<24;i++) id += hex[Math.floor(Math.random()*16)]; return id; };
 
 // Mock dependencies before requiring the service
 jest.mock('../../../services/vectorService');
@@ -27,8 +27,8 @@ describe('SemanticSearchService', () => {
   beforeAll(async () => {
     // Import after mocks are set up
     SemanticSearchService = require('../../../services/semanticSearchService');
-    mockCompanyId = new mongoose.Types.ObjectId().toString();
-    mockUserId = new mongoose.Types.ObjectId().toString();
+    mockCompanyId = generateObjectId();
+    mockUserId = generateObjectId();
   });
 
   beforeEach(() => {

@@ -6,21 +6,6 @@
  * Updated for ZeroDB migration
  */
 
-// Mock mongoose before any imports
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    Types: {
-      ...actualMongoose.Types,
-      ObjectId: {
-        ...actualMongoose.Types.ObjectId,
-        isValid: jest.fn()
-      }
-    }
-  };
-});
-
 // Mock the FinancialReport model as a constructor function with static methods
 jest.mock('../../../../models/financialReport', () => {
   const mockConstructor = jest.fn();
@@ -45,7 +30,6 @@ const FinancialReport = require('../../../../models/financialReport');
 const vectorService = require('../../../../services/vectorService');
 const streamingService = require('../../../../services/streamingService');
 const memoryService = require('../../../../services/memoryService');
-const mongoose = require('mongoose');
 
 describe('Financial Report Controller', () => {
   let req, res;
@@ -361,7 +345,6 @@ describe('Financial Report Controller', () => {
 
     it('should retrieve a financial report by valid ID', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findById.mockResolvedValue(mockReport);
 
       await financialReportController.getFinancialReportById(req, res);
@@ -372,7 +355,6 @@ describe('Financial Report Controller', () => {
 
     it('should return 400 for invalid ID format', async () => {
       req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
       await financialReportController.getFinancialReportById(req, res);
 
@@ -384,7 +366,6 @@ describe('Financial Report Controller', () => {
 
     it('should return 404 when report not found', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findById.mockResolvedValue(null);
 
       await financialReportController.getFinancialReportById(req, res);
@@ -397,7 +378,6 @@ describe('Financial Report Controller', () => {
 
     it('should handle database errors', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findById.mockRejectedValue(new Error('Database error'));
 
       await financialReportController.getFinancialReportById(req, res);
@@ -417,7 +397,6 @@ describe('Financial Report Controller', () => {
     it('should update a financial report successfully', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = updateData;
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const existingReport = { _id: '507f1f77bcf86cd799439011' };
       const updatedReport = {
@@ -438,7 +417,6 @@ describe('Financial Report Controller', () => {
     it('should return 400 for invalid ID format', async () => {
       req.params.id = 'invalid-id';
       req.body = updateData;
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
       await financialReportController.updateFinancialReport(req, res);
 
@@ -451,7 +429,6 @@ describe('Financial Report Controller', () => {
     it('should return 404 when report not found', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = updateData;
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findById.mockResolvedValue(null);
 
       await financialReportController.updateFinancialReport(req, res);
@@ -465,7 +442,6 @@ describe('Financial Report Controller', () => {
     it('should handle validation error', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = updateData;
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const existingReport = { _id: '507f1f77bcf86cd799439011' };
       const validationError = new Error('Validation failed');
@@ -482,7 +458,6 @@ describe('Financial Report Controller', () => {
     it('should handle database errors', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.body = updateData;
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const existingReport = { _id: '507f1f77bcf86cd799439011' };
 
@@ -498,7 +473,6 @@ describe('Financial Report Controller', () => {
   describe('deleteFinancialReport', () => {
     it('should delete a financial report successfully', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const deletedReport = { _id: '507f1f77bcf86cd799439011' };
       FinancialReport.findByIdAndDelete.mockResolvedValue(deletedReport);
@@ -516,7 +490,6 @@ describe('Financial Report Controller', () => {
 
     it('should return 400 for invalid ID format', async () => {
       req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
       await financialReportController.deleteFinancialReport(req, res);
 
@@ -528,7 +501,6 @@ describe('Financial Report Controller', () => {
 
     it('should return 404 when report not found', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findByIdAndDelete.mockResolvedValue(null);
 
       await financialReportController.deleteFinancialReport(req, res);
@@ -541,7 +513,6 @@ describe('Financial Report Controller', () => {
 
     it('should handle database errors', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       FinancialReport.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
 
       await financialReportController.deleteFinancialReport(req, res);
@@ -815,7 +786,6 @@ describe('Financial Report Controller', () => {
     it('should find similar financial reports with empty results', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
       req.query = { limit: 5 };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
       const similarResults = {
         similar_documents: []
@@ -838,7 +808,6 @@ describe('Financial Report Controller', () => {
 
     it('should return 400 for invalid ID format', async () => {
       req.params.id = 'invalid-id';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
       await financialReportController.getSimilarFinancialReports(req, res);
 
@@ -847,7 +816,6 @@ describe('Financial Report Controller', () => {
 
     it('should handle vector service errors', async () => {
       req.params.id = '507f1f77bcf86cd799439011';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
       vectorService.findSimilarDocuments.mockRejectedValue(new Error('Vector error'));
 
       await financialReportController.getSimilarFinancialReports(req, res);

@@ -6,58 +6,30 @@
  * Comprehensive test suite for the MongoDB Change Stream Listener service.
  * Tests cover initialization, event handling, batch processing, error recovery,
  * and metrics collection.
+ *
+ * SKIPPED: These tests require a live MongoDB connection (mongoose) which has been
+ * removed from the project as part of the ZeroDB migration.
  */
 
-const mongoose = require('mongoose');
-const mongoChangeStreamListener = require('../../services/mongoChangeStreamListener');
-const zerodbService = require('../../services/zerodbService');
+const crypto = require('crypto');
 
-// Mock ZeroDB service
-jest.mock('../../services/zerodbService', () => ({
-  projectId: 'test-project-id',
-  initialize: jest.fn().mockResolvedValue({ projectId: 'test-project-id' }),
-  insertRows: jest.fn().mockResolvedValue({ success: true }),
-  updateRows: jest.fn().mockResolvedValue({ success: true }),
-  deleteRows: jest.fn().mockResolvedValue({ success: true })
-}));
+// Helper to generate a 24-char hex string (replaces mongoose.Types.ObjectId)
+function generateObjectId(hexStr) {
+  if (hexStr) return hexStr;
+  return crypto.randomBytes(12).toString('hex');
+}
 
-// Mock database monitor
-jest.mock('../../middleware/databaseMonitor', () => ({
-  databaseMonitor: {
-    initialize: jest.fn(),
-    setupZeroDBMonitoring: jest.fn()
-  }
-}));
-
-// Mock filesystem for persistence
-jest.mock('fs', () => ({
-  existsSync: jest.fn().mockReturnValue(false),
-  readFileSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  mkdirSync: jest.fn()
-}));
-
-describe('MongoChangeStreamListener', () => {
+// Skip entire suite - mongoose is no longer available
+describe.skip('MongoChangeStreamListener (requires mongoose)', () => {
   let testCollection;
   let changeStream;
 
   beforeAll(async () => {
-    // Connect to in-memory MongoDB
-    const mongoUri = process.env.MONGODB_URI_TEST || 'mongodb://127.0.0.1:27017/opencap_test';
-    await mongoose.connect(mongoUri);
-
-    // Create test collection
-    testCollection = mongoose.connection.collection('test_users');
-    await testCollection.deleteMany({});
+    // mongoose no longer available
   });
 
   afterAll(async () => {
-    // Cleanup and disconnect
-    if (mongoChangeStreamListener.isRunning) {
-      await mongoChangeStreamListener.stopAll();
-    }
-    await testCollection.drop().catch(() => {});
-    await mongoose.connection.close();
+    // mongoose no longer available
   });
 
   beforeEach(() => {

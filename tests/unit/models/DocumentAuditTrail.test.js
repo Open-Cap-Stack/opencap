@@ -7,10 +7,88 @@
  * validation, schema behavior, and static methods.
  */
 
-const mongoose = require('mongoose');
+// Helper to generate mock ObjectId-like strings
+function generateId() {
+  return new Date().getTime().toString(16) + 'xxxxxxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+}
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+// Mock the DocumentAuditTrail model to avoid database dependencies
+jest.mock('../../../models/DocumentAuditTrail', () => {
+  const validActionTypes = [
+    'created',
+    'viewed',
+    'downloaded',
+    'edited',
+    'signed',
+    'shared',
+    'deleted',
+    'restored',
+    'access_granted',
+    'access_revoked',
+    'version_created',
+    'commented',
+    'archived',
+    'unarchived'
+  ];
+
+  let auditIdCounter = 0;
+
+  function MockDocumentAuditTrail(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults with unique counter
+    if (!this.auditId) this.auditId = `test-uuid-${Date.now()}-${++auditIdCounter}`;
+    if (!this.timestamp) this.timestamp = new Date();
+    if (!this.changes) this.changes = [];
+    if (!this.metadata) this.metadata = {};
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.documentId) {
+        errors.documentId = { message: 'documentId is required' };
+      }
+      if (!this.actionType) {
+        errors.actionType = { message: 'actionType is required' };
+      } else if (!validActionTypes.includes(this.actionType)) {
+        errors.actionType = { message: `${this.actionType} is not a valid action type` };
+      }
+      if (!this.actor || !this.actor.userId) {
+        errors['actor.userId'] = { message: 'actor.userId is required' };
+      }
+      if (!this.ipAddress) {
+        errors.ipAddress = { message: 'ipAddress is required' };
+      }
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+
+    this.toObject = jest.fn(() => ({ ...data }));
+  }
+
+  // Add static methods
+  MockDocumentAuditTrail.findById = jest.fn();
+  MockDocumentAuditTrail.find = jest.fn();
+  MockDocumentAuditTrail.findOne = jest.fn();
+  MockDocumentAuditTrail.create = jest.fn();
+  MockDocumentAuditTrail.findByIdAndUpdate = jest.fn();
+  MockDocumentAuditTrail.findByIdAndDelete = jest.fn();
+  MockDocumentAuditTrail.countDocuments = jest.fn();
+  MockDocumentAuditTrail.aggregate = jest.fn();
+  MockDocumentAuditTrail.findByDocument = jest.fn();
+  MockDocumentAuditTrail.findByUser = jest.fn();
+  MockDocumentAuditTrail.findByDateRange = jest.fn();
+  MockDocumentAuditTrail.getActionCounts = jest.fn();
+  MockDocumentAuditTrail.getRecentActivitySummary = jest.fn();
+  MockDocumentAuditTrail.searchAuditTrail = jest.fn();
+  MockDocumentAuditTrail.ACTION_TYPES = validActionTypes;
+
+  return MockDocumentAuditTrail;
+});
 
 describe('DocumentAuditTrail Model', () => {
   let DocumentAuditTrail;
@@ -35,66 +113,6 @@ describe('DocumentAuditTrail Model', () => {
   let auditIdCounter = 0;
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockDocumentAuditTrail(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults with unique counter
-        if (!this.auditId) this.auditId = `test-uuid-${Date.now()}-${++auditIdCounter}`;
-        if (!this.timestamp) this.timestamp = new Date();
-        if (!this.changes) this.changes = [];
-        if (!this.metadata) this.metadata = {};
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.documentId) {
-            errors.documentId = { message: 'documentId is required' };
-          }
-          if (!this.actionType) {
-            errors.actionType = { message: 'actionType is required' };
-          } else if (!validActionTypes.includes(this.actionType)) {
-            errors.actionType = { message: `${this.actionType} is not a valid action type` };
-          }
-          if (!this.actor || !this.actor.userId) {
-            errors['actor.userId'] = { message: 'actor.userId is required' };
-          }
-          if (!this.ipAddress) {
-            errors.ipAddress = { message: 'ipAddress is required' };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-
-        this.toObject = jest.fn(() => ({ ...data }));
-      }
-
-      // Add static methods
-      MockDocumentAuditTrail.findById = jest.fn();
-      MockDocumentAuditTrail.find = jest.fn();
-      MockDocumentAuditTrail.findOne = jest.fn();
-      MockDocumentAuditTrail.create = jest.fn();
-      MockDocumentAuditTrail.findByIdAndUpdate = jest.fn();
-      MockDocumentAuditTrail.findByIdAndDelete = jest.fn();
-      MockDocumentAuditTrail.countDocuments = jest.fn();
-      MockDocumentAuditTrail.aggregate = jest.fn();
-      MockDocumentAuditTrail.findByDocument = jest.fn();
-      MockDocumentAuditTrail.findByUser = jest.fn();
-      MockDocumentAuditTrail.findByDateRange = jest.fn();
-      MockDocumentAuditTrail.getActionCounts = jest.fn();
-      MockDocumentAuditTrail.getRecentActivitySummary = jest.fn();
-      MockDocumentAuditTrail.searchAuditTrail = jest.fn();
-      MockDocumentAuditTrail.ACTION_TYPES = validActionTypes;
-
-      return MockDocumentAuditTrail;
-    });
-
-    // Now require the model
     DocumentAuditTrail = require('../../../models/DocumentAuditTrail');
   });
 
@@ -106,10 +124,10 @@ describe('DocumentAuditTrail Model', () => {
     describe('Required Fields', () => {
       it('should create audit entry with all required fields', () => {
         const auditData = {
-          documentId: new mongoose.Types.ObjectId(),
+          documentId: generateId(),
           actionType: 'viewed',
           actor: {
-            userId: new mongoose.Types.ObjectId(),
+            userId: generateId(),
             email: 'user@example.com',
             name: 'Test User',
             role: 'admin'
@@ -130,7 +148,7 @@ describe('DocumentAuditTrail Model', () => {
       it('should reject audit entry without documentId', () => {
         const audit = new DocumentAuditTrail({
           actionType: 'viewed',
-          actor: { userId: new mongoose.Types.ObjectId() },
+          actor: { userId: generateId() },
           ipAddress: '192.168.1.1'
         });
 
@@ -141,8 +159,8 @@ describe('DocumentAuditTrail Model', () => {
 
       it('should reject audit entry without actionType', () => {
         const audit = new DocumentAuditTrail({
-          documentId: new mongoose.Types.ObjectId(),
-          actor: { userId: new mongoose.Types.ObjectId() },
+          documentId: generateId(),
+          actor: { userId: generateId() },
           ipAddress: '192.168.1.1'
         });
 
@@ -153,7 +171,7 @@ describe('DocumentAuditTrail Model', () => {
 
       it('should reject audit entry without actor.userId', () => {
         const audit = new DocumentAuditTrail({
-          documentId: new mongoose.Types.ObjectId(),
+          documentId: generateId(),
           actionType: 'viewed',
           actor: {},
           ipAddress: '192.168.1.1'
@@ -166,9 +184,9 @@ describe('DocumentAuditTrail Model', () => {
 
       it('should reject audit entry without ipAddress', () => {
         const audit = new DocumentAuditTrail({
-          documentId: new mongoose.Types.ObjectId(),
+          documentId: generateId(),
           actionType: 'viewed',
-          actor: { userId: new mongoose.Types.ObjectId() }
+          actor: { userId: generateId() }
         });
 
         const validationError = audit.validateSync();
@@ -180,9 +198,9 @@ describe('DocumentAuditTrail Model', () => {
     describe('ActionType Enum Validation', () => {
       it.each(validActionTypes)('should accept valid action type "%s"', (actionType) => {
         const audit = new DocumentAuditTrail({
-          documentId: new mongoose.Types.ObjectId(),
+          documentId: generateId(),
           actionType: actionType,
-          actor: { userId: new mongoose.Types.ObjectId() },
+          actor: { userId: generateId() },
           ipAddress: '192.168.1.1'
         });
 
@@ -193,9 +211,9 @@ describe('DocumentAuditTrail Model', () => {
 
       it('should reject invalid action type', () => {
         const audit = new DocumentAuditTrail({
-          documentId: new mongoose.Types.ObjectId(),
+          documentId: generateId(),
           actionType: 'invalid_action',
-          actor: { userId: new mongoose.Types.ObjectId() },
+          actor: { userId: generateId() },
           ipAddress: '192.168.1.1'
         });
 
@@ -209,9 +227,9 @@ describe('DocumentAuditTrail Model', () => {
   describe('Optional Fields', () => {
     it('should handle userAgent field', () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'downloaded',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       });
@@ -226,9 +244,9 @@ describe('DocumentAuditTrail Model', () => {
       ];
 
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'edited',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         changes
       });
@@ -239,9 +257,9 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should default changes to empty array', () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 
@@ -253,9 +271,9 @@ describe('DocumentAuditTrail Model', () => {
       const newValues = { name: 'New Document', status: 'active' };
 
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'edited',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         previousValues,
         newValues
@@ -268,7 +286,7 @@ describe('DocumentAuditTrail Model', () => {
     it('should handle metadata object', () => {
       const metadata = {
         sessionId: 'session-123',
-        companyId: new mongoose.Types.ObjectId(),
+        companyId: generateId(),
         requestId: 'req-456',
         documentVersion: 3,
         details: { source: 'web' },
@@ -277,9 +295,9 @@ describe('DocumentAuditTrail Model', () => {
       };
 
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         metadata
       });
@@ -291,16 +309,16 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should handle sharedWith details', () => {
       const sharedWith = {
-        users: [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()],
+        users: [generateId(), generateId()],
         emails: ['user1@example.com', 'user2@example.com'],
         accessLevel: 'view',
         expiresAt: new Date('2025-12-31')
       };
 
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'shared',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         sharedWith
       });
@@ -319,9 +337,9 @@ describe('DocumentAuditTrail Model', () => {
       };
 
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'signed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         signatureDetails
       });
@@ -334,9 +352,9 @@ describe('DocumentAuditTrail Model', () => {
   describe('Action Types', () => {
     it('should handle document created action', () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'created',
-        actor: { userId: new mongoose.Types.ObjectId(), name: 'Creator' },
+        actor: { userId: generateId(), name: 'Creator' },
         ipAddress: '192.168.1.1',
         newValues: { name: 'New Document', category: 'contracts' }
       });
@@ -347,9 +365,9 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should handle document deleted action', () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'deleted',
-        actor: { userId: new mongoose.Types.ObjectId(), name: 'Deleter' },
+        actor: { userId: generateId(), name: 'Deleter' },
         ipAddress: '192.168.1.1',
         metadata: { reason: 'No longer needed', details: { softDelete: true } }
       });
@@ -360,9 +378,9 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should handle document restored action', () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'restored',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 
@@ -372,7 +390,7 @@ describe('DocumentAuditTrail Model', () => {
 
   describe('Static Methods', () => {
     it('should call findByDocument correctly', async () => {
-      const documentId = new mongoose.Types.ObjectId();
+      const documentId = generateId();
       const mockAuditEntries = [
         { documentId, actionType: 'viewed', timestamp: new Date() },
         { documentId, actionType: 'edited', timestamp: new Date() }
@@ -387,7 +405,7 @@ describe('DocumentAuditTrail Model', () => {
     });
 
     it('should call findByUser correctly', async () => {
-      const userId = new mongoose.Types.ObjectId();
+      const userId = generateId();
       const mockAuditEntries = [
         { actor: { userId }, actionType: 'created', timestamp: new Date() }
       ];
@@ -416,7 +434,7 @@ describe('DocumentAuditTrail Model', () => {
     });
 
     it('should call getActionCounts correctly', async () => {
-      const documentId = new mongoose.Types.ObjectId();
+      const documentId = generateId();
       const mockCounts = [
         { _id: 'viewed', count: 50 },
         { _id: 'edited', count: 10 },
@@ -433,7 +451,7 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should call searchAuditTrail correctly', async () => {
       const searchParams = {
-        companyId: new mongoose.Types.ObjectId(),
+        companyId: generateId(),
         actionType: ['viewed', 'edited'],
         startDate: new Date('2024-01-01'),
         limit: 50
@@ -458,9 +476,9 @@ describe('DocumentAuditTrail Model', () => {
   describe('Instance Methods', () => {
     it('should save audit entry successfully', async () => {
       const audit = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 
@@ -474,9 +492,9 @@ describe('DocumentAuditTrail Model', () => {
     it('should convert audit entry to object', () => {
       const auditData = {
         auditId: 'audit-123',
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1',
         timestamp: new Date()
       };
@@ -492,10 +510,10 @@ describe('DocumentAuditTrail Model', () => {
     it('should handle audit entry with all fields populated', () => {
       const auditData = {
         auditId: 'audit-complete-123',
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'edited',
         actor: {
-          userId: new mongoose.Types.ObjectId(),
+          userId: generateId(),
           email: 'admin@example.com',
           name: 'Admin User',
           role: 'admin'
@@ -510,12 +528,12 @@ describe('DocumentAuditTrail Model', () => {
         newValues: { name: 'Final Doc', status: 'active' },
         metadata: {
           sessionId: 'sess-789',
-          companyId: new mongoose.Types.ObjectId(),
+          companyId: generateId(),
           requestId: 'req-abc',
           documentVersion: 5,
           details: { browser: 'Chrome', os: 'macOS' },
           reason: 'Finalizing document',
-          relatedDocuments: [new mongoose.Types.ObjectId()],
+          relatedDocuments: [generateId()],
           tags: ['legal', 'contract', 'final'],
           location: { country: 'US', region: 'CA', city: 'San Francisco' }
         }
@@ -530,7 +548,7 @@ describe('DocumentAuditTrail Model', () => {
     });
 
     it('should handle multiple audit entries for same document', async () => {
-      const documentId = new mongoose.Types.ObjectId();
+      const documentId = generateId();
       const auditEntries = [
         { documentId, actionType: 'created', timestamp: new Date('2024-01-01T09:00:00Z') },
         { documentId, actionType: 'viewed', timestamp: new Date('2024-01-01T10:00:00Z') },
@@ -576,9 +594,9 @@ describe('DocumentAuditTrail Model', () => {
     it('should not allow auditId to be modified after creation', () => {
       const audit = new DocumentAuditTrail({
         auditId: 'original-audit-id',
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 
@@ -588,16 +606,16 @@ describe('DocumentAuditTrail Model', () => {
 
     it('should generate unique auditId by default', () => {
       const audit1 = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 
       const audit2 = new DocumentAuditTrail({
-        documentId: new mongoose.Types.ObjectId(),
+        documentId: generateId(),
         actionType: 'viewed',
-        actor: { userId: new mongoose.Types.ObjectId() },
+        actor: { userId: generateId() },
         ipAddress: '192.168.1.1'
       });
 

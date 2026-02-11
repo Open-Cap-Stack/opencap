@@ -4,112 +4,106 @@
  * Tests for the User model including validation, methods, schema behavior, and RBAC
  */
 
-const mongoose = require('mongoose');
+// Mock the User model to avoid database dependencies
+jest.mock('../../../models/User', () => {
+  function MockUser(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+    this.validateSync = jest.fn();
+    this.toObject = jest.fn(() => ({ ...data }));
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+    // Apply schema defaults
+    if (!this.displayName && this.firstName && this.lastName) {
+      this.displayName = `${this.firstName} ${this.lastName}`;
+    }
+    if (!this.status) this.status = 'pending';
+    if (!this.profile) this.profile = {};
+    if (!this.permissions && this.role) {
+      this.permissions = this._getDefaultPermissions(this.role);
+    }
+  }
+
+  // Add default permissions method
+  MockUser.prototype._getDefaultPermissions = function(role) {
+    const rolePermissions = {
+      admin: [
+        'read:users', 'write:users', 'delete:users',
+        'read:companies', 'write:companies', 'delete:companies',
+        'read:reports', 'write:reports', 'delete:reports',
+        'read:spv', 'write:spv', 'delete:spv',
+        'read:assets', 'write:assets', 'delete:assets',
+        'read:compliance', 'write:compliance', 'delete:compliance',
+        'admin:all'
+      ],
+      founder: [
+        'read:users', 'write:users',
+        'read:companies', 'write:companies',
+        'read:reports', 'write:reports',
+        'read:spv', 'write:spv',
+        'read:assets', 'write:assets',
+        'read:compliance', 'write:compliance',
+        'read:equity', 'write:equity'
+      ],
+      investor: [
+        'read:users',
+        'read:companies',
+        'read:reports',
+        'read:spv',
+        'read:assets',
+        'read:compliance',
+        'read:equity'
+      ],
+      manager: [
+        'read:users', 'write:users',
+        'read:companies', 'write:companies',
+        'read:reports', 'write:reports',
+        'read:spv', 'write:spv',
+        'read:assets', 'write:assets',
+        'read:compliance', 'write:compliance'
+      ],
+      user: [
+        'read:users',
+        'read:companies',
+        'read:reports',
+        'read:spv',
+        'read:assets',
+        'read:compliance',
+        'write:compliance'
+      ],
+      client: [
+        'read:users',
+        'read:reports',
+        'read:spv',
+        'read:assets'
+      ]
+    };
+    return rolePermissions[role] || [];
+  };
+
+  // Add toJSON method
+  MockUser.prototype.toJSON = function() {
+    const user = this.toObject();
+    delete user.password;
+    delete user.passwordResetToken;
+    delete user.passwordResetExpires;
+    return user;
+  };
+
+  // Add static methods
+  MockUser.findById = jest.fn();
+  MockUser.find = jest.fn();
+  MockUser.findOne = jest.fn();
+  MockUser.create = jest.fn();
+
+  return MockUser;
+});
 
 describe('User Model', () => {
   let User;
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockUser(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-        this.validateSync = jest.fn();
-        this.toObject = jest.fn(() => ({ ...data }));
-        
-        // Apply schema defaults
-        if (!this.displayName && this.firstName && this.lastName) {
-          this.displayName = `${this.firstName} ${this.lastName}`;
-        }
-        if (!this.status) this.status = 'pending';
-        if (!this.profile) this.profile = {};
-        if (!this.permissions && this.role) {
-          this.permissions = this._getDefaultPermissions(this.role);
-        }
-      }
-
-      // Add default permissions method
-      MockUser.prototype._getDefaultPermissions = function(role) {
-        const rolePermissions = {
-          admin: [
-            'read:users', 'write:users', 'delete:users',
-            'read:companies', 'write:companies', 'delete:companies',
-            'read:reports', 'write:reports', 'delete:reports',
-            'read:spv', 'write:spv', 'delete:spv',
-            'read:assets', 'write:assets', 'delete:assets',
-            'read:compliance', 'write:compliance', 'delete:compliance',
-            'admin:all'
-          ],
-          founder: [
-            'read:users', 'write:users',
-            'read:companies', 'write:companies',
-            'read:reports', 'write:reports',
-            'read:spv', 'write:spv',
-            'read:assets', 'write:assets',
-            'read:compliance', 'write:compliance',
-            'read:equity', 'write:equity'
-          ],
-          investor: [
-            'read:users',
-            'read:companies',
-            'read:reports',
-            'read:spv',
-            'read:assets',
-            'read:compliance',
-            'read:equity'
-          ],
-          manager: [
-            'read:users', 'write:users',
-            'read:companies', 'write:companies',
-            'read:reports', 'write:reports',
-            'read:spv', 'write:spv',
-            'read:assets', 'write:assets',
-            'read:compliance', 'write:compliance'
-          ],
-          user: [
-            'read:users',
-            'read:companies',
-            'read:reports',
-            'read:spv',
-            'read:assets',
-            'read:compliance',
-            'write:compliance'
-          ],
-          client: [
-            'read:users',
-            'read:reports',
-            'read:spv',
-            'read:assets'
-          ]
-        };
-        return rolePermissions[role] || [];
-      };
-
-      // Add toJSON method
-      MockUser.prototype.toJSON = function() {
-        const user = this.toObject();
-        delete user.password;
-        delete user.passwordResetToken;
-        delete user.passwordResetExpires;
-        return user;
-      };
-
-      // Add static methods
-      MockUser.findById = jest.fn();
-      MockUser.find = jest.fn();
-      MockUser.findOne = jest.fn();
-      MockUser.create = jest.fn();
-
-      return MockUser;
-    });
-
-    // Now require the User model
     User = require('../../../models/User');
   });
 

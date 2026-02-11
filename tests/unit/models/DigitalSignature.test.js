@@ -5,15 +5,22 @@
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock mongoose to avoid database connection
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
+// Mock DigitalSignature model to avoid database dependencies
+jest.mock('../../../models/DigitalSignature', () => {
   return {
-    ...actualMongoose,
-    model: jest.fn(),
-    Schema: actualMongoose.Schema
+    schema: {
+      paths: {
+        signatureId: { isRequired: true },
+        documentId: { isRequired: true },
+        documentType: { isRequired: true },
+        companyId: { isRequired: true },
+        title: { isRequired: true },
+        'signers.name': { isRequired: true },
+        'signers.email': { isRequired: true },
+        'signers.role': { isRequired: true },
+        createdBy: { isRequired: true }
+      }
+    }
   };
 });
 
@@ -22,8 +29,6 @@ describe('DigitalSignature Model', () => {
   let mockDigitalSignature;
 
   beforeEach(() => {
-    jest.resetModules();
-
     // Create mock model with validation
     mockDigitalSignature = {
       signatureId: 'SIG-12345678',
@@ -58,23 +63,6 @@ describe('DigitalSignature Model', () => {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-
-    // Mock the model
-    mongoose.model.mockReturnValue({
-      schema: {
-        paths: {
-          signatureId: { isRequired: true },
-          documentId: { isRequired: true },
-          documentType: { isRequired: true },
-          companyId: { isRequired: true },
-          title: { isRequired: true },
-          'signers.name': { isRequired: true },
-          'signers.email': { isRequired: true },
-          'signers.role': { isRequired: true },
-          createdBy: { isRequired: true }
-        }
-      }
-    });
 
     DigitalSignature = require('../../../models/DigitalSignature');
   });

@@ -4,10 +4,66 @@
  * Tests for the SPV model including validation, methods, and schema behavior
  */
 
-const mongoose = require('mongoose');
+// Mock the SPV model to avoid database dependencies
+jest.mock('../../../models/SPV', () => {
+  const validStatuses = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+  const validComplianceStatuses = ['Compliant', 'NonCompliant', 'PendingReview'];
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+  function MockSPV(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults
+    if (this.updatedAt === undefined) this.updatedAt = new Date();
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.SPVID) {
+        errors.SPVID = { message: 'SPVID is required' };
+      }
+      if (!this.Name) {
+        errors.Name = { message: 'Name is required' };
+      }
+      if (!this.Purpose) {
+        errors.Purpose = { message: 'Purpose is required' };
+      }
+      if (!this.CreationDate) {
+        errors.CreationDate = { message: 'CreationDate is required' };
+      }
+      if (!this.Status) {
+        errors.Status = { message: 'Status is required' };
+      } else if (!validStatuses.includes(this.Status)) {
+        errors.Status = { message: `${this.Status} is not a valid status` };
+      }
+      if (!this.ParentCompanyID) {
+        errors.ParentCompanyID = { message: 'ParentCompanyID is required' };
+      }
+      if (!this.ComplianceStatus) {
+        errors.ComplianceStatus = { message: 'ComplianceStatus is required' };
+      } else if (!validComplianceStatuses.includes(this.ComplianceStatus)) {
+        errors.ComplianceStatus = { message: `${this.ComplianceStatus} is not a valid compliance status` };
+      }
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+    this.toObject = jest.fn(() => ({ ...data }));
+  }
+
+  // Add static methods
+  MockSPV.findById = jest.fn();
+  MockSPV.find = jest.fn();
+  MockSPV.findOne = jest.fn();
+  MockSPV.create = jest.fn();
+  MockSPV.findByIdAndUpdate = jest.fn();
+  MockSPV.findByIdAndDelete = jest.fn();
+  MockSPV.countDocuments = jest.fn();
+
+  return MockSPV;
+});
 
 describe('SPV Model', () => {
   let SPV;
@@ -16,65 +72,6 @@ describe('SPV Model', () => {
   const validComplianceStatuses = ['Compliant', 'NonCompliant', 'PendingReview'];
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockSPV(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults
-        if (this.updatedAt === undefined) this.updatedAt = new Date();
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.SPVID) {
-            errors.SPVID = { message: 'SPVID is required' };
-          }
-          if (!this.Name) {
-            errors.Name = { message: 'Name is required' };
-          }
-          if (!this.Purpose) {
-            errors.Purpose = { message: 'Purpose is required' };
-          }
-          if (!this.CreationDate) {
-            errors.CreationDate = { message: 'CreationDate is required' };
-          }
-          if (!this.Status) {
-            errors.Status = { message: 'Status is required' };
-          } else if (!validStatuses.includes(this.Status)) {
-            errors.Status = { message: `${this.Status} is not a valid status` };
-          }
-          if (!this.ParentCompanyID) {
-            errors.ParentCompanyID = { message: 'ParentCompanyID is required' };
-          }
-          if (!this.ComplianceStatus) {
-            errors.ComplianceStatus = { message: 'ComplianceStatus is required' };
-          } else if (!validComplianceStatuses.includes(this.ComplianceStatus)) {
-            errors.ComplianceStatus = { message: `${this.ComplianceStatus} is not a valid compliance status` };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-        this.toObject = jest.fn(() => ({ ...data }));
-      }
-
-      // Add static methods
-      MockSPV.findById = jest.fn();
-      MockSPV.find = jest.fn();
-      MockSPV.findOne = jest.fn();
-      MockSPV.create = jest.fn();
-      MockSPV.findByIdAndUpdate = jest.fn();
-      MockSPV.findByIdAndDelete = jest.fn();
-      MockSPV.countDocuments = jest.fn();
-
-      return MockSPV;
-    });
-
-    // Now require the SPV model
     SPV = require('../../../models/SPV');
   });
 

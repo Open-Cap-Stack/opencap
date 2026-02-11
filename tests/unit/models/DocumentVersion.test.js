@@ -5,18 +5,6 @@
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
-
-// Mock mongoose before requiring the model
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    model: jest.fn(),
-    Schema: actualMongoose.Schema
-  };
-});
-
 describe('DocumentVersion Model', () => {
   let DocumentVersion;
   let mockDocument;

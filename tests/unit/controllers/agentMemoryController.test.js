@@ -3,7 +3,14 @@
  * [Feature] Issue #27: Implement agent memory for AI features
  */
 
-const mongoose = require('mongoose');
+// Generate a 24-char hex string to simulate ObjectId
+function generateObjectId() {
+  const hex = '0123456789abcdef';
+  let id = '';
+  for (let i = 0; i < 24; i++) id += hex[Math.floor(Math.random() * 16)];
+  return id;
+}
+
 jest.mock('../../../services/agentMemoryService');
 const agentMemoryService = require('../../../services/agentMemoryService');
 
@@ -13,8 +20,8 @@ describe('AgentMemoryController', () => {
 
   beforeAll(() => {
     agentMemoryController = require('../../../controllers/agentMemoryController');
-    mockCompanyId = new mongoose.Types.ObjectId().toString();
-    mockUserId = new mongoose.Types.ObjectId().toString();
+    mockCompanyId = generateObjectId();
+    mockUserId = generateObjectId();
     mockAgentId = 'agent-opencap-001';
   });
 

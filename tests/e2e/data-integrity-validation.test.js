@@ -10,7 +10,6 @@
  * - Concurrent operations
  */
 
-const mongoose = require('mongoose');
 const zerodbService = require('../../services/zerodbService');
 const databaseAdapter = require('../../services/databaseAdapter');
 const { connectDB } = require('../../db');
@@ -36,9 +35,6 @@ describe('Data Integrity Validation Tests', () => {
   afterAll(async () => {
     // Restore original migration mode
     process.env.MIGRATION_MODE = originalMigrationMode;
-
-    // Close connections
-    await mongoose.connection.close();
   });
 
   describe('Data Type Preservation', () => {

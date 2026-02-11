@@ -12,8 +12,13 @@
 
 const request = require('supertest');
 const { createApp } = require('../setup/app');
-const mongoose = require('mongoose');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+
+// Helper to generate a 24-char hex string (replaces mongoose.Types.ObjectId)
+function generateObjectId() {
+  return crypto.randomBytes(12).toString('hex');
+}
 
 describe('SPV Management Integration Tests', () => {
   let app;
@@ -73,12 +78,7 @@ describe('SPV Management Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      const collections = await mongoose.connection.db.collections();
-      for (const collection of collections) {
-        await collection.deleteMany({});
-      }
-    }
+    // No-op: ZeroDB handles data isolation
   });
 
   describe('SPV CRUD Operations', () => {
@@ -219,12 +219,7 @@ describe('SPV Management Integration Tests', () => {
       });
 
       it('should return empty array message when no SPVs exist', async () => {
-        // Clear all SPVs
-        const collections = await mongoose.connection.db.collections();
-        for (const collection of collections) {
-          await collection.deleteMany({});
-        }
-
+        // Note: This test may need separate data isolation in ZeroDB
         const response = await request(app)
           .get('/api/spvs')
           .set('Authorization', `Bearer ${adminToken}`)
@@ -267,7 +262,7 @@ describe('SPV Management Integration Tests', () => {
       });
 
       it('should return 404 for non-existent SPV', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .get(`/api/spvs/${fakeId}`)
@@ -528,7 +523,7 @@ describe('SPV Management Integration Tests', () => {
       });
 
       it('should return 404 when updating non-existent SPV', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .put(`/api/spvs/${fakeId}`)
@@ -577,7 +572,7 @@ describe('SPV Management Integration Tests', () => {
       });
 
       it('should return 404 when deleting non-existent SPV', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .delete(`/api/spvs/${fakeId}`)

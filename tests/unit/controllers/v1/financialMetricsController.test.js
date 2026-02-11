@@ -5,21 +5,6 @@
  * error handling, and edge cases. Issue #39: Controller Test Coverage
  */
 
-// Mock mongoose before any imports
-jest.mock('mongoose', () => {
-  const actualMongoose = jest.requireActual('mongoose');
-  return {
-    ...actualMongoose,
-    Types: {
-      ...actualMongoose.Types,
-      ObjectId: {
-        ...actualMongoose.Types.ObjectId,
-        isValid: jest.fn()
-      }
-    }
-  };
-});
-
 // Mock the dependencies
 jest.mock('../../../../models/financialReport');
 jest.mock('../../../../models/Company');
@@ -27,7 +12,6 @@ jest.mock('../../../../models/Company');
 const financialMetricsController = require('../../../../controllers/v1/financialMetricsController');
 const FinancialReport = require('../../../../models/financialReport');
 const Company = require('../../../../models/Company');
-const mongoose = require('mongoose');
 
 describe('Financial Metrics Controller', () => {
   let req, res;
@@ -60,7 +44,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate profitability metrics successfully', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([mockReport]);
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
@@ -80,7 +64,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = 'invalid-id';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
 
@@ -93,7 +77,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = 'invalid-period';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
 
@@ -106,7 +90,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for missing period', async () => {
       req.params.companyId = validCompanyId;
       req.query = {};
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
 
@@ -116,7 +100,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when no financial data available', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([]);
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
@@ -130,7 +114,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle annual period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-annual';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       const annualReport = { ...mockReport, reportType: 'annual' };
       FinancialReport.find.mockResolvedValue([annualReport]);
@@ -143,7 +127,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateProfitabilityMetrics(req, res);
@@ -168,7 +152,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate liquidity metrics successfully', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q2';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([mockReport]);
 
       await financialMetricsController.calculateLiquidityMetrics(req, res);
@@ -188,7 +172,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = 'invalid-id';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateLiquidityMetrics(req, res);
 
@@ -201,7 +185,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateLiquidityMetrics(req, res);
 
@@ -211,7 +195,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when no financial data available', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([]);
 
       await financialMetricsController.calculateLiquidityMetrics(req, res);
@@ -222,7 +206,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateLiquidityMetrics(req, res);
@@ -247,7 +231,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate solvency metrics successfully', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q3';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([mockReport]);
 
       await financialMetricsController.calculateSolvencyMetrics(req, res);
@@ -267,7 +251,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = 'invalid-id';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateSolvencyMetrics(req, res);
 
@@ -280,7 +264,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = 'Q1-2024';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateSolvencyMetrics(req, res);
 
@@ -290,7 +274,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when no financial data available', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([]);
 
       await financialMetricsController.calculateSolvencyMetrics(req, res);
@@ -301,7 +285,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateSolvencyMetrics(req, res);
@@ -326,7 +310,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate efficiency metrics successfully', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q4';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([mockReport]);
 
       await financialMetricsController.calculateEfficiencyMetrics(req, res);
@@ -346,7 +330,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = '';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateEfficiencyMetrics(req, res);
 
@@ -359,7 +343,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '24-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateEfficiencyMetrics(req, res);
 
@@ -369,7 +353,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when no financial data available', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockResolvedValue([]);
 
       await financialMetricsController.calculateEfficiencyMetrics(req, res);
@@ -380,7 +364,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateEfficiencyMetrics(req, res);
@@ -398,7 +382,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate growth metrics with previous year comparison', async () => {
       req.params.companyId = validCompanyId;
       req.query = { period: '2024-Q1', compareWith: 'previous-year' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       FinancialReport.find.mockResolvedValue([{
         data: { revenue: 100000, netIncome: 20000 }
@@ -418,7 +402,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate growth metrics with previous quarter comparison', async () => {
       req.params.companyId = validCompanyId;
       req.query = { period: '2024-Q2', compareWith: 'previous-quarter' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       FinancialReport.find.mockResolvedValue([{
         data: { revenue: 120000, netIncome: 25000 }
@@ -432,7 +416,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle Q1 with previous quarter comparison (rollover to previous year Q4)', async () => {
       req.params.companyId = validCompanyId;
       req.query = { period: '2024-Q1', compareWith: 'previous-quarter' };
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       FinancialReport.find.mockResolvedValue([{
         data: { revenue: 100000, netIncome: 20000 }
@@ -446,7 +430,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = 'invalid-id';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateGrowthMetrics(req, res);
 
@@ -459,7 +443,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = 'invalid';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateGrowthMetrics(req, res);
 
@@ -469,7 +453,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateGrowthMetrics(req, res);
@@ -499,7 +483,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate comprehensive metrics for private company', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       Company.findById.mockResolvedValue(mockCompany);
       FinancialReport.find.mockResolvedValue([mockReport]);
 
@@ -517,7 +501,7 @@ describe('Financial Metrics Controller', () => {
     it('should calculate comprehensive metrics including valuation for public company', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       const publicCompany = { ...mockCompany, isPublic: true };
       Company.findById.mockResolvedValue(publicCompany);
@@ -531,7 +515,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid company ID', async () => {
       req.params.companyId = 'invalid-id';
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
 
       await financialMetricsController.calculateComprehensiveMetrics(req, res);
 
@@ -544,7 +528,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 400 for invalid period format', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = 'invalid';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
 
       await financialMetricsController.calculateComprehensiveMetrics(req, res);
 
@@ -554,7 +538,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when company not found', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       Company.findById.mockResolvedValue(null);
 
       await financialMetricsController.calculateComprehensiveMetrics(req, res);
@@ -568,7 +552,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
       req.query.period = '2024-Q1';
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
       Company.findById.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.calculateComprehensiveMetrics(req, res);
@@ -669,7 +653,7 @@ describe('Financial Metrics Controller', () => {
     const validCompanyId = '507f1f77bcf86cd799439011';
 
     beforeEach(() => {
-      mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+      // IDs use valid 24-char hex format for ObjectId validation
     });
 
     it('should accept Q1 period format', async () => {
