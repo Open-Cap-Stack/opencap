@@ -67,7 +67,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'All fields are required' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'All fields are required' })
+      }));
     });
 
     it('should return 400 if description is missing', async () => {
@@ -76,7 +79,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'All fields are required' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'All fields are required' })
+      }));
     });
 
     it('should return 500 on database error', async () => {
@@ -86,7 +92,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await createShareClass(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Error creating share class' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Error creating share class' })
+      }));
     });
   });
 
@@ -121,7 +130,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await getAllShareClasses(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Error fetching share classes' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Error fetching share classes' })
+      }));
     });
   });
 
@@ -150,7 +162,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await getShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Share class not found' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Share class not found' })
+      }));
     });
 
     it('should return 500 on database error', async () => {
@@ -160,7 +175,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await getShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Error fetching share class' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Error fetching share class' })
+      }));
     });
   });
 
@@ -198,7 +216,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await updateShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Share class not found' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Share class not found' })
+      }));
     });
 
     it('should return 500 on database error', async () => {
@@ -209,7 +230,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await updateShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Error updating share class' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Error updating share class' })
+      }));
     });
   });
 
@@ -234,7 +258,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await deleteShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Share class not found' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Share class not found' })
+      }));
     });
 
     it('should return 500 on database error', async () => {
@@ -244,7 +271,10 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       await deleteShareClassById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Error deleting share class' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Error deleting share class' })
+      }));
     });
   });
 });

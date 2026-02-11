@@ -71,13 +71,13 @@ describe('Helmet Middleware', () => {
       }
     });
 
-    it('should allow inline scripts (unsafe-inline)', () => {
+    it('should not allow unsafe-inline scripts (hardened CSP)', () => {
       const cspCall = res.setHeader.mock.calls.find(
         call => call[0] === 'Content-Security-Policy'
       );
 
       if (cspCall) {
-        expect(cspCall[1]).toContain("'unsafe-inline'");
+        expect(cspCall[1]).not.toContain("'unsafe-inline'");
       }
     });
 
@@ -152,14 +152,14 @@ describe('Helmet Middleware', () => {
       );
     });
 
-    it('should have max-age of 180 days', () => {
+    it('should have max-age of 365 days', () => {
       const hstsCall = res.setHeader.mock.calls.find(
         call => call[0] === 'Strict-Transport-Security'
       );
 
       if (hstsCall) {
-        // 180 days = 15552000 seconds
-        expect(hstsCall[1]).toContain('max-age=15552000');
+        // 365 days = 31536000 seconds
+        expect(hstsCall[1]).toContain('max-age=31536000');
       }
     });
 
@@ -328,8 +328,8 @@ describe('Helmet Middleware', () => {
       );
 
       if (hstsCall) {
-        // Financial applications need long HSTS max-age
-        expect(hstsCall[1]).toContain('max-age=15552000');
+        // Financial applications need long HSTS max-age (365 days)
+        expect(hstsCall[1]).toContain('max-age=31536000');
         expect(hstsCall[1]).toContain('includeSubDomains');
         expect(hstsCall[1]).toContain('preload');
       }

@@ -88,7 +88,7 @@ describe('Communication Controller', () => {
 
       await communicationController.getCommunications(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('Communication', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('Communication', {}, expect.objectContaining({ limit: expect.any(Number), skip: expect.any(Number) }));
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData())).toEqual(mockCommunications);
     });

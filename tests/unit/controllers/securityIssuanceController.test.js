@@ -333,7 +333,10 @@ describe('SecurityIssuance Controller', () => {
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'security_issuances',
         { id: issuanceId },
-        { $set: mockReq.body }
+        expect.objectContaining({
+          status: 'transferred',
+          complianceNotes: 'Transfer completed'
+        })
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -531,10 +534,18 @@ describe('SecurityIssuance Controller', () => {
         exemptionClaimed: 'Section 25102(f)'
       };
 
+      const existingIssuance = {
+        id: issuanceId,
+        stateFilings: []
+      };
+
       const mockUpdatedIssuance = {
         id: issuanceId,
         stateFilings: [mockReq.body]
       };
+
+      // First call: queryTable to get current issuance (read-modify-write pattern)
+      zerodbService.queryTable.mockResolvedValue([existingIssuance]);
 
       zerodbService.updateRows.mockResolvedValue({
         modifiedCount: 1,
@@ -543,10 +554,19 @@ describe('SecurityIssuance Controller', () => {
 
       await securityIssuanceController.addStateFiling(mockReq, mockRes);
 
+      // Controller uses read-modify-write: queries first, then updates with full array
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'security_issuances',
+        { filter: { id: issuanceId } }
+      );
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'security_issuances',
         { id: issuanceId },
-        { $push: { stateFilings: mockReq.body } }
+        expect.objectContaining({
+          stateFilings: expect.arrayContaining([
+            expect.objectContaining({ stateCode: 'CA' })
+          ])
+        })
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({

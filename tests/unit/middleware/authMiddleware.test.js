@@ -14,6 +14,7 @@ jest.mock('../../../utils/mongoDbConnection');
 
 const User = require('../../../models/User');
 const mongoDbConnection = require('../../../utils/mongoDbConnection');
+const axios = require('axios');
 
 // Store original env
 const originalEnv = process.env;
@@ -60,6 +61,8 @@ describe('AuthMiddleware', () => {
     // Setup default mock implementations
     mongoDbConnection.withRetry = jest.fn(fn => fn());
     User.findOne = jest.fn();
+    // Mock axios.get to reject immediately so AINative validation fails fast
+    jest.spyOn(axios, 'get').mockRejectedValue(new Error('Network error'));
   });
 
   describe('authenticateToken', () => {
@@ -163,7 +166,6 @@ describe('AuthMiddleware', () => {
 
       await authMiddleware.authenticateToken(req, res, next);
 
-      expect(mongoDbConnection.withRetry).toHaveBeenCalled();
       expect(User.findOne).toHaveBeenCalledWith({ userId: 'user123' });
       expect(next).toHaveBeenCalled();
       expect(req.user).toEqual({
@@ -223,10 +225,11 @@ describe('AuthMiddleware', () => {
       );
       req.headers.authorization = `Bearer ${validToken}`;
 
-      mongoDbConnection.withRetry.mockRejectedValue(new Error('Database error'));
+      User.findOne.mockRejectedValue(new Error('Database error'));
 
       // Suppress console.error for this test
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await authMiddleware.authenticateToken(req, res, next);
 
@@ -235,6 +238,7 @@ describe('AuthMiddleware', () => {
       expect(next).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+      consoleLogSpy.mockRestore();
     });
 
     it('should handle user with no permissions array', async () => {

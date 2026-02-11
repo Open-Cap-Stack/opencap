@@ -11,25 +11,60 @@
  * - Audit logging
  */
 
+// Set env vars before any requires so the service constructor picks them up
+process.env.ZERODB_SYNC_ENABLED = 'true';
+process.env.SYNC_CONFLICT_STRATEGY = 'last-write-wins';
+process.env.SYNC_POLL_INTERVAL_MS = '5000';
+process.env.MIGRATION_MODE = 'parallel';
+
+// Mock mongoose before it gets lazy-loaded by the sync service
+const mockModel = {
+  findOne: jest.fn(),
+  create: jest.fn(),
+  createIndexes: jest.fn().mockResolvedValue(),
+  updateOne: jest.fn()
+};
+
+// virtual: true since mongoose was removed from dependencies
+jest.mock('mongoose', () => {
+  const SchemaClass = jest.fn().mockImplementation(() => ({
+    index: jest.fn()
+  }));
+  SchemaClass.Types = { Mixed: 'Mixed' };
+
+  return {
+    Schema: SchemaClass,
+    model: jest.fn(() => mockModel)
+  };
+}, { virtual: true });
+
+// Mock zerodbService to avoid axios initialization issues
+jest.mock('../../../services/zerodbService', () => ({
+  listEvents: jest.fn().mockResolvedValue([]),
+  initialize: jest.fn().mockResolvedValue()
+}));
+
+// Mock databaseAdapter
+jest.mock('../../../services/databaseAdapter', () => ({}));
+
 const zerodbSyncService = require('../../../services/zerodbSyncService');
 const zerodbService = require('../../../services/zerodbService');
 
 describe('ZeroDBSyncService', () => {
-  beforeAll(async () => {
-    // Enable sync service
-    process.env.ZERODB_SYNC_ENABLED = 'true';
-    process.env.SYNC_CONFLICT_STRATEGY = 'last-write-wins';
-    process.env.SYNC_POLL_INTERVAL_MS = '5000';
-  });
-
   afterAll(async () => {
     // Cleanup
   });
 
   beforeEach(async () => {
+    // Ensure the service is enabled for tests
+    zerodbSyncService.enabled = true;
     // Reset service state
     await zerodbSyncService.stopAllSyncs();
     zerodbSyncService.resetMetrics();
+    // Reset initialized so each test can re-initialize
+    zerodbSyncService.initialized = false;
+    zerodbSyncService.SyncMetadata = null;
+    zerodbSyncService.SyncAuditLog = null;
   });
 
   describe('Initialization', () => {

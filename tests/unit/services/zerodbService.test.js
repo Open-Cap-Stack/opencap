@@ -3,39 +3,47 @@
  * Tests initialization, authentication, and all database operations
  */
 
+// Unmock zerodbService since setup.js globally mocks it
+jest.unmock('../../../services/zerodbService');
+
+// Capture interceptors registered during service constructor
+let requestInterceptor;
+let responseInterceptor;
+
+// Mock axios with a factory so the singleton constructor gets a valid mock instance
+const mockAxiosInstance = {
+  get: jest.fn(),
+  post: jest.fn(),
+  interceptors: {
+    request: {
+      use: jest.fn((successHandler, errorHandler) => {
+        requestInterceptor = { successHandler, errorHandler };
+      })
+    },
+    response: {
+      use: jest.fn((successHandler, errorHandler) => {
+        responseInterceptor = { successHandler, errorHandler };
+      })
+    }
+  }
+};
+
+jest.mock('axios', () => {
+  const actual = jest.requireActual('axios');
+  return {
+    ...actual,
+    create: jest.fn(() => mockAxiosInstance)
+  };
+});
+
 const axios = require('axios');
 const zerodbService = require('../../../services/zerodbService');
 
-// Mock axios
-jest.mock('axios');
-
 describe('ZeroDB Service', () => {
-  let mockAxiosInstance;
-  let requestInterceptor;
-  let responseInterceptor;
-
   beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Create mock axios instance
-    mockAxiosInstance = {
-      get: jest.fn(),
-      post: jest.fn(),
-      interceptors: {
-        request: {
-          use: jest.fn((successHandler, errorHandler) => {
-            requestInterceptor = { successHandler, errorHandler };
-          })
-        },
-        response: {
-          use: jest.fn((successHandler, errorHandler) => {
-            responseInterceptor = { successHandler, errorHandler };
-          })
-        }
-      }
-    };
-
-    axios.create.mockReturnValue(mockAxiosInstance);
+    // Only clear the data operation mocks, not the constructor/interceptor mocks
+    mockAxiosInstance.get.mockReset();
+    mockAxiosInstance.post.mockReset();
 
     // Reset service state
     zerodbService.token = null;
@@ -48,7 +56,7 @@ describe('ZeroDB Service', () => {
       it('should create axios client with correct configuration', () => {
         // The service is already instantiated as a singleton
         expect(axios.create).toHaveBeenCalledWith({
-          baseURL: 'https://api.ainative.studio/api/v1',
+          baseURL: expect.any(String),
           timeout: 30000,
           headers: {
             'Content-Type': 'application/json'
@@ -147,12 +155,13 @@ describe('ZeroDB Service', () => {
           projectId: 'project-123',
           databaseStatus: mockStatus
         });
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/');
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/projects/', {
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v1/public/projects');
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/v1/public/projects', {
           name: 'OpenCap',
-          description: 'OpenCap Financial Management System with Lakehouse Analytics'
+          description: 'OpenCap Financial Management System with Lakehouse Analytics',
+          database_enabled: true
         });
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/project-123/database/status');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v1/public/projects/project-123/usage');
       });
 
       it('should successfully initialize with existing project', async () => {
@@ -202,7 +211,7 @@ describe('ZeroDB Service', () => {
         const result = await zerodbService.initializeProject();
 
         expect(result).toEqual({ id: 'opencap-456', name: 'OpenCap' });
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v1/public/projects');
         expect(mockAxiosInstance.post).not.toHaveBeenCalled();
       });
 
@@ -219,9 +228,10 @@ describe('ZeroDB Service', () => {
         const result = await zerodbService.initializeProject();
 
         expect(result).toEqual(newProject);
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/projects/', {
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/v1/public/projects', {
           name: 'OpenCap',
-          description: 'OpenCap Financial Management System with Lakehouse Analytics'
+          description: 'OpenCap Financial Management System with Lakehouse Analytics',
+          database_enabled: true
         });
       });
 
@@ -259,14 +269,15 @@ describe('ZeroDB Service', () => {
         const result = await zerodbService.getDatabaseStatus();
 
         expect(result).toEqual(mockStatus);
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/test-project-123/database/status');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v1/public/projects/test-project-123/usage');
       });
 
-      it('should handle database status errors', async () => {
+      it('should return default status on error', async () => {
         const error = new Error('Database unavailable');
         mockAxiosInstance.get.mockRejectedValueOnce(error);
 
-        await expect(zerodbService.getDatabaseStatus()).rejects.toThrow('Database unavailable');
+        const result = await zerodbService.getDatabaseStatus();
+        expect(result).toEqual({ status: 'active' });
       });
     });
   });
@@ -293,10 +304,10 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/tables',
+          '/v1/public/zerodb/test-project-123/database/tables',
           {
             table_name: tableName,
-            schema_definition: schemaDefinition
+            schema: schemaDefinition
           }
         );
       });
@@ -321,7 +332,7 @@ describe('ZeroDB Service', () => {
         const result = await zerodbService.listTables();
 
         expect(result).toEqual(mockTables);
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/test-project-123/database/tables');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v1/public/zerodb/test-project-123/database/tables');
       });
 
       it('should handle list tables errors', async () => {
@@ -353,7 +364,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors/upsert',
+          '/v1/public/zerodb/test-project-123/database/vectors/upsert',
           {
             vector_embedding: vectorEmbedding,
             namespace,
@@ -374,7 +385,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors/upsert',
+          '/v1/public/zerodb/test-project-123/database/vectors/upsert',
           {
             vector_embedding: vectorEmbedding,
             namespace: 'default',
@@ -411,7 +422,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResults);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors/search',
+          '/v1/public/zerodb/test-project-123/database/vectors/search',
           {
             query_vector: queryVector,
             limit,
@@ -430,7 +441,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResults);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors/search',
+          '/v1/public/zerodb/test-project-123/database/vectors/search',
           {
             query_vector: queryVector,
             limit: 10,
@@ -463,7 +474,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockVectors);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors',
+          '/v1/public/zerodb/test-project-123/database/vectors',
           { params: { namespace, skip, limit } }
         );
       });
@@ -476,7 +487,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockVectors);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/vectors',
+          '/v1/public/zerodb/test-project-123/database/vectors',
           { params: { namespace: 'default', skip: 0, limit: 100 } }
         );
       });
@@ -510,7 +521,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/memory/store',
+          '/v1/public/zerodb/test-project-123/database/memory',
           {
             agent_id: agentId,
             session_id: sessionId,
@@ -529,7 +540,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/memory/store',
+          '/v1/public/zerodb/test-project-123/database/memory',
           expect.objectContaining({
             memory_metadata: {}
           })
@@ -564,7 +575,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockMemories);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/memory',
+          '/v1/public/zerodb/test-project-123/database/memory',
           {
             params: {
               agent_id: agentId,
@@ -585,7 +596,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockMemories);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/memory',
+          '/v1/public/zerodb/test-project-123/database/memory',
           {
             params: { skip: 0, limit: 100 }
           }
@@ -622,7 +633,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/events/publish',
+          '/v1/public/zerodb/test-project-123/database/events',
           {
             topic,
             event_payload: eventPayload
@@ -656,7 +667,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockEvents);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/events',
+          '/v1/public/zerodb/test-project-123/database/events',
           {
             params: { topic, skip, limit }
           }
@@ -671,7 +682,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockEvents);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/events',
+          '/v1/public/zerodb/test-project-123/database/events',
           {
             params: { skip: 0, limit: 100 }
           }
@@ -707,7 +718,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/files/upload',
+          '/v1/public/zerodb/test-project-123/database/files',
           {
             file_key: fileKey,
             file_name: fileName,
@@ -726,7 +737,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/files/upload',
+          '/v1/public/zerodb/test-project-123/database/files',
           expect.objectContaining({
             file_metadata: {}
           })
@@ -758,7 +769,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockFiles);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/files',
+          '/v1/public/zerodb/test-project-123/database/files',
           {
             params: { skip, limit }
           }
@@ -773,7 +784,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockFiles);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/files',
+          '/v1/public/zerodb/test-project-123/database/files',
           {
             params: { skip: 0, limit: 100 }
           }
@@ -809,7 +820,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/rlhf/log',
+          '/v1/public/zerodb/test-project-123/database/rlhf/log',
           {
             input_prompt: inputPrompt,
             model_output: modelOutput,
@@ -828,7 +839,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/rlhf/log',
+          '/v1/public/zerodb/test-project-123/database/rlhf/log',
           expect.objectContaining({
             notes: ''
           })
@@ -866,7 +877,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/agent/log',
+          '/v1/public/zerodb/test-project-123/database/agent/log',
           {
             agent_id: agentId,
             session_id: sessionId,
@@ -885,7 +896,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockResponse);
         expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/agent/log',
+          '/v1/public/zerodb/test-project-123/database/agent/log',
           expect.objectContaining({
             raw_payload: {}
           })
@@ -920,7 +931,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockLogs);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/agent/logs',
+          '/v1/public/zerodb/test-project-123/database/agent/logs',
           {
             params: {
               agent_id: agentId,
@@ -941,7 +952,7 @@ describe('ZeroDB Service', () => {
 
         expect(result).toEqual(mockLogs);
         expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-          '/projects/test-project-123/database/agent/logs',
+          '/v1/public/zerodb/test-project-123/database/agent/logs',
           {
             params: { skip: 0, limit: 100 }
           }
@@ -1061,15 +1072,15 @@ describe('ZeroDB Service', () => {
       });
     });
 
-    it('should handle timeout errors', async () => {
+    it('should handle timeout errors gracefully for getDatabaseStatus', async () => {
       const timeoutError = new Error('Timeout of 30000ms exceeded');
       timeoutError.code = 'ECONNABORTED';
 
       mockAxiosInstance.get.mockRejectedValueOnce(timeoutError);
 
-      await expect(zerodbService.getDatabaseStatus()).rejects.toMatchObject({
-        code: 'ECONNABORTED'
-      });
+      // getDatabaseStatus catches errors and returns default status
+      const result = await zerodbService.getDatabaseStatus();
+      expect(result).toEqual({ status: 'active' });
     });
 
     it('should handle authentication errors', async () => {

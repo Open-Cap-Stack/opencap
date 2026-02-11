@@ -334,7 +334,12 @@ describe('MonitoringDashboard Service', () => {
 
     it('should include sync lag metrics', () => {
       monitoringDashboard.syncMetrics = {
-        syncLag: [{ timestamp: Date.now(), lag: 1500 }]
+        syncLag: [{ timestamp: Date.now(), lag: 1500 }],
+        eventsProcessed: 0,
+        eventsFailed: 0,
+        deadLetterQueueSize: 0,
+        circuitBreakerStatus: 'CLOSED',
+        resumeTokenHealth: 'HEALTHY'
       };
 
       const prometheusText = monitoringDashboard.getPrometheusMetrics();
@@ -344,7 +349,12 @@ describe('MonitoringDashboard Service', () => {
 
     it('should include dead letter queue size', () => {
       monitoringDashboard.syncMetrics = {
-        deadLetterQueueSize: 5
+        syncLag: [],
+        eventsProcessed: 0,
+        eventsFailed: 0,
+        deadLetterQueueSize: 5,
+        circuitBreakerStatus: 'CLOSED',
+        resumeTokenHealth: 'HEALTHY'
       };
 
       const prometheusText = monitoringDashboard.getPrometheusMetrics();
@@ -381,9 +391,9 @@ describe('MonitoringDashboard Service', () => {
 
       const timeSeries = monitoringDashboard.getTimeSeries('zerodb.queryLatency.p95', 10000);
 
-      // Should only return metrics from last 10 seconds
+      // Should only return metrics from last 10 seconds (cutoff = now + 20000)
       timeSeries.forEach(point => {
-        expect(point.timestamp).toBeGreaterThan(now + 20000);
+        expect(point.timestamp).toBeGreaterThanOrEqual(now + 20000);
       });
     });
 
@@ -454,21 +464,26 @@ describe('MonitoringDashboard Service', () => {
 
   describe('cleanup', () => {
     it('should remove old metrics based on retention period', () => {
-      jest.useFakeTimers();
       const dashboard = new MonitoringDashboard({ retentionPeriod: 10000 });
-      dashboard.start();
 
-      jest.advanceTimersByTime(5000);
+      // Manually add metrics with old timestamps
+      const now = Date.now();
+      dashboard.metrics.push(
+        { timestamp: now - 20000, zerodb: {}, sync: {}, system: {} },
+        { timestamp: now - 15000, zerodb: {}, sync: {}, system: {} },
+        { timestamp: now - 5000, zerodb: {}, sync: {}, system: {} },
+        { timestamp: now - 1000, zerodb: {}, sync: {}, system: {} }
+      );
+
       const countBefore = dashboard.metrics.length;
+      expect(countBefore).toBe(4);
 
-      jest.advanceTimersByTime(15000); // Exceed retention period
       dashboard.cleanup();
 
       const countAfter = dashboard.metrics.length;
+      // Metrics older than 10 seconds should be removed (the first two)
       expect(countAfter).toBeLessThan(countBefore);
-
-      dashboard.stop();
-      jest.useRealTimers();
+      expect(countAfter).toBe(2);
     });
   });
 

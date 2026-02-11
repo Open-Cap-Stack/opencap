@@ -104,7 +104,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.createDocument(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'ZeroDB insertion failed' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'ZeroDB insertion failed' })
+      }));
     });
 
     it('should still create document if vector indexing fails', async () => {
@@ -224,7 +227,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocuments(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Query failed' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Query failed' })
+      }));
     });
   });
 
@@ -253,7 +259,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Document not found' })
+      }));
     });
 
     it('should handle query errors', async () => {
@@ -264,7 +273,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Database error' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Database error' })
+      }));
     });
   });
 
@@ -300,7 +312,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.updateDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Document not found' })
+      }));
     });
 
     it('should not re-index if content fields unchanged', async () => {
@@ -325,7 +340,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.updateDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Update failed' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Update failed' })
+      }));
     });
   });
 
@@ -354,7 +372,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.deleteDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Document not found' })
+      }));
     });
 
     it('should handle delete errors', async () => {
@@ -366,7 +387,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.deleteDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Delete failed' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Delete failed' })
+      }));
     });
 
     it('should continue if vector deletion fails', async () => {
@@ -422,7 +446,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.searchDocuments(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Search query is required' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Search query is required' })
+      }));
     });
 
     it('should handle empty search results', async () => {
@@ -508,7 +535,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.findSimilarDocuments(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Reference document not found' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Reference document not found' })
+      }));
     });
 
     it('should deny access to unauthorized users', async () => {
@@ -527,7 +557,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.findSimilarDocuments(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Access denied to reference document' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Access denied to reference document' })
+      }));
     });
   });
 
@@ -575,7 +608,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocumentAnalytics(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Document not found' })
+      }));
     });
 
     it('should deny access to unauthorized users', async () => {
@@ -593,7 +629,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocumentAnalytics(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Access denied' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Access denied' })
+      }));
     });
   });
 
@@ -631,7 +670,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.bulkIndexDocuments(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Admin access required' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Admin access required' })
+      }));
     });
 
     it('should handle partial indexing failures', async () => {
@@ -689,7 +731,10 @@ describe('Document Controller - ZeroDB Migration', () => {
       await documentController.getDocumentById(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Connection refused' });
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ message: 'Connection refused' })
+      }));
     });
 
     it('should handle ZeroDB timeout errors', async () => {
