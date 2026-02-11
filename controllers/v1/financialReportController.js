@@ -7,7 +7,7 @@
  */
 
 const FinancialReport = require('../../models/financialReport');
-const mongoose = require('mongoose');
+const { isValidObjectId } = require('../../utils/inputSanitizer');
 const vectorService = require('../../services/vectorService');
 const streamingService = require('../../services/streamingService');
 const memoryService = require('../../services/memoryService');
@@ -171,7 +171,7 @@ const getFinancialReportById = async (req, res) => {
     const { id } = req.params;
     
     // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
     
@@ -205,7 +205,7 @@ const updateFinancialReport = async (req, res) => {
     const { id } = req.params;
 
     // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
 
@@ -254,7 +254,7 @@ const deleteFinancialReport = async (req, res) => {
     const { id } = req.params;
     
     // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
     
@@ -472,7 +472,7 @@ const searchFinancialReportsVector = async (req, res) => {
     ).filter(id => id);
     
     const reports = await FinancialReport.find({
-      _id: { $in: reportIds.map(id => new mongoose.Types.ObjectId(id)) }
+      _id: { $in: reportIds }
     });
     
     // Combine vector search results with MongoDB data
@@ -512,7 +512,7 @@ const getSimilarFinancialReports = async (req, res) => {
     const { limit = 5 } = req.query;
     
     // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
     
@@ -528,7 +528,7 @@ const getSimilarFinancialReports = async (req, res) => {
     ).filter(docId => docId);
     
     const reports = await FinancialReport.find({
-      _id: { $in: reportIds.map(docId => new mongoose.Types.ObjectId(docId)) }
+      _id: { $in: reportIds }
     });
     
     // Combine results
