@@ -3,35 +3,52 @@
  * Issue #103: Create Secondary Transaction Model
  */
 
-const mongoose = require('mongoose');
+// Lightweight schema helper to replace mongoose.Schema for testing
+function createTestSchema(definition, schemaOptions = {}) {
+  const paths = {};
+  const compoundIndexes = [];
 
-// Define sub-schemas
-const transactionFeesSchema = new mongoose.Schema({
-  platformFee: { type: Number, default: 0, min: 0 },
-  legalFees: { type: Number, default: 0, min: 0 },
-  transferAgentFee: { type: Number, default: 0, min: 0 },
-  escrowFee: { type: Number, default: 0, min: 0 },
-  otherFees: { type: Number, default: 0, min: 0 },
-  feesPaidBy: {
-    type: String,
-    enum: ['seller', 'buyer', 'split', 'company'],
-    default: 'seller'
+  function processField(fieldName, fieldDef) {
+    if (Array.isArray(fieldDef)) {
+      paths[fieldName] = { options: {}, isRequired: false };
+      return;
+    }
+    if (fieldDef && typeof fieldDef === 'object' && fieldDef.type !== undefined) {
+      const pathObj = {
+        options: { ...fieldDef },
+        isRequired: fieldDef.required || false,
+        defaultValue: fieldDef.default,
+        enumValues: fieldDef.enum || undefined
+      };
+      paths[fieldName] = pathObj;
+    } else if (fieldDef && typeof fieldDef === 'object' && !fieldDef.type) {
+      paths[fieldName] = { options: fieldDef };
+    } else {
+      paths[fieldName] = { options: { type: fieldDef } };
+    }
   }
-}, { _id: false });
 
-const documentReferenceSchema = new mongoose.Schema({
-  documentId: { type: String, required: true },
-  documentType: {
-    type: String,
-    enum: ['purchase_agreement', 'board_consent', 'rofr_waiver', 'transfer_notice', 'tax_form', 'other'],
-    required: true
-  },
-  uploadedAt: { type: Date, default: Date.now },
-  uploadedBy: { type: String }
-}, { _id: false });
+  for (const [key, value] of Object.entries(definition)) {
+    processField(key, value);
+  }
+
+  return {
+    paths,
+    options: schemaOptions,
+    path(fieldName) {
+      return paths[fieldName] || undefined;
+    },
+    index(indexDef) {
+      compoundIndexes.push([indexDef]);
+    },
+    indexes() {
+      return compoundIndexes;
+    }
+  };
+}
 
 // Define schema for testing
-const secondaryTransactionSchema = new mongoose.Schema({
+const secondaryTransactionSchema = createTestSchema({
   transactionId: {
     type: String,
     required: true,
@@ -109,36 +126,17 @@ const secondaryTransactionSchema = new mongoose.Schema({
     index: true
   },
   rofrDetails: {
-    rofrHolderId: { type: String },
-    rofrExercised: { type: Boolean, default: false },
-    rofrWaived: { type: Boolean, default: false },
-    rofrDeadline: { type: Date },
-    originalBuyerId: { type: String }
+    type: Object
   },
-  documents: [documentReferenceSchema],
+  documents: [{ documentId: String, documentType: String }],
   fees: {
-    type: transactionFeesSchema,
+    type: Object,
     default: () => ({})
   },
   escrow: {
-    escrowAgentId: { type: String },
-    escrowAccountNumber: { type: String },
-    fundsReceivedAt: { type: Date },
-    fundsReleasedAt: { type: Date }
+    type: Object
   },
-  approvals: [{
-    approverType: {
-      type: String,
-      enum: ['board', 'company_admin', 'legal', 'transfer_agent']
-    },
-    approverId: { type: String },
-    approvedAt: { type: Date },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected']
-    },
-    notes: { type: String }
-  }],
+  approvals: [{ approverType: String, approverId: String }],
   notes: {
     type: String
   },
@@ -146,7 +144,7 @@ const secondaryTransactionSchema = new mongoose.Schema({
     type: String
   },
   metadata: {
-    type: mongoose.Schema.Types.Mixed
+    type: Object
   },
   cancellationReason: {
     type: String

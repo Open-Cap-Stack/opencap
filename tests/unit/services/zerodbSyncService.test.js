@@ -11,30 +11,11 @@
  * - Audit logging
  */
 
-const mongoose = require('mongoose');
 const zerodbSyncService = require('../../../services/zerodbSyncService');
 const zerodbService = require('../../../services/zerodbService');
-const { MongoMemoryServer } = require('mongodb-memory-server');
 
 describe('ZeroDBSyncService', () => {
-  let mongoServer;
-  let TestModel;
-
   beforeAll(async () => {
-    // Start in-memory MongoDB
-    mongoServer = await MongoMemoryServer.create();
-    const mongoUri = mongoServer.getUri();
-    await mongoose.connect(mongoUri);
-
-    // Create test model
-    const TestSchema = new mongoose.Schema({
-      name: String,
-      value: Number,
-      metadata: Object
-    }, { timestamps: true });
-
-    TestModel = mongoose.model('TestModel', TestSchema);
-
     // Enable sync service
     process.env.ZERODB_SYNC_ENABLED = 'true';
     process.env.SYNC_CONFLICT_STRATEGY = 'last-write-wins';
@@ -42,17 +23,10 @@ describe('ZeroDBSyncService', () => {
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    // Cleanup
   });
 
   beforeEach(async () => {
-    // Clear all collections before each test
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-      await collections[key].deleteMany({});
-    }
-
     // Reset service state
     await zerodbSyncService.stopAllSyncs();
     zerodbSyncService.resetMetrics();

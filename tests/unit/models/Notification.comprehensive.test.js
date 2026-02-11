@@ -4,10 +4,61 @@
  * Tests for the Notification model including validation, methods, and schema behavior
  */
 
-const mongoose = require('mongoose');
+// Mock the Notification model to avoid database dependencies
+jest.mock('../../../models/Notification', () => {
+  const validNotificationTypes = ['system', 'user-generated'];
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+  function MockNotification(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults
+    if (this.Timestamp === undefined) this.Timestamp = new Date();
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.notificationId) {
+        errors.notificationId = { message: 'notificationId is required' };
+      }
+      if (!this.notificationType) {
+        errors.notificationType = { message: 'notificationType is required' };
+      } else if (!validNotificationTypes.includes(this.notificationType)) {
+        errors.notificationType = { message: `${this.notificationType} is not a valid notification type` };
+      }
+      if (!this.title) {
+        errors.title = { message: 'title is required' };
+      }
+      if (!this.message) {
+        errors.message = { message: 'message is required' };
+      }
+      if (!this.recipient) {
+        errors.recipient = { message: 'recipient is required' };
+      }
+      if (!this.UserInvolved) {
+        errors.UserInvolved = { message: 'UserInvolved is required' };
+      }
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+    this.toObject = jest.fn(() => ({ ...data }));
+  }
+
+  // Add static methods
+  MockNotification.findById = jest.fn();
+  MockNotification.find = jest.fn();
+  MockNotification.findOne = jest.fn();
+  MockNotification.create = jest.fn();
+  MockNotification.findByIdAndUpdate = jest.fn();
+  MockNotification.findByIdAndDelete = jest.fn();
+  MockNotification.countDocuments = jest.fn();
+  MockNotification.deleteMany = jest.fn();
+
+  return MockNotification;
+});
 
 describe('Notification Model', () => {
   let Notification;
@@ -15,61 +66,6 @@ describe('Notification Model', () => {
   const validNotificationTypes = ['system', 'user-generated'];
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockNotification(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults
-        if (this.Timestamp === undefined) this.Timestamp = new Date();
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.notificationId) {
-            errors.notificationId = { message: 'notificationId is required' };
-          }
-          if (!this.notificationType) {
-            errors.notificationType = { message: 'notificationType is required' };
-          } else if (!validNotificationTypes.includes(this.notificationType)) {
-            errors.notificationType = { message: `${this.notificationType} is not a valid notification type` };
-          }
-          if (!this.title) {
-            errors.title = { message: 'title is required' };
-          }
-          if (!this.message) {
-            errors.message = { message: 'message is required' };
-          }
-          if (!this.recipient) {
-            errors.recipient = { message: 'recipient is required' };
-          }
-          if (!this.UserInvolved) {
-            errors.UserInvolved = { message: 'UserInvolved is required' };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-        this.toObject = jest.fn(() => ({ ...data }));
-      }
-
-      // Add static methods
-      MockNotification.findById = jest.fn();
-      MockNotification.find = jest.fn();
-      MockNotification.findOne = jest.fn();
-      MockNotification.create = jest.fn();
-      MockNotification.findByIdAndUpdate = jest.fn();
-      MockNotification.findByIdAndDelete = jest.fn();
-      MockNotification.countDocuments = jest.fn();
-      MockNotification.deleteMany = jest.fn();
-
-      return MockNotification;
-    });
-
-    // Now require the Notification model
     Notification = require('../../../models/Notification');
   });
 

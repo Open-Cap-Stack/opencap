@@ -5,19 +5,13 @@
  * Establishes baseline metrics for comparison
  * Tests data integrity and query patterns
  *
- * CRITICAL: These tests must pass BEFORE any MongoDB code is removed
+ * SKIPPED: These tests require mongoose and MongoMemoryServer which have been
+ * removed from the project as part of the ZeroDB migration. They were designed
+ * to run BEFORE MongoDB removal and are no longer applicable.
  */
 
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-
-// Import models
-const User = require('../../../models/User');
-const Company = require('../../../models/Company');
-const ShareClass = require('../../../models/ShareClass');
-const Document = require('../../../models/Document');
-
-describe('MongoDB Baseline Tests - Pre-Migration', () => {
+// Skip entire suite - mongoose is no longer available
+describe.skip('MongoDB Baseline Tests - Pre-Migration (requires mongoose)', () => {
   let mongoServer;
   let startTime;
 

@@ -6,10 +6,15 @@
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const mongoose = require('mongoose');
+const crypto = require('crypto');
 const User = require('../../models/User');
 const Company = require('../../models/Company');
 const FinancialReport = require('../../models/financialReport');
+
+// Helper to generate a 24-char hex string (replaces mongoose.Types.ObjectId)
+function generateObjectId() {
+  return crypto.randomBytes(12).toString('hex');
+}
 
 /**
  * Generate JWT token for testing
@@ -39,7 +44,7 @@ async function createTestUser(userData = {}) {
     password: await bcrypt.hash('password123', 10),
     role: 'user',
     status: 'active',
-    companyId: new mongoose.Types.ObjectId(),
+    companyId: generateObjectId(),
     emailVerified: true,
     profile: {
       bio: 'Test user bio',

@@ -10,9 +10,14 @@
 
 const request = require('supertest');
 const { createApp } = require('../setup/app');
-const mongoose = require('mongoose');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+
+// Helper to generate a 24-char hex string (replaces mongoose.Types.ObjectId)
+function generateObjectId() {
+  return crypto.randomBytes(12).toString('hex');
+}
 
 describe('User Management Integration Tests', () => {
   let app;
@@ -95,12 +100,7 @@ describe('User Management Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      const collections = await mongoose.connection.db.collections();
-      for (const collection of collections) {
-        await collection.deleteMany({});
-      }
-    }
+    // No-op: ZeroDB handles data isolation
   });
 
   describe('User CRUD Operations', () => {
@@ -245,7 +245,7 @@ describe('User Management Integration Tests', () => {
       });
 
       it('should return 404 for non-existent user', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .get(`/api/v1/users/${fakeId}`)
@@ -331,7 +331,7 @@ describe('User Management Integration Tests', () => {
       });
 
       it('should return 404 when updating non-existent user', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .put(`/api/v1/users/${fakeId}`)
@@ -379,7 +379,7 @@ describe('User Management Integration Tests', () => {
       });
 
       it('should return 404 when deleting non-existent user', async () => {
-        const fakeId = new mongoose.Types.ObjectId().toString();
+        const fakeId = generateObjectId();
 
         const response = await request(app)
           .delete(`/api/v1/users/${fakeId}`)

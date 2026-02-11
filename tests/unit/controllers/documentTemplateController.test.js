@@ -4,7 +4,13 @@
  */
 process.env.SKIP_DB_SETUP = 'true';
 
-const mongoose = require('mongoose');
+// Generate a 24-char hex string to simulate ObjectId
+function generateObjectId() {
+  const hex = '0123456789abcdef';
+  let id = '';
+  for (let i = 0; i < 24; i++) id += hex[Math.floor(Math.random() * 16)];
+  return id;
+}
 
 // Mock the service
 jest.mock('../../../services/documentTemplateService', () => ({
@@ -38,7 +44,7 @@ describe('DocumentTemplateController', () => {
       body: {},
       params: {},
       query: {},
-      user: { _id: new mongoose.Types.ObjectId().toString() }
+      user: { _id: generateObjectId() }
     };
     mockRes = {
       status: jest.fn().mockReturnThis(),
@@ -49,14 +55,14 @@ describe('DocumentTemplateController', () => {
   describe('createTemplate', () => {
     it('should create a new template and return 201', async () => {
       const templateData = {
-        companyId: new mongoose.Types.ObjectId().toString(),
+        companyId: generateObjectId(),
         name: 'Stock Option Agreement',
         category: 'Legal',
         content: 'Agreement between {{companyName}} and {{employeeName}}.'
       };
 
       const createdTemplate = {
-        _id: new mongoose.Types.ObjectId().toString(),
+        _id: generateObjectId(),
         templateId: 'TMPL-ABC123',
         ...templateData,
         isActive: true,
@@ -94,7 +100,7 @@ describe('DocumentTemplateController', () => {
 
   describe('getTemplates', () => {
     it('should return templates list with 200', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const templates = [
         { _id: '1', name: 'Template 1' },
         { _id: '2', name: 'Template 2' }
@@ -122,7 +128,7 @@ describe('DocumentTemplateController', () => {
 
     it('should pass filter parameters to service', async () => {
       mockReq.query = {
-        companyId: new mongoose.Types.ObjectId().toString(),
+        companyId: generateObjectId(),
         category: 'Legal',
         isActive: 'true',
         skip: '10',
@@ -147,7 +153,7 @@ describe('DocumentTemplateController', () => {
     });
 
     it('should handle service errors with 500', async () => {
-      mockReq.query = { companyId: new mongoose.Types.ObjectId().toString() };
+      mockReq.query = { companyId: generateObjectId() };
       documentTemplateService.getTemplates.mockRejectedValue(new Error('Database error'));
 
       await documentTemplateController.getTemplates(mockReq, mockRes);
@@ -158,7 +164,7 @@ describe('DocumentTemplateController', () => {
 
   describe('getTemplateById', () => {
     it('should return a template with 200', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const template = {
         _id: templateId,
         name: 'Test Template'
@@ -189,7 +195,7 @@ describe('DocumentTemplateController', () => {
 
   describe('updateTemplate', () => {
     it('should update a template and return 200', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const updateData = {
         name: 'Updated Template Name',
         content: 'Updated content'
@@ -231,7 +237,7 @@ describe('DocumentTemplateController', () => {
 
   describe('deleteTemplate', () => {
     it('should soft delete a template and return 200', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
 
       mockReq.params.id = templateId;
       documentTemplateService.deleteTemplate.mockResolvedValue({
@@ -246,7 +252,7 @@ describe('DocumentTemplateController', () => {
     });
 
     it('should hard delete when query param is set', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
 
       mockReq.params.id = templateId;
       mockReq.query.hard = 'true';
@@ -271,7 +277,7 @@ describe('DocumentTemplateController', () => {
 
   describe('generateDocument', () => {
     it('should generate a document from template with 200', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const variables = {
         companyName: 'ACME Corp',
         employeeName: 'John Doe'
@@ -304,7 +310,7 @@ describe('DocumentTemplateController', () => {
     });
 
     it('should return 400 if required variables are missing', async () => {
-      mockReq.params.id = new mongoose.Types.ObjectId().toString();
+      mockReq.params.id = generateObjectId();
       mockReq.body = { variables: {} };
       documentTemplateService.generateDocument.mockRejectedValue(
         new Error('Missing required variables: companyName')
@@ -329,7 +335,7 @@ describe('DocumentTemplateController', () => {
     });
 
     it('should return categories with counts when companyId provided', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       mockReq.query.companyId = companyId;
 
       const categoriesWithCounts = [
@@ -348,7 +354,7 @@ describe('DocumentTemplateController', () => {
 
   describe('previewTemplate', () => {
     it('should return preview with 200', async () => {
-      const templateId = new mongoose.Types.ObjectId().toString();
+      const templateId = generateObjectId();
       const preview = {
         content: 'Amount: $10,000'
       };
@@ -375,9 +381,9 @@ describe('DocumentTemplateController', () => {
 
   describe('cloneTemplate', () => {
     it('should clone a template and return 201', async () => {
-      const sourceTemplateId = new mongoose.Types.ObjectId().toString();
+      const sourceTemplateId = generateObjectId();
       const clonedTemplate = {
-        _id: new mongoose.Types.ObjectId().toString(),
+        _id: generateObjectId(),
         name: 'Copy of Original Template',
         version: 1
       };
@@ -402,7 +408,7 @@ describe('DocumentTemplateController', () => {
 
   describe('searchTemplates', () => {
     it('should search templates and return 200', async () => {
-      const companyId = new mongoose.Types.ObjectId().toString();
+      const companyId = generateObjectId();
       const searchResults = {
         templates: [{ _id: '1', name: 'Stock Option Agreement' }],
         count: 1,
@@ -424,7 +430,7 @@ describe('DocumentTemplateController', () => {
     });
 
     it('should return 400 if search term is missing', async () => {
-      mockReq.query = { companyId: new mongoose.Types.ObjectId().toString() };
+      mockReq.query = { companyId: generateObjectId() };
 
       await documentTemplateController.searchTemplates(mockReq, mockRes);
 

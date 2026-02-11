@@ -6,7 +6,7 @@
  * sentiment analysis, risk detection, financial data extraction, and insights generation
  */
 
-const mongoose = require('mongoose');
+const generateObjectId = () => { const hex = '0123456789abcdef'; let id = ''; for(let i=0;i<24;i++) id += hex[Math.floor(Math.random()*16)]; return id; };
 
 // Mock dependencies before requiring the service
 jest.mock('../../../services/zerodbService');
@@ -21,7 +21,7 @@ describe('DocumentAnalysisService', () => {
 
   beforeAll(async () => {
     DocumentAnalysisService = require('../../../services/documentAnalysisService');
-    mockDocumentId = new mongoose.Types.ObjectId().toString();
+    mockDocumentId = generateObjectId();
   });
 
   beforeEach(() => {

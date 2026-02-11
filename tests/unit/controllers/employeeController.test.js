@@ -10,7 +10,14 @@
 const httpMocks = require('node-mocks-http');
 const employeeController = require('../../../controllers/employeeController');
 const databaseAdapter = require('../../../services/databaseAdapter');
-const mongoose = require('mongoose');
+
+// Generate a 24-char hex string to simulate ObjectId
+function generateObjectId() {
+  const hex = '0123456789abcdef';
+  let id = '';
+  for (let i = 0; i < 24; i++) id += hex[Math.floor(Math.random() * 16)];
+  return id;
+}
 
 // Mock the database adapter
 jest.mock('../../../services/databaseAdapter');
@@ -207,7 +214,7 @@ describe('EmployeeController', () => {
 
   describe('getEmployeeById', () => {
     it('should return employee by ID', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       const mockEmployee = {
@@ -225,7 +232,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 404 when employee not found', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       databaseAdapter.findById.mockResolvedValue(null);
@@ -250,7 +257,7 @@ describe('EmployeeController', () => {
     });
 
     it('should handle database errors', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       databaseAdapter.findById.mockRejectedValue(new Error('Database error'));
@@ -263,7 +270,7 @@ describe('EmployeeController', () => {
 
   describe('updateEmployee', () => {
     it('should update an employee successfully', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = { Name: 'Updated Name' };
 
@@ -296,7 +303,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 400 when no update data provided', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = {};
 
@@ -308,7 +315,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 404 when employee to update not found', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = { Name: 'Updated Name' };
 
@@ -320,7 +327,7 @@ describe('EmployeeController', () => {
     });
 
     it('should validate EquityOverview nested fields', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = {
         EquityOverview: {
@@ -336,7 +343,7 @@ describe('EmployeeController', () => {
     });
 
     it('should handle duplicate key errors', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = { Email: 'existing@company.com' };
 
@@ -356,7 +363,7 @@ describe('EmployeeController', () => {
 
   describe('deleteEmployee', () => {
     it('should delete an employee successfully', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       const mockDeletedEmployee = {
@@ -383,7 +390,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 404 when employee to delete not found', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
@@ -394,7 +401,7 @@ describe('EmployeeController', () => {
     });
 
     it('should handle database errors during delete', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       databaseAdapter.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
@@ -427,7 +434,7 @@ describe('EmployeeController', () => {
     });
 
     it('should handle parallel mode for employee lookup', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
 
       const parallelResult = {

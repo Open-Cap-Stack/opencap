@@ -7,7 +7,14 @@
 const httpMocks = require('node-mocks-http');
 const employeeController = require('../../../controllers/employeeController');
 const databaseAdapter = require('../../../services/databaseAdapter');
-const mongoose = require('mongoose');
+
+// Generate a 24-char hex string to simulate ObjectId
+function generateObjectId() {
+  const hex = '0123456789abcdef';
+  let id = '';
+  for (let i = 0; i < 24; i++) id += hex[Math.floor(Math.random() * 16)];
+  return id;
+}
 
 jest.mock('../../../services/databaseAdapter');
 
@@ -67,7 +74,7 @@ describe('EmployeeController', () => {
 
   describe('getEmployeeById', () => {
     it('should return employee by ID', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       databaseAdapter.findById.mockResolvedValue({ _id: validId, EmployeeID: 'EMP-001' });
 
@@ -77,7 +84,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 404 when employee not found', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       databaseAdapter.findById.mockResolvedValue(null);
 
@@ -97,7 +104,7 @@ describe('EmployeeController', () => {
 
   describe('updateEmployee', () => {
     it('should update an employee successfully', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = { Name: 'Updated Name' };
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({ _id: validId, Name: 'Updated Name' });
@@ -108,7 +115,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 400 for empty update data', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       req.body = {};
 
@@ -120,7 +127,7 @@ describe('EmployeeController', () => {
 
   describe('deleteEmployee', () => {
     it('should delete an employee successfully', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       databaseAdapter.findByIdAndDelete.mockResolvedValue({ _id: validId });
 
@@ -130,7 +137,7 @@ describe('EmployeeController', () => {
     });
 
     it('should return 404 when employee not found', async () => {
-      const validId = new mongoose.Types.ObjectId().toString();
+      const validId = generateObjectId();
       req.params = { id: validId };
       databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
 

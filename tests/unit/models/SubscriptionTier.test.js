@@ -5,10 +5,58 @@
  * Tests for the SubscriptionTier model validation and schema
  */
 
-const mongoose = require('mongoose');
+// Lightweight schema helper to replace mongoose.Schema for testing
+function createTestSchema(definition, schemaOptions = {}) {
+  const paths = {};
+  const compoundIndexes = [];
+
+  function processField(prefix, fieldName, fieldDef) {
+    const fullName = prefix ? `${prefix}.${fieldName}` : fieldName;
+
+    if (Array.isArray(fieldDef)) {
+      paths[fullName] = { options: {}, isRequired: false };
+      return;
+    }
+    if (fieldDef && typeof fieldDef === 'object' && fieldDef.type !== undefined) {
+      const pathObj = {
+        options: { ...fieldDef },
+        isRequired: fieldDef.required || false,
+        defaultValue: fieldDef.default,
+        enumValues: fieldDef.enum || undefined
+      };
+      paths[fullName] = pathObj;
+    } else if (fieldDef && typeof fieldDef === 'object' && !fieldDef.type) {
+      // Nested object - process children
+      paths[fullName] = { options: fieldDef };
+      for (const [subKey, subValue] of Object.entries(fieldDef)) {
+        processField(fullName, subKey, subValue);
+      }
+    } else {
+      paths[fullName] = { options: { type: fieldDef } };
+    }
+  }
+
+  for (const [key, value] of Object.entries(definition)) {
+    processField('', key, value);
+  }
+
+  return {
+    paths,
+    options: schemaOptions,
+    path(fieldName) {
+      return paths[fieldName] || undefined;
+    },
+    index(indexDef) {
+      compoundIndexes.push([indexDef]);
+    },
+    indexes() {
+      return compoundIndexes;
+    }
+  };
+}
 
 // Define schema for testing (mimics the actual model)
-const subscriptionTierSchema = new mongoose.Schema({
+const subscriptionTierSchema = createTestSchema({
   tierId: {
     type: String,
     required: true,
@@ -71,7 +119,7 @@ const subscriptionTierSchema = new mongoose.Schema({
   sortOrder: { type: Number, required: true, default: 0 },
   isDefault: { type: Boolean, default: false },
   trialDays: { type: Number, default: 0, min: 0 },
-  metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
+  metadata: { type: Object, default: {} }
 }, { timestamps: true });
 
 // Helper to create mock subscription tier

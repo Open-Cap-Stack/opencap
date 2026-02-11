@@ -4,10 +4,168 @@
  * Tests for the FinancialMetrics model including validation, methods, and calculations
  */
 
-const mongoose = require('mongoose');
+// Mock the FinancialMetrics model to avoid database dependencies
+jest.mock('../../../models/FinancialMetrics', () => {
+  const validStatuses = ['draft', 'calculated', 'reviewed', 'approved', 'published'];
+  const validCalculationMethods = ['automatic', 'manual', 'hybrid'];
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+  function MockFinancialMetrics(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults
+    if (this.liquidityRatios === undefined) this.liquidityRatios = {};
+    if (this.activityRatios === undefined) this.activityRatios = {};
+    if (this.leverageRatios === undefined) this.leverageRatios = {};
+    if (this.profitabilityRatios === undefined) this.profitabilityRatios = {};
+    if (this.marketRatios === undefined) this.marketRatios = {};
+    if (this.cashFlowMetrics === undefined) this.cashFlowMetrics = {};
+    if (this.growthMetrics === undefined) this.growthMetrics = {};
+    if (this.calculationMethod === undefined) this.calculationMethod = 'automatic';
+    if (this.status === undefined) this.status = 'calculated';
+    if (this.warnings === undefined) this.warnings = [];
+    if (this.isComparative === undefined) this.isComparative = false;
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.companyId) {
+        errors.companyId = { message: 'companyId is required' };
+      }
+      if (!this.reportingPeriod) {
+        errors.reportingPeriod = { message: 'reportingPeriod is required' };
+      }
+      if (!this.reportingDate) {
+        errors.reportingDate = { message: 'reportingDate is required' };
+      }
+      if (!this.calculatedBy) {
+        errors.calculatedBy = { message: 'calculatedBy is required' };
+      }
+      if (this.status && !validStatuses.includes(this.status)) {
+        errors.status = { message: `${this.status} is not a valid status` };
+      }
+      if (this.calculationMethod && !validCalculationMethods.includes(this.calculationMethod)) {
+        errors.calculationMethod = { message: `${this.calculationMethod} is not a valid calculation method` };
+      }
+
+      // Score validations (0-100)
+      const scoreFields = ['financialStrengthScore', 'liquidityScore', 'profitabilityScore', 'leverageScore'];
+      scoreFields.forEach(field => {
+        if (this[field] !== undefined) {
+          if (this[field] < 0 || this[field] > 100) {
+            errors[field] = { message: `${field} must be between 0 and 100` };
+          }
+        }
+      });
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+
+    this.toObject = jest.fn(() => ({ ...data }));
+
+    // Instance methods
+    this.calculateScores = function() {
+      let liquidityScore = 0;
+      let profitabilityScore = 0;
+      let leverageScore = 0;
+
+      // Liquidity score calculation
+      if (this.liquidityRatios) {
+        const { currentRatio, quickRatio, operatingCashFlowRatio } = this.liquidityRatios;
+        if (currentRatio >= 1.5 && currentRatio <= 3.0) liquidityScore += 35;
+        else if (currentRatio >= 1.0) liquidityScore += 20;
+        if (quickRatio >= 1.0 && quickRatio <= 2.0) liquidityScore += 35;
+        else if (quickRatio >= 0.7) liquidityScore += 20;
+        if (operatingCashFlowRatio >= 0.4) liquidityScore += 30;
+        else if (operatingCashFlowRatio >= 0.2) liquidityScore += 20;
+      }
+
+      // Profitability score calculation
+      if (this.profitabilityRatios) {
+        const { netProfitMargin, returnOnAssets, returnOnEquity } = this.profitabilityRatios;
+        if (netProfitMargin >= 0.15) profitabilityScore += 35;
+        else if (netProfitMargin >= 0.10) profitabilityScore += 25;
+        if (returnOnAssets >= 0.15) profitabilityScore += 30;
+        else if (returnOnAssets >= 0.10) profitabilityScore += 20;
+        if (returnOnEquity >= 0.20) profitabilityScore += 35;
+        else if (returnOnEquity >= 0.15) profitabilityScore += 25;
+      }
+
+      // Leverage score calculation
+      if (this.leverageRatios) {
+        const { debtToAssets, debtToEquity, timesInterestEarned } = this.leverageRatios;
+        if (debtToAssets <= 0.3) leverageScore += 40;
+        else if (debtToAssets <= 0.5) leverageScore += 30;
+        if (debtToEquity <= 0.5) leverageScore += 30;
+        else if (debtToEquity <= 1.0) leverageScore += 20;
+        if (timesInterestEarned >= 5.0) leverageScore += 30;
+        else if (timesInterestEarned >= 3.0) leverageScore += 20;
+      }
+
+      this.liquidityScore = Math.min(liquidityScore, 100);
+      this.profitabilityScore = Math.min(profitabilityScore, 100);
+      this.leverageScore = Math.min(leverageScore, 100);
+      this.financialStrengthScore = Math.round(
+        (this.liquidityScore * 0.3) +
+        (this.profitabilityScore * 0.4) +
+        (this.leverageScore * 0.3)
+      );
+
+      return this;
+    };
+
+    this.identifyRedFlags = function() {
+      const redFlags = [];
+      if (this.liquidityRatios?.currentRatio < 1.0) {
+        redFlags.push('Current ratio below 1.0 indicates potential liquidity issues');
+      }
+      if (this.leverageRatios?.debtToEquity > 2.0) {
+        redFlags.push('High debt-to-equity ratio indicates high financial leverage');
+      }
+      if (this.profitabilityRatios?.netProfitMargin < 0) {
+        redFlags.push('Negative profit margin indicates losses');
+      }
+      if (this.cashFlowMetrics?.freeCashFlow < 0) {
+        redFlags.push('Negative free cash flow indicates cash generation issues');
+      }
+      if (this.leverageRatios?.timesInterestEarned < 2.0) {
+        redFlags.push('Low interest coverage ratio indicates difficulty servicing debt');
+      }
+      return redFlags;
+    };
+
+    this.getIndustryBenchmarks = function(industry) {
+      return {
+        currentRatio: { median: 2.0, q1: 1.5, q3: 2.5 },
+        quickRatio: { median: 1.2, q1: 0.8, q3: 1.6 },
+        debtToEquity: { median: 0.6, q1: 0.3, q3: 1.0 },
+        netProfitMargin: { median: 0.08, q1: 0.05, q3: 0.12 },
+        returnOnAssets: { median: 0.07, q1: 0.04, q3: 0.11 },
+        returnOnEquity: { median: 0.12, q1: 0.08, q3: 0.18 }
+      };
+    };
+
+    this.calculatePercentile = function(value, benchmark) {
+      if (value >= benchmark.q3) return 75;
+      if (value >= benchmark.median) return 50;
+      if (value >= benchmark.q1) return 25;
+      return 10;
+    };
+  }
+
+  // Static methods
+  MockFinancialMetrics.findById = jest.fn();
+  MockFinancialMetrics.find = jest.fn();
+  MockFinancialMetrics.findOne = jest.fn();
+  MockFinancialMetrics.create = jest.fn();
+  MockFinancialMetrics.getHistory = jest.fn();
+  MockFinancialMetrics.getTrendAnalysis = jest.fn();
+
+  return MockFinancialMetrics;
+});
 
 describe('FinancialMetrics Model', () => {
   let FinancialMetrics;
@@ -16,167 +174,6 @@ describe('FinancialMetrics Model', () => {
   const validCalculationMethods = ['automatic', 'manual', 'hybrid'];
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockFinancialMetrics(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults
-        if (this.liquidityRatios === undefined) this.liquidityRatios = {};
-        if (this.activityRatios === undefined) this.activityRatios = {};
-        if (this.leverageRatios === undefined) this.leverageRatios = {};
-        if (this.profitabilityRatios === undefined) this.profitabilityRatios = {};
-        if (this.marketRatios === undefined) this.marketRatios = {};
-        if (this.cashFlowMetrics === undefined) this.cashFlowMetrics = {};
-        if (this.growthMetrics === undefined) this.growthMetrics = {};
-        if (this.calculationMethod === undefined) this.calculationMethod = 'automatic';
-        if (this.status === undefined) this.status = 'calculated';
-        if (this.warnings === undefined) this.warnings = [];
-        if (this.isComparative === undefined) this.isComparative = false;
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.companyId) {
-            errors.companyId = { message: 'companyId is required' };
-          }
-          if (!this.reportingPeriod) {
-            errors.reportingPeriod = { message: 'reportingPeriod is required' };
-          }
-          if (!this.reportingDate) {
-            errors.reportingDate = { message: 'reportingDate is required' };
-          }
-          if (!this.calculatedBy) {
-            errors.calculatedBy = { message: 'calculatedBy is required' };
-          }
-          if (this.status && !validStatuses.includes(this.status)) {
-            errors.status = { message: `${this.status} is not a valid status` };
-          }
-          if (this.calculationMethod && !validCalculationMethods.includes(this.calculationMethod)) {
-            errors.calculationMethod = { message: `${this.calculationMethod} is not a valid calculation method` };
-          }
-
-          // Score validations (0-100)
-          const scoreFields = ['financialStrengthScore', 'liquidityScore', 'profitabilityScore', 'leverageScore'];
-          scoreFields.forEach(field => {
-            if (this[field] !== undefined) {
-              if (this[field] < 0 || this[field] > 100) {
-                errors[field] = { message: `${field} must be between 0 and 100` };
-              }
-            }
-          });
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-
-        this.toObject = jest.fn(() => ({ ...data }));
-
-        // Instance methods
-        this.calculateScores = function() {
-          let liquidityScore = 0;
-          let profitabilityScore = 0;
-          let leverageScore = 0;
-
-          // Liquidity score calculation
-          if (this.liquidityRatios) {
-            const { currentRatio, quickRatio, operatingCashFlowRatio } = this.liquidityRatios;
-            if (currentRatio >= 1.5 && currentRatio <= 3.0) liquidityScore += 35;
-            else if (currentRatio >= 1.0) liquidityScore += 20;
-            if (quickRatio >= 1.0 && quickRatio <= 2.0) liquidityScore += 35;
-            else if (quickRatio >= 0.7) liquidityScore += 20;
-            if (operatingCashFlowRatio >= 0.4) liquidityScore += 30;
-            else if (operatingCashFlowRatio >= 0.2) liquidityScore += 20;
-          }
-
-          // Profitability score calculation
-          if (this.profitabilityRatios) {
-            const { netProfitMargin, returnOnAssets, returnOnEquity } = this.profitabilityRatios;
-            if (netProfitMargin >= 0.15) profitabilityScore += 35;
-            else if (netProfitMargin >= 0.10) profitabilityScore += 25;
-            if (returnOnAssets >= 0.15) profitabilityScore += 30;
-            else if (returnOnAssets >= 0.10) profitabilityScore += 20;
-            if (returnOnEquity >= 0.20) profitabilityScore += 35;
-            else if (returnOnEquity >= 0.15) profitabilityScore += 25;
-          }
-
-          // Leverage score calculation
-          if (this.leverageRatios) {
-            const { debtToAssets, debtToEquity, timesInterestEarned } = this.leverageRatios;
-            if (debtToAssets <= 0.3) leverageScore += 40;
-            else if (debtToAssets <= 0.5) leverageScore += 30;
-            if (debtToEquity <= 0.5) leverageScore += 30;
-            else if (debtToEquity <= 1.0) leverageScore += 20;
-            if (timesInterestEarned >= 5.0) leverageScore += 30;
-            else if (timesInterestEarned >= 3.0) leverageScore += 20;
-          }
-
-          this.liquidityScore = Math.min(liquidityScore, 100);
-          this.profitabilityScore = Math.min(profitabilityScore, 100);
-          this.leverageScore = Math.min(leverageScore, 100);
-          this.financialStrengthScore = Math.round(
-            (this.liquidityScore * 0.3) +
-            (this.profitabilityScore * 0.4) +
-            (this.leverageScore * 0.3)
-          );
-
-          return this;
-        };
-
-        this.identifyRedFlags = function() {
-          const redFlags = [];
-          if (this.liquidityRatios?.currentRatio < 1.0) {
-            redFlags.push('Current ratio below 1.0 indicates potential liquidity issues');
-          }
-          if (this.leverageRatios?.debtToEquity > 2.0) {
-            redFlags.push('High debt-to-equity ratio indicates high financial leverage');
-          }
-          if (this.profitabilityRatios?.netProfitMargin < 0) {
-            redFlags.push('Negative profit margin indicates losses');
-          }
-          if (this.cashFlowMetrics?.freeCashFlow < 0) {
-            redFlags.push('Negative free cash flow indicates cash generation issues');
-          }
-          if (this.leverageRatios?.timesInterestEarned < 2.0) {
-            redFlags.push('Low interest coverage ratio indicates difficulty servicing debt');
-          }
-          return redFlags;
-        };
-
-        this.getIndustryBenchmarks = function(industry) {
-          return {
-            currentRatio: { median: 2.0, q1: 1.5, q3: 2.5 },
-            quickRatio: { median: 1.2, q1: 0.8, q3: 1.6 },
-            debtToEquity: { median: 0.6, q1: 0.3, q3: 1.0 },
-            netProfitMargin: { median: 0.08, q1: 0.05, q3: 0.12 },
-            returnOnAssets: { median: 0.07, q1: 0.04, q3: 0.11 },
-            returnOnEquity: { median: 0.12, q1: 0.08, q3: 0.18 }
-          };
-        };
-
-        this.calculatePercentile = function(value, benchmark) {
-          if (value >= benchmark.q3) return 75;
-          if (value >= benchmark.median) return 50;
-          if (value >= benchmark.q1) return 25;
-          return 10;
-        };
-      }
-
-      // Static methods
-      MockFinancialMetrics.findById = jest.fn();
-      MockFinancialMetrics.find = jest.fn();
-      MockFinancialMetrics.findOne = jest.fn();
-      MockFinancialMetrics.create = jest.fn();
-      MockFinancialMetrics.getHistory = jest.fn();
-      MockFinancialMetrics.getTrendAnalysis = jest.fn();
-
-      return MockFinancialMetrics;
-    });
-
-    // Now require the FinancialMetrics model
     FinancialMetrics = require('../../../models/FinancialMetrics');
   });
 

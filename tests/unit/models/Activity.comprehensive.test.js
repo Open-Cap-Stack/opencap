@@ -4,10 +4,61 @@
  * Tests for the Activity model including validation, methods, and schema behavior
  */
 
-const mongoose = require('mongoose');
+// Mock the Activity model to avoid database dependencies
+jest.mock('../../../models/Activity', () => {
+  const validActivityTypes = [
+    'DocumentUpload',
+    'StakeholderUpdate',
+    'FinancialReportCreated',
+    'UserLogin',
+    'SystemUpdate'
+  ];
 
-// Mock mongoose connection
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
+  function MockActivity(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+
+    // Apply defaults
+    if (this.relatedObjects === undefined) this.relatedObjects = [];
+
+    this.validateSync = jest.fn(() => {
+      const errors = {};
+
+      // Check required fields
+      if (!this.activityId) {
+        errors.activityId = { message: 'activityId is required' };
+      }
+      if (!this.activityType) {
+        errors.activityType = { message: 'activityType is required' };
+      } else if (!validActivityTypes.includes(this.activityType)) {
+        errors.activityType = { message: `${this.activityType} is not a valid activity type` };
+      }
+      if (!this.timestamp) {
+        errors.timestamp = { message: 'timestamp is required' };
+      }
+      if (!this.userInvolved) {
+        errors.userInvolved = { message: 'userInvolved is required' };
+      }
+
+      return Object.keys(errors).length > 0 ? { errors } : null;
+    });
+    this.toObject = jest.fn(() => ({ ...data }));
+  }
+
+  // Add static methods
+  MockActivity.findById = jest.fn();
+  MockActivity.find = jest.fn();
+  MockActivity.findOne = jest.fn();
+  MockActivity.create = jest.fn();
+  MockActivity.findByIdAndUpdate = jest.fn();
+  MockActivity.findByIdAndDelete = jest.fn();
+  MockActivity.countDocuments = jest.fn();
+  MockActivity.aggregate = jest.fn();
+
+  return MockActivity;
+});
 
 describe('Activity Model', () => {
   let Activity;
@@ -21,55 +72,6 @@ describe('Activity Model', () => {
   ];
 
   beforeAll(() => {
-    // Mock mongoose model creation
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      function MockActivity(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-
-        // Apply defaults
-        if (this.relatedObjects === undefined) this.relatedObjects = [];
-
-        this.validateSync = jest.fn(() => {
-          const errors = {};
-
-          // Check required fields
-          if (!this.activityId) {
-            errors.activityId = { message: 'activityId is required' };
-          }
-          if (!this.activityType) {
-            errors.activityType = { message: 'activityType is required' };
-          } else if (!validActivityTypes.includes(this.activityType)) {
-            errors.activityType = { message: `${this.activityType} is not a valid activity type` };
-          }
-          if (!this.timestamp) {
-            errors.timestamp = { message: 'timestamp is required' };
-          }
-          if (!this.userInvolved) {
-            errors.userInvolved = { message: 'userInvolved is required' };
-          }
-
-          return Object.keys(errors).length > 0 ? { errors } : null;
-        });
-        this.toObject = jest.fn(() => ({ ...data }));
-      }
-
-      // Add static methods
-      MockActivity.findById = jest.fn();
-      MockActivity.find = jest.fn();
-      MockActivity.findOne = jest.fn();
-      MockActivity.create = jest.fn();
-      MockActivity.findByIdAndUpdate = jest.fn();
-      MockActivity.findByIdAndDelete = jest.fn();
-      MockActivity.countDocuments = jest.fn();
-      MockActivity.aggregate = jest.fn();
-
-      return MockActivity;
-    });
-
-    // Now require the Activity model
     Activity = require('../../../models/Activity');
   });
 

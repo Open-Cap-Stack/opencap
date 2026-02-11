@@ -4,49 +4,48 @@
  * Tests for the Document model including validation, methods, and schema behavior
  */
 
-const mongoose = require('mongoose');
-
-// Mock mongoose connection and UUID
-jest.mock('../../../utils/mongoDbConnection', () => ({}));
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'mock-uuid-12345')
 }));
+
+// Helper to generate mock ObjectId-like strings
+function generateId() {
+  return new Date().getTime().toString(16) + 'xxxxxxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+}
+
+// Mock the Document model to avoid database dependencies
+jest.mock('../../../models/Document', () => {
+  function MockDocument(data = {}) {
+    Object.assign(this, data);
+    this.isNew = true;
+    this.isModified = jest.fn();
+    this.save = jest.fn();
+    this.validateSync = jest.fn();
+  }
+
+  // Add static methods
+  MockDocument.findById = jest.fn();
+  MockDocument.find = jest.fn();
+  MockDocument.findOne = jest.fn();
+  MockDocument.findByTags = jest.fn();
+  MockDocument.findByCategory = jest.fn();
+  MockDocument.findByMetadata = jest.fn();
+  MockDocument.search = jest.fn();
+  MockDocument.findRelatedDocuments = jest.fn();
+  MockDocument.findRelatedDocumentsByType = jest.fn();
+
+  // Add instance methods
+  MockDocument.prototype.hasAccess = jest.fn();
+  MockDocument.prototype.save = jest.fn();
+  MockDocument.prototype.validateSync = jest.fn();
+
+  return MockDocument;
+});
 
 describe('Document Model', () => {
   let Document;
 
   beforeAll(() => {
-    // Mock mongoose model creation to avoid schema compilation issues
-    jest.spyOn(mongoose, 'model').mockImplementation((name, schema) => {
-      // Create a mock constructor function
-      function MockDocument(data = {}) {
-        Object.assign(this, data);
-        this.isNew = true;
-        this.isModified = jest.fn();
-        this.save = jest.fn();
-        this.validateSync = jest.fn();
-      }
-
-      // Add static methods
-      MockDocument.findById = jest.fn();
-      MockDocument.find = jest.fn();
-      MockDocument.findOne = jest.fn();
-      MockDocument.findByTags = jest.fn();
-      MockDocument.findByCategory = jest.fn();
-      MockDocument.findByMetadata = jest.fn();
-      MockDocument.search = jest.fn();
-      MockDocument.findRelatedDocuments = jest.fn();
-      MockDocument.findRelatedDocumentsByType = jest.fn();
-
-      // Add instance methods
-      MockDocument.prototype.hasAccess = jest.fn();
-      MockDocument.prototype.save = jest.fn();
-      MockDocument.prototype.validateSync = jest.fn();
-
-      return MockDocument;
-    });
-
-    // Now require the Document model
     Document = require('../../../models/Document');
   });
 
@@ -60,8 +59,8 @@ describe('Document Model', () => {
         name: 'Test Document',
         content: 'This is test content',
         category: 'legal',
-        uploadedBy: new mongoose.Types.ObjectId(),
-        ownerCompany: new mongoose.Types.ObjectId()
+        uploadedBy: generateId(),
+        ownerCompany: generateId()
       };
 
       const document = new Document(documentData);
@@ -135,7 +134,7 @@ describe('Document Model', () => {
     });
 
     it('should test hasAccess method for document owner', async () => {
-      const ownerId = new mongoose.Types.ObjectId();
+      const ownerId = generateId();
       const document = new Document({
         name: 'Owner Document',
         content: 'Owner content',
@@ -150,8 +149,8 @@ describe('Document Model', () => {
     });
 
     it('should test hasAccess method for unauthorized user', async () => {
-      const ownerId = new mongoose.Types.ObjectId();
-      const userId = new mongoose.Types.ObjectId();
+      const ownerId = generateId();
+      const userId = generateId();
       
       const document = new Document({
         name: 'Restricted Document',
@@ -175,7 +174,7 @@ describe('Document Model', () => {
       const versionHistory = [{
         version: 1,
         changedAt: new Date('2024-01-01'),
-        changedBy: new mongoose.Types.ObjectId(),
+        changedBy: generateId(),
         changeDescription: 'Initial creation',
         content: 'Original content'
       }];
@@ -207,7 +206,7 @@ describe('Document Model', () => {
   describe('Document Relationships', () => {
     it('should handle document relationships', () => {
       const relationships = [{
-        relatedDocument: new mongoose.Types.ObjectId(),
+        relatedDocument: generateId(),
         relationType: 'references',
         description: 'References another document',
         createdAt: new Date()
@@ -235,7 +234,7 @@ describe('Document Model', () => {
 
       validTypes.forEach(relationType => {
         const relationship = {
-          relatedDocument: new mongoose.Types.ObjectId(),
+          relatedDocument: generateId(),
           relationType: relationType,
           description: `Test ${relationType} relationship`
         };
@@ -305,7 +304,7 @@ describe('Document Model', () => {
     });
 
     it('should test findRelatedDocuments static method', async () => {
-      const documentId = new mongoose.Types.ObjectId();
+      const documentId = generateId();
       const mockRelated = [
         { name: 'Related Doc 1' },
         { name: 'Related Doc 2' }
@@ -319,7 +318,7 @@ describe('Document Model', () => {
     });
 
     it('should test findRelatedDocumentsByType static method', async () => {
-      const documentId = new mongoose.Types.ObjectId();
+      const documentId = generateId();
       const relationType = 'references';
       const mockRelated = [
         { name: 'Referenced Doc' }
@@ -349,7 +348,7 @@ describe('Document Model', () => {
     });
 
     it('should handle document locking', () => {
-      const lockingUserId = new mongoose.Types.ObjectId();
+      const lockingUserId = generateId();
       const lockUntil = new Date(Date.now() + 3600000); // 1 hour from now
 
       const document = new Document({
@@ -464,8 +463,8 @@ describe('Document Model', () => {
         tags: ['important', 'contract'],
         status: 'draft',
         version: 1,
-        uploadedBy: new mongoose.Types.ObjectId(),
-        ownerCompany: new mongoose.Types.ObjectId(),
+        uploadedBy: generateId(),
+        ownerCompany: generateId(),
         metadata: {
           department: 'Legal',
           priority: 'high'
@@ -498,7 +497,7 @@ describe('Document Model', () => {
       ];
 
       const relationships = allRelationshipTypes.map(type => ({
-        relatedDocument: new mongoose.Types.ObjectId(),
+        relatedDocument: generateId(),
         relationType: type,
         description: `Test ${type} relationship`
       }));

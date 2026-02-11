@@ -1,37 +1,19 @@
 /**
  * Integration Tests for Continuous Sync
  * End-to-end testing of MongoDB to ZeroDB synchronization
+ *
+ * SKIPPED: These tests require mongoose and MongoMemoryServer which have been
+ * removed from the project as part of the ZeroDB migration.
  */
 
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const mongoose = require('mongoose');
-const syncOrchestrator = require('../../services/syncOrchestrator');
-const zerodbService = require('../../services/zerodbService');
-
-// Mock ZeroDB Service for integration tests
-jest.mock('../../services/zerodbService');
-
-describe('Continuous Sync Integration Tests', () => {
+// Skip entire suite - mongoose is no longer available
+describe.skip('Continuous Sync Integration Tests (requires mongoose)', () => {
   let mongoServer;
   let UserModel;
   let CompanyModel;
   let orchestrator;
-
-  // Define test schemas
-  const userSchema = new mongoose.Schema({
-    name: String,
-    email: String,
-    role: String,
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-  });
-
-  const companySchema = new mongoose.Schema({
-    name: String,
-    industry: String,
-    employees: Number,
-    createdAt: { type: Date, default: Date.now }
-  });
+  let userSchema;
+  let companySchema;
 
   beforeAll(async () => {
     // Start in-memory MongoDB
