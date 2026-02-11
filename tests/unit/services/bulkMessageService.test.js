@@ -126,12 +126,8 @@ describe('BulkMessage Service', () => {
       databaseAdapter.find.mockResolvedValue(mockRecipients);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const sendPromise = bulkMessageService.sendBulkMessage(mockMessage);
-
-      // Advance timers to allow batches to process
-      await jest.advanceTimersByTimeAsync(500);
-
-      const result = await sendPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.sendBulkMessage(mockMessage);
 
       expect(result).toHaveProperty('totalRecipients', 3);
       expect(result).toHaveProperty('sent');
@@ -150,9 +146,8 @@ describe('BulkMessage Service', () => {
         templateVariables: ['name', 'companyName']
       };
 
-      const sendPromise = bulkMessageService.sendBulkMessage(messageWithTemplate);
-      await jest.advanceTimersByTimeAsync(100);
-      const result = await sendPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.sendBulkMessage(messageWithTemplate);
 
       expect(result.sent).toBeGreaterThanOrEqual(0);
     });
@@ -161,9 +156,8 @@ describe('BulkMessage Service', () => {
       databaseAdapter.find.mockResolvedValue(mockRecipients);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const sendPromise = bulkMessageService.sendBulkMessage(mockMessage);
-      await jest.advanceTimersByTimeAsync(500);
-      const result = await sendPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.sendBulkMessage(mockMessage);
 
       // The update should include recipient statuses
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
@@ -174,7 +168,7 @@ describe('BulkMessage Service', () => {
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
       const sendPromise = bulkMessageService.sendBulkMessage(mockMessage);
-      await jest.advanceTimersByTimeAsync(500);
+      jest.useRealTimers();
       await sendPromise;
 
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
@@ -201,10 +195,8 @@ describe('BulkMessage Service', () => {
       // All updates succeed - simulating successful processing
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const sendPromise = bulkMessageService.sendBulkMessage(mockMessage);
-      await jest.advanceTimersByTimeAsync(500);
-
-      const result = await sendPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.sendBulkMessage(mockMessage);
       expect(result).toBeDefined();
       expect(result.totalRecipients).toBe(3);
     });
@@ -251,9 +243,8 @@ describe('BulkMessage Service', () => {
       databaseAdapter.find.mockResolvedValueOnce([scheduledMessage]).mockResolvedValue([]);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const processPromise = bulkMessageService.processScheduledMessages();
-      await jest.advanceTimersByTimeAsync(1000);
-      await processPromise;
+      jest.useRealTimers();
+      await bulkMessageService.processScheduledMessages();
 
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
         'BulkMessage',
@@ -301,9 +292,8 @@ describe('BulkMessage Service', () => {
       };
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const retryPromise = bulkMessageService.retryFailedRecipients(mockMessage);
-      await jest.advanceTimersByTimeAsync(1000);
-      const result = await retryPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.retryFailedRecipients(mockMessage);
 
       expect(result.retried).toBe(2);
     });
@@ -335,9 +325,8 @@ describe('BulkMessage Service', () => {
       };
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const retryPromise = bulkMessageService.retryFailedRecipients(mockMessage);
-      await jest.advanceTimersByTimeAsync(1000);
-      await retryPromise;
+      jest.useRealTimers();
+      await bulkMessageService.retryFailedRecipients(mockMessage);
 
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
     });
@@ -614,9 +603,8 @@ describe('BulkMessage Service', () => {
       };
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const retryPromise = bulkMessageService.retryFailedRecipients(mockMessage);
-      await jest.advanceTimersByTimeAsync(100);
-      const result = await retryPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.retryFailedRecipients(mockMessage);
 
       expect(result.retried).toBe(1);
     });
@@ -641,9 +629,8 @@ describe('BulkMessage Service', () => {
       databaseAdapter.find.mockResolvedValue(mockRecipients);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
 
-      const sendPromise = bulkMessageService.sendBulkMessage(mockMessage);
-      await jest.advanceTimersByTimeAsync(1000);
-      const result = await sendPromise;
+      jest.useRealTimers();
+      const result = await bulkMessageService.sendBulkMessage(mockMessage);
 
       expect(result.totalRecipients).toBe(1);
     });
