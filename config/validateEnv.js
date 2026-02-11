@@ -46,6 +46,42 @@ function validateEnvironment() {
     }
   }
 
+  // OAuth configuration validation (Issue #381)
+  // If GOOGLE_CLIENT_ID is set, validate it's properly configured
+  if (process.env.GOOGLE_CLIENT_ID) {
+    // Ensure it's not a placeholder value
+    if (process.env.GOOGLE_CLIENT_ID === 'your-google-client-id' ||
+        process.env.GOOGLE_CLIENT_ID === 'placeholder' ||
+        process.env.GOOGLE_CLIENT_ID.length < 20) {
+      const msg = 'GOOGLE_CLIENT_ID appears to be a placeholder or invalid';
+      if (isProd) {
+        errors.push(msg);
+      } else {
+        warnings.push(msg);
+      }
+    }
+
+    // Validate it has the correct format (ends with .apps.googleusercontent.com)
+    if (!process.env.GOOGLE_CLIENT_ID.endsWith('.apps.googleusercontent.com')) {
+      const msg = 'GOOGLE_CLIENT_ID does not have the expected Google OAuth format';
+      if (isProd) {
+        errors.push(msg);
+      } else {
+        warnings.push(msg);
+      }
+    }
+  }
+
+  // If OAuth is enabled in production, require proper configuration
+  if (isProd && process.env.ENABLE_OAUTH === 'true') {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      errors.push('GOOGLE_CLIENT_ID is required when OAuth is enabled in production');
+    }
+    if (!process.env.FRONTEND_URL) {
+      errors.push('FRONTEND_URL is required when OAuth is enabled in production');
+    }
+  }
+
   // Emit warnings for non-production environments
   if (warnings.length > 0) {
     warnings.forEach(w => console.warn(`WARNING: ${w}`));

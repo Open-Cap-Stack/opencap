@@ -5,10 +5,8 @@
  * Handles HTTP requests for agent memory operations
  */
 
-const mongoose = require('mongoose');
 const agentMemoryService = require('../services/agentMemoryService');
-
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const { isValidObjectId } = require('../utils/inputSanitizer');
 
 const storeMemory = async (req, res) => {
   try {

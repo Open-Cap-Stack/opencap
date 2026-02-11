@@ -7,7 +7,6 @@ const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const SPVAsset = require('../../models/SPVAssetModel');
 const router = express.Router();
-const mongoose = require('mongoose');
 const SPVAssetController = require('../../controllers/SPVasset');
 const responseDebugger = require('../../middleware/responseDebugger');
 

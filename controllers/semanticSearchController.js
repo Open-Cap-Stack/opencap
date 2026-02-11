@@ -5,8 +5,8 @@
  * Handles HTTP requests for semantic document search functionality
  */
 
-const mongoose = require('mongoose');
 const SemanticSearchService = require('../services/semanticSearchService');
+const { isValidObjectId } = require('../utils/inputSanitizer');
 
 /**
  * Configuration constants
@@ -17,15 +17,6 @@ const CONFIG = {
   DEFAULT_PAGE: 1,
   DEFAULT_PAGE_SIZE: 10,
   MAX_PAGE_SIZE: 100
-};
-
-/**
- * Validate MongoDB ObjectId format
- * @param {string} id - The ID to validate
- * @returns {boolean} - Whether the ID is valid
- */
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
 };
 
 /**

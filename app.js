@@ -438,30 +438,20 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
   });
 
-  // Graceful shutdown handler
-  const gracefulShutdown = async (signal) => {
-    console.log(`\n${signal} received, starting graceful shutdown...`);
+  // Issue #388: Use enhanced graceful shutdown utility
+  const { setupGracefulShutdown, registerCleanupHandler } = require('./utils/gracefulShutdown');
 
-    // Stop accepting new connections
-    server.close(() => {
-      console.log('HTTP server closed');
-    });
+  // Register ZeroDB cleanup (if needed in future for persistent connections)
+  registerCleanupHandler(
+    async () => {
+      console.log('ZeroDB cleanup (stateless HTTP API, no persistent connections)');
+      // Add any ZeroDB-specific cleanup here if needed
+    },
+    'ZeroDB Cleanup'
+  );
 
-    try {
-      // Note: ZeroDB uses HTTP API, no persistent connection to close
-      console.log('Database connections handled (ZeroDB uses stateless HTTP API)');
-
-      console.log('Graceful shutdown complete');
-      process.exit(0);
-    } catch (error) {
-      console.error('Error during graceful shutdown:', error);
-      process.exit(1);
-    }
-  };
-
-  // Listen for termination signals
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  // Setup graceful shutdown with automatic signal handling
+  setupGracefulShutdown(server);
 }
 
 module.exports = app;

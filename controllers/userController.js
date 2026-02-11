@@ -11,6 +11,7 @@
 const User = require('../models/User');
 const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
+const { sanitizeUser, sanitizeUsers } = require('../utils/sanitizeUser');
 
 /**
  * Create a new user
@@ -40,7 +41,9 @@ const createUser = async (req, res) => {
       password,
       role
     });
-    res.status(201).json(user);
+
+    // Issue #386: Remove password from response
+    res.status(201).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Server error while creating user' });
@@ -67,8 +70,8 @@ const getAllUsers = async (req, res) => {
     }
 
     const users = await User.find(filter);
-    // Return 200 with empty array for consistent REST API behavior
-    res.status(200).json({ users: users || [] });
+    // Issue #386: Remove passwords from all user responses
+    res.status(200).json({ users: sanitizeUsers(users || []) });
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Error fetching users' });
@@ -86,7 +89,8 @@ const getUserById = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.status(200).json(user);
+    // Issue #386: Remove password from response
+    res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error fetching user by ID:', error);
     res.status(500).json({ error: 'Error fetching user' });
@@ -116,13 +120,8 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Remove sensitive fields
-    const sanitizedUser = User.toJSON ? User.toJSON(user) : { ...user };
-    delete sanitizedUser.password;
-    delete sanitizedUser.passwordResetToken;
-    delete sanitizedUser.passwordResetExpires;
-
-    res.status(200).json(sanitizedUser);
+    // Issue #386: Use sanitizeUser utility
+    res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ error: 'Error fetching user profile' });
@@ -144,7 +143,8 @@ const updateUserById = async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.status(200).json(updatedUser);
+    // Issue #386: Remove password from response
+    res.status(200).json(sanitizeUser(updatedUser));
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Error updating user' });

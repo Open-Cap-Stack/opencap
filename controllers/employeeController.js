@@ -7,7 +7,6 @@
  * for ZeroDB migration support
  */
 
-const mongoose = require('mongoose');
 const databaseAdapter = require('../services/databaseAdapter');
 
 /**

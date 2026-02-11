@@ -12,16 +12,7 @@
 const SPV = require('../models/SPV');
 const SPVAsset = require('../models/SPVAssetModel');
 const SPVInvestment = require('../models/SPVInvestment');
-const mongoose = require('mongoose');
-
-/**
- * Helper function to validate MongoDB ID format
- * @param {string} id - The ID to validate
- * @returns {boolean} - True if the ID is valid, false otherwise
- */
-const isValidMongoId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
-};
+const { isValidObjectId: isValidMongoId } = require('../utils/inputSanitizer');
 
 /**
  * Helper function to find SPV by ID or SPVID
