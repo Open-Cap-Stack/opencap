@@ -9,9 +9,12 @@
  */
 
 const User = require('../models/User');
+const bcrypt = require('bcrypt');
 const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
 const { sanitizeUser, sanitizeUsers } = require('../utils/sanitizeUser');
+
+const SALT_ROUNDS = 10;
 
 /**
  * Create a new user
@@ -135,9 +138,16 @@ const getProfile = async (req, res) => {
  */
 const updateUserById = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+
+    // Hash password if it's being updated and not already hashed
+    if (updateData.password && !updateData.password.startsWith('$2')) {
+      updateData.password = await bcrypt.hash(updateData.password, SALT_ROUNDS);
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
     if (!updatedUser) {

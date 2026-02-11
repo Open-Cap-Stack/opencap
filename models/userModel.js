@@ -7,6 +7,9 @@
 
 const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcrypt');
+
+const SALT_ROUNDS = 10;
 
 // Valid enum values
 const VALID_USER_ROLES = ['Admin', 'Editor', 'Viewer'];
@@ -102,6 +105,12 @@ const User = {
     async create(data) {
         validateUser(data);
         const userData = applyDefaults(data);
+
+        // Hash password if provided and not already hashed
+        if (userData.password && !userData.password.startsWith('$2')) {
+            userData.password = await bcrypt.hash(userData.password, SALT_ROUNDS);
+        }
+
         return baseModel.create(userData);
     },
 
@@ -232,15 +241,41 @@ const User = {
     /**
      * Update user password
      * @param {string} userId - The userId of the user
-     * @param {string} password - New password (should be hashed before calling)
+     * @param {string} password - New password (will be hashed if not already)
      * @returns {Object} Updated user
      */
     async updatePassword(userId, password) {
+        // Hash password if not already hashed
+        let hashedPassword = password;
+        if (password && !password.startsWith('$2')) {
+            hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+        }
+
         return baseModel.findOneAndUpdate(
             { userId },
-            { $set: { password } },
+            { $set: { password: hashedPassword } },
             { new: true }
         );
+    },
+
+    /**
+     * Compare a plaintext password with a user's hashed password
+     * @param {string} plaintext - Plaintext password to check
+     * @param {string} hashedPassword - Hashed password to compare against
+     * @returns {boolean} True if passwords match
+     */
+    async comparePassword(plaintext, hashedPassword) {
+        if (!plaintext || !hashedPassword) return false;
+        return bcrypt.compare(plaintext, hashedPassword);
+    },
+
+    /**
+     * Hash a plaintext password
+     * @param {string} plaintext - Plaintext password to hash
+     * @returns {string} Hashed password
+     */
+    async hashPassword(plaintext) {
+        return bcrypt.hash(plaintext, SALT_ROUNDS);
     },
 
     /**

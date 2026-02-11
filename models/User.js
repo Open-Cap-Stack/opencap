@@ -7,6 +7,9 @@
 
 const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcrypt');
+
+const SALT_ROUNDS = 10;
 
 // Schema definition for documentation and validation
 const userSchema = {
@@ -161,6 +164,12 @@ const User = {
             };
         }
 
+        // Hash password if provided and not already hashed
+        // bcrypt hashes start with "$2b$" or "$2a$"
+        if (data.password && !data.password.startsWith('$2')) {
+            data.password = await bcrypt.hash(data.password, SALT_ROUNDS);
+        }
+
         const createdUser = await baseModel.create.call(baseModel, data);
 
         // Create default settings for the user asynchronously (don't wait)
@@ -227,6 +236,26 @@ const User = {
         delete sanitized.passwordResetToken;
         delete sanitized.passwordResetExpires;
         return sanitized;
+    },
+
+    /**
+     * Compare a plaintext password with a user's hashed password
+     * @param {string} plaintext - Plaintext password to check
+     * @param {string} hashedPassword - Hashed password to compare against
+     * @returns {boolean} True if passwords match
+     */
+    async comparePassword(plaintext, hashedPassword) {
+        if (!plaintext || !hashedPassword) return false;
+        return bcrypt.compare(plaintext, hashedPassword);
+    },
+
+    /**
+     * Hash a plaintext password
+     * @param {string} plaintext - Plaintext password to hash
+     * @returns {string} Hashed password
+     */
+    async hashPassword(plaintext) {
+        return bcrypt.hash(plaintext, SALT_ROUNDS);
     },
 
     /**

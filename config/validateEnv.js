@@ -21,11 +21,38 @@ function validateEnvironment() {
     } else {
       warnings.push(msg);
     }
-  }
+  } else if (process.env.JWT_SECRET.trim() === '') {
+    const msg = 'JWT_SECRET is set but empty';
+    if (isProd) {
+      errors.push(msg);
+    } else {
+      warnings.push(msg);
+    }
+  } else {
+    // In production, JWT_SECRET must not be the default test value or common placeholders
+    const insecureDefaults = [
+      'test-secret',
+      'your-secret-key',
+      'your_jwt_secret_here',
+      'your_jwt_secret_here_minimum_32_chars',
+      'secret',
+      'changeme',
+      'password',
+    ];
+    if (isProd && insecureDefaults.includes(process.env.JWT_SECRET.toLowerCase())) {
+      errors.push('JWT_SECRET must be changed from default/placeholder value in production');
+    }
 
-  // In production, JWT_SECRET must not be the default test value
-  if (isProd && process.env.JWT_SECRET === 'test-secret') {
-    errors.push('JWT_SECRET must be changed from default value in production');
+    // JWT_SECRET must be at least 32 characters (Issue #379)
+    const MIN_JWT_SECRET_LENGTH = 32;
+    if (process.env.JWT_SECRET.length < MIN_JWT_SECRET_LENGTH) {
+      const msg = `JWT_SECRET must be at least ${MIN_JWT_SECRET_LENGTH} characters (current length: ${process.env.JWT_SECRET.length}). Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`;
+      if (isProd) {
+        errors.push(msg);
+      } else {
+        warnings.push(msg);
+      }
+    }
   }
 
   // NODE_ENV should be explicitly set

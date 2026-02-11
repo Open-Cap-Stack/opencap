@@ -28,16 +28,48 @@ describe('validateEnvironment', () => {
       expect(() => validateEnvironment()).toThrow('JWT_SECRET is not set');
     });
 
+    it('should throw when JWT_SECRET is empty string', () => {
+      process.env.JWT_SECRET = '   ';
+      process.env.ZERODB_API_KEY = 'valid-key';
+
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(() => validateEnvironment()).toThrow('JWT_SECRET is set but empty');
+    });
+
     it('should throw when JWT_SECRET is the default test-secret value', () => {
       process.env.JWT_SECRET = 'test-secret';
       process.env.ZERODB_API_KEY = 'valid-key';
 
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(() => validateEnvironment()).toThrow('JWT_SECRET must be changed from default value in production');
+      expect(() => validateEnvironment()).toThrow('JWT_SECRET must be changed from default/placeholder value in production');
+    });
+
+    it('should throw when JWT_SECRET is a common placeholder value', () => {
+      process.env.JWT_SECRET = 'your-secret-key';
+      process.env.ZERODB_API_KEY = 'valid-key';
+
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(() => validateEnvironment()).toThrow('JWT_SECRET must be changed from default/placeholder value in production');
+    });
+
+    it('should throw when JWT_SECRET is shorter than 32 characters', () => {
+      process.env.JWT_SECRET = 'short-but-not-placeholder-val';
+      process.env.ZERODB_API_KEY = 'valid-key';
+
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(() => validateEnvironment()).toThrow('JWT_SECRET must be at least 32 characters');
+    });
+
+    it('should not throw when JWT_SECRET is 32+ characters', () => {
+      process.env.JWT_SECRET = 'a'.repeat(32);
+      process.env.ZERODB_API_KEY = 'valid-key';
+
+      const result = validateEnvironment();
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should throw when neither ZERODB_API_KEY nor AINATIVE_API_TOKEN is set', () => {
-      process.env.JWT_SECRET = 'secure-production-secret';
+      process.env.JWT_SECRET = 'a]3kF9!mZ#qR7wL$2pX8nC&5vB0jT*6d';
       delete process.env.ZERODB_API_KEY;
       delete process.env.AINATIVE_API_TOKEN;
 
@@ -54,7 +86,7 @@ describe('validateEnvironment', () => {
     });
 
     it('should not throw when all required vars are properly set with ZERODB_API_KEY', () => {
-      process.env.JWT_SECRET = 'secure-production-secret';
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'valid-zerodb-key';
 
       const result = validateEnvironment();
@@ -63,7 +95,7 @@ describe('validateEnvironment', () => {
     });
 
     it('should not throw when all required vars are properly set with AINATIVE_API_TOKEN', () => {
-      process.env.JWT_SECRET = 'secure-production-secret';
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.AINATIVE_API_TOKEN = 'valid-ainative-token';
       delete process.env.ZERODB_API_KEY;
 
@@ -89,7 +121,7 @@ describe('validateEnvironment', () => {
     });
 
     it('should return warnings but not throw when ZeroDB credentials are missing', () => {
-      process.env.JWT_SECRET = 'dev-secret';
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       delete process.env.ZERODB_API_KEY;
       delete process.env.AINATIVE_API_TOKEN;
 
@@ -98,8 +130,17 @@ describe('validateEnvironment', () => {
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should not warn when all vars are set', () => {
+    it('should warn when JWT_SECRET is too short in development', () => {
       process.env.JWT_SECRET = 'dev-secret';
+      process.env.ZERODB_API_KEY = 'dev-key';
+
+      const result = validateEnvironment();
+      expect(result.warnings.some(w => w.includes('JWT_SECRET must be at least 32 characters'))).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should not warn when all vars are set with sufficient length', () => {
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'dev-key';
 
       const result = validateEnvironment();
@@ -128,7 +169,7 @@ describe('validateEnvironment', () => {
   describe('NODE_ENV validation', () => {
     it('should warn when NODE_ENV is not set', () => {
       delete process.env.NODE_ENV;
-      process.env.JWT_SECRET = 'some-secret';
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'some-key';
 
       const result = validateEnvironment();
@@ -137,7 +178,7 @@ describe('validateEnvironment', () => {
 
     it('should not warn about NODE_ENV when it is explicitly set', () => {
       process.env.NODE_ENV = 'development';
-      process.env.JWT_SECRET = 'some-secret';
+      process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'some-key';
 
       const result = validateEnvironment();

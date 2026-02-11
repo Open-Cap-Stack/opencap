@@ -11,7 +11,7 @@
     "frontend:preview": "cd frontend && npm run preview",
     "dev:full": "concurrently \"npm run dev\" \"npm run frontend:dev\"",
     "test": "cross-env NODE_ENV=test jest --config config/jest.config.js --detectOpenHandles --forceExit",
-    "test:ci": "cross-env NODE_ENV=test CI=true jest --config config/jest.config.js --coverage --maxWorkers=2 --detectOpenHandles --forceExit",
+    "test:ci": "cross-env NODE_ENV=test CI=true jest --ci --config config/jest.config.js --coverage --maxWorkers=2 --detectOpenHandles --forceExit",
     "test:watch": "cross-env NODE_ENV=test jest --config config/jest.config.js --watch --detectOpenHandles --forceExit",
     "test:coverage": "cross-env NODE_ENV=test jest --config config/jest.config.js --coverage --detectOpenHandles --forceExit",
     "test:e2e": "npx playwright test --config config/playwright.config.js",
