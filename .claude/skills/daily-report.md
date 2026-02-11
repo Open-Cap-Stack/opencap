@@ -45,100 +45,122 @@ else
 fi
 ```
 
-### Step 2: Git Commits (Today - YOUR commits from ALL identities)
+### Step 2: Git Commits (Today - ALL commits across BOTH repos)
+
+IMPORTANT: This project has TWO repos — the backend (opencapstack) and a frontend
+submodule (opencap-frontend at ./frontend). You MUST count commits from BOTH repos.
 
 ```bash
-# Build author filter for ALL your emails
-# Format: --author="email1\|email2\|email3"
-AUTHOR_FILTER=$(echo "$GIT_EMAILS" | tr '|' '\n' | sed 's/^/--author="/; s/$/"/' | tr '\n' ' ')
+# Backend commits today (all commits on all branches, including merges)
+git log --since="today 00:00" --oneline --all
 
-# Today's commits by ANY of your identities
-git log $AUTHOR_FILTER --since="today 00:00" --pretty=format:"%h|%H|%ad|%s|%an|%ae" --date=iso --no-merges
+# Frontend commits today (cd into submodule)
+cd frontend && git log --since="today 00:00" --oneline --all && cd ..
 
-# YOUR commit count (all identities)
-git log $AUTHOR_FILTER --since="today 00:00" --no-merges --oneline | wc -l
+# Backend commit count
+BACKEND_COMMITS=$(git log --since="today 00:00" --oneline --all | wc -l | tr -d ' ')
 
-# Files YOU changed today (all identities)
-git log $AUTHOR_FILTER --since="today 00:00" --name-only --pretty=format: | sort -u
+# Frontend commit count
+FRONTEND_COMMITS=$(cd frontend && git log --since="today 00:00" --oneline --all | wc -l | tr -d ' ')
+
+# Total
+TODAY_COMMITS=$((BACKEND_COMMITS + FRONTEND_COMMITS))
+
+# Files changed today
+git log --since="today 00:00" --name-only --pretty=format: | sort -u
 ```
 
-### Step 3: GitHub Issues (Assigned to YOU)
+### Step 3: GitHub PRs and Issues (ALL activity, not just assigned)
+
+IMPORTANT: Do NOT use --assignee="@me" or --author="@me" — these filters miss
+PRs/issues that were created without assignment. Instead, use date-based queries
+and the mergedAt/closedAt fields to get accurate counts.
 
 ```bash
-# Issues assigned to YOU
-gh issue list --assignee="@me" --state all --limit 50 --json number,title,state,updatedAt,labels
+# PRs merged today — use mergedAt field for accuracy
+# Backend PRs:
+gh pr list --state merged --limit 50 --json number,title,mergedAt \
+  --jq '[.[] | select(.mergedAt | startswith("YYYY-MM-DD"))] | length'
 
-# PRs created by YOU
-gh pr list --author="@me" --state all --limit 20 --json number,title,state,updatedAt
+# Frontend PRs:
+gh pr list --state merged --limit 50 --repo Open-Cap-Stack/opencap-frontend \
+  --json number,title,mergedAt \
+  --jq '[.[] | select(.mergedAt | startswith("YYYY-MM-DD"))] | length'
 
-# Get your GitHub username
-GH_USERNAME=$(gh api user --jq .login)
+# Issues closed today — use closedAt field for accuracy
+# Backend issues:
+gh issue list --state closed --limit 100 --json number,title,closedAt \
+  --jq '[.[] | select(.closedAt | startswith("YYYY-MM-DD"))] | length'
+
+# Frontend issues:
+gh issue list --state closed --limit 100 --repo Open-Cap-Stack/opencap-frontend \
+  --json number,title,closedAt \
+  --jq '[.[] | select(.closedAt | startswith("YYYY-MM-DD"))] | length'
+
+# Issues opened today
+# Backend:
+gh issue list --state all --search "created:YYYY-MM-DD" --json number --jq 'length'
+
+# Frontend:
+gh issue list --state all --search "created:YYYY-MM-DD" \
+  --repo Open-Cap-Stack/opencap-frontend --json number --jq 'length'
 ```
 
-### Step 4: Calculate Developer Velocity (YOUR velocity only)
+### Step 4: Calculate Developer Velocity
 
 ```bash
-# Today's commit count (all your identities)
-TODAY_COMMITS=$(git log $AUTHOR_FILTER --since="today 00:00" --no-merges --oneline | wc -l | tr -d ' ')
+# Use the totals from Step 2 and Step 3 (both repos combined)
+TODAY_COMMITS=$((BACKEND_COMMITS + FRONTEND_COMMITS))
+PRS_MERGED_TODAY=$((BACKEND_PRS + FRONTEND_PRS))
+ISSUES_CLOSED_TODAY=$((BACKEND_ISSUES_CLOSED + FRONTEND_ISSUES_CLOSED))
 
-# Yesterday's commit count (all your identities)
-YESTERDAY_COMMITS=$(git log $AUTHOR_FILTER --since="yesterday 00:00" --until="today 00:00" --no-merges --oneline | wc -l | tr -d ' ')
+# Yesterday's commit count (both repos)
+YESTERDAY_BACKEND=$(git log --since="yesterday 00:00" --until="today 00:00" --oneline --all | wc -l | tr -d ' ')
+YESTERDAY_FRONTEND=$(cd frontend && git log --since="yesterday 00:00" --until="today 00:00" --oneline --all | wc -l | tr -d ' ')
+YESTERDAY_COMMITS=$((YESTERDAY_BACKEND + YESTERDAY_FRONTEND))
 
-# Last 7 days commit counts by day (all your identities)
-for i in {0..6}; do
-  DAY_COMMITS=$(git log $AUTHOR_FILTER --since="$i days ago 00:00" --until="$((i-1)) days ago 00:00" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
-  echo "Day -$i: $DAY_COMMITS commits"
-done
-
-# 7-day average (all your identities)
-WEEK_COMMITS=$(git log $AUTHOR_FILTER --since="7 days ago" --no-merges --oneline | wc -l | tr -d ' ')
+# 7-day average (both repos)
+WEEK_BACKEND=$(git log --since="7 days ago" --oneline --all | wc -l | tr -d ' ')
+WEEK_FRONTEND=$(cd frontend && git log --since="7 days ago" --oneline --all | wc -l | tr -d ' ')
+WEEK_COMMITS=$((WEEK_BACKEND + WEEK_FRONTEND))
 SEVEN_DAY_AVG=$(echo "scale=1; $WEEK_COMMITS / 7" | bc)
 
-# Issues closed today (assigned to you)
-ISSUES_CLOSED_TODAY=$(gh issue list --assignee="@me" --state closed --search "closed:$(date +%Y-%m-%d)" --json number --jq 'length')
-
-# PRs merged today (created by you)
-PRS_MERGED_TODAY=$(gh pr list --author="@me" --state merged --search "merged:$(date +%Y-%m-%d)" --json number --jq 'length')
-
-# Calculate velocity trend
-if [ "$TODAY_COMMITS" -gt "$SEVEN_DAY_AVG" ]; then
-  VELOCITY_TREND="📈 Above Average"
-elif [ "$TODAY_COMMITS" -lt "$SEVEN_DAY_AVG" ]; then
-  VELOCITY_TREND="📉 Below Average"
-else
-  VELOCITY_TREND="➡️ On Track"
-fi
-
-# Velocity score (weighted: commits * 1 + issues * 3 + PRs * 5)
+# Velocity score (weighted: commits * 1 + issues closed * 3 + PRs merged * 5)
 VELOCITY_SCORE=$(echo "$TODAY_COMMITS * 1 + $ISSUES_CLOSED_TODAY * 3 + $PRS_MERGED_TODAY * 5" | bc)
 
-# Productivity rating based on real historical benchmarks (urbantech profile, last year)
-# Benchmarks derived from percentile analysis:
-# - Exceptional: 90th percentile (19+ commits/day, 50+ velocity points)
-# - Strong: 75th percentile (15+ commits/day, 30+ velocity points)
-# - Good: 50th percentile (3+ commits/day, 15+ velocity points)
-# - Light: Below median (<3 commits/day, <15 velocity points)
-if [ "$VELOCITY_SCORE" -ge 50 ] && [ "$TODAY_COMMITS" -ge 19 ]; then
-  PRODUCTIVITY_RATING="🔥 Exceptional (top 10%)"
-elif [ "$VELOCITY_SCORE" -ge 30 ] && [ "$TODAY_COMMITS" -ge 15 ]; then
-  PRODUCTIVITY_RATING="⭐ Strong (top 25%)"
-elif [ "$VELOCITY_SCORE" -ge 15 ] && [ "$TODAY_COMMITS" -ge 3 ]; then
-  PRODUCTIVITY_RATING="✅ Good (above median)"
+# Productivity rating
+if [ "$VELOCITY_SCORE" -ge 50 ]; then
+  PRODUCTIVITY_RATING="Exceptional"
+elif [ "$VELOCITY_SCORE" -ge 30 ]; then
+  PRODUCTIVITY_RATING="Strong"
+elif [ "$VELOCITY_SCORE" -ge 15 ]; then
+  PRODUCTIVITY_RATING="Good"
 else
-  PRODUCTIVITY_RATING="⚠️ Light (below median)"
+  PRODUCTIVITY_RATING="Light"
 fi
 ```
+
+## Critical Rules
+
+1. **ALWAYS count BOTH repos** — opencapstack (backend) AND opencap-frontend (submodule at ./frontend)
+2. **NEVER use --assignee="@me" or --author="@me"** — these miss activity not assigned to you. Use date-based filtering with closedAt/mergedAt fields instead.
+3. **Use closedAt/mergedAt JSON fields** — the `--search "closed:DATE"` parameter is unreliable. Instead, fetch recent items and filter by the JSON date field.
+4. **Include issues opened** — not just closed. Track new issues created today.
+5. **Break down by repo** — show Backend and Frontend sub-sections under each heading.
+6. **List PRs and issues in tables** — use `| PR | Title |` and `| Issue | Title |` table format.
+7. **Include issues closed section** — list actual issue numbers and titles from both repos.
 
 ## Report Sections
 
 | Section | Content |
 |---------|---------|
-| Summary | Quick overview of today's work |
+| Summary | Quick overview with commits, PRs, issues, velocity score |
 | Developer Velocity | Today vs yesterday, 7-day average, trend analysis |
-| Commits | List of all commits with descriptions |
-| Issues Worked On | Issues closed, updated, or created |
+| Commits | List of all commits with descriptions (split by Backend/Frontend) |
+| PRs Merged | PR tables split by Backend/Frontend |
+| Issues Closed | Issue tables split by Backend/Frontend |
+| Issues Opened | Issue tables split by Backend/Frontend |
 | Files Modified | Key files changed |
-| Tests Added | New test coverage |
 | Next Steps | Tomorrow's priorities |
 
 ## Output Location
