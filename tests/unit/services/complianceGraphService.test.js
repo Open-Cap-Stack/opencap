@@ -9,6 +9,21 @@
  * - Compliance report generation
  */
 
+// Mock neo4j-driver before any requires that trigger graphDatabaseService loading
+// virtual: true since the package was removed from dependencies
+jest.mock('neo4j-driver', () => ({
+  driver: jest.fn(() => ({
+    session: jest.fn(() => ({
+      run: jest.fn(),
+      close: jest.fn()
+    })),
+    close: jest.fn(),
+    verifyConnectivity: jest.fn()
+  })),
+  auth: { basic: jest.fn() },
+  int: jest.fn(v => v)
+}), { virtual: true });
+
 const complianceGraphService = require('../../../services/complianceGraphService');
 const graphDatabaseService = require('../../../services/graphDatabaseService');
 

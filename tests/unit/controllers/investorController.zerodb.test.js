@@ -60,7 +60,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('All fields are required');
+      expect(data.error.message).toBe('All fields are required');
     });
 
     it('should return 400 when investmentAmount is missing', async () => {
@@ -130,7 +130,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Error creating investor');
+      expect(data.error.message).toBe('Error creating investor');
     });
   });
 
@@ -164,7 +164,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(404);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Investor not found');
+      expect(data.error.message).toBe('Investor not found');
     });
 
     it('should handle database errors', async () => {
@@ -176,7 +176,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Error fetching investor');
+      expect(data.error.message).toBe('Error fetching investor');
     });
   });
 
@@ -215,7 +215,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Error fetching investors');
+      expect(data.error.message).toBe('Error fetching investors');
     });
   });
 
@@ -259,7 +259,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('All fields are required');
+      expect(data.error.message).toBe('All fields are required');
     });
 
     it('should return 404 when investor to update not found', async () => {
@@ -278,7 +278,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(404);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Investor not found');
+      expect(data.error.message).toBe('Investor not found');
     });
 
     it('should handle database errors during update', async () => {
@@ -297,7 +297,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Error updating investor');
+      expect(data.error.message).toBe('Error updating investor');
     });
   });
 
@@ -324,7 +324,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(404);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Investor not found');
+      expect(data.error.message).toBe('Investor not found');
     });
 
     it('should handle database errors during delete', async () => {
@@ -336,7 +336,7 @@ describe('InvestorController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Error deleting investor');
+      expect(data.error.message).toBe('Error deleting investor');
     });
   });
 

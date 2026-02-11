@@ -52,14 +52,14 @@ describe('Stakeholder Model (ZeroDB)', () => {
   describe('CRUD Methods', () => {
     describe('create', () => {
       it('should create a stakeholder with provided data', async () => {
-        const stakeholderData = { stakeholderId: 'stake-123', name: 'John Doe', email: 'john@example.com', role: 'Investor', projectId: 'proj-456' };
+        const stakeholderData = { stakeholderId: 'stake-123', name: 'John Doe', email: 'john@example.com', role: 'investor', companyId: '507f1f77bcf86cd799439011', projectId: 'proj-456' };
         zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { _id: 'uuid-123', ...stakeholderData } }] });
         const result = await Stakeholder.create(stakeholderData);
         expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ stakeholderId: 'stake-123', name: 'John Doe' }));
         expect(result).toBeDefined();
       });
       it('should generate stakeholderId if not provided', async () => {
-        const stakeholderData = { name: 'John Doe', email: 'john@example.com', role: 'Investor' };
+        const stakeholderData = { name: 'John Doe', email: 'john@example.com', role: 'investor', companyId: '507f1f77bcf86cd799439011' };
         zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { ...stakeholderData, stakeholderId: 'stakeholder_uuid-gen' } }] });
         await Stakeholder.create(stakeholderData);
         expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ stakeholderId: expect.stringMatching(/^stakeholder_/) }));
@@ -232,20 +232,20 @@ describe('Stakeholder Model (ZeroDB)', () => {
   });
 
   describe('Stakeholder Roles', () => {
-    it('should handle Investor role', async () => {
-      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'Investor' } }] });
-      await Stakeholder.create({ stakeholderId: 'stake-inv-123', name: 'Investor Name', email: 'investor@example.com', role: 'Investor' });
-      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'Investor' }));
+    it('should handle investor role', async () => {
+      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'investor' } }] });
+      await Stakeholder.create({ stakeholderId: 'stake-inv-123', name: 'Investor Name', email: 'investor@example.com', role: 'investor', companyId: '507f1f77bcf86cd799439011' });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'investor' }));
     });
-    it('should handle Founder role', async () => {
-      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'Founder' } }] });
-      await Stakeholder.create({ stakeholderId: 'stake-founder-123', name: 'Founder Name', email: 'founder@example.com', role: 'Founder' });
-      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'Founder' }));
+    it('should handle founder role', async () => {
+      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'founder' } }] });
+      await Stakeholder.create({ stakeholderId: 'stake-founder-123', name: 'Founder Name', email: 'founder@example.com', role: 'founder', companyId: '507f1f77bcf86cd799439011' });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'founder' }));
     });
-    it('should handle Employee role', async () => {
-      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'Employee' } }] });
-      await Stakeholder.create({ stakeholderId: 'stake-emp-123', name: 'Employee Name', email: 'employee@example.com', role: 'Employee' });
-      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'Employee' }));
+    it('should handle employee role', async () => {
+      zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { role: 'employee' } }] });
+      await Stakeholder.create({ stakeholderId: 'stake-emp-123', name: 'Employee Name', email: 'employee@example.com', role: 'employee', companyId: '507f1f77bcf86cd799439011' });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ role: 'employee' }));
     });
   });
 
@@ -253,19 +253,19 @@ describe('Stakeholder Model (ZeroDB)', () => {
     it('should handle full name with multiple words', async () => {
       const fullName = 'Dr. John Michael Doe Jr.';
       zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { name: fullName } }] });
-      await Stakeholder.create({ stakeholderId: 'stake-123', name: fullName, email: 'dr.john@example.com', role: 'Advisor' });
+      await Stakeholder.create({ stakeholderId: 'stake-123', name: fullName, email: 'dr.john@example.com', role: 'advisor', companyId: '507f1f77bcf86cd799439011' });
       expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ name: fullName }));
     });
     it('should handle names with special characters', async () => {
       const specialName = "Mary O'Brien-Smith";
       zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { name: specialName } }] });
-      await Stakeholder.create({ stakeholderId: 'stake-special-123', name: specialName, email: 'mary@example.com', role: 'Investor' });
+      await Stakeholder.create({ stakeholderId: 'stake-special-123', name: specialName, email: 'mary@example.com', role: 'investor', companyId: '507f1f77bcf86cd799439011' });
       expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ name: specialName }));
     });
     it('should handle UUID-style stakeholderId', async () => {
       const uuidId = '550e8400-e29b-41d4-a716-446655440000';
       zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'uuid-123', row_data: { stakeholderId: uuidId } }] });
-      await Stakeholder.create({ stakeholderId: uuidId, name: 'UUID Stakeholder', email: 'uuid@example.com', role: 'Investor' });
+      await Stakeholder.create({ stakeholderId: uuidId, name: 'UUID Stakeholder', email: 'uuid@example.com', role: 'investor', companyId: '507f1f77bcf86cd799439011' });
       expect(zerodbService.insertRow).toHaveBeenCalledWith('stakeholders', expect.objectContaining({ stakeholderId: uuidId }));
     });
   });

@@ -135,9 +135,12 @@ describe('Document Folder Controller', () => {
             await createFolder(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Folder name cannot contain special characters: / \\ : * ? " < > |'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Folder name cannot contain special characters: / \\ : * ? " < > |'
+                })
+            }));
         });
 
         it('should reject folder with missing name', async () => {
@@ -149,9 +152,12 @@ describe('Document Folder Controller', () => {
             await createFolder(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Folder name is required'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Folder name is required'
+                })
+            }));
         });
 
         it('should reject folder with non-existent parent', async () => {
@@ -163,9 +169,12 @@ describe('Document Folder Controller', () => {
             await createFolder(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Parent folder not found'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Parent folder not found'
+                })
+            }));
         });
 
         it('should reject circular folder reference', async () => {
@@ -177,9 +186,12 @@ describe('Document Folder Controller', () => {
             await createFolder(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Circular folder reference detected'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Circular folder reference detected'
+                })
+            }));
         });
     });
 
@@ -250,7 +262,10 @@ describe('Document Folder Controller', () => {
             await getFolders(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(500);
-            expect(mockJson).toHaveBeenCalledWith({ message: 'Database error' });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({ message: 'Database error' })
+            }));
         });
     });
 
@@ -291,7 +306,7 @@ describe('Document Folder Controller', () => {
             await getFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(404);
-            expect(mockJson).toHaveBeenCalledWith({ message: 'Folder not found' });
+            expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 404, message: 'Folder not found' } });
         });
 
         it('should handle errors', async () => {
@@ -303,7 +318,10 @@ describe('Document Folder Controller', () => {
             await getFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(500);
-            expect(mockJson).toHaveBeenCalledWith({ message: 'Database error' });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({ message: 'Database error' })
+            }));
         });
     });
 
@@ -361,7 +379,10 @@ describe('Document Folder Controller', () => {
             await updateFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({ message: 'Folder not found' });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({ message: 'Folder not found' })
+            }));
         });
 
         it('should reject circular reference on parent update', async () => {
@@ -374,9 +395,12 @@ describe('Document Folder Controller', () => {
             await updateFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Circular folder reference detected'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Circular folder reference detected'
+                })
+            }));
         });
     });
 
@@ -401,9 +425,12 @@ describe('Document Folder Controller', () => {
             await deleteFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Cannot delete folder with subfolders'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Cannot delete folder with subfolders'
+                })
+            }));
         });
 
         it('should reject deletion of folder with documents', async () => {
@@ -415,9 +442,12 @@ describe('Document Folder Controller', () => {
             await deleteFolderById(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(400);
-            expect(mockJson).toHaveBeenCalledWith({
-                message: 'Cannot delete folder containing documents'
-            });
+            expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                error: expect.objectContaining({
+                    message: 'Cannot delete folder containing documents'
+                })
+            }));
         });
 
         it('should return 404 if folder not found', async () => {
@@ -472,7 +502,7 @@ describe('Document Folder Controller', () => {
             await getFolderContents(mockReq, mockRes);
 
             expect(mockStatus).toHaveBeenCalledWith(404);
-            expect(mockJson).toHaveBeenCalledWith({ message: 'Folder not found' });
+            expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 404, message: 'Folder not found' } });
         });
 
         it('should handle empty folder', async () => {

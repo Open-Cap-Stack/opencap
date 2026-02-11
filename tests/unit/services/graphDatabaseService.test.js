@@ -12,7 +12,7 @@
 const graphDatabaseService = require('../../../services/graphDatabaseService');
 const neo4j = require('neo4j-driver');
 
-// Mock neo4j-driver
+// Mock neo4j-driver (virtual: true since the package was removed from dependencies)
 jest.mock('neo4j-driver', () => {
   const mockSession = {
     run: jest.fn(),
@@ -33,7 +33,7 @@ jest.mock('neo4j-driver', () => {
     int: jest.fn((val) => ({ toNumber: () => val, low: val, high: 0 })),
     isInt: jest.fn((val) => val && typeof val.toNumber === 'function')
   };
-});
+}, { virtual: true });
 
 describe('Graph Database Service', () => {
   let mockDriver;

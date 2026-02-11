@@ -42,9 +42,9 @@ describe('BulkMessage Controller', () => {
 
   describe('createBulkMessage', () => {
     const validBulkMessageData = {
-      bulkMessageId: 'BM-001',
-      companyId: 'COMP-001',
-      senderId: 'user123',
+      bulkMessageId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+      companyId: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+      senderId: 'c3d4e5f6-a7b8-4c9d-8e1f-2a3b4c5d6e7f',
       subject: 'Important Update',
       content: 'This is the message content',
       messageType: 'email',
@@ -62,7 +62,7 @@ describe('BulkMessage Controller', () => {
       await bulkMessageController.createBulkMessage(req, res);
 
       expect(databaseAdapter.create).toHaveBeenCalledWith('BulkMessage', expect.objectContaining({
-        bulkMessageId: 'BM-001',
+        bulkMessageId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
         subject: 'Important Update',
         status: 'draft'
       }));
@@ -71,7 +71,7 @@ describe('BulkMessage Controller', () => {
     });
 
     it('should return 400 when required fields are missing', async () => {
-      req.body = { bulkMessageId: 'BM-001', subject: 'Test' };
+      req.body = { bulkMessageId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', subject: 'Test' };
 
       await bulkMessageController.createBulkMessage(req, res);
 

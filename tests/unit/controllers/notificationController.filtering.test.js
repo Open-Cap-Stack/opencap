@@ -199,7 +199,7 @@ describe('Notification Controller - Filtering (Issue #124)', () => {
         );
       });
 
-      it('should default limit to 100 and offset to 0', async () => {
+      it('should default limit to 20 and offset to 0', async () => {
         req.query = {};
 
         databaseAdapter.find.mockResolvedValue([]);
@@ -210,7 +210,7 @@ describe('Notification Controller - Filtering (Issue #124)', () => {
         expect(databaseAdapter.find).toHaveBeenCalledWith(
           'Notification',
           expect.any(Object),
-          expect.objectContaining({ limit: 100, skip: 0 })
+          expect.objectContaining({ limit: 20, skip: 0 })
         );
       });
     });

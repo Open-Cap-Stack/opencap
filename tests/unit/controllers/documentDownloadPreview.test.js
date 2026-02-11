@@ -148,7 +148,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.downloadDocument(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('not found') }));
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.objectContaining({ message: expect.stringContaining('not found') }) }));
     });
 
     it('should return 404 if document has no file attached', async () => {
@@ -160,7 +160,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.downloadDocument(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('not available') }));
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.objectContaining({ message: expect.stringContaining('not available') }) }));
     });
 
     it('should deny access to unauthorized users', async () => {
@@ -178,7 +178,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.downloadDocument(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Access denied' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 403, message: 'Access denied' } });
     });
 
     it('should allow admin users to download any document', async () => {
@@ -264,7 +264,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.downloadDocument(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Failed to download') }));
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.objectContaining({ message: expect.stringContaining('Failed to download') }) }));
     });
 
     it('should set Content-Length header when available', async () => {
@@ -382,7 +382,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentPreview(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 404, message: 'Document not found' } });
     });
 
     it('should return 404 if document has no file attached', async () => {
@@ -394,7 +394,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentPreview(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'No file attached to document' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 404, message: 'No file attached to document' } });
     });
 
     it('should deny access to unauthorized users', async () => {
@@ -412,7 +412,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentPreview(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Access denied' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 403, message: 'Access denied' } });
     });
 
     it('should return preview info for Word documents', async () => {
@@ -547,7 +547,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Document not found' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 404, message: 'Document not found' } });
     });
 
     it('should return view-only permissions for public documents to any user', async () => {
@@ -587,7 +587,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ message: 'Access denied' });
+      expect(mockJson).toHaveBeenCalledWith({ success: false, error: { status: 403, message: 'Access denied' } });
     });
 
     it('should return company-wide access info for company documents', async () => {
@@ -621,7 +621,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       await documentController.getDocumentAccess(mockReq, mockRes);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Failed to get document access') }));
+      expect(mockJson).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.objectContaining({ message: expect.stringContaining('Failed to get document access') }) }));
     });
   });
 

@@ -194,16 +194,15 @@ describe('User Controller - Profile Photo Upload', () => {
       // Verify presigned URLs were generated
       expect(fileStorageService.getPresignedUrl).toHaveBeenCalledTimes(2);
 
-      // Verify user profile was updated
+      // Verify user profile was updated (ZeroDB: no $set wrapper)
       expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_12345' },
-        { $set: expect.objectContaining({
-            'profile.avatar': 'https://storage.example.com/photos/original.jpg',
-            'profile.avatarThumbnail': 'https://storage.example.com/photos/thumb.jpg',
-            'profile.avatarFileId': 'file_original_123',
-            'profile.avatarThumbnailFileId': 'file_thumb_123'
-          })
-        },
+        expect.objectContaining({
+          'profile.avatar': 'https://storage.example.com/photos/original.jpg',
+          'profile.avatarThumbnail': 'https://storage.example.com/photos/thumb.jpg',
+          'profile.avatarFileId': 'file_original_123',
+          'profile.avatarThumbnailFileId': 'file_thumb_123'
+        }),
         { new: true }
       );
 
@@ -376,16 +375,15 @@ describe('User Controller - Profile Photo Upload', () => {
         { soft: false }
       );
 
-      // Verify user profile was updated
+      // Verify user profile was updated (ZeroDB: no $set wrapper)
       expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_12345' },
-        { $set: {
-            'profile.avatar': null,
-            'profile.avatarThumbnail': null,
-            'profile.avatarFileId': null,
-            'profile.avatarThumbnailFileId': null
-          }
-        },
+        expect.objectContaining({
+          'profile.avatar': null,
+          'profile.avatarThumbnail': null,
+          'profile.avatarFileId': null,
+          'profile.avatarThumbnailFileId': null
+        }),
         { new: true }
       );
 
