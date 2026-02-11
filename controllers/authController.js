@@ -16,6 +16,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { blacklistToken } = require('../middleware/authMiddleware');
+const { sanitizeUser } = require('../utils/sanitizeUser');
 
 // Initialize Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -219,8 +220,8 @@ const loginUser = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response (ZeroDB returns plain objects)
-    const { password: _, ...userResponse } = user;
+    // Remove sensitive fields from response
+    const userResponse = sanitizeUser(user);
 
     return res.status(200).json({
       message: 'Login successful',
@@ -310,8 +311,8 @@ const oauthLogin = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Remove password from response (ZeroDB returns plain objects)
-    const { password: _, ...userResponse } = user;
+    // Remove sensitive fields from response
+    const userResponse = sanitizeUser(user);
 
     return res.status(200).json({
       message: 'OAuth login successful',
@@ -617,12 +618,11 @@ const getUserProfile = async (req, res) => {
       foundUser = await User.findById(userId);
     }
 
-    // Remove password from response (ZeroDB returns plain objects)
+    // Remove sensitive fields from response
     if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      user = userWithoutPassword;
+      user = sanitizeUser(foundUser);
     }
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -698,8 +698,8 @@ const updateUserProfile = async (req, res) => {
     // Save updates
     await user.save();
 
-    // Remove password from response (ZeroDB returns plain objects)
-    const { password: _, ...userResponse } = user;
+    // Remove sensitive fields from response
+    const userResponse = sanitizeUser(user);
 
     return res.status(200).json({
       message: 'Profile updated successfully',

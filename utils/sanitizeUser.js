@@ -15,6 +15,8 @@ const SENSITIVE_FIELDS = [
   'verificationTokenExpires',
   'resetPasswordToken',
   'resetPasswordExpires',
+  'passwordResetToken',
+  'passwordResetExpires',
   '__v'
 ];
 
