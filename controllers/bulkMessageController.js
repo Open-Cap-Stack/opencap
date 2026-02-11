@@ -7,9 +7,39 @@
  */
 const databaseAdapter = require('../services/databaseAdapter');
 const bulkMessageService = require('../services/bulkMessageService');
+const { sanitizeString, isValidObjectId } = require('../utils/inputSanitizer');
 
 const VALID_MESSAGE_TYPES = ['email', 'sms', 'notification', 'in-app'];
 const VALID_STATUSES = ['draft', 'scheduled', 'processing', 'sent', 'partially_sent', 'failed', 'cancelled'];
+
+/**
+ * Sanitize bulk message input to prevent XSS and injection attacks
+ * Issue #387
+ */
+const sanitizeBulkMessageInput = (data) => {
+  const sanitized = { ...data };
+
+  // Sanitize string fields
+  if (sanitized.subject) {
+    sanitized.subject = sanitizeString(sanitized.subject);
+  }
+  if (sanitized.content) {
+    sanitized.content = sanitizeString(sanitized.content);
+  }
+
+  // Validate IDs
+  if (sanitized.bulkMessageId && !isValidObjectId(sanitized.bulkMessageId)) {
+    throw new Error('Invalid bulkMessageId format');
+  }
+  if (sanitized.companyId && !isValidObjectId(sanitized.companyId)) {
+    throw new Error('Invalid companyId format');
+  }
+  if (sanitized.senderId && !isValidObjectId(sanitized.senderId)) {
+    throw new Error('Invalid senderId format');
+  }
+
+  return sanitized;
+};
 
 /**
  * Build query filter from request query parameters
@@ -49,6 +79,14 @@ const buildBulkMessageFilter = (query) => {
  */
 exports.createBulkMessage = async (req, res) => {
   try {
+    // Issue #387: Sanitize input to prevent XSS and injection attacks
+    let sanitizedData;
+    try {
+      sanitizedData = sanitizeBulkMessageInput(req.body);
+    } catch (sanitizeError) {
+      return res.status(400).json({ message: sanitizeError.message });
+    }
+
     const {
       bulkMessageId,
       companyId,
@@ -61,7 +99,7 @@ exports.createBulkMessage = async (req, res) => {
       rateLimiting,
       metadata,
       tags
-    } = req.body;
+    } = sanitizedData;
 
     // Validate required fields
     if (!bulkMessageId || !companyId || !senderId || !subject || !content || !messageType || !recipientFilter) {

@@ -264,26 +264,38 @@ const oauthLogin = async (req, res) => {
       return res.status(400).json({ message: 'Unsupported OAuth provider' });
     }
 
-    // Check if user exists
-    let user = await User.findOne({ email: userInfo.email });
+    // Use atomic upsert to prevent race conditions (Issue #382)
+    // This ensures that even if multiple OAuth requests come simultaneously,
+    // only one user record is created
+    const { v4: uuidv4 } = require('uuid');
 
-    // Create user if not exists
-    if (!user) {
-      // Create a new user using ZeroDB pattern
-      const { v4: uuidv4 } = require('uuid');
-      user = await User.create({
-        userId: uuidv4(),
-        firstName: userInfo.given_name,
-        lastName: userInfo.family_name,
-        email: userInfo.email,
-        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-        role: 'user',
-        status: 'active',
-        emailVerified: true,
-        oauthProvider: provider,
-        oauthId: userInfo.sub
-      });
-    }
+    const user = await User.findOneAndUpdate(
+      { email: userInfo.email },
+      {
+        $setOnInsert: {
+          userId: uuidv4(),
+          firstName: userInfo.given_name,
+          lastName: userInfo.family_name,
+          email: userInfo.email,
+          password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+          role: 'user',
+          status: 'active',
+          emailVerified: true,
+          oauthProvider: provider,
+          oauthId: userInfo.sub,
+          createdAt: new Date()
+        },
+        $set: {
+          // Update last login even if user exists
+          lastLogin: new Date()
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true
+      }
+    );
 
     // Generate tokens
     const accessToken = jwt.sign(

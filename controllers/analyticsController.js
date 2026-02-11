@@ -13,7 +13,6 @@ const SecurityAudit = require('../models/SecurityAudit');
 const vectorService = require('../services/vectorService');
 const streamingService = require('../services/streamingService');
 const memoryService = require('../services/memoryService');
-const mongoose = require('mongoose');
 
 /**
  * Predictive Financial Modeling

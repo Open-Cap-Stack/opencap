@@ -9,28 +9,40 @@
 
 const helmet = require('helmet');
 
-// Configure helmet with sensible defaults for financial applications
+// Configure helmet with hardened CSP for financial applications
+// Issue #383: Remove unsafe-inline directives to prevent XSS attacks
 const helmetMiddleware = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:'],
-      fontSrc: ["'self'"],
+      // Removed unsafe-inline - use nonces or hashes for inline scripts
+      scriptSrc: ["'self'"],
+      // Removed unsafe-inline - use external stylesheets or nonces
+      styleSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      mediaSrc: ["'self'"],
       objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
       upgradeInsecureRequests: [],
     },
   },
-  xssFilter: true, // Simple boolean for XSS protection
+  xssFilter: true,
   noSniff: true,
   frameguard: { action: 'deny' },
   hsts: {
-    maxAge: 15552000, // 180 days in seconds
+    maxAge: 31536000, // 1 year in seconds (increased from 180 days)
     includeSubDomains: true,
     preload: true,
   },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // Additional security headers
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  dnsPrefetchControl: { allow: false },
 });
 
 module.exports = helmetMiddleware;

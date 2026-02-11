@@ -1,6 +1,5 @@
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const mongoose = require('mongoose');
 const ComplianceCheck = require('../../models/ComplianceCheck');
 const router = express.Router();
 
