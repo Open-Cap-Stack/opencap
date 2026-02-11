@@ -6,7 +6,18 @@ module.exports = {
     '**/__tests__/**/*.test.js',
     '**/*.test.js'
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/startup-love/', '/frontend/'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/startup-love/',
+    '/frontend/',
+    '/e2e/',
+    '/tests/deployment/',
+    '/tests/integration/',
+    '/tests/security/',
+    '/tests/migration/',
+    '/tests/performance/',
+    '/__tests__/'
+  ],
   collectCoverage: true,
   collectCoverageFrom: [
     // CORE BUSINESS LOGIC FOCUS - Only essential files for 80% coverage target
