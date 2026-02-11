@@ -14,7 +14,9 @@ module.exports = {
     '/tests/deployment/',
     '/tests/integration/',
     '/tests/security/',
-    '/__tests__/scripts/'
+    '/tests/migration/',
+    '/tests/performance/',
+    '/__tests__/'
   ],
   collectCoverage: true,
   collectCoverageFrom: [
