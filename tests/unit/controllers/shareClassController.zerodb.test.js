@@ -69,20 +69,19 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: false,
-        error: expect.objectContaining({ message: 'All fields are required' })
+        error: expect.objectContaining({ message: 'Name is required' })
       }));
     });
 
-    it('should return 400 if description is missing', async () => {
+    it('should create share class when only name is provided', async () => {
       req.body = { name: 'Common Stock' };
+      const mockCreated = { ...req.body, _id: 'test-id' };
+      databaseAdapter.create.mockResolvedValue(mockCreated);
 
       await createShareClass(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        error: expect.objectContaining({ message: 'All fields are required' })
-      }));
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({ shareClass: mockCreated });
     });
 
     it('should return 500 on database error', async () => {

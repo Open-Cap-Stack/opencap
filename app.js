@@ -228,6 +228,7 @@ const routes = {
   accessGroupRoutes: safeRequire(path.join(__dirname, 'routes/v1/accessGroupRoutes')), // Issue #274: Access Groups Endpoints
   taxDocumentRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxDocumentRoutes')), // Issue #246: Tax Document Download Endpoint
   bulkReportsRoutes: safeRequire(path.join(__dirname, 'routes/v1/bulkReportsRoutes')), // Issue #238: Bulk Reports Endpoint
+  dilutionRoutes: safeRequire(path.join(__dirname, 'routes/v1/dilutionRoutes')), // Dilution calculator
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
