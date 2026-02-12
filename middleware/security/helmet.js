@@ -16,15 +16,17 @@ const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       // Removed unsafe-inline - use nonces or hashes for inline scripts
-      scriptSrc: ["'self'"],
+      // accounts.google.com needed for Google Identity Services (OAuth)
+      scriptSrc: ["'self'", 'https://accounts.google.com'],
       // Removed unsafe-inline - use external stylesheets or nonces
-      styleSrc: ["'self'"],
+      styleSrc: ["'self'", 'https://accounts.google.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
       fontSrc: ["'self'", 'data:'],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://accounts.google.com'],
       mediaSrc: ["'self'"],
       objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
+      // accounts.google.com needed for Google Identity Services popup
+      frameSrc: ["'self'", 'https://accounts.google.com'],
       baseUri: ["'self'"],
       formAction: ["'self'"],
       frameAncestors: ["'none'"],
