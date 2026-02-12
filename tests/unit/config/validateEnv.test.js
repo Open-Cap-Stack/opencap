@@ -88,6 +88,8 @@ describe('validateEnvironment', () => {
     it('should not throw when all required vars are properly set with ZERODB_API_KEY', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'valid-zerodb-key';
+      process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
 
       const result = validateEnvironment();
       expect(result.errors).toHaveLength(0);
@@ -97,6 +99,8 @@ describe('validateEnvironment', () => {
     it('should not throw when all required vars are properly set with AINATIVE_API_TOKEN', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.AINATIVE_API_TOKEN = 'valid-ainative-token';
+      process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
+      process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
       delete process.env.ZERODB_API_KEY;
 
       const result = validateEnvironment();
@@ -142,6 +146,7 @@ describe('validateEnvironment', () => {
     it('should not warn when all vars are set with sufficient length', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
       process.env.ZERODB_API_KEY = 'dev-key';
+      process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
 
       const result = validateEnvironment();
       expect(result.warnings).toHaveLength(0);

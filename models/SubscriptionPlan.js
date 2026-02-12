@@ -39,6 +39,8 @@ const subscriptionPlanSchema = {
   isActive: { type: 'boolean', default: true },
   sortOrder: { type: 'number', default: 0 },
   externalPlanId: { type: 'string', default: null },
+  stripePriceId: { type: 'string', default: null },
+  stripeProductId: { type: 'string', default: null },
   metadata: { type: 'object', default: {} },
   createdBy: { type: 'string', default: null },
   updatedBy: { type: 'string', default: null },
@@ -88,6 +90,15 @@ const SubscriptionPlan = {
    */
   async findByPlanId(planId) {
     return baseModel.findOne.call(baseModel, { planId });
+  },
+
+  /**
+   * Find plan by Stripe Price ID
+   * @param {string} stripePriceId - Stripe Price ID
+   * @returns {Object|null} Plan or null
+   */
+  async findByStripePriceId(stripePriceId) {
+    return baseModel.findOne.call(baseModel, { stripePriceId });
   },
 
   /**

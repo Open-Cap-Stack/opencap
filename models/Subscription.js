@@ -35,6 +35,9 @@ const subscriptionSchema = {
   quantity: { type: 'number', default: 1 },
   pausedAt: { type: 'date', default: null },
   resumesAt: { type: 'date', default: null },
+  stripeSubscriptionId: { type: 'string', default: null },
+  stripeCustomerId: { type: 'string', default: null },
+  stripePriceId: { type: 'string', default: null },
   metadata: { type: 'object', default: {} },
   history: { type: 'array', default: [] },
   createdBy: { type: 'string', default: null },
@@ -108,6 +111,15 @@ const Subscription = {
       query.status = options.status;
     }
     return baseModel.find.call(baseModel, query);
+  },
+
+  /**
+   * Find subscription by Stripe subscription ID
+   * @param {string} stripeSubscriptionId - Stripe Subscription ID
+   * @returns {Object|null} Subscription or null
+   */
+  async findByStripeSubscriptionId(stripeSubscriptionId) {
+    return baseModel.findOne.call(baseModel, { stripeSubscriptionId });
   },
 
   /**
