@@ -62,6 +62,9 @@ if (Array.isArray(loggingMiddleware)) {
 // GitHub Issue #8: Database monitoring metrics endpoint
 app.use(metricsMiddleware);
 
+// Stripe webhook needs raw body BEFORE json parser
+app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

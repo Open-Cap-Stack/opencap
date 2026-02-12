@@ -81,6 +81,8 @@ const invoiceSchema = {
   paymentId: { type: 'string', default: null },
   paymentMethod: { type: 'string', default: null },
   subscriptionId: { type: 'string', default: null },
+  stripeInvoiceId: { type: 'string', default: null },
+  hostedInvoiceUrl: { type: 'string', default: null },
   notes: { type: 'string', default: '' },
   metadata: { type: 'object', default: {} },
   createdBy: { type: 'string', default: null },
@@ -151,6 +153,15 @@ const Invoice = {
    */
   async findByInvoiceId(invoiceId) {
     return baseModel.findOne.call(baseModel, { invoiceId });
+  },
+
+  /**
+   * Find invoice by Stripe Invoice ID
+   * @param {string} stripeInvoiceId - Stripe Invoice ID
+   * @returns {Object|null} Invoice or null
+   */
+  async findByStripeInvoiceId(stripeInvoiceId) {
+    return baseModel.findOne.call(baseModel, { stripeInvoiceId });
   },
 
   /**

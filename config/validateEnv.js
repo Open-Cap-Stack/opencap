@@ -73,6 +73,24 @@ function validateEnvironment() {
     }
   }
 
+  // Stripe configuration validation
+  if (process.env.STRIPE_SECRET_KEY) {
+    if (!process.env.STRIPE_SECRET_KEY.startsWith('sk_') && !process.env.STRIPE_SECRET_KEY.startsWith('rk_')) {
+      const msg = 'STRIPE_SECRET_KEY does not have the expected Stripe key format (sk_* or rk_*)';
+      if (isProd) {
+        errors.push(msg);
+      } else {
+        warnings.push(msg);
+      }
+    }
+  } else {
+    warnings.push('STRIPE_SECRET_KEY is not set - Stripe billing features will be disabled');
+  }
+
+  if (isProd && process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_WEBHOOK_SECRET) {
+    errors.push('STRIPE_WEBHOOK_SECRET is required in production when Stripe is enabled');
+  }
+
   // OAuth configuration validation (Issue #381)
   // If GOOGLE_CLIENT_ID is set, validate it's properly configured
   if (process.env.GOOGLE_CLIENT_ID) {

@@ -8,15 +8,11 @@
  * - Invoice management
  * - Payment methods
  * - Plan changes
+ * - Stripe integration (checkout, webhooks, setup intents)
  */
 
 const BillingService = require('../services/billingService');
-
-// Initialize Stripe if configured
-let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-}
+const stripeService = require('../services/stripeService');
 
 /**
  * Determine appropriate HTTP status code based on error message
@@ -30,7 +26,8 @@ function getErrorStatusCode(error) {
     return 404;
   }
   if (message.includes('required') || message.includes('invalid') || message.includes('cannot') ||
-      message.includes('no active') || message.includes('already on')) {
+      message.includes('no active') || message.includes('already on') || message.includes('not completed') ||
+      message.includes('not configured')) {
     return 400;
   }
   if (message.includes('unauthorized') || message.includes('forbidden')) {
@@ -285,7 +282,21 @@ async function addPaymentMethod(req, res) {
       return res.status(400).json({ error: 'companyId is required' });
     }
 
-    const method = await BillingService.addPaymentMethod(companyId, req.body);
+    const { stripePaymentMethodId, setAsDefault } = req.body;
+
+    let method;
+    if (stripePaymentMethodId && stripeService.isConfigured()) {
+      // Stripe-integrated flow
+      method = await BillingService.syncPaymentMethodFromStripe(
+        companyId,
+        stripePaymentMethodId,
+        setAsDefault
+      );
+    } else {
+      // Legacy flow
+      method = await BillingService.addPaymentMethod(companyId, req.body);
+    }
+
     return res.status(201).json(method);
   } catch (error) {
     console.error('Error adding payment method:', error);
@@ -312,10 +323,40 @@ async function removePaymentMethod(req, res) {
       return res.status(400).json({ error: 'companyId is required' });
     }
 
-    const result = await BillingService.removePaymentMethod(companyId, methodId);
+    const result = stripeService.isConfigured()
+      ? await BillingService.removePaymentMethodViaStripe(companyId, methodId)
+      : await BillingService.removePaymentMethod(companyId, methodId);
+
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error removing payment method:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Set default payment method
+ * POST /api/v1/billing/payment-methods/:id/set-default
+ */
+async function setDefaultPaymentMethod(req, res) {
+  try {
+    const methodId = req.params.id;
+
+    if (!methodId) {
+      return res.status(400).json({ error: 'Payment method ID is required' });
+    }
+
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const result = await BillingService.setDefaultPaymentMethod(companyId, methodId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error setting default payment method:', error);
     const statusCode = getErrorStatusCode(error);
     return res.status(statusCode).json({ error: error.message });
   }
@@ -405,61 +446,191 @@ async function getPaymentHistory(req, res) {
 
 /**
  * Create Stripe Checkout Session
- * POST /api/v1/billing/stripe-checkout
+ * POST /api/v1/billing/checkout-session
  */
-async function createStripeCheckout(req, res) {
+async function createCheckoutSession(req, res) {
   try {
-    if (!stripe) {
+    if (!stripeService.isConfigured()) {
       return res.status(503).json({
         error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.'
       });
     }
 
-    const { price_id, success_url, cancel_url, mode } = req.body;
+    const { priceId, price_id, successUrl, success_url, cancelUrl, cancel_url } = req.body;
+    const finalPriceId = priceId || price_id;
+    const finalSuccessUrl = successUrl || success_url;
+    const finalCancelUrl = cancelUrl || cancel_url;
 
-    if (!price_id) {
-      return res.status(400).json({ error: 'price_id is required' });
+    if (!finalPriceId) {
+      return res.status(400).json({ error: 'priceId is required' });
     }
 
-    if (!success_url || !cancel_url) {
-      return res.status(400).json({ error: 'success_url and cancel_url are required' });
+    if (!finalSuccessUrl || !finalCancelUrl) {
+      return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
 
-    const sessionConfig = {
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: price_id,
-          quantity: 1,
-        },
-      ],
-      mode: mode || 'subscription',
-      success_url,
-      cancel_url,
-    };
+    const companyId = req.user?.companyId;
 
-    // Add customer email if user is authenticated
-    if (req.user?.email) {
-      sessionConfig.customer_email = req.user.email;
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
     }
 
-    // Add metadata
-    sessionConfig.metadata = {
-      userId: req.user?.userId || 'anonymous',
-      companyId: req.user?.companyId || 'unknown',
-    };
+    const result = await BillingService.createCheckoutSession(
+      companyId,
+      finalPriceId,
+      finalSuccessUrl,
+      finalCancelUrl,
+      {
+        email: req.user?.email,
+        name: req.user?.name,
+        userId: req.user?.userId
+      }
+    );
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
-
-    return res.status(200).json({ url: session.url });
+    return res.status(200).json(result);
   } catch (error) {
-    console.error('Error creating Stripe checkout session:', error);
+    console.error('Error creating checkout session:', error);
 
     if (error.type === 'StripeInvalidRequestError') {
       return res.status(400).json({ error: error.message });
     }
 
-    return res.status(500).json({ error: 'Failed to create checkout session' });
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Verify Checkout Session
+ * POST /api/v1/billing/verify-session
+ */
+async function verifyCheckoutSession(req, res) {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+
+    const result = await BillingService.verifyCheckoutSession(sessionId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error verifying checkout session:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Cancel subscription
+ * POST /api/v1/billing/cancel
+ */
+async function cancelSubscription(req, res) {
+  try {
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const { cancelAtPeriodEnd = true } = req.body;
+    const result = await BillingService.cancelSubscription(companyId, cancelAtPeriodEnd);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Reactivate subscription
+ * POST /api/v1/billing/reactivate
+ */
+async function reactivateSubscription(req, res) {
+  try {
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const result = await BillingService.reactivateSubscription(companyId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error reactivating subscription:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Create Setup Intent for payment method collection
+ * POST /api/v1/billing/setup-intent
+ */
+async function createSetupIntent(req, res) {
+  try {
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const result = await BillingService.createSetupIntent(
+      companyId,
+      req.user?.email,
+      req.user?.name
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error creating setup intent:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Handle Stripe Webhook
+ * POST /api/v1/billing/webhook
+ * NOTE: No auth middleware - uses Stripe signature verification
+ */
+async function handleStripeWebhook(req, res) {
+  try {
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const signature = req.headers['stripe-signature'];
+
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    let event;
+    try {
+      event = stripeService.constructEvent(req.body, signature, webhookSecret);
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    const result = await BillingService.handleWebhookEvent(event);
+    return res.status(200).json({ received: true, ...result });
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    // Always return 200 to prevent Stripe retries for non-transient errors
+    return res.status(200).json({ received: true, error: error.message });
   }
 }
 
@@ -474,8 +645,14 @@ module.exports = {
   getPaymentMethods,
   addPaymentMethod,
   removePaymentMethod,
+  setDefaultPaymentMethod,
   upgradePlan,
   downgradePlan,
   getPaymentHistory,
-  createStripeCheckout
+  createCheckoutSession,
+  verifyCheckoutSession,
+  cancelSubscription,
+  reactivateSubscription,
+  createSetupIntent,
+  handleStripeWebhook
 };
