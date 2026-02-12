@@ -244,18 +244,21 @@ const loginUser = async (req, res) => {
  */
 const oauthLogin = async (req, res) => {
   try {
-    const { token, provider } = req.body;
+    const { token, provider, code, redirect_uri } = req.body;
 
-    if (!token || !provider) {
-      return res.status(400).json({ message: 'Token and provider are required' });
+    if (!provider) {
+      return res.status(400).json({ message: 'Provider is required' });
     }
 
     let userInfo;
 
     // Verify token based on provider
     if (provider === 'google') {
+      if (!token) {
+        return res.status(400).json({ message: 'Token is required for Google OAuth' });
+      }
       if (!googleClient) {
-        return res.status(503).json({ message: 'OAuth not configured' });
+        return res.status(503).json({ message: 'Google OAuth not configured' });
       }
       try {
         const ticket = await googleClient.verifyIdToken({
@@ -264,7 +267,65 @@ const oauthLogin = async (req, res) => {
         });
         userInfo = ticket.getPayload();
       } catch (error) {
-        return res.status(401).json({ message: 'Invalid OAuth token' });
+        return res.status(401).json({ message: 'Invalid Google OAuth token' });
+      }
+    } else if (provider === 'linkedin') {
+      if (!code) {
+        return res.status(400).json({ message: 'Authorization code is required for LinkedIn OAuth' });
+      }
+
+      const linkedinClientId = process.env.LINKEDIN_CLIENT_ID;
+      const linkedinClientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+
+      if (!linkedinClientId || !linkedinClientSecret) {
+        return res.status(503).json({ message: 'LinkedIn OAuth not configured on server' });
+      }
+
+      try {
+        // Exchange authorization code for access token
+        const https = require('https');
+        const tokenParams = new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirect_uri || '',
+          client_id: linkedinClientId,
+          client_secret: linkedinClientSecret,
+        });
+
+        const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: tokenParams.toString(),
+        });
+
+        if (!tokenResponse.ok) {
+          const errorData = await tokenResponse.text();
+          console.error('LinkedIn token exchange failed:', errorData);
+          return res.status(401).json({ message: 'LinkedIn authorization code exchange failed' });
+        }
+
+        const tokenData = await tokenResponse.json();
+
+        // Get user info from LinkedIn using the access token
+        const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
+        if (!profileResponse.ok) {
+          return res.status(401).json({ message: 'Failed to retrieve LinkedIn profile' });
+        }
+
+        const profileData = await profileResponse.json();
+
+        userInfo = {
+          email: profileData.email,
+          given_name: profileData.given_name || profileData.name?.split(' ')[0] || '',
+          family_name: profileData.family_name || profileData.name?.split(' ').slice(1).join(' ') || '',
+          sub: profileData.sub || profileData.id,
+        };
+      } catch (error) {
+        console.error('LinkedIn OAuth error:', error.message);
+        return res.status(401).json({ message: 'LinkedIn authentication failed' });
       }
     } else {
       return res.status(400).json({ message: 'Unsupported OAuth provider' });
