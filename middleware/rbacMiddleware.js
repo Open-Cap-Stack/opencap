@@ -28,7 +28,7 @@ const rolePermissions = {
     'read:companies', 'write:companies'
   ],
   'user': [
-    'read:companies'
+    'read:companies', 'write:companies'
   ],
   'client': [
     'read:companies'
