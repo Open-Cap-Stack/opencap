@@ -9,6 +9,14 @@ const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
+// Mock axios to prevent real HTTP calls to AINative API during token fallback
+jest.mock('axios', () => ({
+  get: jest.fn().mockRejectedValue(new Error('Mock: AINative validation rejected')),
+  post: jest.fn().mockRejectedValue(new Error('Mock: AINative validation rejected')),
+  create: jest.fn().mockReturnThis(),
+  defaults: { headers: { common: {} } }
+}));
+
 // Mock the models before requiring routes
 jest.mock('../../../models/Valuation409A');
 jest.mock('../../../models/ValuationPartner');
