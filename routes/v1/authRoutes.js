@@ -12,6 +12,9 @@ router.post('/register', authController.registerUser);
 router.post('/login', authController.loginUser);
 router.post('/oauth-login', authController.oauthLogin);
 
+// Token exchange: convert AINative token to fast local JWT (unprotected)
+router.post('/exchange-token', authController.exchangeAINativeToken);
+
 // New routes for OCAE-203
 // Token management
 router.post('/token/refresh', authController.refreshToken);

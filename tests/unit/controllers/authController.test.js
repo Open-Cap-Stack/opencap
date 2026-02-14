@@ -14,8 +14,11 @@ jest.mock('../../../models/User', () => ({
 
 jest.mock('../../../middleware/authMiddleware', () => ({
   blacklistToken: jest.fn().mockResolvedValue(true),
-  authenticateToken: jest.fn((req, res, next) => next())
+  authenticateToken: jest.fn((req, res, next) => next()),
+  provisionAINativeUser: jest.fn()
 }));
+
+jest.mock('axios');
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(() => ({ sendMail: jest.fn().mockResolvedValue(true) }))
@@ -30,6 +33,8 @@ const authController = require('../../../controllers/authController');
 const User = require('../../../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
+const { provisionAINativeUser } = require('../../../middleware/authMiddleware');
 
 // Spy on bcrypt and jwt (real modules, not mocked)
 jest.spyOn(bcrypt, 'hash');
@@ -311,6 +316,117 @@ describe('AuthController', () => {
       User.findById.mockResolvedValue(null);
       await authController.updateUserProfile(req, res);
       expect(res.statusCode).toBe(404);
+    });
+  });
+
+  describe('exchangeAINativeToken', () => {
+    it('should return 400 when ainativeToken is missing', async () => {
+      req.body = {};
+      await authController.exchangeAINativeToken(req, res);
+      expect(res.statusCode).toBe(400);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toBe('ainativeToken is required');
+    });
+
+    it('should return 401 when AINative token is invalid', async () => {
+      req.body = { ainativeToken: 'invalid-token' };
+      axios.get.mockRejectedValue(new Error('Unauthorized'));
+      await authController.exchangeAINativeToken(req, res);
+      expect(res.statusCode).toBe(401);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toBe('Invalid AINative token');
+    });
+
+    it('should exchange valid AINative token for local JWT', async () => {
+      req.body = { ainativeToken: 'valid-ainative-token' };
+
+      axios.get.mockResolvedValue({
+        data: { id: 'ainative-user-1', email: 'user@example.com', name: 'Test User' }
+      });
+
+      const mockLocalUser = {
+        userId: 'local-user-1',
+        email: 'user@example.com',
+        displayName: 'Test User',
+        role: 'user',
+        permissions: ['read'],
+        companyId: 'company-1'
+      };
+      provisionAINativeUser.mockResolvedValue(mockLocalUser);
+
+      jwt.sign
+        .mockReturnValueOnce('mock-access-token')
+        .mockReturnValueOnce('mock-refresh-token');
+
+      await authController.exchangeAINativeToken(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toBe('Token exchanged successfully');
+      expect(data.accessToken).toBe('mock-access-token');
+      expect(data.refreshToken).toBe('mock-refresh-token');
+      expect(data.user.email).toBe('user@example.com');
+      expect(data.user.userId).toBe('local-user-1');
+      expect(data.user.companyId).toBe('company-1');
+
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/auth/me'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer valid-ainative-token'
+          })
+        })
+      );
+      expect(provisionAINativeUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'ainative-user-1',
+          email: 'user@example.com',
+          isAINativeUser: true
+        })
+      );
+    });
+
+    it('should use ainativeUser name as fallback when localUser has no displayName', async () => {
+      req.body = { ainativeToken: 'valid-token' };
+
+      axios.get.mockResolvedValue({
+        data: { id: 'user-2', email: 'fallback@example.com', name: 'Fallback Name' }
+      });
+
+      provisionAINativeUser.mockResolvedValue({
+        userId: 'local-2',
+        email: 'fallback@example.com',
+        role: 'user',
+        permissions: []
+      });
+
+      jwt.sign
+        .mockReturnValueOnce('access-token-2')
+        .mockReturnValueOnce('refresh-token-2');
+
+      await authController.exchangeAINativeToken(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const data = JSON.parse(res._getData());
+      expect(data.user.name).toBe('Fallback Name');
+    });
+
+    it('should return 500 on unexpected errors', async () => {
+      req.body = { ainativeToken: 'valid-token' };
+
+      axios.get.mockResolvedValue({
+        data: { id: 'user-3', email: 'error@example.com', name: 'Error User' }
+      });
+
+      provisionAINativeUser.mockImplementation(() => {
+        throw new Error('Unexpected DB error');
+      });
+
+      await authController.exchangeAINativeToken(req, res);
+
+      expect(res.statusCode).toBe(500);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toBe('Internal server error');
     });
   });
 });
