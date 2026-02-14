@@ -62,8 +62,10 @@ if (Array.isArray(loggingMiddleware)) {
 // GitHub Issue #8: Database monitoring metrics endpoint
 app.use(metricsMiddleware);
 
-// Stripe webhook needs raw body BEFORE json parser
-app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+// Stripe webhook needs raw body BEFORE json parser and auth middleware
+// Mount the webhook handler directly here so it bypasses all auth
+const billingController = require('./controllers/billingController');
+app.post('/api/v1/billing/webhook', express.raw({ type: 'application/json' }), billingController.handleStripeWebhook);
 
 // Body parsers
 app.use(express.json());
