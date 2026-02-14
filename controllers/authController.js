@@ -14,9 +14,13 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
-const { blacklistToken } = require('../middleware/authMiddleware');
+const { blacklistToken, provisionAINativeUser } = require('../middleware/authMiddleware');
 const { sanitizeUser } = require('../utils/sanitizeUser');
+
+// AINative API URL for token validation
+const AINATIVE_API_URL = process.env.AINATIVE_API_URL || process.env.ZERODB_BASE_URL || 'https://api.ainative.studio';
 
 // Initialize Google OAuth client only when configured
 const googleClient = process.env.GOOGLE_CLIENT_ID
@@ -905,6 +909,85 @@ const sendVerificationEmailToUser = async (user) => {
   });
 };
 
+/**
+ * Exchange an AINative token for a local JWT
+ * This avoids slow AINative API round-trips on every subsequent request.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const exchangeAINativeToken = async (req, res) => {
+  try {
+    const { ainativeToken } = req.body;
+
+    if (!ainativeToken) {
+      return res.status(400).json({ message: 'ainativeToken is required' });
+    }
+
+    // Validate token against AINative /v1/auth/me
+    let ainativeUser;
+    try {
+      const response = await axios.get(`${AINATIVE_API_URL}/v1/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${ainativeToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 45000
+      });
+
+      ainativeUser = {
+        userId: response.data.id,
+        email: response.data.email,
+        name: response.data.name,
+        role: 'user',
+        permissions: [],
+        isAINativeUser: true
+      };
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid AINative token' });
+    }
+
+    // Provision or retrieve local user record
+    const localUser = await provisionAINativeUser(ainativeUser);
+
+    // Generate local JWT
+    const accessToken = jwt.sign(
+      {
+        userId: localUser.userId,
+        email: localUser.email,
+        name: localUser.displayName || localUser.name || ainativeUser.name,
+        role: localUser.role || 'user',
+        permissions: localUser.permissions || [],
+        companyId: localUser.companyId
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    const localRefreshToken = jwt.sign(
+      { userId: localUser.userId },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.status(200).json({
+      message: 'Token exchanged successfully',
+      accessToken,
+      refreshToken: localRefreshToken,
+      user: {
+        userId: localUser.userId,
+        email: localUser.email,
+        name: localUser.displayName || localUser.name || ainativeUser.name,
+        role: localUser.role || 'user',
+        permissions: localUser.permissions || [],
+        companyId: localUser.companyId
+      }
+    });
+  } catch (error) {
+    console.error('Token exchange error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Export all controller functions
 module.exports = {
   registerUser,
@@ -920,5 +1003,6 @@ module.exports = {
   sendVerificationEmail,
   verifyEmail,
   checkVerificationToken,
-  createEmailTransporter
+  createEmailTransporter,
+  exchangeAINativeToken
 };

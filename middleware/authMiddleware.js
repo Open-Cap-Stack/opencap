@@ -207,7 +207,7 @@ const validateAINativeToken = async (token) => {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      timeout: 5000
+      timeout: 45000
     });
 
     // AINative returns user object with id, email, name, etc.
