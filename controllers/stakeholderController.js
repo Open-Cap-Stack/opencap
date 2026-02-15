@@ -16,6 +16,18 @@ const { parsePagination } = require('../middleware/pagination');
  */
 exports.createStakeholder = async (req, res) => {
   try {
+    const { name, email, role } = req.body;
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    if (!role || typeof role !== 'string' || !role.trim()) {
+      return res.status(400).json({ error: 'Role is required' });
+    }
+
     const stakeholder = await Stakeholder.create(req.body);
     res.status(201).json(stakeholder);
   } catch (error) {

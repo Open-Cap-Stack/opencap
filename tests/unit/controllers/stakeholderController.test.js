@@ -48,6 +48,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       const stakeholderData = {
         stakeholderId: 'STK-001',
         name: 'John Doe',
+        email: 'john@example.com',
         role: 'Investor',
         projectId: 'PRJ-001'
       };
@@ -75,6 +76,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.body = {
         stakeholderId: 'STK-001',
         name: 'John Doe',
+        email: 'john@example.com',
         role: 'Investor',
         projectId: 'PRJ-001'
       };
@@ -409,19 +411,14 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   });
 
   describe('Edge Cases and Error Handling', () => {
-    it('should handle empty request body for create', async () => {
+    it('should return 400 for empty request body on create', async () => {
       mockReq.body = {};
-
-      Stakeholder.create.mockResolvedValue({
-        _id: 'test-id',
-        stakeholderId: 'stakeholder_generated',
-        createdAt: new Date().toISOString()
-      });
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
-      expect(Stakeholder.create).toHaveBeenCalledWith({});
-      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Name is required' });
+      expect(Stakeholder.create).not.toHaveBeenCalled();
     });
 
     it('should handle multiple query filters with pagination', async () => {
@@ -461,6 +458,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.body = {
         stakeholderId: 'STK-001',
         name: 'John Doe',
+        email: 'john@example.com',
         role: 'Investor',
         projectId: 'PRJ-001'
       };
