@@ -630,7 +630,25 @@ class BillingService {
       throw new Error('Plan is not active');
     }
 
-    // Calculate proration (simplified)
+    // If subscription is linked to Stripe, update via Stripe API
+    if (subscription.stripeSubscriptionId && stripeService.isConfigured() && newPlan.stripePriceId) {
+      const updatedStripeSub = await stripeService.updateSubscription(
+        subscription.stripeSubscriptionId,
+        { priceId: newPlan.stripePriceId }
+      );
+
+      // Sync from Stripe response to local DB
+      await this._syncSubscriptionFromStripe(companyId, updatedStripeSub);
+
+      return {
+        success: true,
+        stripeSubscriptionId: updatedStripeSub.id,
+        previousPlan: subscription.planId,
+        newPlan: newPlanId
+      };
+    }
+
+    // Fallback: local-only update for non-Stripe subscriptions
     let prorationAmount = 0;
     if (currentPlan && subscription.currentPeriodEnd) {
       const now = new Date();
@@ -640,12 +658,12 @@ class BillingService {
       prorationAmount = Math.max(0, dailyDiff * daysRemaining);
     }
 
-    // Update subscription
     const updatedSubscription = await databaseAdapter.findByIdAndUpdate(
       'Subscription',
       subscription._id,
       {
         planId: newPlanId,
+        stripePriceId: newPlan.stripePriceId || null,
         $push: {
           history: {
             action: 'plan_changed',
@@ -708,7 +726,45 @@ class BillingService {
       throw new Error('Cannot downgrade to a more expensive plan');
     }
 
-    // Schedule downgrade for end of billing period
+    // If subscription is linked to Stripe, schedule downgrade via Stripe
+    if (subscription.stripeSubscriptionId && stripeService.isConfigured() && newPlan.stripePriceId) {
+      // Stripe handles proration; schedule change at period end
+      const stripe = stripeService.getStripe();
+      const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+
+      await stripe.subscriptionSchedules.create({
+        from_subscription: subscription.stripeSubscriptionId,
+        phases: [
+          {
+            items: [{ price: stripeSub.items.data[0].price.id, quantity: 1 }],
+            start_date: stripeSub.current_period_start,
+            end_date: stripeSub.current_period_end
+          },
+          {
+            items: [{ price: newPlan.stripePriceId, quantity: 1 }]
+          }
+        ]
+      });
+
+      // Record locally
+      await databaseAdapter.findByIdAndUpdate('Subscription', subscription._id, {
+        metadata: {
+          ...(subscription.metadata || {}),
+          scheduledDowngrade: newPlanId,
+          scheduledDowngradeDate: subscription.currentPeriodEnd
+        }
+      });
+
+      return {
+        success: true,
+        scheduledDowngrade: true,
+        effectiveDate: subscription.currentPeriodEnd,
+        currentPlan: subscription.planId,
+        newPlan: newPlanId
+      };
+    }
+
+    // Fallback: local-only scheduled downgrade
     const updatedSubscription = await databaseAdapter.findByIdAndUpdate(
       'Subscription',
       subscription._id,

@@ -13,6 +13,7 @@
 
 const BillingService = require('../services/billingService');
 const stripeService = require('../services/stripeService');
+const { getAllPlans } = require('../config/stripe');
 
 /**
  * Determine appropriate HTTP status code based on error message
@@ -48,28 +49,32 @@ async function getCurrentPlan(req, res) {
     // Return default free plan if no companyId
     if (!companyId) {
       return res.status(200).json({
-        planId: 'free',
-        planName: 'Free',
-        status: 'active',
-        features: ['Basic features', 'Limited storage'],
-        limits: { stakeholders: 10, documents: 100, storage: '1GB' }
+        plan: {
+          planId: 'free',
+          planName: 'Free',
+          status: 'active',
+          features: ['Basic features', 'Limited storage'],
+          limits: { stakeholders: 10, documents: 100, storage: '1GB' }
+        }
       });
     }
 
-    const plan = await BillingService.getCurrentPlan(companyId);
+    const planData = await BillingService.getCurrentPlan(companyId);
 
-    if (!plan) {
+    if (!planData) {
       // Return default free plan if no subscription found
       return res.status(200).json({
-        planId: 'free',
-        planName: 'Free',
-        status: 'active',
-        features: ['Basic features', 'Limited storage'],
-        limits: { stakeholders: 10, documents: 100, storage: '1GB' }
+        plan: {
+          planId: 'free',
+          planName: 'Free',
+          status: 'active',
+          features: ['Basic features', 'Limited storage'],
+          limits: { stakeholders: 10, documents: 100, storage: '1GB' }
+        }
       });
     }
 
-    return res.status(200).json(plan);
+    return res.status(200).json({ plan: planData });
   } catch (error) {
     console.error('Error getting current plan:', error);
     const statusCode = getErrorStatusCode(error);
@@ -88,15 +93,17 @@ async function getUsageMetrics(req, res) {
     // Return default empty usage if no companyId
     if (!companyId) {
       return res.status(200).json({
-        stakeholders: { used: 0, limit: 10 },
-        documents: { used: 0, limit: 100 },
-        storage: { used: 0, limit: 1073741824 }, // 1GB in bytes
-        apiCalls: { used: 0, limit: 1000 }
+        usage: {
+          stakeholders: { used: 0, limit: 10 },
+          documents: { used: 0, limit: 100 },
+          storage: { used: 0, limit: 1073741824 },
+          apiCalls: { used: 0, limit: 1000 }
+        }
       });
     }
 
     const usage = await BillingService.getUsageMetrics(companyId);
-    return res.status(200).json(usage);
+    return res.status(200).json({ usage });
   } catch (error) {
     console.error('Error getting usage metrics:', error);
     const statusCode = getErrorStatusCode(error);
@@ -156,7 +163,7 @@ async function getInvoiceById(req, res) {
     }
 
     const invoice = await BillingService.getInvoiceById(invoiceId, companyId);
-    return res.status(200).json(invoice);
+    return res.status(200).json({ invoice });
   } catch (error) {
     console.error('Error getting invoice:', error);
     const statusCode = getErrorStatusCode(error);
@@ -262,7 +269,7 @@ async function getPaymentMethods(req, res) {
     }
 
     const methods = await BillingService.getPaymentMethods(companyId);
-    return res.status(200).json(methods);
+    return res.status(200).json({ paymentMethods: methods });
   } catch (error) {
     console.error('Error getting payment methods:', error);
     const statusCode = getErrorStatusCode(error);
@@ -634,6 +641,95 @@ async function handleStripeWebhook(req, res) {
   }
 }
 
+/**
+ * Get available subscription plans
+ * GET /api/v1/billing/plans
+ */
+async function getPlans(req, res) {
+  try {
+    const plans = getAllPlans();
+    return res.status(200).json({ plans });
+  } catch (error) {
+    console.error('Error getting plans:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * Create a Stripe Customer Portal session
+ * POST /api/v1/billing/customer-portal
+ */
+async function createCustomerPortalSession(req, res) {
+  try {
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const customer = await BillingService.getOrCreateStripeCustomer(
+      companyId,
+      req.user?.email,
+      req.user?.name
+    );
+
+    const returnUrl = req.body.returnUrl || `${req.headers.origin || 'http://localhost:5173'}/app/billing`;
+
+    const stripe = stripeService.getStripe();
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customer.stripeCustomerId,
+      return_url: returnUrl
+    });
+
+    return res.status(200).json({ url: portalSession.url });
+  } catch (error) {
+    console.error('Error creating customer portal session:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
+/**
+ * Get checkout session details
+ * GET /api/v1/billing/checkout-session/:sessionId
+ */
+async function getCheckoutSession(req, res) {
+  try {
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+
+    const session = await stripeService.retrieveCheckoutSession(sessionId);
+
+    return res.status(200).json({
+      session: {
+        id: session.id,
+        status: session.status,
+        paymentStatus: session.payment_status,
+        customerEmail: session.customer_details?.email,
+        amountTotal: session.amount_total ? session.amount_total / 100 : null,
+        currency: session.currency,
+        subscriptionId: session.subscription,
+        createdAt: new Date(session.created * 1000).toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error getting checkout session:', error);
+    const statusCode = getErrorStatusCode(error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getCurrentPlan,
   getUsageMetrics,
@@ -654,5 +750,8 @@ module.exports = {
   cancelSubscription,
   reactivateSubscription,
   createSetupIntent,
-  handleStripeWebhook
+  handleStripeWebhook,
+  getPlans,
+  createCustomerPortalSession,
+  getCheckoutSession
 };

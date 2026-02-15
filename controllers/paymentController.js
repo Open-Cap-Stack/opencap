@@ -291,20 +291,41 @@ const setDefaultPaymentMethod = async (req, res, next) => {
 /**
  * Handle Stripe webhooks
  * POST /api/v1/webhooks/stripe
+ *
+ * DEPRECATED: Use /api/v1/billing/webhook instead.
+ * This endpoint verifies Stripe signatures. Requires express.raw() middleware.
  */
 const handleWebhook = async (req, res, next) => {
   try {
-    const event = req.body;
+    const stripeService = require('../services/stripeService');
 
-    // In production, verify webhook signature here
-    // const sig = req.headers['stripe-signature'];
-    // const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    let event;
+    try {
+      event = stripeService.constructEvent(req.body, signature, webhookSecret);
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
 
     const result = await paymentService.handleWebhook(event);
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error handling webhook:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(200).json({ received: true, error: error.message });
   }
 };
 

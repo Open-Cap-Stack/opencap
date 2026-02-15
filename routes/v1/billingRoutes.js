@@ -31,6 +31,17 @@ const { authenticateToken } = require('../../middleware/authMiddleware');
 router.post('/webhook', billingController.handleStripeWebhook);
 
 // ============================================================
+// Public routes (no authentication required)
+// ============================================================
+
+/**
+ * @route GET /api/v1/billing/plans
+ * @desc Get available subscription plans
+ * @access Public
+ */
+router.get('/plans', billingController.getPlans);
+
+// ============================================================
 // All routes below require authentication
 // ============================================================
 router.use(authenticateToken);
@@ -170,5 +181,19 @@ router.post('/reactivate', billingController.reactivateSubscription);
  * @access Private
  */
 router.post('/setup-intent', billingController.createSetupIntent);
+
+/**
+ * @route POST /api/v1/billing/customer-portal
+ * @desc Create a Stripe Customer Portal session
+ * @access Private
+ */
+router.post('/customer-portal', billingController.createCustomerPortalSession);
+
+/**
+ * @route GET /api/v1/billing/checkout-session/:sessionId
+ * @desc Get checkout session details for success page
+ * @access Private
+ */
+router.get('/checkout-session/:sessionId', billingController.getCheckoutSession);
 
 module.exports = router;

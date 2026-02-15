@@ -87,6 +87,9 @@ const companySchema = {
     },
     authorizedShares: { type: 'number', required: false },
 
+    // Stripe billing integration
+    stripeCustomerId: { type: 'string', required: false, default: null },
+
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
 };
