@@ -23,7 +23,7 @@ describe('BillingController', () => {
       BillingService.getCurrentPlan.mockResolvedValue(mockPlanData);
       await billingController.getCurrentPlan(mockReq, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ subscription: expect.any(Object), plan: expect.any(Object) }));
+      expect(mockRes.json).toHaveBeenCalledWith({ plan: expect.objectContaining({ subscription: expect.any(Object), plan: expect.any(Object) }) });
     });
 
     it('should return default free plan when no active plan exists', async () => {
@@ -31,7 +31,7 @@ describe('BillingController', () => {
       await billingController.getCurrentPlan(mockReq, mockRes);
       // Controller returns default free plan with 200 when plan is null
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ planId: 'free', planName: 'Free', status: 'active' }));
+      expect(mockRes.json).toHaveBeenCalledWith({ plan: expect.objectContaining({ planId: 'free', planName: 'Free', status: 'active' }) });
     });
 
     it('should handle errors gracefully', async () => {
@@ -48,7 +48,7 @@ describe('BillingController', () => {
       BillingService.getUsageMetrics.mockResolvedValue(mockUsage);
       await billingController.getUsageMetrics(mockReq, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(mockUsage);
+      expect(mockRes.json).toHaveBeenCalledWith({ usage: mockUsage });
     });
     it('should handle errors gracefully', async () => {
       BillingService.getUsageMetrics.mockRejectedValue(new Error('Service unavailable'));
@@ -202,7 +202,7 @@ describe('BillingController', () => {
       await billingController.getCurrentPlan(mockReq, mockRes);
       // Controller returns default free plan when no companyId
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ planId: 'free' }));
+      expect(mockRes.json).toHaveBeenCalledWith({ plan: expect.objectContaining({ planId: 'free' }) });
     });
 
     it('should return appropriate status codes based on error type', async () => {
