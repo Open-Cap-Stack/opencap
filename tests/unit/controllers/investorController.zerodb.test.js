@@ -181,21 +181,31 @@ describe('InvestorController', () => {
   });
 
   describe('getAllInvestors', () => {
-    it('should return all investors', async () => {
+    it('should return all investors filtered by companyId', async () => {
       const mockInvestors = [
         { _id: 'mongo_1', investorId: 'INV-001', investorType: 'Angel' },
         { _id: 'mongo_2', investorId: 'INV-002', investorType: 'VC' }
       ];
 
+      req.query = { companyId: 'company-A' };
       databaseAdapter.find.mockResolvedValue(mockInvestors);
 
       await investorController.getAllInvestors(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.find).toHaveBeenCalledWith('Investor', {}, expect.any(Object));
+      expect(databaseAdapter.find).toHaveBeenCalledWith('Investor', { companyId: 'company-A' }, expect.any(Object));
       const data = JSON.parse(res._getData());
       expect(data.investors).toBeDefined();
       expect(data.investors.length).toBe(2);
+    });
+
+    it('should use user companyId when query param not provided', async () => {
+      req.user = { companyId: 'company-B' };
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await investorController.getAllInvestors(req, res);
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith('Investor', { companyId: 'company-B' }, expect.any(Object));
     });
 
     it('should return empty array when no investors exist', async () => {

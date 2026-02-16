@@ -72,7 +72,13 @@ exports.getInvestorById = async (req, res) => {
  */
 exports.getAllInvestors = async (req, res) => {
   try {
-    const investors = await databaseAdapter.find('Investor', {}, {});
+    // Filter by companyId to prevent cross-tenant data leakage
+    const filter = {};
+    const companyId = req.query?.companyId || req.user?.companyId;
+    if (companyId) {
+      filter.companyId = companyId;
+    }
+    const investors = await databaseAdapter.find('Investor', filter, {});
     res.status(200).json({ investors });
   } catch (error) {
     errorResponse(res, 500, 'Error fetching investors', error);

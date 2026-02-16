@@ -150,8 +150,16 @@ describe('ZeroDBModel', () => {
     });
 
     it('should increment __v on successful update', async () => {
-      zerodbService.queryTable.mockResolvedValue({
-        data: [{ row_id: 'r1', row_data: { _id: '1', __v: 0, name: 'Test' } }]
+      // First call: findOne for the update
+      // Second call: read-after-write verification (returns the updated version)
+      let callCount = 0;
+      zerodbService.queryTable.mockImplementation(() => {
+        callCount++;
+        if (callCount <= 1) {
+          return Promise.resolve({ data: [{ row_id: 'r1', row_data: { _id: '1', __v: 0, name: 'Test' } }] });
+        }
+        // Read-after-write returns updated version
+        return Promise.resolve({ data: [{ row_id: 'r1', row_data: { _id: '1', __v: 1, name: 'Updated' } }] });
       });
       zerodbService.client.put.mockResolvedValue({});
 
@@ -160,6 +168,25 @@ describe('ZeroDBModel', () => {
       // Verify the PUT call included incremented version
       const putCallData = zerodbService.client.put.mock.calls[0][1];
       expect(putCallData.row_data.__v).toBe(1);
+    });
+
+    it('should detect concurrent modification via read-after-write', async () => {
+      // First call: findOne returns version 0
+      // Second call: read-after-write finds version 5 (someone else wrote)
+      let callCount = 0;
+      zerodbService.queryTable.mockImplementation(() => {
+        callCount++;
+        if (callCount <= 1) {
+          return Promise.resolve({ data: [{ row_id: 'r1', row_data: { _id: '1', __v: 0, name: 'Test' } }] });
+        }
+        // Another writer bumped version to 5
+        return Promise.resolve({ data: [{ row_id: 'r1', row_data: { _id: '1', __v: 5, name: 'Other' } }] });
+      });
+      zerodbService.client.put.mockResolvedValue({});
+
+      await expect(
+        model.updateOne({ _id: '1' }, { $set: { name: 'Updated' } })
+      ).rejects.toThrow('Version conflict');
     });
   });
 

@@ -19,6 +19,7 @@ const {
 } = require('./middleware/security/rateLimit');
 const getLoggingMiddleware = require('./middleware/logging');
 const { securityLogger } = require('./middleware/securityAuditLogger'); // OCAE-306: Import security audit logging
+const { verifyCompanyAccess } = require('./middleware/companyAuth');
 // testEndpoints removed - no longer needed
 const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 const { databaseMonitor, metricsMiddleware } = require('./middleware/databaseMonitor'); // GitHub Issue #8: Database monitoring
@@ -249,6 +250,18 @@ const routes = {
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
+
+// Apply company-scope authorization to all API routes (after auth middleware in each route)
+// This ensures users can only access their own company's data
+// Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
+app.use('/api/v1', (req, res, next) => {
+  // Skip company check for auth, health, and public routes
+  const skipPaths = ['/auth', '/health'];
+  if (skipPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+  return verifyCompanyAccess()(req, res, next);
+});
 
 // Mount routes with correct paths
 Object.entries(routes).forEach(([key, route]) => {

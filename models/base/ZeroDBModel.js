@@ -276,6 +276,10 @@ class ZeroDBModel {
             }
         }
 
+        // Track if we need post-write verification
+        const needsVersionVerify = !options.skipVersionCheck && doc.__v !== undefined;
+        const expectedNewVersion = needsVersionVerify ? updateData.__v : null;
+
         // If we have row_id, use it for reliable update
         if (doc.row_id) {
             const newRowData = { ...doc, ...updateData };
@@ -287,6 +291,16 @@ class ZeroDBModel {
                 `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
                 { row_data: newRowData }
             );
+
+            // Read-after-write verification: confirm our version won
+            if (needsVersionVerify) {
+                const verified = await this.findOne(query);
+                if (verified && verified.__v !== expectedNewVersion) {
+                    const error = new Error('Version conflict: document was modified by a concurrent request');
+                    error.code = 'VERSION_CONFLICT';
+                    throw error;
+                }
+            }
 
             return {
                 acknowledged: true,
@@ -300,6 +314,16 @@ class ZeroDBModel {
             filter: query,
             update: { $set: updateData }
         });
+
+        // Read-after-write verification for fallback path
+        if (needsVersionVerify) {
+            const verified = await this.findOne(query);
+            if (verified && verified.__v !== expectedNewVersion) {
+                const error = new Error('Version conflict: document was modified by a concurrent request');
+                error.code = 'VERSION_CONFLICT';
+                throw error;
+            }
+        }
 
         return {
             acknowledged: true,
