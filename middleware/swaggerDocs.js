@@ -474,11 +474,6 @@ const setupSwagger = (app) => {
     res.send(swaggerSpec);
   });
   
-  // Add a redirect from root to Swagger docs for convenience
-  app.get('/', (req, res) => {
-    res.redirect('/api-docs');
-  });
-
   console.log('🚀 Swagger documentation available at /api-docs');
 };
 
