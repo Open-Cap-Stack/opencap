@@ -76,6 +76,12 @@ jest.mock('../../../services/zerodbService', () => {
 
             return Promise.resolve({ deletedCount: initialLength - mockData[tableName].length });
         }),
+        deleteRowById: jest.fn().mockImplementation((tableName, rowId) => {
+            return Promise.resolve({ deletedCount: 1 });
+        }),
+        client: {
+            put: jest.fn().mockResolvedValue({})
+        },
         // Expose mockData for test assertions
         _mockData: mockData,
         _clearMockData: () => {
@@ -753,18 +759,16 @@ describe('Document Models ZeroDB Migration', () => {
         });
 
         describe('deleteMany', () => {
-            it('should call deleteRows with filter', async () => {
-                // Insert a document first so findOne/deleteOne can locate it
-                zerodbService._mockData.documents.push({ _id: 'doc-2', DocumentType: 'Other', title: 'To Delete' });
+            it('should delete all matching documents', async () => {
+                // Insert documents so deleteMany can find and delete them
+                zerodbService._mockData.documents.push({ _id: 'doc-2', DocumentType: 'Other', title: 'To Delete 1' });
+                zerodbService._mockData.documents.push({ _id: 'doc-3', DocumentType: 'Other', title: 'To Delete 2' });
 
-                await DocumentModel.deleteMany({ DocumentType: 'Other' });
+                const result = await DocumentModel.deleteMany({ DocumentType: 'Other' });
 
-                // deleteMany calls deleteOne which calls findOne first, then deleteRows
+                // deleteMany finds all matches via queryTable, then deletes each by _id
                 expect(zerodbService.queryTable).toHaveBeenCalled();
-                expect(zerodbService.deleteRows).toHaveBeenCalledWith(
-                    'documents',
-                    { filter: { DocumentType: 'Other' } }
-                );
+                expect(result.deletedCount).toBe(2);
             });
         });
     });
