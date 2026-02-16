@@ -447,12 +447,6 @@ app.get('/health/zerodb', async (req, res) => {
   }
 });
 
-// Serve frontend static files
-const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
-if (fs.existsSync(frontendDistPath)) {
-  app.use(express.static(frontendDistPath));
-}
-
 // Global error handler - must be after all routes (Issue #357)
 const { errorResponse } = require('./middleware/errorResponse');
 app.use((err, req, res, next) => {
@@ -462,19 +456,7 @@ app.use((err, req, res, next) => {
   errorResponse(res, status, message, err);
 });
 
-// SPA catch-all: serve frontend index.html for non-API routes
-// Must be after API routes and error handler, before 404
-if (fs.existsSync(frontendDistPath)) {
-  app.get('*', (req, res, next) => {
-    // Don't serve index.html for API routes, health checks, or api-docs
-    if (req.path.startsWith('/api') || req.path.startsWith('/health') || req.path.startsWith('/api-docs')) {
-      return next();
-    }
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
-  });
-}
-
-// 404 handler - must be last (only hits for unmatched API routes)
+// 404 handler - must be last
 app.use('*', (req, res) => {
   errorResponse(res, 404, 'Route not found');
 });
