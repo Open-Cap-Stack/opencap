@@ -8,6 +8,7 @@
 
 const Stakeholder = require('../models/Stakeholder');
 const { parsePagination } = require('../middleware/pagination');
+const logger = require('../utils/logger');
 
 /**
  * Create a new stakeholder
@@ -31,7 +32,7 @@ exports.createStakeholder = async (req, res) => {
     const stakeholder = await Stakeholder.create(req.body);
     res.status(201).json(stakeholder);
   } catch (error) {
-    console.error('Error creating stakeholder:', error);
+    logger.error('Error creating stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error creating stakeholder' });
   }
 };
@@ -62,7 +63,7 @@ exports.getAllStakeholders = async (req, res) => {
     const stakeholders = await Stakeholder.find(filter, { limit, skip });
     res.status(200).json(stakeholders);
   } catch (error) {
-    console.error('Error fetching stakeholders:', error);
+    logger.error('Error fetching stakeholders', { error: error.message });
     res.status(500).json({ error: 'Error fetching stakeholders' });
   }
 };
@@ -85,7 +86,7 @@ exports.getStakeholderById = async (req, res) => {
 
     res.status(200).json({ stakeholder });
   } catch (error) {
-    console.error('Error fetching stakeholder:', error);
+    logger.error('Error fetching stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error fetching stakeholder' });
   }
 };
@@ -116,7 +117,7 @@ exports.updateStakeholderById = async (req, res) => {
 
     res.status(200).json({ stakeholder });
   } catch (error) {
-    console.error('Error updating stakeholder:', error);
+    logger.error('Error updating stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error updating stakeholder' });
   }
 };
@@ -139,7 +140,7 @@ exports.deleteStakeholderById = async (req, res) => {
 
     res.status(200).json({ message: 'Stakeholder deleted' });
   } catch (error) {
-    console.error('Error deleting stakeholder:', error);
+    logger.error('Error deleting stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error deleting stakeholder' });
   }
 };
