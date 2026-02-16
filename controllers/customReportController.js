@@ -40,7 +40,7 @@ class CustomReportController {
         ...req.body,
         reportId: uuidv4(),
         createdBy: user.id,
-        companyId: req.body.companyId || user.companyId
+        companyId: user.companyId
       };
 
       const report = new CustomReport(reportData);
