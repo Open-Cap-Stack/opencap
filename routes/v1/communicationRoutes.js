@@ -142,9 +142,24 @@ router.get('/:id', async (req, res) => {
 // PUT /api/communications/:id - Update communication by ID
 router.put('/:id', async (req, res) => {
   try {
+    // Validate that at least one updatable field is provided
+    const { MessageType, Content, Recipient } = req.body;
+    if (!MessageType && !Content && !Recipient) {
+      return res.status(400).json({ message: 'At least one field (MessageType, Content, Recipient) is required for update' });
+    }
+
+    // Build safe update payload with only allowed fields
+    const allowedFields = ['MessageType', 'Content', 'Recipient', 'Timestamp', 'ThreadId'];
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
     const communication = await Communication.findOneAndUpdate(
       { communicationId: req.params.id },
-      req.body,
+      updateData,
       { new: true }
     );
 
