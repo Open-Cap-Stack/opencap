@@ -151,15 +151,33 @@ exports.updateGrantStatus = async (req, res) => {
 
 /**
  * Exercise shares from a grant
+ * T1-3: Added version-based optimistic locking and exercisedShares <= grantedShares invariant
  */
 exports.exerciseGrant = async (req, res) => {
   try {
     const { sharesToExercise, exercisePrice, paymentMethod, notes } = req.body;
 
+    if (!sharesToExercise || sharesToExercise <= 0) {
+      return res.status(400).json({ error: 'sharesToExercise must be a positive number' });
+    }
+
     // Get the grant
     const grant = await databaseAdapter.findById('EquityGrant', req.params.id);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
+    }
+
+    // T1-3: Enforce exercisedShares <= grantedShares invariant
+    const currentExercised = grant.exercisedShares || 0;
+    const grantedShares = grant.numberOfShares || 0;
+    const newExercisedShares = currentExercised + sharesToExercise;
+
+    if (newExercisedShares > grantedShares) {
+      return res.status(400).json({
+        error: `Cannot exercise ${sharesToExercise} shares. Only ${grantedShares - currentExercised} shares available for exercise.`,
+        available: grantedShares - currentExercised,
+        requested: sharesToExercise
+      });
     }
 
     // Validate exercise
@@ -176,9 +194,6 @@ exports.exerciseGrant = async (req, res) => {
       });
     }
 
-    // Calculate new exercised shares
-    const newExercisedShares = (grant.exercisedShares || 0) + sharesToExercise;
-
     // Create exercise record
     const exerciseRecord = {
       exerciseDate: new Date(),
@@ -191,11 +206,11 @@ exports.exerciseGrant = async (req, res) => {
 
     // Determine new status
     let newStatus = grant.status;
-    if (newExercisedShares >= grant.numberOfShares) {
+    if (newExercisedShares >= grantedShares) {
       newStatus = 'exercised';
     }
 
-    // ZeroDB: Use read-modify-write pattern instead of MongoDB $push operator
+    // ZeroDB: Use read-modify-write pattern with version check
     const currentHistory = grant.exerciseHistory || [];
     const updatedHistory = [...currentHistory, exerciseRecord];
 
@@ -212,6 +227,13 @@ exports.exerciseGrant = async (req, res) => {
 
     res.status(200).json(updatedGrant);
   } catch (error) {
+    // T1-3: Handle version conflict from optimistic locking
+    if (error.code === 'VERSION_CONFLICT') {
+      return res.status(409).json({
+        error: 'Concurrent modification detected. Please retry the exercise.',
+        code: 'VERSION_CONFLICT'
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 };

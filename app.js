@@ -125,21 +125,32 @@ const isTestEnv = process.env.NODE_ENV === "test";
 // ============================================================================
 // ZeroDB is the primary and only database for OpenCap Stack
 // ============================================================================
-if (!isTestEnv && process.env.ENABLE_ZERODB === 'true') {
-  if (process.env.AINATIVE_API_TOKEN) {
-    zerodbService.initialize(process.env.AINATIVE_API_TOKEN)
-      .then(async result => {
-        console.log(`✅ ZeroDB initialized (project: ${result.projectId}, tables: ${result.databaseStatus?.tables || 0})`);
-        databaseMonitor.setupZeroDBMonitoring(zerodbService);
-        // Also initialize databaseAdapter for controllers that use it
-        await databaseAdapter.initialize(process.env.AINATIVE_API_TOKEN);
-        console.log('✅ DatabaseAdapter initialized');
-      })
-      .catch(err => console.error('❌ ZeroDB initialization failed:', err.message));
-  } else {
-    console.warn('⚠️  ZeroDB enabled but AINATIVE_API_TOKEN not set');
+// T2-2: ZeroDB initialization - made available as a promise for blocking startup
+const zerodbReady = (async () => {
+  if (isTestEnv || process.env.ENABLE_ZERODB !== 'true') return;
+
+  if (!process.env.AINATIVE_API_TOKEN) {
+    const msg = 'ZeroDB enabled but AINATIVE_API_TOKEN not set';
+    console.warn(`⚠️  ${msg}`);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(msg);
+    }
+    return;
   }
-}
+
+  try {
+    const result = await zerodbService.initialize(process.env.AINATIVE_API_TOKEN);
+    console.log(`✅ ZeroDB initialized (project: ${result.projectId}, tables: ${result.databaseStatus?.tables || 0})`);
+    databaseMonitor.setupZeroDBMonitoring(zerodbService);
+    await databaseAdapter.initialize(process.env.AINATIVE_API_TOKEN);
+    console.log('✅ DatabaseAdapter initialized');
+  } catch (err) {
+    console.error('❌ ZeroDB initialization failed:', err.message);
+    if (process.env.NODE_ENV === 'production') {
+      throw err; // Fatal in production - server should not start without DB
+    }
+  }
+})();
 
 // Function to safely require routes
 const safeRequire = (routePath) => {
@@ -440,9 +451,22 @@ app.use('*', (req, res) => {
 // Set up server and start listening
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 3000;
-  const server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+  // T2-2: Wait for ZeroDB before accepting requests in production
+  const startServer = async () => {
+    try {
+      await zerodbReady;
+    } catch (err) {
+      console.error('Fatal: Cannot start server without database:', err.message);
+      process.exit(1);
+    }
+    return app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+    });
+  };
+  const server = startServer().catch(err => {
+    console.error('Server startup failed:', err);
+    process.exit(1);
   });
 
   // Issue #388: Use enhanced graceful shutdown utility
@@ -452,13 +476,14 @@ if (process.env.NODE_ENV !== 'test') {
   registerCleanupHandler(
     async () => {
       console.log('ZeroDB cleanup (stateless HTTP API, no persistent connections)');
-      // Add any ZeroDB-specific cleanup here if needed
     },
     'ZeroDB Cleanup'
   );
 
-  // Setup graceful shutdown with automatic signal handling
-  setupGracefulShutdown(server);
+  // Setup graceful shutdown after server starts
+  server.then(srv => {
+    if (srv) setupGracefulShutdown(srv);
+  });
 }
 
 module.exports = app;

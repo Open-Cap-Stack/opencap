@@ -8,11 +8,15 @@
 const express = require('express');
 const router = express.Router();
 const zerodbSyncService = require('../services/zerodbSyncService');
+const { authenticateToken } = require('../middleware/authMiddleware');
+
+// T0-5: Protect all sync routes with authentication
+router.use(authenticateToken);
 
 /**
  * @route   GET /api/sync/health
  * @desc    Get comprehensive health status of all active syncs
- * @access  Public (should be protected in production)
+ * @access  Authenticated
  */
 router.get('/health', async (req, res) => {
   try {

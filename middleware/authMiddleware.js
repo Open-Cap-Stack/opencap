@@ -23,8 +23,27 @@ const AINATIVE_API_URL = process.env.AINATIVE_API_URL || process.env.ZERODB_BASE
 const JWT_VERIFICATION_TIMEOUT_MS = 5000; // 5 seconds timeout for JWT verification
 const TOKEN_BLACKLIST_TTL = 3600; // 1 hour TTL for blacklisted tokens
 
-// Use in-memory token blacklist as default
-let tokenBlacklist = new Set();
+// T2-4: Use in-memory token blacklist with TTL tracking
+// Map<token, expiresAt> instead of a bare Set, so we can periodically purge expired entries
+let tokenBlacklist = new Map();
+
+// Periodic cleanup of expired blacklisted tokens (every 10 minutes)
+const BLACKLIST_CLEANUP_INTERVAL = 10 * 60 * 1000;
+setInterval(() => {
+  if (tokenBlacklist instanceof Map) {
+    const now = Date.now();
+    let purged = 0;
+    for (const [token, expiresAt] of tokenBlacklist) {
+      if (expiresAt <= now) {
+        tokenBlacklist.delete(token);
+        purged++;
+      }
+    }
+    if (purged > 0) {
+      console.log(`[AuthMiddleware] Purged ${purged} expired tokens from blacklist (remaining: ${tokenBlacklist.size})`);
+    }
+  }
+}, BLACKLIST_CLEANUP_INTERVAL).unref(); // .unref() so this doesn't prevent process exit
 
 // Setup Redis client if available (conditionally loaded)
 let redisClient = null;
@@ -394,11 +413,13 @@ const isTokenBlacklisted = async (token) => {
     } catch (error) {
       console.error('Redis blacklist check failed:', error);
       // Fall back to in-memory blacklist
-      return tokenBlacklist.has(token);
+      const expiresAt = tokenBlacklist.get(token);
+      return expiresAt !== undefined && expiresAt > Date.now();
     }
   } else {
-    // Use in-memory blacklist
-    return tokenBlacklist.has(token);
+    // Use in-memory blacklist with TTL check
+    const expiresAt = tokenBlacklist.get(token);
+    return expiresAt !== undefined && expiresAt > Date.now();
   }
 };
 
@@ -408,7 +429,8 @@ const isTokenBlacklisted = async (token) => {
  */
 const checkTokenBlacklist = (token) => {
   // For backward compatibility, return synchronously from memory
-  return tokenBlacklist.has(token);
+  const expiresAt = tokenBlacklist.get(token);
+  return expiresAt !== undefined && expiresAt > Date.now();
 };
 
 /**
@@ -420,8 +442,8 @@ const checkTokenBlacklist = (token) => {
  */
 const blacklistToken = async (token) => {
   try {
-    // Always add to in-memory blacklist as a fallback
-    tokenBlacklist.add(token);
+    // Always add to in-memory blacklist with TTL as a fallback
+    tokenBlacklist.set(token, Date.now() + (TOKEN_BLACKLIST_TTL * 1000));
     
     // If Redis client exists and is ready, try to use it
     if (redisClient && redisClient.isReady) {

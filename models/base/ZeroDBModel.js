@@ -7,6 +7,7 @@
 
 const zerodbService = require('../../services/zerodbService');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../../utils/logger');
 
 class ZeroDBModel {
     constructor(tableName, schema = {}) {
@@ -57,15 +58,15 @@ class ZeroDBModel {
 
         const doc = {
             _id: this._generateId(),
+            __v: 0, // T0-6: Optimistic locking version field
             ...data
         };
 
         this._addTimestamps(doc, true);
 
         try {
-            console.log(`[ZeroDBModel] Creating document in ${this.tableName}:`, JSON.stringify(doc, null, 2));
+            logger.debug(`[ZeroDBModel] Creating document in ${this.tableName}`);
             const result = await zerodbService.insertRow(this.tableName, doc);
-            console.log(`[ZeroDBModel] Insert result:`, JSON.stringify(result, null, 2));
 
             // ZeroDB returns { row_id, row_data: {...} }, unwrap it properly
             const insertedRow = result.data?.[0];
@@ -85,13 +86,12 @@ class ZeroDBModel {
                 row_id: insertedRow?.row_id
             };
         } catch (error) {
-            console.error(`[ZeroDBModel] Error creating document in ${this.tableName}:`, error.message);
+            logger.error(`[ZeroDBModel] Error creating document in ${this.tableName}: ${error.message}`);
             // If table doesn't exist, try to create it and retry
             if (error.response?.status === 404 || error.message?.includes('not found')) {
-                console.log(`[ZeroDBModel] Table ${this.tableName} not found, attempting to create...`);
+                logger.info(`[ZeroDBModel] Table ${this.tableName} not found, attempting to create...`);
                 try {
                     await zerodbService.createTable(this.tableName, { fields: {} });
-                    console.log(`[ZeroDBModel] Table ${this.tableName} created, retrying insert...`);
                     const result = await zerodbService.insertRow(this.tableName, doc);
                     const insertedRow = result.data?.[0];
                     if (insertedRow?.row_data) {
@@ -103,12 +103,34 @@ class ZeroDBModel {
                     }
                     return { ...doc, ...insertedRow, _id: doc._id, row_id: insertedRow?.row_id };
                 } catch (createError) {
-                    console.error(`[ZeroDBModel] Failed to create table ${this.tableName}:`, createError.message);
+                    logger.error(`[ZeroDBModel] Failed to create table ${this.tableName}: ${createError.message}`);
                     throw error; // Throw original error
                 }
             }
             throw error;
         }
+    }
+
+    /**
+     * T0-7: Create a document with application-level uniqueness check.
+     * Verifies that no existing document matches the given unique fields before inserting.
+     * @param {Object} data - Document data
+     * @param {Object} uniqueFields - Key-value pairs that must be unique (e.g., { stakeholderId: 'sh_123' })
+     * @returns {Object} Created document
+     * @throws {Error} If a document with matching unique fields already exists
+     */
+    async createWithUniquenessCheck(data, uniqueFields) {
+        if (uniqueFields && Object.keys(uniqueFields).length > 0) {
+            const existing = await this.findOne(uniqueFields);
+            if (existing) {
+                const fieldNames = Object.keys(uniqueFields).join(', ');
+                const error = new Error(`Duplicate entry: a document with the same ${fieldNames} already exists in ${this.tableName}`);
+                error.code = 'DUPLICATE_ENTRY';
+                error.fields = uniqueFields;
+                throw error;
+            }
+        }
+        return this.create(data);
     }
 
     /**
@@ -181,10 +203,11 @@ class ZeroDBModel {
             return results[0];
         }
 
-        // Fallback: If query has filter criteria but no results found,
-        // try client-side filtering (handles ZeroDB filter inconsistencies)
+        // T2-1: Fallback with warning - client-side filtering for ZeroDB inconsistencies
+        // Use a smaller limit to avoid loading excessive records
         if (Object.keys(query).length > 0) {
-            const allResults = await this.find({}, { ...options, limit: 1000 });
+            logger.warn(`[ZeroDBModel] findOne fallback to client-side filter for ${this.tableName}, query: ${JSON.stringify(query)}`);
+            const allResults = await this.find({}, { ...options, limit: 200 });
             return allResults.find(item => {
                 return Object.entries(query).every(([key, value]) => item[key] === value);
             }) || null;
@@ -208,9 +231,9 @@ class ZeroDBModel {
             return filtered;
         }
 
-        // Fallback: fetch all and filter client-side if ZeroDB filter not working
-        // This handles cases where ZeroDB query doesn't support _id filtering
-        const allResults = await this.find({}, { ...options, limit: 1000 });
+        // Fallback: fetch and filter client-side if ZeroDB filter not working
+        logger.warn(`[ZeroDBModel] findById fallback to client-side filter for ${this.tableName}, id: ${id}`);
+        const allResults = await this.find({}, { ...options, limit: 200 });
         return allResults.find(item => item._id === id) || null;
     }
 
@@ -237,6 +260,21 @@ class ZeroDBModel {
         // Handle $set operator or direct updates
         const updateData = update.$set || update;
         updateData.updatedAt = new Date().toISOString();
+
+        // T0-6: Optimistic locking - check version and increment
+        if (!options.skipVersionCheck && doc.__v !== undefined) {
+            const expectedVersion = doc.__v;
+            updateData.__v = expectedVersion + 1;
+
+            // If caller provided an expected version, verify it matches
+            if (options.expectedVersion !== undefined && options.expectedVersion !== expectedVersion) {
+                const error = new Error('Version conflict: document was modified by another request');
+                error.code = 'VERSION_CONFLICT';
+                error.expectedVersion = options.expectedVersion;
+                error.actualVersion = expectedVersion;
+                throw error;
+            }
+        }
 
         // If we have row_id, use it for reliable update
         if (doc.row_id) {
@@ -278,7 +316,34 @@ class ZeroDBModel {
      * @returns {Object} Update result
      */
     async updateMany(query, update, options = {}) {
-        return this.updateOne(query, update, options);
+        await this._ensureInitialized();
+
+        // Find ALL matching documents
+        const docs = await this.find(query);
+        if (!docs || docs.length === 0) {
+            return {
+                acknowledged: true,
+                modifiedCount: 0,
+                matchedCount: 0
+            };
+        }
+
+        let modifiedCount = 0;
+        for (const doc of docs) {
+            try {
+                // Update each document individually using its _id
+                await this.updateOne({ _id: doc._id }, update, { ...options, skipVersionCheck: true });
+                modifiedCount++;
+            } catch (error) {
+                logger.error(`[ZeroDBModel] updateMany: failed to update doc ${doc._id}: ${error.message}`);
+            }
+        }
+
+        return {
+            acknowledged: true,
+            modifiedCount,
+            matchedCount: docs.length
+        };
     }
 
     /**
@@ -368,7 +433,35 @@ class ZeroDBModel {
      * @returns {Object} Delete result
      */
     async deleteMany(query) {
-        return this.deleteOne(query);
+        await this._ensureInitialized();
+
+        // Find ALL matching documents
+        const docs = await this.find(query);
+        if (!docs || docs.length === 0) {
+            return {
+                acknowledged: true,
+                deletedCount: 0
+            };
+        }
+
+        let deletedCount = 0;
+        for (const doc of docs) {
+            try {
+                if (doc.row_id) {
+                    await zerodbService.deleteRowById(this.tableName, doc.row_id);
+                } else {
+                    await zerodbService.deleteRows(this.tableName, { filter: { _id: doc._id } });
+                }
+                deletedCount++;
+            } catch (error) {
+                logger.error(`[ZeroDBModel] deleteMany: failed to delete doc ${doc._id}: ${error.message}`);
+            }
+        }
+
+        return {
+            acknowledged: true,
+            deletedCount
+        };
     }
 
     /**
@@ -490,72 +583,131 @@ class ZeroDBModel {
     }
 
     /**
+     * Create a new query builder to avoid shared mutable state.
+     * Each call returns a fresh object that doesn't mutate the model singleton.
+     * @returns {Object} Query builder with chainable methods
+     */
+    _createQueryBuilder(query = {}) {
+        const model = this;
+        const builder = {
+            _query: query,
+            _projection: null,
+            _sort: null,
+            _skip: null,
+            _limit: null,
+            _populate: null,
+
+            lean() { return this; },
+
+            select(fields) {
+                this._projection = typeof fields === 'string'
+                    ? fields.split(' ').reduce((acc, f) => {
+                        if (f.startsWith('-')) {
+                            acc[f.slice(1)] = 0;
+                        } else {
+                            acc[f] = 1;
+                        }
+                        return acc;
+                    }, {})
+                    : fields;
+                return this;
+            },
+
+            populate(path) {
+                this._populate = path;
+                return this;
+            },
+
+            sort(sort) {
+                this._sort = sort;
+                return this;
+            },
+
+            skip(n) {
+                this._skip = n;
+                return this;
+            },
+
+            limit(n) {
+                this._limit = n;
+                return this;
+            },
+
+            async exec() {
+                const options = {
+                    projection: this._projection,
+                    sort: this._sort,
+                    skip: this._skip,
+                    limit: this._limit
+                };
+                return model.find(this._query, options);
+            },
+
+            // Allow awaiting the builder directly
+            then(resolve, reject) {
+                return this.exec().then(resolve, reject);
+            }
+        };
+        return builder;
+    }
+
+    /**
      * Lean query - returns plain objects (no-op in ZeroDB, included for compatibility)
-     * @returns {ZeroDBModel} This model instance
+     * Returns a query builder to avoid mutating the shared model instance.
+     * @returns {Object} Query builder
      */
     lean() {
-        return this;
+        return this._createQueryBuilder();
     }
 
     /**
      * Select fields (for compatibility)
+     * Returns a query builder to avoid mutating the shared model instance.
      * @param {string|Object} fields - Fields to select
-     * @returns {ZeroDBModel} This model instance
+     * @returns {Object} Query builder
      */
     select(fields) {
-        this._projection = typeof fields === 'string'
-            ? fields.split(' ').reduce((acc, f) => {
-                if (f.startsWith('-')) {
-                    acc[f.slice(1)] = 0;
-                } else {
-                    acc[f] = 1;
-                }
-                return acc;
-            }, {})
-            : fields;
-        return this;
+        return this._createQueryBuilder().select(fields);
     }
 
     /**
      * Populate references (basic support - returns as-is for now)
+     * Returns a query builder to avoid mutating the shared model instance.
      * @param {string|Object} path - Path to populate
-     * @returns {ZeroDBModel} This model instance
+     * @returns {Object} Query builder
      */
     populate(path) {
-        // ZeroDB doesn't support joins natively
-        // For now, return this for chaining compatibility
-        this._populate = path;
-        return this;
+        return this._createQueryBuilder().populate(path);
     }
 
     /**
      * Sort results
+     * Returns a query builder to avoid mutating the shared model instance.
      * @param {Object} sort - Sort specification
-     * @returns {ZeroDBModel} This model instance
+     * @returns {Object} Query builder
      */
     sort(sort) {
-        this._sort = sort;
-        return this;
+        return this._createQueryBuilder().sort(sort);
     }
 
     /**
      * Skip results
+     * Returns a query builder to avoid mutating the shared model instance.
      * @param {number} n - Number to skip
-     * @returns {ZeroDBModel} This model instance
+     * @returns {Object} Query builder
      */
     skip(n) {
-        this._skip = n;
-        return this;
+        return this._createQueryBuilder().skip(n);
     }
 
     /**
      * Limit results
+     * Returns a query builder to avoid mutating the shared model instance.
      * @param {number} n - Maximum results
-     * @returns {ZeroDBModel} This model instance
+     * @returns {Object} Query builder
      */
     limit(n) {
-        this._limit = n;
-        return this;
+        return this._createQueryBuilder().limit(n);
     }
 
     /**
@@ -563,23 +715,7 @@ class ZeroDBModel {
      * @returns {Array} Query results
      */
     async exec() {
-        const options = {
-            projection: this._projection,
-            sort: this._sort,
-            skip: this._skip,
-            limit: this._limit
-        };
-
-        const results = await this.find(this._query || {}, options);
-
-        // Reset chained options
-        this._projection = null;
-        this._sort = null;
-        this._skip = null;
-        this._limit = null;
-        this._query = null;
-
-        return results;
+        return this.find({});
     }
 }
 

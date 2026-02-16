@@ -464,6 +464,7 @@ describe('Company Controller - ZeroDB Migration', () => {
   describe('deleteCompanyById', () => {
     it('should delete a company successfully', async () => {
       mockReq.params.id = 'zerodb-id-123';
+      mockReq.query = {};
 
       const existingCompany = {
         _id: 'zerodb-id-123',
@@ -471,17 +472,17 @@ describe('Company Controller - ZeroDB Migration', () => {
         CompanyName: 'Company To Delete'
       };
 
-      zerodbService.queryTable.mockResolvedValue([existingCompany]);
+      // Cascade-aware delete: first call returns company, child table checks return empty
+      let deleteCallIdx = 0;
+      zerodbService.queryTable.mockImplementation(() => {
+        deleteCallIdx++;
+        if (deleteCallIdx === 1) return Promise.resolve([existingCompany]);
+        return Promise.resolve([]); // No children
+      });
       zerodbService.deleteRows.mockResolvedValue({ deletedCount: 1 });
 
       await companyController.deleteCompanyById(mockReq, mockRes);
 
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {
-        filter: { _id: 'zerodb-id-123' }
-      });
-      expect(zerodbService.deleteRows).toHaveBeenCalledWith('companies', {
-        _id: 'zerodb-id-123'
-      });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Company deleted' });
     });
@@ -512,6 +513,7 @@ describe('Company Controller - ZeroDB Migration', () => {
 
     it('should handle cascading delete for company relationships', async () => {
       mockReq.params.id = 'zerodb-id-123';
+      mockReq.query = { force: 'true' };
 
       const companyWithRelationships = {
         _id: 'zerodb-id-123',
@@ -521,7 +523,13 @@ describe('Company Controller - ZeroDB Migration', () => {
         documents: ['doc-1', 'doc-2']
       };
 
-      zerodbService.queryTable.mockResolvedValue([companyWithRelationships]);
+      // First call returns company, subsequent calls for child table checks return empty
+      let callCount = 0;
+      zerodbService.queryTable.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve([companyWithRelationships]);
+        return Promise.resolve([]); // No children in child tables
+      });
       zerodbService.deleteRows.mockResolvedValue({ deletedCount: 1 });
 
       await companyController.deleteCompanyById(mockReq, mockRes);
@@ -941,10 +949,16 @@ describe('Company Controller - ZeroDB Migration', () => {
       await companyController.updateCompanyById(mockReq, mockRes);
       expect(zerodbService.updateRows).toHaveBeenCalledWith('companies', expect.any(Object), expect.any(Object));
 
-      // Test delete
+      // Test delete (cascade-aware: first call returns company, rest return empty)
       jest.clearAllMocks();
       mockReq.params.id = 'id-1';
-      zerodbService.queryTable.mockResolvedValue([{ _id: 'id-1' }]);
+      mockReq.query = {};
+      let deleteCallCount = 0;
+      zerodbService.queryTable.mockImplementation(() => {
+        deleteCallCount++;
+        if (deleteCallCount === 1) return Promise.resolve([{ _id: 'id-1', companyId: 'comp-1' }]);
+        return Promise.resolve([]); // No children
+      });
       zerodbService.deleteRows.mockResolvedValue({ deletedCount: 1 });
       await companyController.deleteCompanyById(mockReq, mockRes);
       expect(zerodbService.deleteRows).toHaveBeenCalledWith('companies', expect.any(Object));

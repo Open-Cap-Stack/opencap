@@ -224,6 +224,9 @@ const SAFE = {
      * @param {string} userId - User ID
      * @returns {Object} Updated SAFE
      */
+    /**
+     * T1-5: Add investor signature with optimistic locking to prevent dual-signature race.
+     */
     async addInvestorSignature(safeId, signatureData, userId) {
         const safe = await this.findOne({ safeId });
         if (!safe) {
@@ -238,9 +241,10 @@ const SAFE = {
             updatedBy: userId
         };
 
-        await this.updateOne({ safeId }, { $set: updateData });
+        // Use version-aware update to prevent race condition
+        await this.updateOne({ safeId }, { $set: updateData }, { expectedVersion: safe.__v });
 
-        // Check if both signatures are now present
+        // Check if both signatures are now present (re-read after our update)
         const updatedSafe = await this.findOne({ safeId });
         if (updatedSafe.companySignature?.signedAt) {
             return this.transitionTo(safeId, 'fully_signed', userId, 'Both parties signed');
@@ -256,6 +260,9 @@ const SAFE = {
      * @param {string} userId - User ID
      * @returns {Object} Updated SAFE
      */
+    /**
+     * T1-5: Add company signature with optimistic locking to prevent dual-signature race.
+     */
     async addCompanySignature(safeId, signatureData, userId) {
         const safe = await this.findOne({ safeId });
         if (!safe) {
@@ -270,9 +277,10 @@ const SAFE = {
             updatedBy: userId
         };
 
-        await this.updateOne({ safeId }, { $set: updateData });
+        // Use version-aware update to prevent race condition
+        await this.updateOne({ safeId }, { $set: updateData }, { expectedVersion: safe.__v });
 
-        // Check if both signatures are now present
+        // Check if both signatures are now present (re-read after our update)
         const updatedSafe = await this.findOne({ safeId });
         if (updatedSafe.investorSignature?.signedAt) {
             return this.transitionTo(safeId, 'fully_signed', userId, 'Both parties signed');

@@ -115,15 +115,11 @@ describe('Tax Calculation Formula Verification - IRS Compliance', () => {
       // Excess $500K at 37% = $185,000
       // Total should be = $405,000
 
-      // DOCUMENTED ISSUE: Current implementation doesn't handle >$1M correctly
-      const currentImplementation = spread * 0.22; // $330,000
+      // T0-8 FIX: Now correctly implements two-tier supplemental wage rate
+      // First $1M at 22% = $220,000, excess $500K at 37% = $185,000
       const correctIRSCalculation = (1000000 * 0.22) + (500000 * 0.37); // $405,000
 
-      // Test current behavior (will need fix)
-      expect(result.summary.federalWithholding).toBe(currentImplementation);
-
-      // TODO: Implement correct >$1M supplemental wage handling
-      // expect(result.summary.federalWithholding).toBe(correctIRSCalculation);
+      expect(result.summary.federalWithholding).toBe(correctIRSCalculation);
     });
   });
 

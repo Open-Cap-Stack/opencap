@@ -201,6 +201,63 @@ describe('TaxWithholdingService', () => {
     });
   });
 
+  describe('T0-8: $1M supplemental wage rate tiers', () => {
+    it('should apply 22% rate for income entirely under $1M', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 500000,
+        ordinaryIncome: 500000,
+        eventType: 'nso_exercise',
+        employeeProfile: baseEmployeeProfile,
+        ytdWages: 0,
+        ytdSocialSecurity: 0
+      });
+
+      const federalWithholdings = result.withholdings.filter(w => w.type === 'federal' && w.rate > 0);
+      expect(federalWithholdings).toHaveLength(1);
+      expect(federalWithholdings[0].rate).toBe(0.22);
+    });
+
+    it('should apply 37% rate for income when ytdWages already over $1M', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 500000,
+        ordinaryIncome: 500000,
+        eventType: 'nso_exercise',
+        employeeProfile: baseEmployeeProfile,
+        ytdWages: 1500000,
+        ytdSocialSecurity: 0
+      });
+
+      const federalWithholdings = result.withholdings.filter(w => w.type === 'federal' && w.rate > 0);
+      expect(federalWithholdings).toHaveLength(1);
+      expect(federalWithholdings[0].rate).toBe(0.37);
+      expect(federalWithholdings[0].withholdingAmount).toBeCloseTo(185000, 0);
+    });
+
+    it('should split 22%/37% when income crosses $1M threshold', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 600000,
+        ordinaryIncome: 600000,
+        eventType: 'nso_exercise',
+        employeeProfile: baseEmployeeProfile,
+        ytdWages: 800000,
+        ytdSocialSecurity: 0
+      });
+
+      const federalWithholdings = result.withholdings.filter(w => w.type === 'federal' && w.rate > 0);
+      expect(federalWithholdings).toHaveLength(2);
+
+      // First $200K at 22%
+      const at22 = federalWithholdings.find(w => w.rate === 0.22);
+      expect(at22.baseAmount).toBeCloseTo(200000, 0);
+      expect(at22.withholdingAmount).toBeCloseTo(44000, 0);
+
+      // Remaining $400K at 37%
+      const at37 = federalWithholdings.find(w => w.rate === 0.37);
+      expect(at37.baseAmount).toBeCloseTo(400000, 0);
+      expect(at37.withholdingAmount).toBeCloseTo(148000, 0);
+    });
+  });
+
   describe('calculateSharesToWithhold', () => {
     it('should calculate shares needed for sell-to-cover', () => {
       const totalWithholding = 10000;

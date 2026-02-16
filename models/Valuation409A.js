@@ -228,6 +228,10 @@ const Valuation409A = {
      * @param {Object} metadata - Additional metadata
      * @returns {Object} Updated valuation
      */
+    /**
+     * T1-4: State transition with optimistic locking to prevent TOCTOU race conditions.
+     * Uses the version field (__v) to detect concurrent modifications.
+     */
     async transitionTo(valuationId, newStatus, userId, reason = null, metadata = {}) {
         const valuation = await this.findOne({ valuationId });
         if (!valuation) {
@@ -273,7 +277,12 @@ const Valuation409A = {
             updateData.expirationDate = expiration.toISOString();
         }
 
-        await this.updateOne({ valuationId }, { $set: updateData });
+        // Use version-aware update to prevent concurrent transitions
+        await this.updateOne(
+            { valuationId },
+            { $set: updateData },
+            { expectedVersion: valuation.__v }
+        );
         return this.findOne({ valuationId });
     },
 

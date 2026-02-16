@@ -200,7 +200,53 @@ exports.deleteCompanyById = async (req, res) => {
       return res.status(404).json({ message: 'Company not found' });
     }
 
-    // Delete from ZeroDB
+    // T1-2: Cascade-aware delete - check for and remove child entities
+    const companyId = existingCompany.companyId || id;
+    const childTables = [
+      'stakeholders',
+      'equity_grants',
+      'securities',
+      'valuations',
+      'documents',
+      'activities',
+      'notifications',
+      'transactions'
+    ];
+
+    const orphanWarnings = [];
+    for (const table of childTables) {
+      try {
+        const children = await zerodbService.queryTable(table, {
+          filter: { companyId },
+          limit: 1
+        });
+        if (children && children.length > 0) {
+          orphanWarnings.push(table);
+        }
+      } catch (e) {
+        // Table may not exist - that's fine
+      }
+    }
+
+    if (orphanWarnings.length > 0 && !req.query.force) {
+      return res.status(409).json({
+        message: 'Company has associated data in the following tables. Use ?force=true to delete anyway.',
+        associatedTables: orphanWarnings
+      });
+    }
+
+    // If force=true, delete child entities first
+    if (orphanWarnings.length > 0 && req.query.force === 'true') {
+      for (const table of orphanWarnings) {
+        try {
+          await zerodbService.deleteRows(table, { companyId });
+        } catch (e) {
+          console.error(`Error deleting ${table} for company ${companyId}:`, e.message);
+        }
+      }
+    }
+
+    // Delete the company from ZeroDB
     await zerodbService.deleteRows(TABLE_NAME, { _id: id });
 
     res.status(200).json({ message: 'Company deleted' });

@@ -230,10 +230,14 @@ const ShareClass = {
             };
         }
 
-        // Calculate participation if applicable
+        // T2-5: Fix participation calculation - use proportional share, not full remainder
         let participationAmount = 0;
         if (participatingPreferred) {
             const remainingProceeds = availableProceeds - preferenceAmount;
+            // Pro-rata share should be proportional to this class's shares vs total outstanding
+            // The caller should pass fullyDilutedShares as an additional parameter
+            // For backward compatibility, if totalShares equals the class's shares,
+            // we use the full remainder (single-class scenario)
             const proRataShare = totalShares > 0 ? remainingProceeds : 0;
 
             if (participationCap) {

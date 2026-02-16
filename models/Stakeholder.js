@@ -462,6 +462,11 @@ const Stakeholder = {
      * @param {Date} terminationDate - Termination date
      * @returns {Object} Updated stakeholder
      */
+    /**
+     * T1-6: Terminate stakeholder with optimistic locking to prevent double forfeiture.
+     * Uses version check to ensure the stakeholder hasn't been modified between
+     * the status check and the update.
+     */
     async terminate(stakeholderId, terminationDate = new Date()) {
         const stakeholder = await this.findByStakeholderId(stakeholderId);
 
@@ -476,16 +481,23 @@ const Stakeholder = {
         // Upon termination, unvested shares are typically forfeited
         const newForfeitedShares = (stakeholder.totalForfeitedShares || 0) + (stakeholder.totalUnvestedShares || 0);
 
-        return baseModel.findOneAndUpdate.call(baseModel,
+        const updateData = {
+            status: 'terminated',
+            terminationDate,
+            totalForfeitedShares: newForfeitedShares,
+            totalUnvestedShares: 0,
+            updatedAt: new Date()
+        };
+
+        // Use version-aware update to prevent concurrent terminations
+        await baseModel.updateOne.call(baseModel,
             { stakeholderId },
-            {
-                status: 'terminated',
-                terminationDate,
-                totalForfeitedShares: newForfeitedShares,
-                totalUnvestedShares: 0,
-                updatedAt: new Date()
-            }
+            { $set: updateData },
+            { expectedVersion: stakeholder.__v }
         );
+
+        // Return the updated stakeholder (merge local update data for consistency)
+        return { ...stakeholder, ...updateData };
     },
 
     // Expose base model methods

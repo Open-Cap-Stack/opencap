@@ -5,7 +5,9 @@
 const TaxWithholding = require('../models/TaxWithholding');
 
 // 2024 Federal Tax Brackets (Supplemental wage flat rate)
-const FEDERAL_SUPPLEMENTAL_RATE = 0.22; // 22% flat rate for supplemental wages
+const FEDERAL_SUPPLEMENTAL_RATE = 0.22; // 22% flat rate for supplemental wages up to $1M
+const FEDERAL_SUPPLEMENTAL_RATE_EXCESS = 0.37; // 37% rate for supplemental wages over $1M
+const SUPPLEMENTAL_WAGE_THRESHOLD = 1000000; // $1M threshold for higher rate
 
 // 2024 FICA rates
 const SOCIAL_SECURITY_RATE = 0.062;
@@ -155,15 +157,54 @@ class TaxWithholdingService {
     const withholdings = [];
     let totalWithholding = 0;
 
-    // Federal withholding (supplemental flat rate)
-    const federalWithholding = ordinaryIncome * FEDERAL_SUPPLEMENTAL_RATE;
-    withholdings.push({
-      type: 'federal',
-      rate: FEDERAL_SUPPLEMENTAL_RATE,
-      baseAmount: ordinaryIncome,
-      withholdingAmount: federalWithholding,
-      notes: 'Federal supplemental wage rate'
-    });
+    // T0-8: Federal withholding - two-tier supplemental rate
+    // IRS requires 22% on first $1M of supplemental wages, 37% on excess
+    const cumulativeSupplemental = ytdWages + ordinaryIncome;
+    let federalWithholding = 0;
+
+    if (ytdWages >= SUPPLEMENTAL_WAGE_THRESHOLD) {
+      // All of this income is above $1M threshold
+      federalWithholding = ordinaryIncome * FEDERAL_SUPPLEMENTAL_RATE_EXCESS;
+      withholdings.push({
+        type: 'federal',
+        rate: FEDERAL_SUPPLEMENTAL_RATE_EXCESS,
+        baseAmount: ordinaryIncome,
+        withholdingAmount: federalWithholding,
+        notes: 'Federal supplemental wage rate (excess over $1M)'
+      });
+    } else if (cumulativeSupplemental > SUPPLEMENTAL_WAGE_THRESHOLD) {
+      // Part at 22%, part at 37%
+      const amountAt22 = SUPPLEMENTAL_WAGE_THRESHOLD - ytdWages;
+      const amountAt37 = ordinaryIncome - amountAt22;
+      const withholding22 = amountAt22 * FEDERAL_SUPPLEMENTAL_RATE;
+      const withholding37 = amountAt37 * FEDERAL_SUPPLEMENTAL_RATE_EXCESS;
+      federalWithholding = withholding22 + withholding37;
+
+      withholdings.push({
+        type: 'federal',
+        rate: FEDERAL_SUPPLEMENTAL_RATE,
+        baseAmount: amountAt22,
+        withholdingAmount: withholding22,
+        notes: 'Federal supplemental wage rate (first $1M)'
+      });
+      withholdings.push({
+        type: 'federal',
+        rate: FEDERAL_SUPPLEMENTAL_RATE_EXCESS,
+        baseAmount: amountAt37,
+        withholdingAmount: withholding37,
+        notes: 'Federal supplemental wage rate (excess over $1M)'
+      });
+    } else {
+      // All under $1M threshold
+      federalWithholding = ordinaryIncome * FEDERAL_SUPPLEMENTAL_RATE;
+      withholdings.push({
+        type: 'federal',
+        rate: FEDERAL_SUPPLEMENTAL_RATE,
+        baseAmount: ordinaryIncome,
+        withholdingAmount: federalWithholding,
+        notes: 'Federal supplemental wage rate'
+      });
+    }
     totalWithholding += federalWithholding;
 
     // State withholding
