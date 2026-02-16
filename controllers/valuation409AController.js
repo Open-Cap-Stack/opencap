@@ -18,7 +18,7 @@ exports.createValuationRequest = async (req, res) => {
       metadata
     } = req.body;
 
-    const valuation = new Valuation409A({
+    const valuation = await Valuation409A.create({
       companyId,
       requestedBy: req.user._id,
       reason,
@@ -26,16 +26,8 @@ exports.createValuationRequest = async (req, res) => {
       notes,
       tags,
       metadata,
-      createdBy: req.user._id,
-      statusHistory: [{
-        status: 'requested',
-        changedAt: new Date(),
-        changedBy: req.user._id,
-        reason: 'Valuation request created'
-      }]
+      createdBy: req.user._id
     });
-
-    await valuation.save();
 
     res.status(201).json({
       success: true,
@@ -138,13 +130,13 @@ exports.updateValuation = async (req, res) => {
     delete updates.status;
     delete updates.statusHistory;
 
-    Object.assign(valuation, updates);
-    valuation.updatedBy = req.user._id;
-    await valuation.save();
+    updates.updatedBy = req.user._id;
+    await Valuation409A.updateOne({ valuationId }, { $set: updates });
+    const updated = await Valuation409A.findOne({ valuationId });
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
@@ -168,14 +160,15 @@ exports.assignValuationFirm = async (req, res) => {
       });
     }
 
-    await valuation.assignValuationFirm(
+    const updated = await Valuation409A.assignValuationFirm(
+      valuationId,
       { name, contactName, contactEmail, phone },
       req.user._id
     );
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
@@ -199,14 +192,15 @@ exports.receiveDraft = async (req, res) => {
       });
     }
 
-    await valuation.receiveDraft(
+    const updated = await Valuation409A.receiveDraft(
+      valuationId,
       { fairMarketValue, valuationMethod, effectiveDate, notes },
       req.user._id
     );
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
@@ -230,11 +224,11 @@ exports.startReview = async (req, res) => {
       });
     }
 
-    await valuation.startReview(req.user._id, notes);
+    const updated = await Valuation409A.startReview(valuationId, req.user._id, notes);
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
@@ -258,16 +252,17 @@ exports.approveValuation = async (req, res) => {
       });
     }
 
-    await valuation.approve(req.user._id, resolution ? { resolution } : null);
+    const updated = await Valuation409A.approve(valuationId, req.user._id, resolution ? { resolution } : null);
 
     if (notes) {
-      valuation.notes = notes;
-      await valuation.save();
+      await Valuation409A.updateOne({ valuationId }, { $set: { notes } });
     }
+
+    const result = notes ? await Valuation409A.findOne({ valuationId }) : updated;
 
     res.json({
       success: true,
-      data: valuation
+      data: result
     });
   } catch (error) {
     res.status(400).json({
@@ -291,18 +286,18 @@ exports.cancelValuation = async (req, res) => {
       });
     }
 
-    if (!valuation.canTransitionTo('cancelled')) {
+    if (!Valuation409A.canTransitionTo(valuation.status, 'cancelled')) {
       return res.status(400).json({
         success: false,
         error: `Cannot cancel valuation in ${valuation.status} status`
       });
     }
 
-    await valuation.transitionTo('cancelled', req.user._id, reason || 'Cancelled by user');
+    const updated = await Valuation409A.transitionTo(valuationId, 'cancelled', req.user._id, reason || 'Cancelled by user');
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
@@ -326,11 +321,11 @@ exports.addDocument = async (req, res) => {
       });
     }
 
-    await valuation.addDocument({ documentId, type, name }, req.user._id);
+    const updated = await Valuation409A.addDocument(valuationId, { documentId, type, name }, req.user._id);
 
     res.json({
       success: true,
-      data: valuation
+      data: updated
     });
   } catch (error) {
     res.status(400).json({
