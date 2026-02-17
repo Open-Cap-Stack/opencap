@@ -96,6 +96,7 @@ const rolePermissions = {
     user: [
         'read:users',
         'read:companies',
+        'write:companies',
         'read:reports',
         'read:spv',
         'read:assets',
