@@ -296,13 +296,11 @@ exports.getCompanyByCompanyId = async (req, res) => {
   try {
     const { companyId } = req.params;
 
-    // Query company by companyId from ZeroDB
-    const result = await zerodbService.queryTable(TABLE_NAME, {
-      filter: { companyId }
-    });
+    // Query all companies and filter in-memory (ZeroDB filters don't search inside row_data)
+    const result = await zerodbService.queryTable(TABLE_NAME, {});
     const rows = unwrapZeroDBResponse(result);
 
-    const company = rows.length > 0 ? rows[0] : null;
+    const company = rows.find(row => row.companyId === companyId) || null;
 
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
