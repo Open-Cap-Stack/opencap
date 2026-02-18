@@ -15,6 +15,30 @@ const LEGAL_STRUCTURE_FIELDS = [
 ];
 
 /**
+ * Unwrap ZeroDB response to a flat array of row objects.
+ * queryTable may return { data: [...] } or a plain array.
+ * Each item may have row_data wrapping the actual fields.
+ */
+function unwrapZeroDBResponse(result) {
+  if (!result) return [];
+  const rawData = result.data || result.rows || result || [];
+  if (Array.isArray(rawData)) {
+    return rawData.map(item => {
+      if (item.row_data) {
+        return {
+          ...item.row_data,
+          id: item.row_id || item.row_data.id,
+          _id: item.row_id || item.row_data._id || item.row_data.id,
+          row_id: item.row_id
+        };
+      }
+      return item;
+    });
+  }
+  return rawData;
+}
+
+/**
  * Validate company data against schema requirements
  * @param {Object} data - Company data to validate
  * @returns {Object} - { valid: boolean, errors: string[] }
@@ -89,9 +113,12 @@ exports.createCompany = async (req, res) => {
     // Insert into ZeroDB
     const result = await zerodbService.insertRow(TABLE_NAME, companyData);
 
-    // Return the created company
-    const savedCompany = result.rows ? result.rows[0] : result;
-    res.status(201).json(savedCompany);
+    // Return the created company (insertRow returns { data: [...] })
+    const savedCompany = result.data?.[0] || result.rows?.[0] || result;
+    const company = savedCompany?.row_data
+      ? { ...savedCompany.row_data, _id: savedCompany.row_id || savedCompany.row_data._id, row_id: savedCompany.row_id }
+      : savedCompany;
+    res.status(201).json(company);
   } catch (error) {
     console.error('Error creating company:', error.message);
     res.status(500).json({ message: 'Server error' });
@@ -105,7 +132,8 @@ exports.createCompany = async (req, res) => {
 exports.getAllCompanies = async (req, res) => {
   try {
     // Query all companies from ZeroDB
-    const companies = await zerodbService.queryTable(TABLE_NAME, {});
+    const result = await zerodbService.queryTable(TABLE_NAME, {});
+    const companies = unwrapZeroDBResponse(result);
 
     if (!companies || companies.length === 0) {
       return res.status(404).json({ message: 'No companies found' });
@@ -130,8 +158,9 @@ exports.getCompanyById = async (req, res) => {
     const result = await zerodbService.queryTable(TABLE_NAME, {
       filter: { _id: id }
     });
+    const rows = unwrapZeroDBResponse(result);
 
-    const company = result && result.length > 0 ? result[0] : null;
+    const company = rows.length > 0 ? rows[0] : null;
 
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
@@ -167,8 +196,9 @@ exports.updateCompanyById = async (req, res) => {
     const result = await zerodbService.queryTable(TABLE_NAME, {
       filter: { _id: id }
     });
+    const rows = unwrapZeroDBResponse(result);
 
-    const updatedCompany = result && result.length > 0 ? result[0] : null;
+    const updatedCompany = rows.length > 0 ? rows[0] : null;
 
     if (!updatedCompany) {
       return res.status(404).json({ message: 'Company not found' });
@@ -193,8 +223,9 @@ exports.deleteCompanyById = async (req, res) => {
     const existingResult = await zerodbService.queryTable(TABLE_NAME, {
       filter: { _id: id }
     });
+    const existingRows = unwrapZeroDBResponse(existingResult);
 
-    const existingCompany = existingResult && existingResult.length > 0 ? existingResult[0] : null;
+    const existingCompany = existingRows.length > 0 ? existingRows[0] : null;
 
     if (!existingCompany) {
       return res.status(404).json({ message: 'Company not found' });
@@ -216,10 +247,11 @@ exports.deleteCompanyById = async (req, res) => {
     const orphanWarnings = [];
     for (const table of childTables) {
       try {
-        const children = await zerodbService.queryTable(table, {
+        const childResult = await zerodbService.queryTable(table, {
           filter: { companyId },
           limit: 1
         });
+        const children = unwrapZeroDBResponse(childResult);
         if (children && children.length > 0) {
           orphanWarnings.push(table);
         }
@@ -268,8 +300,9 @@ exports.getCompanyByCompanyId = async (req, res) => {
     const result = await zerodbService.queryTable(TABLE_NAME, {
       filter: { companyId }
     });
+    const rows = unwrapZeroDBResponse(result);
 
-    const company = result && result.length > 0 ? result[0] : null;
+    const company = rows.length > 0 ? rows[0] : null;
 
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
@@ -298,9 +331,10 @@ exports.getCompaniesByType = async (req, res) => {
     }
 
     // Query companies by type from ZeroDB
-    const companies = await zerodbService.queryTable(TABLE_NAME, {
+    const result = await zerodbService.queryTable(TABLE_NAME, {
       filter: { CompanyType: type }
     });
+    const companies = unwrapZeroDBResponse(result);
 
     if (!companies || companies.length === 0) {
       return res.status(404).json({ message: 'No companies found for this type' });
