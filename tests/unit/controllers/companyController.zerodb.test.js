@@ -549,13 +549,12 @@ describe('Company Controller - ZeroDB Migration', () => {
       };
 
       mockReq.params.companyId = 'COMP-001';
+      // Returns all companies; controller filters in-memory
       zerodbService.queryTable.mockResolvedValue([mockCompany]);
 
       await companyController.getCompanyByCompanyId(mockReq, mockRes);
 
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {
-        filter: { companyId: 'COMP-001' }
-      });
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {});
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockCompany);
     });
