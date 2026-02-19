@@ -11,6 +11,26 @@ const { parsePagination } = require('../middleware/pagination');
 const logger = require('../utils/logger');
 
 /**
+ * Capitalize the first letter of a string
+ */
+function capitalize(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Normalize stakeholder display fields (capitalize type, role, status)
+ */
+function normalizeForDisplay(stakeholder) {
+  if (!stakeholder) return stakeholder;
+  const obj = typeof stakeholder.toObject === 'function' ? stakeholder.toObject() : { ...stakeholder };
+  if (obj.type) obj.type = capitalize(obj.type);
+  if (obj.role) obj.role = capitalize(obj.role);
+  if (obj.status) obj.status = capitalize(obj.status);
+  return obj;
+}
+
+/**
  * Create a new stakeholder
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -29,8 +49,14 @@ exports.createStakeholder = async (req, res) => {
       return res.status(400).json({ error: 'Role is required' });
     }
 
-    const stakeholder = await Stakeholder.create(req.body);
-    res.status(201).json(stakeholder);
+    // Normalize enum fields to lowercase for backend model validation
+    const data = { ...req.body };
+    if (data.type) data.type = data.type.toLowerCase();
+    if (data.role) data.role = data.role.toLowerCase();
+    if (data.status) data.status = data.status.toLowerCase();
+
+    const stakeholder = await Stakeholder.create(data);
+    res.status(201).json(normalizeForDisplay(stakeholder));
   } catch (error) {
     logger.error('Error creating stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error creating stakeholder' });
@@ -53,15 +79,15 @@ exports.getAllStakeholders = async (req, res) => {
       filter.projectId = req.query.projectId;
     }
     if (req.query.role) {
-      filter.role = req.query.role;
+      filter.role = req.query.role.toLowerCase();
     }
     if (req.query.status) {
-      filter.status = req.query.status;
+      filter.status = req.query.status.toLowerCase();
     }
 
     const { limit, skip } = parsePagination(req.query);
     const stakeholders = await Stakeholder.find(filter, { limit, skip });
-    res.status(200).json(stakeholders);
+    res.status(200).json(stakeholders.map(normalizeForDisplay));
   } catch (error) {
     logger.error('Error fetching stakeholders', { error: error.message });
     res.status(500).json({ error: 'Error fetching stakeholders' });
@@ -84,7 +110,7 @@ exports.getStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
-    res.status(200).json({ stakeholder });
+    res.status(200).json({ stakeholder: normalizeForDisplay(stakeholder) });
   } catch (error) {
     logger.error('Error fetching stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error fetching stakeholder' });
@@ -115,7 +141,7 @@ exports.updateStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
-    res.status(200).json({ stakeholder });
+    res.status(200).json({ stakeholder: normalizeForDisplay(stakeholder) });
   } catch (error) {
     logger.error('Error updating stakeholder', { error: error.message });
     res.status(500).json({ error: 'Error updating stakeholder' });

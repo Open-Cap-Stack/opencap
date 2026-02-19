@@ -64,7 +64,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
-      expect(Stakeholder.create).toHaveBeenCalledWith(stakeholderData);
+      expect(Stakeholder.create).toHaveBeenCalledWith({
+        ...stakeholderData,
+        role: 'investor'
+      });
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
         stakeholderId: 'STK-001',
@@ -144,7 +147,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { role: 'Investor' },
+        { role: 'investor' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -157,7 +160,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { status: 'Active' },
+        { status: 'active' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -437,8 +440,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         {
           companyId: 'COMP-001',
           projectId: 'PRJ-001',
-          role: 'Investor',
-          status: 'Active'
+          role: 'investor',
+          status: 'active'
         },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
@@ -467,7 +470,13 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
-      expect(Stakeholder.create).toHaveBeenCalledWith(mockReq.body);
+      expect(Stakeholder.create).toHaveBeenCalledWith({
+        stakeholderId: 'STK-001',
+        name: 'John Doe',
+        email: 'john@example.com',
+        role: 'investor',
+        projectId: 'PRJ-001'
+      });
     });
 
     it('should use Stakeholder.findByIdAndUpdate for updates', async () => {
