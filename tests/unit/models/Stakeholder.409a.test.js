@@ -166,7 +166,7 @@ describe('Stakeholder Model - 409A Enhancements', () => {
 
         it('should export STAKEHOLDER_ROLES enum', () => {
             expect(Stakeholder.STAKEHOLDER_ROLES).toEqual([
-                'founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider'
+                'founder', 'co_founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider', 'engineer', 'manager', 'venture_capitalist'
             ]);
         });
 

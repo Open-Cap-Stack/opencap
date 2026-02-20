@@ -446,6 +446,72 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
+
+    it('should normalize hyphenated roles to underscore format on create', async () => {
+      mockReq.body = {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        role: 'Co-Founder'
+      };
+
+      Stakeholder.create.mockResolvedValue({ _id: '1', ...mockReq.body, role: 'co_founder' });
+
+      await stakeholderController.createStakeholder(mockReq, mockRes);
+
+      expect(Stakeholder.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'co_founder' })
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should normalize spaced roles to underscore format on create', async () => {
+      mockReq.body = {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        role: 'Venture Capitalist'
+      };
+
+      Stakeholder.create.mockResolvedValue({ _id: '1', ...mockReq.body, role: 'venture_capitalist' });
+
+      await stakeholderController.createStakeholder(mockReq, mockRes);
+
+      expect(Stakeholder.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'venture_capitalist' })
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should normalize spaced roles in query filter to underscore format', async () => {
+      mockReq.query.role = 'Board Member';
+
+      Stakeholder.find.mockResolvedValue([]);
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(Stakeholder.find).toHaveBeenCalledWith(
+        { role: 'board_member' },
+        expect.objectContaining({ limit: 20, skip: 0 })
+      );
+    });
+
+    it('should convert underscore roles to title case in display response', async () => {
+      const mockStakeholder = {
+        _id: '1',
+        stakeholderId: 'STK-001',
+        name: 'Jane Doe',
+        role: 'co_founder',
+        status: 'active',
+        type: 'common'
+      };
+
+      Stakeholder.find.mockResolvedValue([mockStakeholder]);
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith([
+        expect.objectContaining({ role: 'Co Founder', status: 'Active', type: 'Common' })
+      ]);
+    });
   });
 
   describe('Integration with Stakeholder Model', () => {

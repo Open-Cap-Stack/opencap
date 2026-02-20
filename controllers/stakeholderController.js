@@ -19,13 +19,21 @@ function capitalize(str) {
 }
 
 /**
+ * Convert underscore_case to Title Case (e.g., 'co_founder' -> 'Co Founder')
+ */
+function toTitleCase(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.split('_').map(word => capitalize(word)).join(' ');
+}
+
+/**
  * Normalize stakeholder display fields (capitalize type, role, status)
  */
 function normalizeForDisplay(stakeholder) {
   if (!stakeholder) return stakeholder;
   const obj = typeof stakeholder.toObject === 'function' ? stakeholder.toObject() : { ...stakeholder };
   if (obj.type) obj.type = capitalize(obj.type);
-  if (obj.role) obj.role = capitalize(obj.role);
+  if (obj.role) obj.role = toTitleCase(obj.role);
   if (obj.status) obj.status = capitalize(obj.status);
   return obj;
 }
@@ -50,9 +58,10 @@ exports.createStakeholder = async (req, res) => {
     }
 
     // Normalize enum fields to lowercase for backend model validation
+    // Convert spaces/hyphens to underscores to match enum format (e.g., "Co-Founder" -> "co_founder")
     const data = { ...req.body };
     if (data.type) data.type = data.type.toLowerCase();
-    if (data.role) data.role = data.role.toLowerCase();
+    if (data.role) data.role = data.role.toLowerCase().replace(/[\s-]+/g, '_');
     if (data.status) data.status = data.status.toLowerCase();
 
     const stakeholder = await Stakeholder.create(data);
@@ -79,7 +88,7 @@ exports.getAllStakeholders = async (req, res) => {
       filter.projectId = req.query.projectId;
     }
     if (req.query.role) {
-      filter.role = req.query.role.toLowerCase();
+      filter.role = req.query.role.toLowerCase().replace(/[\s-]+/g, '_');
     }
     if (req.query.status) {
       filter.status = req.query.status.toLowerCase();

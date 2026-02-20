@@ -15,7 +15,7 @@ const { v4: uuidv4 } = require('uuid');
 // Enum definitions for validation
 const STAKEHOLDER_TYPES = ['common', 'preferred', 'option', 'warrant', 'convertible', 'rsu', 'phantom'];
 const STAKEHOLDER_STATUS = ['active', 'inactive', 'pending', 'terminated', 'deceased'];
-const STAKEHOLDER_ROLES = ['founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider'];
+const STAKEHOLDER_ROLES = ['founder', 'co_founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider', 'engineer', 'manager', 'venture_capitalist'];
 
 // Schema definition for documentation and validation
 const stakeholderSchema = {
