@@ -17,7 +17,7 @@ describe('Financial Report Controller - calculateTotals', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     req = {
-      user: { id: 'user-1', companyId: 'company-1' },
+      user: { userId: 'user-1', companyId: 'company-1' },
       body: {},
       params: {},
       query: {}
@@ -87,7 +87,7 @@ describe('Financial Report Controller - Ownership Checks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     req = {
-      user: { id: 'user-1', companyId: 'company-1' },
+      user: { userId: 'user-1', companyId: 'company-1' },
       body: {},
       params: { id: 'aaaaaaaaaaaaaaaaaaaaaaaa' },
       query: {}
@@ -148,7 +148,7 @@ describe('Financial Report Controller - Search Regex Escaping', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     req = {
-      user: { id: 'user-1', companyId: 'company-1' },
+      user: { userId: 'user-1', companyId: 'company-1' },
       body: {},
       params: {},
       query: {}

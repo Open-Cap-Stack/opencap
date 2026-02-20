@@ -23,7 +23,7 @@ describe('Financial Report Controller (ZeroDB)', () => {
       params: {},
       query: {},
       body: {},
-      user: { id: 'user-123', role: 'user' }
+      user: { userId: 'user-123', role: 'user' }
     };
 
     mockRes = {
