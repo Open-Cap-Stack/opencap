@@ -45,7 +45,7 @@ const calculateTotals = (data) => {
 const createFinancialReport = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -61,7 +61,7 @@ const createFinancialReport = async (req, res) => {
     // Calculate totals and prepare report data
     const reportData = calculateTotals({
       ...req.body,
-      userId: req.user.id,
+      userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reportDate: req.body.reportDate || new Date().toISOString()
@@ -184,7 +184,7 @@ const getFinancialReportById = async (req, res) => {
 const updateFinancialReport = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -211,7 +211,7 @@ const updateFinancialReport = async (req, res) => {
     // Calculate totals and prepare update data
     const updateData = calculateTotals({
       ...req.body,
-      lastModifiedBy: req.user.id,
+      lastModifiedBy: req.user.userId,
       updatedAt: new Date().toISOString()
     });
 
@@ -420,7 +420,7 @@ const getFinancialReportAnalytics = async (req, res) => {
 const bulkCreateFinancialReports = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -433,7 +433,7 @@ const bulkCreateFinancialReports = async (req, res) => {
     // Add user ID and calculate totals for each report
     const reportsWithUser = req.body.map(report => calculateTotals({
       ...report,
-      userId: req.user.id,
+      userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reportDate: new Date().toISOString()
