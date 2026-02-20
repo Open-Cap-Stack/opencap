@@ -16,6 +16,21 @@ const ModelScenario = require('../models/ModelScenario');
 const DilutionCalculationService = require('../services/dilutionCalculationService');
 
 /**
+ * Verify that the model belongs to the requesting user's company.
+ * Returns true if access is denied (caller should return early).
+ */
+function isDeniedAccess(model, req, res) {
+    if (model.companyId && req.user?.companyId && model.companyId !== req.user.companyId) {
+        res.status(403).json({
+            success: false,
+            error: 'Access denied: model belongs to another company'
+        });
+        return true;
+    }
+    return false;
+}
+
+/**
  * Create a new fundraising model
  */
 exports.createModel = async (req, res) => {
@@ -77,6 +92,8 @@ exports.getModel = async (req, res) => {
             });
         }
 
+        if (isDeniedAccess(model, req, res)) return;
+
         res.status(200).json({
             success: true,
             data: model
@@ -131,6 +148,8 @@ exports.updateModel = async (req, res) => {
                 error: 'Fundraising model not found'
             });
         }
+
+        if (isDeniedAccess(model, req, res)) return;
 
         // Prevent updates to finalized models
         if (model.status === 'finalized') {
@@ -190,6 +209,8 @@ exports.calculateModel = async (req, res) => {
                 error: 'Fundraising model not found'
             });
         }
+
+        if (isDeniedAccess(model, req, res)) return;
 
         // Calculate pro-forma cap table
         const proFormaCapTable = DilutionCalculationService.calculateProFormaCapTable(
@@ -251,6 +272,8 @@ exports.calculateWaterfall = async (req, res) => {
             });
         }
 
+        if (isDeniedAccess(model, req, res)) return;
+
         if (model.status !== 'calculated' && model.status !== 'finalized') {
             return res.status(400).json({
                 success: false,
@@ -298,6 +321,8 @@ exports.addScenario = async (req, res) => {
                 error: 'Fundraising model not found'
             });
         }
+
+        if (isDeniedAccess(model, req, res)) return;
 
         const { name, description, scenarioType, financingOverrides } = req.body;
 
@@ -354,6 +379,13 @@ exports.getScenario = async (req, res) => {
             });
         }
 
+        if (scenario.companyId && req.user?.companyId && scenario.companyId !== req.user.companyId) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied: scenario belongs to another company'
+            });
+        }
+
         res.status(200).json({
             success: true,
             data: scenario
@@ -379,6 +411,8 @@ exports.getProFormaCapTable = async (req, res) => {
                 error: 'Fundraising model not found'
             });
         }
+
+        if (isDeniedAccess(model, req, res)) return;
 
         if (model.status === 'draft') {
             return res.status(400).json({
@@ -412,6 +446,8 @@ exports.exportModel = async (req, res) => {
                 error: 'Fundraising model not found'
             });
         }
+
+        if (isDeniedAccess(model, req, res)) return;
 
         const format = req.query.format || 'json';
 
@@ -486,6 +522,8 @@ exports.deleteModel = async (req, res) => {
             });
         }
 
+        if (isDeniedAccess(model, req, res)) return;
+
         // Prevent deletion of finalized models
         if (model.status === 'finalized') {
             return res.status(400).json({
@@ -526,6 +564,8 @@ exports.finalizeModel = async (req, res) => {
             });
         }
 
+        if (isDeniedAccess(model, req, res)) return;
+
         if (model.status !== 'calculated') {
             return res.status(400).json({
                 success: false,
@@ -560,6 +600,8 @@ exports.cloneModel = async (req, res) => {
                 error: 'Source model not found'
             });
         }
+
+        if (isDeniedAccess(sourceModel, req, res)) return;
 
         const { name, description, financing } = req.body;
 

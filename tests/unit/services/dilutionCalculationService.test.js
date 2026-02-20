@@ -556,5 +556,68 @@ describe('DilutionCalculationService', () => {
                 DilutionCalculationService.calculateProFormaCapTable(baseCapTable, financing);
             }).toThrow();
         });
+
+        it('should throw when totalShares is zero (no base shares, no new shares)', () => {
+            const baseCapTable = {
+                totalShares: 0,
+                shareClasses: [],
+                stakeholders: [],
+                optionPool: { allocated: 0, unallocated: 0, total: 0 }
+            };
+
+            const financing = {
+                amount: 0,
+                pricePerShare: 1.00,
+                investors: []
+            };
+
+            expect(() => {
+                DilutionCalculationService.calculateProFormaCapTable(baseCapTable, financing);
+            }).toThrow('Total shares cannot be zero');
+        });
+
+        it('should throw when optionPoolTargetPercentage is 100 (division by zero)', () => {
+            const baseCapTable = {
+                totalShares: 10000000,
+                shareClasses: [],
+                stakeholders: [],
+                optionPool: { allocated: 0, unallocated: 0, total: 0 }
+            };
+
+            const financing = {
+                amount: 1000000,
+                pricePerShare: 1.00,
+                optionPoolExpansion: true,
+                optionPoolTargetPercentage: 100,
+                optionPoolPreOrPost: 'pre',
+                investors: []
+            };
+
+            expect(() => {
+                DilutionCalculationService.calculateProFormaCapTable(baseCapTable, financing);
+            }).toThrow('Option pool target percentage must be less than 100');
+        });
+
+        it('should throw when optionPoolTargetPercentage exceeds 100', () => {
+            const baseCapTable = {
+                totalShares: 10000000,
+                shareClasses: [],
+                stakeholders: [],
+                optionPool: { allocated: 0, unallocated: 0, total: 0 }
+            };
+
+            const financing = {
+                amount: 1000000,
+                pricePerShare: 1.00,
+                optionPoolExpansion: true,
+                optionPoolTargetPercentage: 150,
+                optionPoolPreOrPost: 'post',
+                investors: []
+            };
+
+            expect(() => {
+                DilutionCalculationService.calculateProFormaCapTable(baseCapTable, financing);
+            }).toThrow('Option pool target percentage must be less than 100');
+        });
     });
 });

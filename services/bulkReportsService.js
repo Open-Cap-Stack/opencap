@@ -11,6 +11,7 @@
 
 const databaseAdapter = require('./databaseAdapter');
 const JobQueueService = require('./jobQueueService');
+const stakeholderReportService = require('./stakeholderReportService');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -114,38 +115,81 @@ class BulkReportsService {
       }
     }
 
-    // Create job record
     const jobId = `JOB-BULK-${uuidv4().slice(0, 8).toUpperCase()}`;
     const now = new Date();
+    const companyId = jobData.companyId;
 
-    // Simulate immediate completion for now (full job queue implementation pending)
-    const job = {
-      jobId,
-      userId: jobData.userId,
-      companyId: jobData.companyId,
-      status: 'completed',
-      totalReports: jobData.reports.length,
-      completedReports: jobData.reports.length,
-      failedReports: 0,
-      cancelledReports: 0,
-      reports: jobData.reports.map((report, index) => ({
-        ...report,
-        status: 'completed',
-        reportId: `RPT-${uuidv4().slice(0, 8).toUpperCase()}`,
-        error: null,
-        startedAt: now,
-        completedAt: now,
-        downloadUrl: `/api/v1/reports/stakeholder/${report.parameters?.stakeholderId || index}`
-      })),
-      createdAt: now,
-      completedAt: now,
-      estimatedCompletionTime: now
+    const generatedReports = [];
+    const errors = [];
+
+    // Map report types to service methods
+    const reportMethodMap = {
+      holdings: 'generateHoldingsReport',
+      transactions: 'generateTransactionsReport',
+      valuations: 'generateValuationsReport',
+      tax: 'generateTaxReport'
     };
 
-    // TODO: Implement persistent storage when BulkReportJob table is created
-    // const createdJob = await databaseAdapter.create('BulkReportJob', job);
+    for (let i = 0; i < jobData.reports.length; i++) {
+      const report = jobData.reports[i];
+      const stakeholderId = report.parameters?.stakeholderId;
+      const methodName = reportMethodMap[report.reportType];
 
-    return job;
+      if (!methodName) {
+        errors.push({
+          index: i,
+          reportType: report.reportType,
+          stakeholderId,
+          error: `Unsupported report type for generation: ${report.reportType}`
+        });
+        continue;
+      }
+
+      const options = {
+        format: report.format || 'pdf',
+        includeVesting: report.parameters?.includeVesting,
+        includeTransactions: report.parameters?.includeTransactions,
+        includeValuations: report.parameters?.includeValuations,
+        startDate: report.parameters?.dateRange?.startDate,
+        endDate: report.parameters?.dateRange?.endDate,
+        taxYear: report.parameters?.dateRange
+          ? parseInt(report.parameters.dateRange.startDate?.split('-')[0])
+          : undefined
+      };
+
+      try {
+        const created = await stakeholderReportService[methodName](stakeholderId, companyId, options);
+
+        generatedReports.push({
+          stakeholderId,
+          reportId: created.reportId,
+          reportType: created.reportType || report.reportType,
+          status: created.status || 'completed',
+          format: created.format || report.format,
+          fileName: `${report.reportType}-report-${Date.now()}-${i}.${report.format || 'pdf'}`
+        });
+      } catch (error) {
+        errors.push({
+          index: i,
+          reportType: report.reportType,
+          stakeholderId,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      jobId,
+      totalReports: jobData.reports.length,
+      successfulReports: generatedReports.length,
+      failedReports: errors.length,
+      reports: generatedReports,
+      errors,
+      createdAt: now,
+      completedAt: new Date(),
+      estimatedCompletionTime: this._calculateEstimatedCompletion(jobData.reports.length)
+    };
   }
 
   /**

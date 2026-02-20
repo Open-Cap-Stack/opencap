@@ -9,7 +9,11 @@ router.use(authenticateToken);
 // GET /api/v1/share-classes - Get all share classes
 router.get('/', async (req, res) => {
   try {
-    const shareClasses = await ShareClass.find();
+    const filter = {};
+    if (req.query.companyId) {
+      filter.companyId = req.query.companyId;
+    }
+    const shareClasses = await ShareClass.find(filter);
     res.status(200).json(shareClasses);
   } catch (error) {
     console.error('Error fetching share classes:', error);
@@ -35,6 +39,9 @@ router.get('/:id', async (req, res) => {
     if (!shareClass) {
       return res.status(404).json({ message: 'Share class not found' });
     }
+    if (shareClass.companyId && req.user?.companyId && shareClass.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Access denied: share class belongs to another company' });
+    }
     res.status(200).json(shareClass);
   } catch (error) {
     console.error('Error fetching share class:', error);
@@ -45,6 +52,14 @@ router.get('/:id', async (req, res) => {
 // PUT /api/v1/share-classes/:id - Update a share class
 router.put('/:id', async (req, res) => {
   try {
+    // Verify ownership before update
+    const existing = await ShareClass.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Share class not found' });
+    }
+    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Access denied: share class belongs to another company' });
+    }
     const shareClass = await ShareClass.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -63,6 +78,14 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/v1/share-classes/:id - Delete a share class
 router.delete('/:id', async (req, res) => {
   try {
+    // Verify ownership before delete
+    const existing = await ShareClass.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Share class not found' });
+    }
+    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Access denied: share class belongs to another company' });
+    }
     const shareClass = await ShareClass.findByIdAndDelete(req.params.id);
     if (!shareClass) {
       return res.status(404).json({ message: 'Share class not found' });
