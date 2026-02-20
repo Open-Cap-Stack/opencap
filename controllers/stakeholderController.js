@@ -119,6 +119,10 @@ exports.getStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
+    if (stakeholder.companyId && req.user?.companyId && stakeholder.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
+    }
+
     res.status(200).json({ stakeholder: normalizeForDisplay(stakeholder) });
   } catch (error) {
     logger.error('Error fetching stakeholder', { error: error.message });
@@ -133,6 +137,23 @@ exports.getStakeholderById = async (req, res) => {
  */
 exports.updateStakeholderById = async (req, res) => {
   try {
+    // Normalize enum fields to match create path
+    if (req.body.type) req.body.type = req.body.type.toLowerCase();
+    if (req.body.role) req.body.role = req.body.role.toLowerCase().replace(/[\s-]+/g, '_');
+    if (req.body.status) req.body.status = req.body.status.toLowerCase();
+
+    // Verify ownership before update
+    let existing = await Stakeholder.findById(req.params.id);
+    if (!existing) {
+      existing = await Stakeholder.findOne({ stakeholderId: req.params.id });
+    }
+    if (!existing) {
+      return res.status(404).json({ error: 'Stakeholder not found' });
+    }
+    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
+    }
+
     let stakeholder = await Stakeholder.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -164,6 +185,18 @@ exports.updateStakeholderById = async (req, res) => {
  */
 exports.deleteStakeholderById = async (req, res) => {
   try {
+    // Verify ownership before delete
+    let existing = await Stakeholder.findById(req.params.id);
+    if (!existing) {
+      existing = await Stakeholder.findOne({ stakeholderId: req.params.id });
+    }
+    if (!existing) {
+      return res.status(404).json({ error: 'Stakeholder not found' });
+    }
+    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
+    }
+
     let stakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
     if (!stakeholder) {
       stakeholder = await Stakeholder.findOneAndDelete({ stakeholderId: req.params.id });

@@ -33,6 +33,10 @@ class DilutionCalculationService {
             throw new Error('Price per share must be positive');
         }
 
+        if (financing.optionPoolTargetPercentage !== undefined && financing.optionPoolTargetPercentage >= 100) {
+            throw new Error('Option pool target percentage must be less than 100');
+        }
+
         const {
             amount = 0,
             pricePerShare,
@@ -81,6 +85,9 @@ class DilutionCalculationService {
 
         // Step 5: Calculate final totals
         const totalShares = baseShares + optionPoolExpansionShares + newSharesFromFinancing;
+        if (totalShares === 0) {
+            throw new Error('Total shares cannot be zero — base cap table has no shares and no new shares are being issued');
+        }
         const fullyDilutedShares = totalShares;
         optionPoolShares += optionPoolExpansionShares;
 

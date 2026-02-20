@@ -25,14 +25,11 @@ const calculateTotals = (data) => {
   const revenue = data.revenue || {};
   const expenses = data.expenses || {};
 
-  const totalRevenue = (revenue.sales || 0) +
-                       (revenue.services || 0) +
-                       (revenue.other || 0);
+  const computedRevenue = Number(revenue.sales || 0) + Number(revenue.services || 0) + Number(revenue.other || 0);
+  const computedExpenses = Number(expenses.salaries || 0) + Number(expenses.marketing || 0) + Number(expenses.operations || 0) + Number(expenses.other || 0);
 
-  const totalExpenses = (expenses.salaries || 0) +
-                        (expenses.marketing || 0) +
-                        (expenses.operations || 0) +
-                        (expenses.other || 0);
+  const totalRevenue = data.totalRevenue !== undefined && !data.revenue ? Number(data.totalRevenue) : computedRevenue;
+  const totalExpenses = data.totalExpenses !== undefined && !data.expenses ? Number(data.totalExpenses) : computedExpenses;
 
   return {
     ...data,
@@ -67,7 +64,7 @@ const createFinancialReport = async (req, res) => {
       userId: req.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      reportDate: new Date().toISOString()
+      reportDate: req.body.reportDate || new Date().toISOString()
     });
 
     const result = await zerodbService.insertRow('financial_reports', reportData);
@@ -169,7 +166,12 @@ const getFinancialReportById = async (req, res) => {
       return res.status(404).json({ error: 'Financial report not found' });
     }
 
-    return res.status(200).json(reports[0]);
+    const report = reports[0];
+    if (report.companyId && req.user?.companyId && report.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: report belongs to another company' });
+    }
+
+    return res.status(200).json(report);
   } catch (error) {
     console.error('Error fetching financial report:', error);
     return res.status(500).json({ error: 'Failed to retrieve financial report' });
@@ -200,6 +202,10 @@ const updateFinancialReport = async (req, res) => {
 
     if (!existingReports || existingReports.length === 0) {
       return res.status(404).json({ error: 'Financial report not found' });
+    }
+
+    if (existingReports[0].companyId && req.user?.companyId && existingReports[0].companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: report belongs to another company' });
     }
 
     // Calculate totals and prepare update data
@@ -251,6 +257,10 @@ const deleteFinancialReport = async (req, res) => {
       return res.status(404).json({ error: 'Financial report not found' });
     }
 
+    if (existingReports[0].companyId && req.user?.companyId && existingReports[0].companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Access denied: report belongs to another company' });
+    }
+
     await zerodbService.deleteRows('financial_reports', { _id: id });
 
     return res.status(200).json({
@@ -274,12 +284,15 @@ const searchFinancialReports = async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
+    // Escape regex special characters to prevent injection
+    const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Build search filter using regex-like pattern
     const filter = {
       $or: [
-        { reportingPeriod: { $regex: q, $options: 'i' } },
-        { reportType: { $regex: q, $options: 'i' } },
-        { notes: { $regex: q, $options: 'i' } }
+        { reportingPeriod: { $regex: escapedQ, $options: 'i' } },
+        { reportType: { $regex: escapedQ, $options: 'i' } },
+        { notes: { $regex: escapedQ, $options: 'i' } }
       ]
     };
 

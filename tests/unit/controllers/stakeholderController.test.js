@@ -279,17 +279,21 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         _id: stakeholderId,
         stakeholderId: 'STK-001',
         name: 'John Doe Updated',
-        role: 'Lead Investor',
+        role: 'lead_investor',
         projectId: 'PRJ-001'
       };
 
+      // Ownership pre-check
+      Stakeholder.findById.mockResolvedValue({ _id: stakeholderId });
       Stakeholder.findByIdAndUpdate.mockResolvedValue(mockUpdatedStakeholder);
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
+      expect(Stakeholder.findById).toHaveBeenCalledWith(stakeholderId);
+      // role gets normalized to lowercase with underscores
       expect(Stakeholder.findByIdAndUpdate).toHaveBeenCalledWith(
         stakeholderId,
-        mockReq.body,
+        expect.objectContaining({ name: 'John Doe Updated', role: 'lead_investor' }),
         { new: true }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -308,6 +312,9 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         name: 'Updated Name'
       };
 
+      // Ownership pre-check: findById returns null, findOne returns result
+      Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue({ _id: 'zerodb-id-123', stakeholderId: 'STK-001' });
       Stakeholder.findByIdAndUpdate.mockResolvedValue(null);
       Stakeholder.findOneAndUpdate.mockResolvedValue(mockUpdatedStakeholder);
 
@@ -326,8 +333,9 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.params.id = 'non-existent-id';
       mockReq.body = { name: 'Updated Name' };
 
-      Stakeholder.findByIdAndUpdate.mockResolvedValue(null);
-      Stakeholder.findOneAndUpdate.mockResolvedValue(null);
+      // Ownership pre-check returns nothing
+      Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue(null);
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
@@ -335,11 +343,11 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'Stakeholder not found' });
     });
 
-    it('should return 500 when Stakeholder.findByIdAndUpdate fails', async () => {
+    it('should return 500 when Stakeholder.findById fails during ownership check', async () => {
       mockReq.params.id = 'zerodb-id-123';
       mockReq.body = { name: 'Updated Name' };
 
-      Stakeholder.findByIdAndUpdate.mockRejectedValue(new Error('Database update error'));
+      Stakeholder.findById.mockRejectedValue(new Error('Database update error'));
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
@@ -360,10 +368,13 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         role: 'Investor'
       };
 
+      // Ownership pre-check
+      Stakeholder.findById.mockResolvedValue(mockDeletedStakeholder);
       Stakeholder.findByIdAndDelete.mockResolvedValue(mockDeletedStakeholder);
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
+      expect(Stakeholder.findById).toHaveBeenCalledWith(stakeholderId);
       expect(Stakeholder.findByIdAndDelete).toHaveBeenCalledWith(stakeholderId);
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Stakeholder deleted' });
@@ -378,11 +389,15 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         name: 'John Doe'
       };
 
+      // Ownership pre-check: findById null, findOne finds it
+      Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue(mockDeletedStakeholder);
       Stakeholder.findByIdAndDelete.mockResolvedValue(null);
       Stakeholder.findOneAndDelete.mockResolvedValue(mockDeletedStakeholder);
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
+      expect(Stakeholder.findById).toHaveBeenCalledWith('STK-001');
       expect(Stakeholder.findByIdAndDelete).toHaveBeenCalledWith('STK-001');
       expect(Stakeholder.findOneAndDelete).toHaveBeenCalledWith({ stakeholderId: 'STK-001' });
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -392,8 +407,9 @@ describe('Stakeholder Controller (ZeroDB)', () => {
     it('should return 404 when stakeholder to delete is not found', async () => {
       mockReq.params.id = 'non-existent-id';
 
-      Stakeholder.findByIdAndDelete.mockResolvedValue(null);
-      Stakeholder.findOneAndDelete.mockResolvedValue(null);
+      // Ownership pre-check returns nothing
+      Stakeholder.findById.mockResolvedValue(null);
+      Stakeholder.findOne.mockResolvedValue(null);
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
@@ -401,10 +417,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'Stakeholder not found' });
     });
 
-    it('should return 500 when Stakeholder.findByIdAndDelete fails', async () => {
+    it('should return 500 when Stakeholder.findById fails during ownership check', async () => {
       mockReq.params.id = 'zerodb-id-123';
 
-      Stakeholder.findByIdAndDelete.mockRejectedValue(new Error('Database delete error'));
+      Stakeholder.findById.mockRejectedValue(new Error('Database delete error'));
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
@@ -549,10 +565,13 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.params.id = 'zerodb-id-123';
       mockReq.body = { name: 'Updated Name' };
 
+      // Ownership check calls findById first
+      Stakeholder.findById.mockResolvedValue({ _id: 'zerodb-id-123', name: 'Old Name' });
       Stakeholder.findByIdAndUpdate.mockResolvedValue({ _id: '123', name: 'Updated Name' });
 
       await stakeholderController.updateStakeholderById(mockReq, mockRes);
 
+      expect(Stakeholder.findById).toHaveBeenCalledWith('zerodb-id-123');
       expect(Stakeholder.findByIdAndUpdate).toHaveBeenCalledWith(
         'zerodb-id-123',
         { name: 'Updated Name' },
@@ -563,10 +582,13 @@ describe('Stakeholder Controller (ZeroDB)', () => {
     it('should use Stakeholder.findByIdAndDelete for deletion', async () => {
       mockReq.params.id = 'zerodb-id-123';
 
+      // Ownership check calls findById first
+      Stakeholder.findById.mockResolvedValue({ _id: 'zerodb-id-123' });
       Stakeholder.findByIdAndDelete.mockResolvedValue({ _id: 'zerodb-id-123' });
 
       await stakeholderController.deleteStakeholderById(mockReq, mockRes);
 
+      expect(Stakeholder.findById).toHaveBeenCalledWith('zerodb-id-123');
       expect(Stakeholder.findByIdAndDelete).toHaveBeenCalledWith('zerodb-id-123');
     });
   });

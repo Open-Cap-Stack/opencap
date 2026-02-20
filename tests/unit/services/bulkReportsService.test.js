@@ -3,7 +3,7 @@
  * Issue #238: Implement Bulk Reports Endpoint
  *
  * Test suite for bulk report generation service including:
- * - Job creation and management
+ * - Job creation with real report generation
  * - Queue operations
  * - Report generation
  * - Status tracking
@@ -13,10 +13,12 @@
 const BulkReportsService = require('../../../services/bulkReportsService');
 const databaseAdapter = require('../../../services/databaseAdapter');
 const JobQueueService = require('../../../services/jobQueueService');
+const stakeholderReportService = require('../../../services/stakeholderReportService');
 
 // Mock dependencies
 jest.mock('../../../services/databaseAdapter');
 jest.mock('../../../services/jobQueueService');
+jest.mock('../../../services/stakeholderReportService');
 
 describe('BulkReportsService', () => {
   beforeEach(() => {
@@ -24,36 +26,39 @@ describe('BulkReportsService', () => {
   });
 
   describe('createBulkJob', () => {
-    describe('when creating a valid bulk job', () => {
-      it('should create job record and queue all reports', async () => {
+    describe('when creating a valid bulk job with stakeholder report types', () => {
+      it('should call the real report service for each report', async () => {
         // Arrange
-        const jobData = {
-          reports: [
-            { reportType: 'financial', format: 'pdf', parameters: { year: 2025 } },
-            { reportType: 'equity', format: 'csv', parameters: { asOf: '2025-12-31' } }
-          ],
-          userId: 'user-123',
-          companyId: 'company-123'
+        const mockHoldingsReport = {
+          reportId: 'SR-ABC12345',
+          reportType: 'holdings',
+          status: 'completed',
+          format: 'pdf',
+          stakeholderId: 'stk-001'
+        };
+        const mockTransactionsReport = {
+          reportId: 'SR-DEF67890',
+          reportType: 'transactions',
+          status: 'completed',
+          format: 'csv',
+          stakeholderId: 'stk-002'
         };
 
-        // Act - createBulkJob creates job in-memory and returns completed job
-        const result = await BulkReportsService.createBulkJob(jobData);
+        stakeholderReportService.generateHoldingsReport.mockResolvedValue(mockHoldingsReport);
+        stakeholderReportService.generateTransactionsReport.mockResolvedValue(mockTransactionsReport);
 
-        // Assert
-        expect(result.jobId).toBeDefined();
-        expect(result.jobId).toMatch(/^JOB-BULK-/);
-        expect(result.totalReports).toBe(2);
-        expect(result.status).toBe('completed');
-        expect(result.reports).toHaveLength(2);
-      });
-
-      it('should validate all report configurations', async () => {
-        // Arrange
         const jobData = {
           reports: [
-            { reportType: 'financial', format: 'pdf' },
-            { reportType: 'equity', format: 'csv' },
-            { reportType: 'compliance', format: 'xlsx' }
+            {
+              reportType: 'holdings',
+              format: 'pdf',
+              parameters: { stakeholderId: 'stk-001' }
+            },
+            {
+              reportType: 'transactions',
+              format: 'csv',
+              parameters: { stakeholderId: 'stk-002', dateRange: { startDate: '2025-01-01', endDate: '2025-12-31' } }
+            }
           ],
           userId: 'user-123',
           companyId: 'company-123'
@@ -63,19 +68,109 @@ describe('BulkReportsService', () => {
         const result = await BulkReportsService.createBulkJob(jobData);
 
         // Assert
-        expect(result.totalReports).toBe(3);
-        expect(result.status).toBe('completed');
+        expect(stakeholderReportService.generateHoldingsReport).toHaveBeenCalledWith(
+          'stk-001',
+          'company-123',
+          expect.objectContaining({ format: 'pdf' })
+        );
+        expect(stakeholderReportService.generateTransactionsReport).toHaveBeenCalledWith(
+          'stk-002',
+          'company-123',
+          expect.objectContaining({ format: 'csv', startDate: '2025-01-01', endDate: '2025-12-31' })
+        );
+        expect(result.totalReports).toBe(2);
+        expect(result.successfulReports).toBe(2);
+        expect(result.failedReports).toBe(0);
+        expect(result.success).toBe(true);
       });
 
-      it('should set estimated completion time based on report count', async () => {
+      it('should return reports with stakeholderId, fileName, and reportId at top level', async () => {
         // Arrange
+        const mockReport = {
+          reportId: 'SR-TESTID01',
+          reportType: 'valuations',
+          status: 'completed',
+          format: 'pdf',
+          stakeholderId: 'stk-100'
+        };
+
+        stakeholderReportService.generateValuationsReport.mockResolvedValue(mockReport);
+
         const jobData = {
           reports: [
-            { reportType: 'financial', format: 'pdf' },
-            { reportType: 'equity', format: 'csv' },
-            { reportType: 'compliance', format: 'xlsx' },
-            { reportType: 'investor', format: 'pdf' },
-            { reportType: 'operational', format: 'json' }
+            {
+              reportType: 'valuations',
+              format: 'pdf',
+              parameters: { stakeholderId: 'stk-100' }
+            }
+          ],
+          userId: 'user-123',
+          companyId: 'company-123'
+        };
+
+        // Act
+        const result = await BulkReportsService.createBulkJob(jobData);
+
+        // Assert
+        expect(result.reports).toHaveLength(1);
+        const report = result.reports[0];
+        expect(report.stakeholderId).toBe('stk-100');
+        expect(report.reportId).toBe('SR-TESTID01');
+        expect(report.fileName).toMatch(/^valuations-report-\d+-0\.pdf$/);
+        expect(report.reportType).toBe('valuations');
+        expect(report.status).toBe('completed');
+        expect(report.format).toBe('pdf');
+      });
+
+      it('should pass taxYear in options for tax reports', async () => {
+        // Arrange
+        const mockTaxReport = {
+          reportId: 'SR-TAXRPT01',
+          reportType: 'tax',
+          status: 'completed',
+          format: 'pdf'
+        };
+
+        stakeholderReportService.generateTaxReport.mockResolvedValue(mockTaxReport);
+
+        const jobData = {
+          reports: [
+            {
+              reportType: 'tax',
+              format: 'pdf',
+              parameters: {
+                stakeholderId: 'stk-200',
+                dateRange: { startDate: '2025-01-01', endDate: '2025-12-31' }
+              }
+            }
+          ],
+          userId: 'user-123',
+          companyId: 'company-123'
+        };
+
+        // Act
+        await BulkReportsService.createBulkJob(jobData);
+
+        // Assert
+        expect(stakeholderReportService.generateTaxReport).toHaveBeenCalledWith(
+          'stk-200',
+          'company-123',
+          expect.objectContaining({ taxYear: 2025 })
+        );
+      });
+
+      it('should set estimated completion time', async () => {
+        // Arrange
+        stakeholderReportService.generateHoldingsReport.mockResolvedValue({
+          reportId: 'SR-12345678',
+          reportType: 'holdings',
+          status: 'completed',
+          format: 'pdf'
+        });
+
+        const jobData = {
+          reports: [
+            { reportType: 'holdings', format: 'pdf', parameters: { stakeholderId: 'stk-1' } }
           ],
           userId: 'user-123',
           companyId: 'company-123'
@@ -86,6 +181,75 @@ describe('BulkReportsService', () => {
 
         // Assert
         expect(result.estimatedCompletionTime).toBeDefined();
+      });
+    });
+
+    describe('when handling partial failures', () => {
+      it('should track individual successes and failures', async () => {
+        // Arrange
+        stakeholderReportService.generateHoldingsReport.mockResolvedValue({
+          reportId: 'SR-SUCCESS1',
+          reportType: 'holdings',
+          status: 'completed',
+          format: 'pdf'
+        });
+        stakeholderReportService.generateTransactionsReport.mockRejectedValue(
+          new Error('Stakeholder not found')
+        );
+
+        const jobData = {
+          reports: [
+            {
+              reportType: 'holdings',
+              format: 'pdf',
+              parameters: { stakeholderId: 'stk-exists' }
+            },
+            {
+              reportType: 'transactions',
+              format: 'csv',
+              parameters: { stakeholderId: 'stk-missing' }
+            }
+          ],
+          userId: 'user-123',
+          companyId: 'company-123'
+        };
+
+        // Act
+        const result = await BulkReportsService.createBulkJob(jobData);
+
+        // Assert
+        expect(result.totalReports).toBe(2);
+        expect(result.successfulReports).toBe(1);
+        expect(result.failedReports).toBe(1);
+        expect(result.success).toBe(false);
+        expect(result.reports).toHaveLength(1);
+        expect(result.reports[0].reportId).toBe('SR-SUCCESS1');
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0].stakeholderId).toBe('stk-missing');
+        expect(result.errors[0].error).toBe('Stakeholder not found');
+      });
+
+      it('should treat unsupported report types as failures', async () => {
+        // Arrange
+        const jobData = {
+          reports: [
+            {
+              reportType: 'financial',
+              format: 'pdf',
+              parameters: {}
+            }
+          ],
+          userId: 'user-123',
+          companyId: 'company-123'
+        };
+
+        // Act
+        const result = await BulkReportsService.createBulkJob(jobData);
+
+        // Assert
+        expect(result.successfulReports).toBe(0);
+        expect(result.failedReports).toBe(1);
+        expect(result.errors[0].error).toContain('Unsupported report type');
       });
     });
 
@@ -173,6 +337,25 @@ describe('BulkReportsService', () => {
         // Act & Assert
         await expect(BulkReportsService.createBulkJob(jobData))
           .rejects.toThrow('Invalid reportType: invalid-type');
+      });
+
+      it('should reject when more than 50 reports', async () => {
+        // Arrange
+        const reports = Array.from({ length: 51 }, () => ({
+          reportType: 'holdings',
+          format: 'pdf',
+          parameters: { stakeholderId: 'stk-1' }
+        }));
+
+        const jobData = {
+          reports,
+          userId: 'user-123',
+          companyId: 'company-123'
+        };
+
+        // Act & Assert
+        await expect(BulkReportsService.createBulkJob(jobData))
+          .rejects.toThrow('Maximum 50 reports allowed per bulk job');
       });
     });
   });
@@ -543,6 +726,27 @@ describe('BulkReportsService', () => {
         // Assert - Job should continue even if some reports fail
         expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('getValidReportTypes', () => {
+    it('should return all valid report types', () => {
+      const types = BulkReportsService.getValidReportTypes();
+      expect(types).toContain('holdings');
+      expect(types).toContain('transactions');
+      expect(types).toContain('valuations');
+      expect(types).toContain('tax');
+      expect(types).toContain('financial');
+    });
+  });
+
+  describe('getValidFormats', () => {
+    it('should return all valid formats', () => {
+      const formats = BulkReportsService.getValidFormats();
+      expect(formats).toContain('pdf');
+      expect(formats).toContain('csv');
+      expect(formats).toContain('xlsx');
+      expect(formats).toContain('json');
     });
   });
 });
