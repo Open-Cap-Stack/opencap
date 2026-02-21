@@ -16,6 +16,7 @@ jest.mock('../../../../controllers/stakeholderReportController', () => ({
   generateValuationsReport: jest.fn((req, res) => res.status(201).json({ reportId: 'RPT-003' })),
   generateTaxReport: jest.fn((req, res) => res.status(201).json({ reportId: 'RPT-004' })),
   scheduleAutomatedDelivery: jest.fn((req, res) => res.status(201).json({ scheduleId: 'SCH-001' })),
+  emailReport: jest.fn((req, res) => res.status(200).json({ status: 'sent' })),
   getReportById: jest.fn((req, res) => res.status(200).json({ reportId: 'RPT-001' })),
   downloadReport: jest.fn((req, res) => res.status(200).json({ downloadUrl: 'https://example.com/report.pdf' }))
 }));
@@ -240,6 +241,27 @@ describe('Stakeholder Report Routes - Authentication Tests', () => {
         .expect(201);
 
       expect(stakeholderReportController.scheduleAutomatedDelivery).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /:id/reports/:reportId/email', () => {
+    it('should require authentication', async () => {
+      await request(app)
+        .post('/api/v1/stakeholders/SH-001/reports/RPT-001/email')
+        .send({ to: 'investor@example.com' })
+        .expect(401);
+
+      expect(stakeholderReportController.emailReport).not.toHaveBeenCalled();
+    });
+
+    it('should route to emailReport when authenticated', async () => {
+      await request(app)
+        .post('/api/v1/stakeholders/SH-001/reports/RPT-001/email')
+        .set('Authorization', 'Bearer valid-token-123')
+        .send({ to: 'investor@example.com' })
+        .expect(200);
+
+      expect(stakeholderReportController.emailReport).toHaveBeenCalled();
     });
   });
 

@@ -15,17 +15,22 @@ jest.mock('../../../models/Activity');
 jest.mock('../../../models/Valuation409A', () => ({
   find: jest.fn()
 }));
+jest.mock('../../../services/zerodbService', () => ({
+  createTable: jest.fn().mockResolvedValue({ success: true })
+}));
 
 const StakeholderReport = require('../../../models/StakeholderReport');
 const Stakeholder = require('../../../models/Stakeholder');
 const EquityGrant = require('../../../models/EquityGrant');
 const Activity = require('../../../models/Activity');
 const Valuation409A = require('../../../models/Valuation409A');
+const zerodbService = require('../../../services/zerodbService');
 const stakeholderReportService = require('../../../services/stakeholderReportService');
 
 describe('StakeholderReportService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    stakeholderReportService._resetTablesEnsured();
   });
 
   describe('getStakeholderReports', () => {
@@ -130,6 +135,12 @@ describe('StakeholderReportService', () => {
       expect(result).toBeDefined();
       expect(result.reportType).toBe('holdings');
       expect(result.status).toBe('completed');
+      expect(result.generatedAt).toBeDefined();
+      expect(new Date(result.generatedAt).toISOString()).toBe(result.generatedAt);
+      expect(result.fileName).toContain('holdings');
+      expect(result.fileName).toContain('pdf');
+      expect(result.fileSize).toBeGreaterThan(0);
+      expect(result.downloadCount).toBe(0);
     });
 
     it('should throw error if stakeholder not found', async () => {
@@ -218,6 +229,12 @@ describe('StakeholderReportService', () => {
       expect(result).toBeDefined();
       expect(result.reportType).toBe('transactions');
       expect(result.status).toBe('completed');
+      expect(result.generatedAt).toBeDefined();
+      expect(new Date(result.generatedAt).toISOString()).toBe(result.generatedAt);
+      expect(result.fileName).toContain('transactions');
+      expect(result.fileName).toContain('pdf');
+      expect(result.fileSize).toBeGreaterThan(0);
+      expect(result.downloadCount).toBe(0);
     });
 
     it('should throw error if stakeholder not found', async () => {
@@ -305,6 +322,12 @@ describe('StakeholderReportService', () => {
       expect(result).toBeDefined();
       expect(result.reportType).toBe('valuations');
       expect(result.status).toBe('completed');
+      expect(result.generatedAt).toBeDefined();
+      expect(new Date(result.generatedAt).toISOString()).toBe(result.generatedAt);
+      expect(result.fileName).toContain('valuations');
+      expect(result.fileName).toContain('pdf');
+      expect(result.fileSize).toBeGreaterThan(0);
+      expect(result.downloadCount).toBe(0);
     });
 
     it('should throw error if stakeholder not found', async () => {
@@ -373,6 +396,12 @@ describe('StakeholderReportService', () => {
       expect(result).toBeDefined();
       expect(result.reportType).toBe('tax');
       expect(result.status).toBe('completed');
+      expect(result.generatedAt).toBeDefined();
+      expect(new Date(result.generatedAt).toISOString()).toBe(result.generatedAt);
+      expect(result.fileName).toContain('tax');
+      expect(result.fileName).toContain('pdf');
+      expect(result.fileSize).toBeGreaterThan(0);
+      expect(result.downloadCount).toBe(0);
     });
 
     it('should throw error for invalid tax year', async () => {
@@ -617,6 +646,223 @@ describe('StakeholderReportService', () => {
           })
         ).rejects.toThrow('Invalid schedule format');
       }
+    });
+  });
+
+  describe('ensureTables', () => {
+    it('should call createTable for equity_grants and stakeholder_reports', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+
+      expect(zerodbService.createTable).toHaveBeenCalledWith('equity_grants', { fields: {} });
+      expect(zerodbService.createTable).toHaveBeenCalledWith('stakeholder_reports', { fields: {} });
+    });
+
+    it('should only call createTable once across multiple report generations', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+      await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+
+      // Should only be called twice total (once for each table), not four times
+      expect(zerodbService.createTable).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle table already exists error gracefully', async () => {
+      zerodbService.createTable.mockRejectedValue(new Error('Table already exists'));
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+      expect(result).toBeDefined();
+    });
+
+    it('should handle 409 status response as already exists', async () => {
+      const err409 = new Error('Conflict');
+      err409.response = { status: 409 };
+      zerodbService.createTable.mockRejectedValue(err409);
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+      expect(result).toBeDefined();
+    });
+
+    it('should retry ensureTables on next call if previous call failed', async () => {
+      // First call: createTable fails with a non-409 error
+      zerodbService.createTable.mockRejectedValue(new Error('Network error'));
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+      // createTable was called 2 times (once for each table)
+      expect(zerodbService.createTable).toHaveBeenCalledTimes(2);
+
+      // Second call: createTable succeeds now
+      zerodbService.createTable.mockResolvedValue({ success: true });
+      jest.clearAllMocks();
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+      // Should retry createTable since previous call failed
+      expect(zerodbService.createTable).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('empty equity grants handling', () => {
+    it('should generate holdings report with empty holdings when no equity grants exist', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+
+      expect(result.data.holdings).toEqual([]);
+      expect(result.data.summary.totalShares).toBe(0);
+      expect(result.data.summary.holdingsCount).toBe(0);
+    });
+
+    it('should generate valuations report with zero value when no equity grants exist', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      EquityGrant.find.mockResolvedValue([]);
+      Valuation409A.find.mockResolvedValue([{ pricePerShare: 10, valuationDate: '2023-01-01', totalValuation: 100000, type: '409A' }]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateValuationsReport('STK-001', 'COMP-001');
+
+      expect(result.data.currentEquityValue).toBe(0);
+      expect(result.data.summary.totalShares).toBe(0);
+    });
+  });
+
+  describe('EquityGrant.find error resilience', () => {
+    it('should generate holdings report with empty holdings when EquityGrant.find throws', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockRejectedValue(new Error('Table not found'));
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.data.holdings).toEqual([]);
+      expect(result.data.summary.totalShares).toBe(0);
+      expect(result.data.summary.holdingsCount).toBe(0);
+    });
+
+    it('should generate valuations report with zero equity value when EquityGrant.find throws', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      EquityGrant.find.mockRejectedValue(new Error('Table not found'));
+      Valuation409A.find.mockResolvedValue([{ pricePerShare: 10, valuationDate: '2023-01-01', totalValuation: 100000, type: '409A' }]);
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateValuationsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.data.currentEquityValue).toBe(0);
+      expect(result.data.summary.totalShares).toBe(0);
+    });
+  });
+
+  describe('Activity.find error resilience', () => {
+    it('should generate transactions report with empty transactions when Activity.find throws', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      Activity.find.mockRejectedValue(new Error('Table not found'));
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateTransactionsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.data.transactions).toEqual([]);
+      expect(result.data.summary.totalTransactions).toBe(0);
+    });
+
+    it('should generate tax report with empty transactions when Activity.find throws', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      Activity.find.mockRejectedValue(new Error('Network error'));
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateTaxReport('STK-001', 'COMP-001', { taxYear: 2023 });
+
+      expect(result).toBeDefined();
+      expect(result.data.costBasis).toBeDefined();
+      expect(result.data.costBasis.totalCost).toBe(0);
+    });
+  });
+
+  describe('Valuation409A.find error resilience', () => {
+    it('should generate valuations report with empty valuations when Valuation409A.find throws', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      EquityGrant.find.mockResolvedValue([{ shares: 1000 }]);
+      Valuation409A.find.mockRejectedValue(new Error('Table not found'));
+      StakeholderReport.create.mockImplementation(data => Promise.resolve({ ...data }));
+
+      const result = await stakeholderReportService.generateValuationsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.data.valuations).toEqual([]);
+      expect(result.data.currentEquityValue).toBe(0);
+    });
+  });
+
+  describe('StakeholderReport.create error resilience', () => {
+    it('should return report data even when StakeholderReport.create fails for holdings', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com', type: 'investor' });
+      EquityGrant.find.mockResolvedValue([]);
+      StakeholderReport.create.mockRejectedValue(new Error('Insert failed'));
+
+      const result = await stakeholderReportService.generateHoldingsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.reportType).toBe('holdings');
+      expect(result.status).toBe('completed');
+      expect(result.data).toBeDefined();
+    });
+
+    it('should return report data even when StakeholderReport.create fails for transactions', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      Activity.find.mockResolvedValue([]);
+      StakeholderReport.create.mockRejectedValue(new Error('Insert failed'));
+
+      const result = await stakeholderReportService.generateTransactionsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.reportType).toBe('transactions');
+      expect(result.status).toBe('completed');
+    });
+
+    it('should return report data even when StakeholderReport.create fails for valuations', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      EquityGrant.find.mockResolvedValue([]);
+      Valuation409A.find.mockResolvedValue([]);
+      StakeholderReport.create.mockRejectedValue(new Error('Insert failed'));
+
+      const result = await stakeholderReportService.generateValuationsReport('STK-001', 'COMP-001');
+
+      expect(result).toBeDefined();
+      expect(result.reportType).toBe('valuations');
+      expect(result.status).toBe('completed');
+    });
+
+    it('should return report data even when StakeholderReport.create fails for tax', async () => {
+      Stakeholder.findOne.mockResolvedValue({ stakeholderId: 'STK-001', name: 'Test', email: 'test@test.com' });
+      Activity.find.mockResolvedValue([]);
+      StakeholderReport.create.mockRejectedValue(new Error('Insert failed'));
+
+      const result = await stakeholderReportService.generateTaxReport('STK-001', 'COMP-001', { taxYear: 2023 });
+
+      expect(result).toBeDefined();
+      expect(result.reportType).toBe('tax');
+      expect(result.status).toBe('completed');
     });
   });
 

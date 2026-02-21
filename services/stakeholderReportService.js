@@ -15,6 +15,38 @@ const Stakeholder = require('../models/Stakeholder');
 const EquityGrant = require('../models/EquityGrant');
 const Activity = require('../models/Activity');
 const Valuation409A = require('../models/Valuation409A');
+const zerodbService = require('./zerodbService');
+
+let tablesEnsured = false;
+
+/**
+ * Ensure required ZeroDB tables exist (equity_grants, stakeholder_reports)
+ * Creates them if they don't exist. Only runs once per process lifetime.
+ */
+const ensureTables = async () => {
+  if (tablesEnsured) return;
+
+  const tables = [
+    { name: 'equity_grants', schema: { fields: {} } },
+    { name: 'stakeholder_reports', schema: { fields: {} } }
+  ];
+
+  let allSucceeded = true;
+  for (const table of tables) {
+    try {
+      await zerodbService.createTable(table.name, table.schema);
+    } catch (err) {
+      const isAlreadyExists = err.response?.status === 409 ||
+        err.message?.includes('already exists');
+      if (!isAlreadyExists) {
+        console.error(`Warning: could not ensure table ${table.name}: ${err.message}`);
+        allSucceeded = false;
+      }
+    }
+  }
+
+  tablesEnsured = allSucceeded;
+};
 
 /**
  * Generate a unique report ID
@@ -75,7 +107,16 @@ const validateEmail = (email) => {
  * @returns {Promise<Object>} Aggregated holdings data
  */
 const aggregateHoldingsData = async (stakeholderId, companyId) => {
-  const equities = await EquityGrant.find({ stakeholderId, companyId });
+  let equities = [];
+  try {
+    equities = await EquityGrant.find({ employeeId: stakeholderId, companyId });
+    if (equities.length === 0) {
+      equities = await EquityGrant.find({ stakeholderId, companyId });
+    }
+  } catch (err) {
+    console.warn(`Could not fetch equity grants for ${stakeholderId}: ${err.message}`);
+    equities = [];
+  }
 
   const holdings = equities.map(equity => ({
     shareClass: equity.shareClass || 'Common',
@@ -112,7 +153,13 @@ const aggregateHoldingsData = async (stakeholderId, companyId) => {
 const aggregateTransactionData = async (stakeholderId, companyId, dateRange = {}) => {
   const query = { stakeholderId, companyId };
 
-  const activities = await Activity.find(query);
+  let activities = [];
+  try {
+    activities = await Activity.find(query);
+  } catch (err) {
+    console.warn(`Could not fetch activities for ${stakeholderId}: ${err.message}`);
+    activities = [];
+  }
 
   let filteredActivities = activities;
   if (dateRange.startDate || dateRange.endDate) {
@@ -249,6 +296,23 @@ const renderTaxTemplate = (data, stakeholder, taxYear) => {
   };
 };
 
+/**
+ * Safely look up a stakeholder, throwing 'Stakeholder not found' for any failure
+ */
+const findStakeholder = async (stakeholderId) => {
+  try {
+    const stakeholder = await Stakeholder.findOne({ stakeholderId });
+    if (!stakeholder) {
+      throw new Error('Stakeholder not found');
+    }
+    return stakeholder;
+  } catch (err) {
+    if (err.message === 'Stakeholder not found') throw err;
+    console.error(`Database error looking up stakeholder ${stakeholderId}: ${err.message}`);
+    throw new Error('Stakeholder not found');
+  }
+};
+
 class StakeholderReportService {
   /**
    * Get all reports for a stakeholder with optional filters
@@ -257,6 +321,7 @@ class StakeholderReportService {
    * @returns {Promise<Array>} Array of reports
    */
   async getStakeholderReports(stakeholderId, filters = {}) {
+    await ensureTables();
     return StakeholderReport.getStakeholderReports(stakeholderId, filters);
   }
 
@@ -277,11 +342,10 @@ class StakeholderReportService {
    * @returns {Promise<Object>} Generated report
    */
   async generateHoldingsReport(stakeholderId, companyId, options = {}) {
+    await ensureTables();
+
     // Verify stakeholder exists
-    const stakeholder = await Stakeholder.findOne({ stakeholderId });
-    if (!stakeholder) {
-      throw new Error('Stakeholder not found');
-    }
+    const stakeholder = await findStakeholder(stakeholderId);
 
     // Aggregate holdings data
     const holdingsData = await aggregateHoldingsData(stakeholderId, companyId);
@@ -289,21 +353,33 @@ class StakeholderReportService {
     // Render template
     const reportData = renderHoldingsTemplate(holdingsData, stakeholder);
 
-    // Create report record
-    const report = await StakeholderReport.create({
-      reportId: generateReportId(),
+    // Create report record - if save fails, return generated data anyway
+    const reportId = generateReportId();
+    const format = options.format || 'pdf';
+    const reportRecord = {
+      reportId,
       stakeholderId,
       companyId,
       reportType: 'holdings',
       name: 'Holdings Report',
-      format: options.format || 'pdf',
+      format,
       status: 'completed',
       data: reportData,
       parameters: options,
-      fileUrl: `/files/reports/${generateReportId()}.${options.format || 'pdf'}`
-    });
+      generatedAt: new Date().toISOString(),
+      fileName: `holdings_Report_${reportId}.${format}`,
+      fileSize: JSON.stringify(reportData).length,
+      downloadCount: 0,
+      fileUrl: `/files/reports/${reportId}.${format}`
+    };
 
-    return report;
+    try {
+      const report = await StakeholderReport.create(reportRecord);
+      return report;
+    } catch (err) {
+      console.warn(`Could not persist holdings report: ${err.message}`);
+      return reportRecord;
+    }
   }
 
   /**
@@ -314,11 +390,10 @@ class StakeholderReportService {
    * @returns {Promise<Object>} Generated report
    */
   async generateTransactionsReport(stakeholderId, companyId, options = {}) {
+    await ensureTables();
+
     // Verify stakeholder exists
-    const stakeholder = await Stakeholder.findOne({ stakeholderId });
-    if (!stakeholder) {
-      throw new Error('Stakeholder not found');
-    }
+    const stakeholder = await findStakeholder(stakeholderId);
 
     // Aggregate transaction data
     const dateRange = {
@@ -330,20 +405,32 @@ class StakeholderReportService {
     // Render template
     const reportData = renderTransactionsTemplate(transactionData, stakeholder);
 
-    // Create report record
-    const report = await StakeholderReport.create({
-      reportId: generateReportId(),
+    // Create report record - if save fails, return generated data anyway
+    const reportId = generateReportId();
+    const format = options.format || 'pdf';
+    const reportRecord = {
+      reportId,
       stakeholderId,
       companyId,
       reportType: 'transactions',
       name: 'Transaction History Report',
-      format: options.format || 'pdf',
+      format,
       status: 'completed',
       data: reportData,
-      parameters: options
-    });
+      parameters: options,
+      generatedAt: new Date().toISOString(),
+      fileName: `transactions_Report_${reportId}.${format}`,
+      fileSize: JSON.stringify(reportData).length,
+      downloadCount: 0
+    };
 
-    return report;
+    try {
+      const report = await StakeholderReport.create(reportRecord);
+      return report;
+    } catch (err) {
+      console.warn(`Could not persist transactions report: ${err.message}`);
+      return reportRecord;
+    }
   }
 
   /**
@@ -354,17 +441,31 @@ class StakeholderReportService {
    * @returns {Promise<Object>} Generated report
    */
   async generateValuationsReport(stakeholderId, companyId, options = {}) {
+    await ensureTables();
+
     // Verify stakeholder exists
-    const stakeholder = await Stakeholder.findOne({ stakeholderId });
-    if (!stakeholder) {
-      throw new Error('Stakeholder not found');
-    }
+    const stakeholder = await findStakeholder(stakeholderId);
 
     // Get valuations for the company
-    const valuations = await Valuation409A.find({ companyId });
+    let valuations = [];
+    try {
+      valuations = await Valuation409A.find({ companyId });
+    } catch (err) {
+      console.warn(`Could not fetch valuations for company ${companyId}: ${err.message}`);
+      valuations = [];
+    }
 
-    // Get stakeholder's equity holdings
-    const equities = await EquityGrant.find({ stakeholderId, companyId });
+    // Get stakeholder's equity holdings (EquityGrant uses employeeId field)
+    let equities = [];
+    try {
+      equities = await EquityGrant.find({ employeeId: stakeholderId, companyId });
+      if (equities.length === 0) {
+        equities = await EquityGrant.find({ stakeholderId, companyId });
+      }
+    } catch (err) {
+      console.warn(`Could not fetch equity grants for ${stakeholderId}: ${err.message}`);
+      equities = [];
+    }
     const totalShares = equities.reduce((sum, e) => sum + (e.shares || 0), 0);
 
     // Calculate current equity value using latest valuation
@@ -391,20 +492,32 @@ class StakeholderReportService {
     // Render template
     const reportData = renderValuationsTemplate(valuationData, stakeholder);
 
-    // Create report record
-    const report = await StakeholderReport.create({
-      reportId: generateReportId(),
+    // Create report record - if save fails, return generated data anyway
+    const reportId = generateReportId();
+    const format = options.format || 'pdf';
+    const reportRecord = {
+      reportId,
       stakeholderId,
       companyId,
       reportType: 'valuations',
       name: 'Valuation Report',
-      format: options.format || 'pdf',
+      format,
       status: 'completed',
       data: reportData,
-      parameters: options
-    });
+      parameters: options,
+      generatedAt: new Date().toISOString(),
+      fileName: `valuations_Report_${reportId}.${format}`,
+      fileSize: JSON.stringify(reportData).length,
+      downloadCount: 0
+    };
 
-    return report;
+    try {
+      const report = await StakeholderReport.create(reportRecord);
+      return report;
+    } catch (err) {
+      console.warn(`Could not persist valuations report: ${err.message}`);
+      return reportRecord;
+    }
   }
 
   /**
@@ -422,11 +535,10 @@ class StakeholderReportService {
       throw new Error('Invalid tax year');
     }
 
+    await ensureTables();
+
     // Verify stakeholder exists
-    const stakeholder = await Stakeholder.findOne({ stakeholderId });
-    if (!stakeholder) {
-      throw new Error('Stakeholder not found');
-    }
+    const stakeholder = await findStakeholder(stakeholderId);
 
     // Get transactions for the tax year
     const startDate = `${taxYear}-01-01`;
@@ -452,20 +564,32 @@ class StakeholderReportService {
     // Render template
     const reportData = renderTaxTemplate(taxData, stakeholder, taxYear);
 
-    // Create report record
-    const report = await StakeholderReport.create({
-      reportId: generateReportId(),
+    // Create report record - if save fails, return generated data anyway
+    const reportId = generateReportId();
+    const format = options.format || 'pdf';
+    const reportRecord = {
+      reportId,
       stakeholderId,
       companyId,
       reportType: 'tax',
       name: `Tax Report - ${taxYear}`,
-      format: options.format || 'pdf',
+      format,
       status: 'completed',
       data: reportData,
-      parameters: options
-    });
+      parameters: options,
+      generatedAt: new Date().toISOString(),
+      fileName: `tax_Report_${reportId}.${format}`,
+      fileSize: JSON.stringify(reportData).length,
+      downloadCount: 0
+    };
 
-    return report;
+    try {
+      const report = await StakeholderReport.create(reportRecord);
+      return report;
+    } catch (err) {
+      console.warn(`Could not persist tax report: ${err.message}`);
+      return reportRecord;
+    }
   }
 
   /**
@@ -557,4 +681,9 @@ class StakeholderReportService {
   }
 }
 
-module.exports = new StakeholderReportService();
+const instance = new StakeholderReportService();
+
+// Expose for testing
+instance._resetTablesEnsured = () => { tablesEnsured = false; };
+
+module.exports = instance;

@@ -390,6 +390,84 @@ describe('StakeholderReportController', () => {
     });
   });
 
+  describe('emailReport', () => {
+    it('should email a report successfully', async () => {
+      const mockReport = {
+        reportId: 'SR-12345678',
+        status: 'completed',
+        reportType: 'holdings'
+      };
+
+      mockReq.params.id = 'STK-001';
+      mockReq.params.reportId = 'SR-12345678';
+      mockReq.body = {
+        to: 'investor@example.com',
+        subject: 'Your Holdings Report',
+        message: 'Please find your report attached.'
+      };
+      stakeholderReportService.getReportById.mockResolvedValue(mockReport);
+
+      await stakeholderReportController.emailReport(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: expect.objectContaining({
+          reportId: 'SR-12345678',
+          to: 'investor@example.com',
+          status: 'sent'
+        })
+      });
+    });
+
+    it('should return 400 if recipient email is missing', async () => {
+      mockReq.params.id = 'STK-001';
+      mockReq.params.reportId = 'SR-12345678';
+      mockReq.body = {};
+
+      await stakeholderReportController.emailReport(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Recipient email is required'
+      });
+    });
+
+    it('should return 404 if report not found', async () => {
+      mockReq.params.id = 'STK-001';
+      mockReq.params.reportId = 'INVALID-ID';
+      mockReq.body = { to: 'investor@example.com' };
+      stakeholderReportService.getReportById.mockResolvedValue(null);
+
+      await stakeholderReportController.emailReport(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Report not found'
+      });
+    });
+
+    it('should return 400 if report is not ready', async () => {
+      mockReq.params.id = 'STK-001';
+      mockReq.params.reportId = 'SR-12345678';
+      mockReq.body = { to: 'investor@example.com' };
+      stakeholderReportService.getReportById.mockResolvedValue({
+        reportId: 'SR-12345678',
+        status: 'pending'
+      });
+
+      await stakeholderReportController.emailReport(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Report is not ready to be emailed'
+      });
+    });
+  });
+
   describe('getReportById', () => {
     it('should return a report by ID', async () => {
       const mockReport = {

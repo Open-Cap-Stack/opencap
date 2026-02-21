@@ -297,6 +297,56 @@ router.post('/:id/reports/schedule', stakeholderReportController.scheduleAutomat
 
 /**
  * @swagger
+ * /api/v1/stakeholders/{id}/reports/{reportId}/email:
+ *   post:
+ *     summary: Email a report to specified recipients
+ *     tags: [StakeholderReports]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Stakeholder ID
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Report ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - to
+ *             properties:
+ *               to:
+ *                 type: string
+ *                 format: email
+ *                 description: Recipient email address
+ *               subject:
+ *                 type: string
+ *                 description: Email subject
+ *               message:
+ *                 type: string
+ *                 description: Email message body
+ *     responses:
+ *       200:
+ *         description: Email sent successfully
+ *       400:
+ *         description: Invalid request or report not ready
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/:id/reports/:reportId/email', stakeholderReportController.emailReport);
+
+/**
+ * @swagger
  * /api/v1/stakeholders/{id}/reports/{reportId}:
  *   get:
  *     summary: Get a specific report by ID
