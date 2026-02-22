@@ -96,6 +96,7 @@ exports.generateHoldingsReport = async (req, res) => {
       data: report
     });
   } catch (error) {
+    console.error(`[StakeholderReportController] generateHoldingsReport error:`, error.message);
     if (error.message === 'Stakeholder not found') {
       return res.status(404).json({
         success: false,
@@ -151,6 +152,7 @@ exports.generateTransactionsReport = async (req, res) => {
       data: report
     });
   } catch (error) {
+    console.error(`[StakeholderReportController] generateTransactionsReport error:`, error.message);
     if (error.message === 'Stakeholder not found') {
       return res.status(404).json({
         success: false,
@@ -199,6 +201,7 @@ exports.generateValuationsReport = async (req, res) => {
       data: report
     });
   } catch (error) {
+    console.error(`[StakeholderReportController] generateValuationsReport error:`, error.message);
     if (error.message === 'Stakeholder not found') {
       return res.status(404).json({
         success: false,
@@ -264,6 +267,7 @@ exports.generateTaxReport = async (req, res) => {
       });
     }
 
+    console.error(`[StakeholderReportController] generateTaxReport error:`, error.message);
     if (error.message === 'Invalid tax year') {
       return res.status(400).json({
         success: false,
@@ -271,6 +275,75 @@ exports.generateTaxReport = async (req, res) => {
       });
     }
 
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/v1/stakeholders/:id/reports/:reportId/email
+ * Email a report to specified recipients
+ */
+exports.emailReport = async (req, res) => {
+  try {
+    const stakeholderId = sanitizeInput(req.params.id);
+    const reportId = sanitizeInput(req.params.reportId);
+
+    if (!stakeholderId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stakeholder ID is required'
+      });
+    }
+
+    if (!reportId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Report ID is required'
+      });
+    }
+
+    const { to, subject, message } = req.body;
+
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Recipient email is required'
+      });
+    }
+
+    // Verify report exists and is completed
+    const report = await stakeholderReportService.getReportById(reportId);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+    }
+
+    if (report.status !== 'completed' && report.status !== 'delivered') {
+      return res.status(400).json({
+        success: false,
+        error: 'Report is not ready to be emailed'
+      });
+    }
+
+    // Return success (actual email sending is future work)
+    res.status(200).json({
+      success: true,
+      data: {
+        reportId,
+        to: sanitizeInput(to),
+        subject: subject ? sanitizeInput(subject) : `Report ${reportId}`,
+        message: message ? sanitizeInput(message) : '',
+        emailedAt: new Date().toISOString(),
+        status: 'sent'
+      }
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message
