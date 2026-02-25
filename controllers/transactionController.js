@@ -249,7 +249,7 @@ const updateTransaction = async (req, res, next) => {
     };
 
     // ZeroDB: Use direct update without MongoDB $set operator
-    await zerodbService.updateRows('transactions', { transactionId: id }, updateData);
+    await zerodbService.updateRows('transactions', { filter: { transactionId: id }, update: updateData });
 
     const updatedTransactions = await zerodbService.queryTable('transactions', {
       filter: { transactionId: id }
@@ -444,9 +444,9 @@ const processTransaction = async (req, res, next) => {
     }
 
     // ZeroDB: Use direct update without MongoDB $set operator
-    await zerodbService.updateRows('transactions', { transactionId: id }, {
-      status: 'processing',
-      updatedAt: new Date().toISOString()
+    await zerodbService.updateRows('transactions', {
+      filter: { transactionId: id },
+      update: { status: 'processing', updatedAt: new Date().toISOString() }
     });
 
     const updatedTransactions = await zerodbService.queryTable('transactions', {
@@ -527,9 +527,9 @@ const refundTransaction = async (req, res, next) => {
     const result = await zerodbService.insertRow('transactions', refundTransaction);
 
     // ZeroDB: Use direct update without MongoDB $set operator
-    await zerodbService.updateRows('transactions', { transactionId: id }, {
-      status: 'refunded',
-      updatedAt: new Date().toISOString()
+    await zerodbService.updateRows('transactions', {
+      filter: { transactionId: id },
+      update: { status: 'refunded', updatedAt: new Date().toISOString() }
     });
 
     const createdRefund = result.rows && result.rows[0] ? result.rows[0] : refundTransaction;

@@ -215,9 +215,7 @@ const updateFinancialReport = async (req, res) => {
       updatedAt: new Date().toISOString()
     });
 
-    await zerodbService.updateRows('financial_reports', { _id: id }, {
-      $set: updateData
-    });
+    await zerodbService.updateRows('financial_reports', { filter: { _id: id }, update: updateData });
 
     // Fetch updated report
     const updatedReports = await zerodbService.queryTable('financial_reports', {

@@ -190,7 +190,7 @@ exports.updateCompanyById = async (req, res) => {
     }
 
     // Update in ZeroDB
-    await zerodbService.updateRows(TABLE_NAME, { _id: id }, updateData);
+    await zerodbService.updateRows(TABLE_NAME, { filter: { _id: id }, update: updateData });
 
     // Fetch the updated company
     const result = await zerodbService.queryTable(TABLE_NAME, {

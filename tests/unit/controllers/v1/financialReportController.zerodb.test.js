@@ -298,12 +298,12 @@ describe('Financial Report Controller (ZeroDB)', () => {
 
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'financial_reports',
-        { _id: '507f1f77bcf86cd799439011' },
-        expect.objectContaining({
-          $set: expect.objectContaining({
+        {
+          filter: { _id: '507f1f77bcf86cd799439011' },
+          update: expect.objectContaining({
             lastModifiedBy: 'user-123'
           })
-        })
+        }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
@@ -338,14 +338,14 @@ describe('Financial Report Controller (ZeroDB)', () => {
 
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'financial_reports',
-        expect.any(Object),
-        expect.objectContaining({
-          $set: expect.objectContaining({
+        {
+          filter: expect.any(Object),
+          update: expect.objectContaining({
             totalRevenue: 188000,
             totalExpenses: 120000,
             netIncome: 68000
           })
-        })
+        }
       );
     });
 

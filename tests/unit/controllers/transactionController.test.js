@@ -366,8 +366,10 @@ describe('Transaction Controller (ZeroDB)', () => {
 
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'transactions',
-        { transactionId: 'txn-001' },
-        expect.objectContaining(updateData)
+        {
+          filter: { transactionId: 'txn-001' },
+          update: expect.objectContaining(updateData)
+        }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
@@ -581,10 +583,12 @@ describe('Transaction Controller (ZeroDB)', () => {
 
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'transactions',
-        { transactionId: 'txn-001' },
-        expect.objectContaining({
-          status: 'processing'
-        })
+        {
+          filter: { transactionId: 'txn-001' },
+          update: expect.objectContaining({
+            status: 'processing'
+          })
+        }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });

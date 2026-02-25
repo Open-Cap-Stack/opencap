@@ -370,12 +370,14 @@ describe('Company Controller - ZeroDB Migration', () => {
 
       expect(zerodbService.updateRows).toHaveBeenCalledWith(
         'companies',
-        { _id: 'zerodb-id-123' },
-        expect.objectContaining({
-          CompanyName: updateData.CompanyName,
-          RegisteredAddress: updateData.RegisteredAddress,
-          updatedAt: expect.any(String)
-        })
+        {
+          filter: { _id: 'zerodb-id-123' },
+          update: expect.objectContaining({
+            CompanyName: updateData.CompanyName,
+            RegisteredAddress: updateData.RegisteredAddress,
+            updatedAt: expect.any(String)
+          })
+        }
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(updatedCompany);
@@ -946,7 +948,7 @@ describe('Company Controller - ZeroDB Migration', () => {
       zerodbService.updateRows.mockResolvedValue({ modifiedCount: 1 });
       zerodbService.queryTable.mockResolvedValue([{ _id: 'id-1' }]);
       await companyController.updateCompanyById(mockReq, mockRes);
-      expect(zerodbService.updateRows).toHaveBeenCalledWith('companies', expect.any(Object), expect.any(Object));
+      expect(zerodbService.updateRows).toHaveBeenCalledWith('companies', expect.objectContaining({ filter: expect.any(Object), update: expect.any(Object) }));
 
       // Test delete (cascade-aware: first call returns company, rest return empty)
       jest.clearAllMocks();
