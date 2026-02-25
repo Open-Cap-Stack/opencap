@@ -30,7 +30,16 @@ const stakeholderSchema = {
     name: { type: 'string', required: true },
     email: { type: 'string', required: true },
     phone: { type: 'string' },
-    address: { type: 'string' },
+    address: {
+        type: 'object',
+        properties: {
+            street: { type: 'string' },
+            city: { type: 'string' },
+            state: { type: 'string' },
+            zipCode: { type: 'string' },
+            country: { type: 'string', default: 'USA' }
+        }
+    },
 
     // Role and classification
     role: { type: 'string', required: true, enum: STAKEHOLDER_ROLES },

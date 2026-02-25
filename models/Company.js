@@ -75,7 +75,8 @@ const companySchema = {
             street: { type: 'string' },
             city: { type: 'string' },
             state: { type: 'string', enum: US_STATES },
-            zip: { type: 'string' }
+            zip: { type: 'string' },
+            country: { type: 'string', default: 'USA' }
         },
         required: false
     },
