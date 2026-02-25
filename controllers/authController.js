@@ -723,7 +723,7 @@ const updateUserProfile = async (req, res) => {
   try {
     // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
-    const { firstName, lastName, email, currentPassword, newPassword } = req.body;
+    const { firstName, lastName, email, currentPassword, newPassword, companyId } = req.body;
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
@@ -740,6 +740,7 @@ const updateUserProfile = async (req, res) => {
     // Update basic info
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
+    if (companyId) user.companyId = companyId;
     
     // Update email if provided and different
     if (email && email !== user.email) {

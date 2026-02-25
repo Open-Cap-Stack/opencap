@@ -317,6 +317,16 @@ describe('AuthController', () => {
       await authController.updateUserProfile(req, res);
       expect(res.statusCode).toBe(404);
     });
+
+    it('should persist companyId when provided', async () => {
+      req.user = { userId: 'user_123' };
+      req.body = { companyId: 'company-abc-123' };
+      const mockUser = { _id: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com', save: jest.fn().mockResolvedValue(true) };
+      User.findOne.mockResolvedValue(mockUser);
+      await authController.updateUserProfile(req, res);
+      expect(mockUser.companyId).toBe('company-abc-123');
+      expect(res.statusCode).toBe(200);
+    });
   });
 
   describe('exchangeAINativeToken', () => {
