@@ -759,7 +759,18 @@ class ZeroDBModel {
  * @returns {ZeroDBModel} Model instance
  */
 function createModel(tableName, schema = {}) {
-    return new ZeroDBModel(tableName, schema);
+    const instance = new ZeroDBModel(tableName, schema);
+
+    // Copy prototype methods to own properties so they survive object spread
+    // Models use { ...baseModel, customMethods } which drops prototype methods
+    const proto = Object.getPrototypeOf(instance);
+    Object.getOwnPropertyNames(proto).forEach(name => {
+        if (name !== 'constructor' && typeof proto[name] === 'function') {
+            instance[name] = proto[name].bind(instance);
+        }
+    });
+
+    return instance;
 }
 
 module.exports = { ZeroDBModel, createModel };
