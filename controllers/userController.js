@@ -115,8 +115,8 @@ const getProfile = async (req, res) => {
       user = await User.findOne({ userId: req.user.userId });
     }
     // Fall back to _id if userId not found
-    if (!user && req.user.id) {
-      user = await User.findById(req.user.id);
+    if (!user && req.user._id) {
+      user = await User.findById(req.user._id);
     }
 
     if (!user) {
@@ -205,8 +205,8 @@ const uploadProfilePhoto = async (req, res) => {
 
     // Verify user exists
     let user = await User.findOne({ userId });
-    if (!user && req.user.id) {
-      user = await User.findById(req.user.id);
+    if (!user && req.user._id) {
+      user = await User.findById(req.user._id);
     }
 
     if (!user) {
@@ -343,8 +343,8 @@ const deleteProfilePhoto = async (req, res) => {
 
     // Verify user exists
     let user = await User.findOne({ userId });
-    if (!user && req.user.id) {
-      user = await User.findById(req.user.id);
+    if (!user && req.user._id) {
+      user = await User.findById(req.user._id);
     }
 
     if (!user) {
