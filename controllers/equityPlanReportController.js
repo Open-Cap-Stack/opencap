@@ -75,7 +75,7 @@ exports.createReport = async (req, res) => {
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       parameters: parameters || {},
-      requestedBy: requestedBy || req.user?.id
+      requestedBy: requestedBy || req.user?.userId
     };
 
     const report = await equityPlanReportService.createReport(reportData);
@@ -157,7 +157,7 @@ exports.generateOptionPoolSummary = async (req, res) => {
       reportType: 'option_pool_summary',
       companyId,
       format: format || 'json',
-      requestedBy: requestedBy || req.user?.id,
+      requestedBy: requestedBy || req.user?.userId,
       parameters: options
     });
 
@@ -197,7 +197,7 @@ exports.generateGrantStatusReport = async (req, res) => {
       format: format || 'json',
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
-      requestedBy: requestedBy || req.user?.id,
+      requestedBy: requestedBy || req.user?.userId,
       parameters: { grantTypes }
     });
 
@@ -236,7 +236,7 @@ exports.generateVestingScheduleReport = async (req, res) => {
       reportType: 'vesting_schedule',
       companyId,
       format: format || 'json',
-      requestedBy: requestedBy || req.user?.id,
+      requestedBy: requestedBy || req.user?.userId,
       parameters: { forecastMonths }
     });
 
@@ -275,7 +275,7 @@ exports.generateDilutionAnalysis = async (req, res) => {
       reportType: 'dilution_analysis',
       companyId,
       format: format || 'json',
-      requestedBy: requestedBy || req.user?.id,
+      requestedBy: requestedBy || req.user?.userId,
       parameters: options
     });
 

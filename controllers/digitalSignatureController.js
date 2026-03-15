@@ -16,6 +16,7 @@ const DigitalSignatureService = require('../services/digitalSignatureService');
  */
 exports.createSignatureRequest = async (req, res) => {
   try {
+    req.body.companyId = req.body.companyId || req.user?.companyId;
     const requestData = {
       ...req.body,
       createdBy: req.user?._id || req.body.createdBy
@@ -33,7 +34,8 @@ exports.createSignatureRequest = async (req, res) => {
  */
 exports.getSignatureRequests = async (req, res) => {
   try {
-    const { companyId, status, documentId, documentType, provider } = req.query;
+    const { status, documentId, documentType, provider } = req.query;
+    const companyId = req.query.companyId || req.user?.companyId;
     const query = {};
 
     if (companyId) query.companyId = companyId;

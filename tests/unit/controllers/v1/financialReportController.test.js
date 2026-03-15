@@ -39,7 +39,7 @@ describe('Financial Report Controller', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-123' }
+      user: { userId: 'user-123' }
     };
     res = {
       status: jest.fn().mockReturnThis(),

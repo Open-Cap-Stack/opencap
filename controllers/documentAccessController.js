@@ -27,6 +27,7 @@ exports.createDocumentAccess = async (req, res) => {
         // Generate unique accessId if not provided
         const accessId = req.body.accessId || `access_${uuidv4()}`;
 
+        req.body.companyId = req.body.companyId || req.user?.companyId;
         const accessData = {
             ...req.body,
             accessId,
@@ -66,7 +67,11 @@ exports.createDocumentAccess = async (req, res) => {
  */
 exports.getDocumentAccesses = async (req, res) => {
     try {
-        const result = await zerodbService.queryTable(TABLE_NAME, {});
+        const companyId = req.query.companyId || req.user?.companyId;
+        const filter = {};
+        if (companyId) filter.companyId = companyId;
+
+        const result = await zerodbService.queryTable(TABLE_NAME, { filter });
         const accesses = result.rows || result;
 
         res.status(200).json(accesses);

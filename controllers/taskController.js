@@ -16,6 +16,7 @@ const Task = require('../models/Task');
  */
 exports.createTask = async (req, res) => {
   try {
+    req.body.companyId = req.body.companyId || req.user?.companyId;
     const task = await Task.create(req.body);
     res.status(201).json(task);
   } catch (error) {
@@ -36,6 +37,7 @@ exports.getTasks = async (req, res) => {
   try {
     // Build filter object from query parameters
     const filter = {};
+    const companyId = req.query.companyId || req.user?.companyId;
 
     if (req.query.status) {
       filter.status = req.query.status;
@@ -49,8 +51,8 @@ exports.getTasks = async (req, res) => {
       filter.assigneeId = req.query.assigneeId;
     }
 
-    if (req.query.companyId) {
-      filter.companyId = req.query.companyId;
+    if (companyId) {
+      filter.companyId = companyId;
     }
 
     const tasks = await Task.find(filter);

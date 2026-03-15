@@ -891,6 +891,7 @@ async function generateDocumentSummaryInternal(documentId) {
 // Legacy functions migrated to ZeroDB
 const createDocumentEmbedding = async (req, res) => {
   try {
+    req.body.companyId = req.body.companyId || req.user?.companyId;
     const embeddingData = {
       ...req.body,
       createdAt: new Date().toISOString(),
@@ -908,7 +909,11 @@ const createDocumentEmbedding = async (req, res) => {
 
 const getDocumentEmbeddings = async (req, res) => {
   try {
-    const result = await zerodbService.queryTable(EMBEDDINGS_TABLE, {});
+    const companyId = req.query.companyId || req.user?.companyId;
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+
+    const result = await zerodbService.queryTable(EMBEDDINGS_TABLE, { filter });
     const embeddings = result.rows || result;
 
     res.status(200).json(embeddings);

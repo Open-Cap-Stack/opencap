@@ -10,6 +10,7 @@ const MODEL_NAME = 'InvestmentTracker';
 
 async function trackInvestment(req, res, next) {
   try {
+    req.body.companyId = req.body.companyId || req.user?.companyId;
     const { TrackID, Company, EquityPercentage, CurrentValue } = req.body;
 
     if (!TrackID || !Company || !EquityPercentage || !CurrentValue) {

@@ -21,7 +21,7 @@ const memoryService = require('../../services/memoryService');
 const createFinancialReport = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -198,7 +198,7 @@ const getFinancialReportById = async (req, res) => {
 const updateFinancialReport = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -402,7 +402,7 @@ const getFinancialReportAnalytics = async (req, res) => {
 const bulkCreateFinancialReports = async (req, res) => {
   try {
     // Validate authentication
-    if (!req.user?.id) {
+    if (!req.user?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 

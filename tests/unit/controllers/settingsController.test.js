@@ -72,17 +72,15 @@ describe('Settings Controller', () => {
             expect(data).toEqual(defaultSettings);
         });
 
-        it('should handle user from req.user.id fallback', async () => {
+        it('should return 401 if only req.user.id is set (userId field required)', async () => {
             const userId = 'user_789';
             req.user = { id: userId };
 
-            const mockSettings = { userId, preferences: { theme: 'dark' } };
-            Settings.getUserSettings.mockResolvedValue(mockSettings);
-
             await settingsController.getUserSettings(req, res);
 
-            expect(Settings.getUserSettings).toHaveBeenCalledWith(userId);
-            expect(res.statusCode).toBe(200);
+            expect(res.statusCode).toBe(401);
+            const data = JSON.parse(res._getData());
+            expect(data.error).toBe('User not authenticated');
         });
 
         it('should return 401 if user not authenticated', async () => {

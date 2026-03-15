@@ -213,7 +213,7 @@ const resolveAlert = async (req, res) => {
     }
 
     const resolution = {
-      resolvedBy: resolvedBy || req.user?.id,
+      resolvedBy: resolvedBy || req.user?.userId,
       notes
     };
 
