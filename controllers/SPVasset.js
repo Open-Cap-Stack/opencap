@@ -55,7 +55,10 @@ exports.createSPVAsset = async (req, res) => {
  */
 exports.getSPVAssets = async (req, res) => {
   try {
-    const assets = await SPVAsset.find({});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const assets = await SPVAsset.find(query);
     res.status(200).json({ spvassets: assets || [] });
   } catch (error) {
     console.error('Error retrieving SPV Assets:', error);

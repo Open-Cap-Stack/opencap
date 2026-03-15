@@ -20,7 +20,10 @@ exports.createInvite = async (req, res) => {
 
 exports.getAllInvites = async (req, res) => {
   try {
-    const invites = await databaseAdapter.find(MODEL_NAME, {});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const invites = await databaseAdapter.find(MODEL_NAME, query);
     res.status(200).json(invites);
   } catch (error) {
     console.error('Error fetching invites:', error);

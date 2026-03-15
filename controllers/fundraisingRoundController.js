@@ -30,7 +30,10 @@ exports.createFundraisingRound = async (req, res) => {
  */
 exports.getFundraisingRounds = async (req, res) => {
   try {
-    const rounds = await databaseAdapter.find('FundraisingRound', {}, {});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const rounds = await databaseAdapter.find('FundraisingRound', query, {});
     res.status(200).json(rounds);
   } catch (error) {
     res.status(500).json({ error: error.message });

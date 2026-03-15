@@ -35,7 +35,7 @@ const createFinancialReport = async (req, res) => {
     }
 
     // Add user ID from JWT token
-    req.body.userId = req.user.id;
+    req.body.userId = req.user.userId;
     
     // Create new financial report
     const newFinancialReport = new FinancialReport(req.body);
@@ -74,7 +74,7 @@ const createFinancialReport = async (req, res) => {
         companyId,
         category: reportType,
         status: 'created'
-      }, req.user.id);
+      }, req.user.userId);
       
     } catch (lakehouseError) {
       console.warn('ZeroDB integration warning:', lakehouseError.message);
@@ -216,7 +216,7 @@ const updateFinancialReport = async (req, res) => {
     }
 
     // Add last modified info
-    req.body.lastModifiedBy = req.user.id;
+    req.body.lastModifiedBy = req.user.userId;
     req.body.updatedAt = new Date();
     
     // Update financial report and recalculate totals
@@ -413,7 +413,7 @@ const bulkCreateFinancialReports = async (req, res) => {
     // Add user ID to each financial report
     const reportsWithUser = req.body.map(report => ({
       ...report,
-      userId: req.user.id
+      userId: req.user.userId
     }));
     
     // Create reports and calculate totals

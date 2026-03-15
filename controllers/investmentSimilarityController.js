@@ -150,14 +150,14 @@ const findSimilarInvestments = async (req, res, next) => {
 const getRecommendations = async (req, res, next) => {
   try {
     // Check authentication
-    if (!req.user || !req.user.id) {
+    if (!req.user || !req.user.userId) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Authentication required'
       });
     }
 
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const {
       sectors,
       investmentTypes,

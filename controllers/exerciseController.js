@@ -64,7 +64,7 @@ exports.createExerciseRequest = async (req, res) => {
       employeeProfile,
       exerciseWindow,
       notes,
-      requestedBy: req.user.id || req.user.userId
+      requestedBy: req.user?.userId
     };
 
     const exerciseRequest = await ExerciseService.createExerciseRequest(requestData);
@@ -143,7 +143,7 @@ exports.approveExerciseRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
-    const approvedBy = req.user.id || req.user.userId;
+    const approvedBy = req.user?.userId;
 
     const exerciseRequest = await ExerciseService.approveExerciseRequest(
       id,
@@ -174,7 +174,7 @@ exports.rejectExerciseRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const rejectedBy = req.user.id || req.user.userId;
+    const rejectedBy = req.user?.userId;
 
     if (!reason || reason.trim() === '') {
       return res.status(400).json({ error: 'Rejection reason is required' });
@@ -208,7 +208,7 @@ exports.rejectExerciseRequest = async (req, res) => {
 exports.processExerciseRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const processedBy = req.user.id || req.user.userId;
+    const processedBy = req.user?.userId;
 
     const exerciseRequest = await ExerciseService.processExerciseRequest(
       id,
@@ -238,7 +238,7 @@ exports.completeExerciseRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { certificateNumber, paymentReceived } = req.body;
-    const completedBy = req.user.id || req.user.userId;
+    const completedBy = req.user?.userId;
 
     if (!certificateNumber) {
       return res.status(400).json({ error: 'Certificate number is required' });
@@ -273,7 +273,7 @@ exports.cancelExerciseRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const cancelledBy = req.user.id || req.user.userId;
+    const cancelledBy = req.user?.userId;
 
     const exerciseRequest = await ExerciseService.cancelExerciseRequest(
       id,
@@ -474,7 +474,7 @@ exports.generateForm3921 = async (req, res) => {
   try {
     const { id } = req.params;
     const formData = req.body;
-    const userId = req.user.id || req.user.userId;
+    const userId = req.user?.userId;
 
     const exerciseRequest = await ExerciseService.getExerciseRequestById(id);
 

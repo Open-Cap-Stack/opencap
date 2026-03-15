@@ -6,6 +6,7 @@ const databaseAdapter = require('../services/databaseAdapter');
 
 exports.createEquityPlan = async (req, res) => {
     try {
+        req.body.companyId = req.body.companyId || req.user?.companyId;
         const savedPlan = await databaseAdapter.create('EquityPlan', req.body);
         res.status(201).json(savedPlan);
     } catch (error) {
@@ -15,7 +16,10 @@ exports.createEquityPlan = async (req, res) => {
 
 exports.getEquityPlans = async (req, res) => {
     try {
-        const plans = await databaseAdapter.find('EquityPlan', {});
+        const query = {};
+        const companyId = req.query.companyId || req.user?.companyId;
+        if (companyId) query.companyId = companyId;
+        const plans = await databaseAdapter.find('EquityPlan', query);
         res.status(200).json(plans);
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -46,9 +46,10 @@ exports.getVestingSchedules = async (req, res) => {
     const { stakeholderId, equityPlanId, companyId, status } = req.query;
     const query = {};
 
+    const effectiveCompanyId = companyId || req.user?.companyId;
+    if (effectiveCompanyId) query.companyId = effectiveCompanyId;
     if (stakeholderId) query.stakeholderId = stakeholderId;
     if (equityPlanId) query.equityPlanId = equityPlanId;
-    if (companyId) query.companyId = companyId;
     if (status) query.status = status;
 
     const schedules = await databaseAdapter.find('VestingSchedule', query);

@@ -45,7 +45,10 @@ exports.calculateTax = async (req, res) => {
 // Get all tax calculations
 exports.getTaxCalculations = async (req, res) => {
   try {
-    const taxCalculations = await TaxCalculator.find({});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const taxCalculations = await TaxCalculator.find(query);
     // Return 200 with empty array for consistent REST API behavior
     res.status(200).json({ taxCalculations: taxCalculations || [] });
   } catch (error) {

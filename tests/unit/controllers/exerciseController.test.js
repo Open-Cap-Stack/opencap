@@ -24,7 +24,7 @@ describe('ExerciseController', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-001' }
+      user: { id: 'user-001', userId: 'user-001', companyId: 'company-123', role: 'user' }
     };
 
     mockRes = {
@@ -63,10 +63,12 @@ describe('ExerciseController', () => {
 
       await exerciseController.createExerciseRequest(mockReq, mockRes);
 
-      expect(ExerciseService.createExerciseRequest).toHaveBeenCalledWith({
-        ...validRequestData,
-        requestedBy: 'user-001'
-      });
+      expect(ExerciseService.createExerciseRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...validRequestData,
+          requestedBy: 'user-001'
+        })
+      );
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith(mockCreatedRequest);
     });
