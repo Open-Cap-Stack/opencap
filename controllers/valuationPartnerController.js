@@ -3,6 +3,7 @@
  * Feature: Issue #61 - Implement Valuation Specialist Integration
  *
  * Handles API endpoints for valuation partner management.
+ * Migrated to ZeroDB - no Mongoose patterns (no new Model(), .save(), .populate())
  */
 const ValuationPartner = require('../models/ValuationPartner');
 
@@ -23,7 +24,7 @@ exports.createPartner = async (req, res) => {
       metadata
     } = req.body;
 
-    const partner = new ValuationPartner({
+    const partner = await ValuationPartner.create({
       companyId,
       name,
       legalName,
@@ -36,10 +37,8 @@ exports.createPartner = async (req, res) => {
       tags,
       metadata,
       status: 'pending_approval',
-      createdBy: req.user._id
+      createdBy: req.user?.userId
     });
-
-    await partner.save();
 
     res.status(201).json({
       success: true,
@@ -59,31 +58,41 @@ exports.getPartners = async (req, res) => {
     const { companyId, type, status, page = 1, limit = 20 } = req.query;
 
     const query = {};
-    if (companyId) {
-      query.$or = [
-        { companyId },
-        { companyId: null }
-      ];
-    }
     if (type) query.type = type;
     if (status) query.status = status;
 
-    const partners = await ValuationPartner.find(query)
-      .populate('companyId', 'name')
-      .sort({ 'qualifications.rating': -1, name: 1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+    let allPartners;
+    if (companyId) {
+      // ZeroDB doesn't support $or; fetch both and merge
+      const companyPartners = await ValuationPartner.find({ ...query, companyId });
+      const globalPartners = await ValuationPartner.find({ ...query, companyId: null });
+      allPartners = [...companyPartners, ...globalPartners];
+    } else {
+      allPartners = await ValuationPartner.find(query);
+    }
 
-    const total = await ValuationPartner.countDocuments(query);
+    // Sort by rating descending, then name ascending
+    allPartners.sort((a, b) => {
+      const ratingDiff = (b.qualifications?.rating || 0) - (a.qualifications?.rating || 0);
+      if (ratingDiff !== 0) return ratingDiff;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    // Paginate in-memory
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const partners = allPartners.slice(startIndex, startIndex + limitNum);
+    const total = allPartners.length;
 
     res.json({
       success: true,
       data: partners,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
@@ -99,11 +108,7 @@ exports.getPartner = async (req, res) => {
   try {
     const { partnerId } = req.params;
 
-    const partner = await ValuationPartner.findOne({ partnerId })
-      .populate('companyId', 'name')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('communications.createdBy', 'firstName lastName')
-      .populate('scheduledCalls.createdBy', 'firstName lastName');
+    const partner = await ValuationPartner.findOne({ partnerId });
 
     if (!partner) {
       return res.status(404).json({
@@ -128,7 +133,7 @@ exports.getPartner = async (req, res) => {
 exports.updatePartner = async (req, res) => {
   try {
     const { partnerId } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
 
     const partner = await ValuationPartner.findOne({ partnerId });
     if (!partner) {
@@ -144,13 +149,14 @@ exports.updatePartner = async (req, res) => {
     delete updates.scheduledCalls;
     delete updates.metrics;
 
-    Object.assign(partner, updates);
-    partner.updatedBy = req.user._id;
-    await partner.save();
+    updates.updatedBy = req.user?.userId;
+
+    await ValuationPartner.updateOne({ partnerId }, { $set: updates });
+    const updatedPartner = await ValuationPartner.findOne({ partnerId });
 
     res.json({
       success: true,
-      data: partner
+      data: updatedPartner
     });
   } catch (error) {
     res.status(400).json({
@@ -166,22 +172,15 @@ exports.addContact = async (req, res) => {
     const { partnerId } = req.params;
     const contactData = req.body;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
-
-    await partner.addContact(contactData, req.user._id);
+    const updatedPartner = await ValuationPartner.addContact(partnerId, contactData, req.user?.userId);
 
     res.json({
       success: true,
-      data: partner
+      data: updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -193,22 +192,15 @@ exports.setPrimaryContact = async (req, res) => {
   try {
     const { partnerId, contactId } = req.params;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
-
-    await partner.setPrimaryContact(contactId, req.user._id);
+    const updatedPartner = await ValuationPartner.setPrimaryContact(partnerId, contactId, req.user?.userId);
 
     res.json({
       success: true,
-      data: partner
+      data: updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -229,7 +221,7 @@ exports.scheduleCall = async (req, res) => {
       });
     }
 
-    const call = await partner.scheduleCall(callData, req.user._id);
+    const call = await ValuationPartner.scheduleCall(partnerId, callData, req.user?.userId);
 
     res.status(201).json({
       success: true,
@@ -255,22 +247,18 @@ exports.updateCallStatus = async (req, res) => {
     const { partnerId, callId } = req.params;
     const { status, ...data } = req.body;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
+    const updatedPartner = await ValuationPartner.updateCallStatus(partnerId, callId, status, req.user?.userId, data);
 
-    await partner.updateCallStatus(callId, status, req.user._id, data);
+    // Find the specific call from the updated partner
+    const call = (updatedPartner.scheduledCalls || []).find(c => c._id === callId);
 
     res.json({
       success: true,
-      data: partner.scheduledCalls.id(callId)
+      data: call || updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' || error.message === 'Call not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -290,9 +278,11 @@ exports.getUpcomingCalls = async (req, res) => {
       });
     }
 
+    const upcomingCalls = ValuationPartner.getUpcomingCalls(partner);
+
     res.json({
       success: true,
-      data: partner.upcomingCalls
+      data: upcomingCalls
     });
   } catch (error) {
     res.status(500).json({
@@ -308,22 +298,19 @@ exports.addCommunication = async (req, res) => {
     const { partnerId } = req.params;
     const commData = req.body;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
+    const updatedPartner = await ValuationPartner.addCommunication(partnerId, commData, req.user?.userId);
 
-    await partner.addCommunication(commData, req.user._id);
+    // Return the most recently added communication
+    const communications = updatedPartner.communications || [];
+    const latestComm = communications[communications.length - 1];
 
     res.json({
       success: true,
-      data: partner.communications[partner.communications.length - 1]
+      data: latestComm || updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -336,8 +323,7 @@ exports.getCommunicationHistory = async (req, res) => {
     const { partnerId } = req.params;
     const { type, page = 1, limit = 20 } = req.query;
 
-    const partner = await ValuationPartner.findOne({ partnerId })
-      .populate('communications.createdBy', 'firstName lastName');
+    const partner = await ValuationPartner.findOne({ partnerId });
 
     if (!partner) {
       return res.status(404).json({
@@ -346,27 +332,29 @@ exports.getCommunicationHistory = async (req, res) => {
       });
     }
 
-    let communications = partner.communications;
+    let communications = partner.communications || [];
 
     if (type) {
       communications = communications.filter(c => c.type === type);
     }
 
     // Sort by date descending
-    communications.sort((a, b) => b.createdAt - a.createdAt);
+    communications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Paginate
-    const startIndex = (page - 1) * limit;
-    const paginatedComms = communications.slice(startIndex, startIndex + parseInt(limit));
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedComms = communications.slice(startIndex, startIndex + limitNum);
 
     res.json({
       success: true,
       data: paginatedComms,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total: communications.length,
-        pages: Math.ceil(communications.length / limit)
+        pages: Math.ceil(communications.length / limitNum)
       }
     });
   } catch (error) {
@@ -382,22 +370,15 @@ exports.activatePartner = async (req, res) => {
   try {
     const { partnerId } = req.params;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
-
-    await partner.activate(req.user._id);
+    const updatedPartner = await ValuationPartner.activate(partnerId, req.user?.userId);
 
     res.json({
       success: true,
-      data: partner
+      data: updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -410,22 +391,15 @@ exports.deactivatePartner = async (req, res) => {
     const { partnerId } = req.params;
     const { reason } = req.body;
 
-    const partner = await ValuationPartner.findOne({ partnerId });
-    if (!partner) {
-      return res.status(404).json({
-        success: false,
-        error: 'Partner not found'
-      });
-    }
-
-    await partner.deactivate(req.user._id, reason);
+    const updatedPartner = await ValuationPartner.deactivate(partnerId, req.user?.userId, reason);
 
     res.json({
       success: true,
-      data: partner
+      data: updatedPartner
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Partner not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });

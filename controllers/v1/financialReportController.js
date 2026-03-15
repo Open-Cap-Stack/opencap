@@ -38,13 +38,17 @@ const createFinancialReport = async (req, res) => {
     req.body.userId = req.user.userId;
     
     // Create new financial report
-    const newFinancialReport = new FinancialReport(req.body);
-    
-    // Calculate totals
-    newFinancialReport.calculateTotals();
-    
+    const reportData = { ...req.body };
+
+    // Calculate totals inline
+    const revenue = reportData.revenue || {};
+    const expenses = reportData.expenses || {};
+    reportData.totalRevenue = Object.values(revenue).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    reportData.totalExpenses = Object.values(expenses).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    reportData.netIncome = reportData.totalRevenue - reportData.totalExpenses;
+
     // Save to database
-    await newFinancialReport.save();
+    const newFinancialReport = await FinancialReport.create(reportData);
     
     // ZeroDB Integration: Index document for vector search
     try {
@@ -219,16 +223,19 @@ const updateFinancialReport = async (req, res) => {
     req.body.lastModifiedBy = req.user.userId;
     req.body.updatedAt = new Date();
     
-    // Update financial report and recalculate totals
-    const updatedReport = await FinancialReport.findByIdAndUpdate(
-      id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    );
-    
-    // Recalculate totals for the updated report
-    updatedReport.calculateTotals();
-    await updatedReport.save();
+    // Recalculate totals if revenue/expenses changed
+    const updateData = { ...req.body };
+    const revenue = updateData.revenue || {};
+    const expenses = updateData.expenses || {};
+    if (Object.keys(revenue).length > 0 || Object.keys(expenses).length > 0) {
+      updateData.totalRevenue = Object.values(revenue).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      updateData.totalExpenses = Object.values(expenses).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      updateData.netIncome = updateData.totalRevenue - updateData.totalExpenses;
+    }
+
+    // Update financial report
+    await FinancialReport.updateOne({ _id: id }, updateData);
+    const updatedReport = await FinancialReport.findById(id);
     
     res.status(200).json(updatedReport);
   } catch (error) {
@@ -416,12 +423,15 @@ const bulkCreateFinancialReports = async (req, res) => {
       userId: req.user.userId
     }));
     
-    // Create reports and calculate totals
+    // Create reports with calculated totals
     const newReports = [];
     for (const reportData of reportsWithUser) {
-      const report = new FinancialReport(reportData);
-      report.calculateTotals();
-      await report.save();
+      const revenue = reportData.revenue || {};
+      const expenses = reportData.expenses || {};
+      reportData.totalRevenue = Object.values(revenue).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      reportData.totalExpenses = Object.values(expenses).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      reportData.netIncome = reportData.totalRevenue - reportData.totalExpenses;
+      const report = await FinancialReport.create(reportData);
       newReports.push(report);
     }
     

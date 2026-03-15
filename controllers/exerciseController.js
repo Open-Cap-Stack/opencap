@@ -508,10 +508,11 @@ exports.generateForm3921 = async (req, res) => {
     );
 
     // Update exercise request with Form 3921 reference
-    exerciseRequest.form3921Id = form3921._id;
-    exerciseRequest.form3921Generated = true;
-    exerciseRequest.form3921GeneratedAt = new Date();
-    await exerciseRequest.save();
+    await ExerciseService.updateExerciseRequest(exerciseRequest._id, {
+      form3921Id: form3921._id,
+      form3921Generated: true,
+      form3921GeneratedAt: new Date()
+    });
 
     res.status(201).json({
       message: 'Form 3921 generated successfully',

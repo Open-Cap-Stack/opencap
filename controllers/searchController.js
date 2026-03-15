@@ -109,10 +109,12 @@ const calculateCombinedRelevance = (entity, fields, query) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchStakeholders = async (query, limit) => {
+const searchStakeholders = async (query, limit, companyId) => {
   try {
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
     // Get all stakeholders (in production, this should use database text search)
-    const stakeholders = await Stakeholder.find({});
+    const stakeholders = await Stakeholder.find(filter);
     const lowerQuery = query.toLowerCase();
 
     // Filter and score
@@ -151,14 +153,14 @@ const searchStakeholders = async (query, limit) => {
  * @param {number} pageSize - Page size
  * @returns {Promise<Array>} - Search results
  */
-const searchDocuments = async (query, page, pageSize) => {
+const searchDocuments = async (query, page, pageSize, companyId) => {
   try {
     const searchOptions = {
       pagination: {
         page,
         pageSize
       },
-      filters: {},
+      filters: companyId ? { companyId } : {},
       minRelevance: 0,
       highlight: false,
       includeContent: false
@@ -186,9 +188,11 @@ const searchDocuments = async (query, page, pageSize) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchTasks = async (query, limit) => {
+const searchTasks = async (query, limit, companyId) => {
   try {
-    const tasks = await Task.find({});
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+    const tasks = await Task.find(filter);
 
     const results = tasks
       .map(task => {
@@ -225,9 +229,11 @@ const searchTasks = async (query, limit) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchCompanies = async (query, limit) => {
+const searchCompanies = async (query, limit, companyId) => {
   try {
-    const companies = await Company.find({});
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+    const companies = await Company.find(filter);
 
     const results = companies
       .map(company => {
@@ -262,9 +268,11 @@ const searchCompanies = async (query, limit) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchShareClasses = async (query, limit) => {
+const searchShareClasses = async (query, limit, companyId) => {
   try {
-    const shareClasses = await ShareClass.find({});
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+    const shareClasses = await ShareClass.find(filter);
 
     const results = shareClasses
       .map(sc => {
@@ -299,7 +307,7 @@ const searchShareClasses = async (query, limit) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchValuations = async (query, limit) => {
+const searchValuations = async (query, limit, companyId) => {
   try {
     // Check if find method exists (handle both ZeroDB and test mocks)
     if (typeof Valuation409A.find !== 'function') {
@@ -307,7 +315,9 @@ const searchValuations = async (query, limit) => {
       return [];
     }
 
-    const valuations = await Valuation409A.find({});
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+    const valuations = await Valuation409A.find(filter);
 
     const results = valuations
       .map(val => {
@@ -346,9 +356,11 @@ const searchValuations = async (query, limit) => {
  * @param {number} limit - Result limit
  * @returns {Promise<Array>} - Search results with relevance scores
  */
-const searchMessages = async (query, limit) => {
+const searchMessages = async (query, limit, companyId) => {
   try {
-    const messages = await Communication.find({});
+    const filter = {};
+    if (companyId) filter.companyId = companyId;
+    const messages = await Communication.find(filter);
 
     const results = messages
       .map(msg => {
@@ -392,6 +404,7 @@ const globalSearch = async (req, res) => {
 
   try {
     const { q, types, limit, offset } = req.query;
+    const companyId = req.query.companyId || req.user?.companyId;
 
     // Validate query parameter
     if (!q && q !== '') {
@@ -453,7 +466,7 @@ const globalSearch = async (req, res) => {
 
     if (entityTypes.includes('stakeholders')) {
       searchPromises.push(
-        searchStakeholders(sanitizedQuery, resultLimit)
+        searchStakeholders(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.stakeholders = r; })
       );
     }
@@ -461,42 +474,42 @@ const globalSearch = async (req, res) => {
     if (entityTypes.includes('documents')) {
       const page = Math.floor(resultOffset / resultLimit) + 1;
       searchPromises.push(
-        searchDocuments(sanitizedQuery, page, resultLimit)
+        searchDocuments(sanitizedQuery, page, resultLimit, companyId)
           .then(r => { results.documents = r; })
       );
     }
 
     if (entityTypes.includes('tasks')) {
       searchPromises.push(
-        searchTasks(sanitizedQuery, resultLimit)
+        searchTasks(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.tasks = r; })
       );
     }
 
     if (entityTypes.includes('companies')) {
       searchPromises.push(
-        searchCompanies(sanitizedQuery, resultLimit)
+        searchCompanies(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.companies = r; })
       );
     }
 
     if (entityTypes.includes('share_classes')) {
       searchPromises.push(
-        searchShareClasses(sanitizedQuery, resultLimit)
+        searchShareClasses(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.share_classes = r; })
       );
     }
 
     if (entityTypes.includes('valuations')) {
       searchPromises.push(
-        searchValuations(sanitizedQuery, resultLimit)
+        searchValuations(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.valuations = r; })
       );
     }
 
     if (entityTypes.includes('messages')) {
       searchPromises.push(
-        searchMessages(sanitizedQuery, resultLimit)
+        searchMessages(sanitizedQuery, resultLimit, companyId)
           .then(r => { results.messages = r; })
       );
     }
@@ -574,29 +587,32 @@ const getSearchSuggestions = async (req, res) => {
     }
 
     const sanitizedQuery = sanitizeQuery(q);
+    const companyId = req.query.companyId || req.user?.companyId;
     const limit = 10; // Fixed limit for suggestions
+
+    const companyFilter = companyId ? { companyId } : {};
 
     // Get suggestions from multiple sources
     const [stakeholders, companies, tasks, documents] = await Promise.all([
-      Stakeholder.find({}).then(all =>
+      Stakeholder.find(companyFilter).then(all =>
         all.filter(s =>
           s.name?.toLowerCase().includes(sanitizedQuery.toLowerCase())
         ).slice(0, 3)
       ).catch(() => []),
 
-      Company.find({}).then(all =>
+      Company.find(companyFilter).then(all =>
         all.filter(c =>
           c.CompanyName?.toLowerCase().includes(sanitizedQuery.toLowerCase())
         ).slice(0, 3)
       ).catch(() => []),
 
-      Task.find({}).then(all =>
+      Task.find(companyFilter).then(all =>
         all.filter(t =>
           t.title?.toLowerCase().includes(sanitizedQuery.toLowerCase())
         ).slice(0, 2)
       ).catch(() => []),
 
-      Document.find({}).then(all =>
+      Document.find(companyFilter).then(all =>
         all.filter(d =>
           d.name?.toLowerCase().includes(sanitizedQuery.toLowerCase())
         ).slice(0, 2)

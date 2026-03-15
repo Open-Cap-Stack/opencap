@@ -3,6 +3,7 @@
  * Feature: Issue #60 - Build Material Events Tracking
  *
  * Handles API endpoints for material event detection and management.
+ * Migrated to ZeroDB - no Mongoose patterns (no new Model(), .save(), .populate())
  */
 const MaterialEvent = require('../models/MaterialEvent');
 
@@ -23,30 +24,28 @@ exports.createEvent = async (req, res) => {
       metadata
     } = req.body;
 
-    const event = new MaterialEvent({
+    const event = await MaterialEvent.create({
       companyId,
       eventType,
-      eventDate: eventDate || new Date(),
+      eventDate: eventDate || new Date().toISOString(),
       description,
       triggersValuation,
-      impactSeverity,
+      severity: impactSeverity,
       valuationImpactReason,
       relatedEntities,
       notes,
       tags,
       metadata,
       detectionSource: 'manual',
-      detectedBy: req.user._id,
-      createdBy: req.user._id,
+      detectedBy: req.user?.userId,
+      createdBy: req.user?.userId,
       statusHistory: [{
         status: 'detected',
-        changedAt: new Date(),
-        changedBy: req.user._id,
+        changedAt: new Date().toISOString(),
+        changedBy: req.user?.userId,
         reason: 'Event created manually'
       }]
     });
-
-    await event.save();
 
     res.status(201).json({
       success: true,
@@ -73,23 +72,26 @@ exports.getCompanyEvents = async (req, res) => {
       query.triggersValuation = triggersValuation === 'true';
     }
 
-    const events = await MaterialEvent.find(query)
-      .populate('companyId', 'name')
-      .populate('detectedBy', 'firstName lastName email')
-      .sort({ eventDate: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+    const allEvents = await MaterialEvent.find(query);
 
-    const total = await MaterialEvent.countDocuments(query);
+    // Sort by eventDate descending
+    allEvents.sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate));
+
+    // Paginate in-memory
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const events = allEvents.slice(startIndex, startIndex + limitNum);
+    const total = allEvents.length;
 
     res.json({
       success: true,
       data: events,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
@@ -105,13 +107,7 @@ exports.getEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    const event = await MaterialEvent.findOne({ eventId })
-      .populate('companyId', 'name')
-      .populate('detectedBy', 'firstName lastName email')
-      .populate('resolution.resolvedBy', 'firstName lastName email')
-      .populate('resolution.valuationRequestId')
-      .populate('actionItems.assignedTo', 'firstName lastName email')
-      .populate('statusHistory.changedBy', 'firstName lastName email');
+    const event = await MaterialEvent.findOne({ eventId });
 
     if (!event) {
       return res.status(404).json({
@@ -136,7 +132,7 @@ exports.getEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
 
     const event = await MaterialEvent.findOne({ eventId });
     if (!event) {
@@ -150,13 +146,14 @@ exports.updateEvent = async (req, res) => {
     delete updates.status;
     delete updates.statusHistory;
 
-    Object.assign(event, updates);
-    event.updatedBy = req.user._id;
-    await event.save();
+    updates.updatedBy = req.user?.userId;
+
+    await MaterialEvent.updateOne({ eventId }, { $set: updates });
+    const updatedEvent = await MaterialEvent.findOne({ eventId });
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
     res.status(400).json({
@@ -172,22 +169,15 @@ exports.acknowledgeEvent = async (req, res) => {
     const { eventId } = req.params;
     const { notes } = req.body;
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.acknowledge(req.user._id, notes);
+    const updatedEvent = await MaterialEvent.acknowledge(eventId, req.user?.userId, notes);
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -200,22 +190,15 @@ exports.markActionRequired = async (req, res) => {
     const { eventId } = req.params;
     const { actionItems, notes } = req.body;
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.markActionRequired(req.user._id, actionItems || [], notes);
+    const updatedEvent = await MaterialEvent.markActionRequired(eventId, req.user?.userId, actionItems || [], notes);
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -228,22 +211,15 @@ exports.resolveEvent = async (req, res) => {
     const { eventId } = req.params;
     const { notes, valuationRequestId } = req.body;
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.resolve(req.user._id, { notes, valuationRequestId });
+    const updatedEvent = await MaterialEvent.resolve(eventId, req.user?.userId, { notes, valuationRequestId });
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -263,22 +239,15 @@ exports.dismissEvent = async (req, res) => {
       });
     }
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.dismiss(req.user._id, reason);
+    const updatedEvent = await MaterialEvent.dismiss(eventId, req.user?.userId, reason);
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -291,22 +260,15 @@ exports.addActionItem = async (req, res) => {
     const { eventId } = req.params;
     const { action, assignedTo, dueDate } = req.body;
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.addActionItem({ action, assignedTo, dueDate }, req.user._id);
+    const updatedEvent = await MaterialEvent.addActionItem(eventId, { action, assignedTo, dueDate }, req.user?.userId);
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -319,22 +281,15 @@ exports.completeActionItem = async (req, res) => {
     const { eventId, actionItemId } = req.params;
     const { notes } = req.body;
 
-    const event = await MaterialEvent.findOne({ eventId });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
-    }
-
-    await event.completeActionItem(actionItemId, req.user._id, notes);
+    const updatedEvent = await MaterialEvent.completeActionItem(eventId, actionItemId, req.user?.userId, notes);
 
     res.json({
       success: true,
-      data: event
+      data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
+    const statusCode = error.message === 'Event not found' || error.message === 'Action item not found' ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: error.message
     });
@@ -405,7 +360,7 @@ exports.detectFromFundraisingRound = async (req, res) => {
   try {
     const roundData = req.body;
 
-    const event = await MaterialEvent.detectFromFundraisingRound(roundData, req.user._id);
+    const event = await MaterialEvent.detectFromFinancingRound(roundData, req.user?.userId);
 
     res.status(201).json({
       success: true,
@@ -434,7 +389,7 @@ exports.detectFromEmployeeChange = async (req, res) => {
     const event = await MaterialEvent.detectFromEmployeeChange(
       employeeData,
       changeType,
-      req.user._id
+      req.user?.userId
     );
 
     res.status(201).json({
@@ -458,16 +413,26 @@ exports.getComplianceDashboard = async (req, res) => {
       actionRequired,
       valuationTriggers,
       summary,
-      recentEvents
+      allEvents
     ] = await Promise.all([
       MaterialEvent.findActionRequired(companyId),
       MaterialEvent.findValuationTriggers(companyId),
       MaterialEvent.getCompanySummary(companyId),
       MaterialEvent.find({ companyId })
-        .sort({ eventDate: -1 })
-        .limit(10)
-        .select('eventId eventType eventDate status triggersValuation impactSeverity')
     ]);
+
+    // Sort and limit recent events in-memory
+    const recentEvents = allEvents
+      .sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate))
+      .slice(0, 10)
+      .map(e => ({
+        eventId: e.eventId,
+        eventType: e.eventType,
+        eventDate: e.eventDate,
+        status: e.status,
+        triggersValuation: e.triggersValuation,
+        impactSeverity: e.severity
+      }));
 
     res.json({
       success: true,

@@ -27,8 +27,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const complianceCheck = new ComplianceCheck(req.body);
-    const savedCheck = await complianceCheck.save();
+    const savedCheck = await ComplianceCheck.create(req.body);
     
     res.status(201).json(savedCheck);
   } catch (error) {

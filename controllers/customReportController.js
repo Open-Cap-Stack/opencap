@@ -39,12 +39,11 @@ class CustomReportController {
       const reportData = {
         ...req.body,
         reportId: uuidv4(),
-        createdBy: user.id,
+        createdBy: user.userId,
         companyId: user.companyId
       };
 
-      const report = new CustomReport(reportData);
-      await report.save();
+      const report = await CustomReport.create(reportData);
 
       // Store in ZeroDB
       try {
@@ -88,9 +87,9 @@ class CustomReportController {
 
       // Check access permissions
       const hasAccess =
-        report.createdBy === user.id ||
+        report.createdBy === user.userId ||
         report.isPublic ||
-        report.sharedWith.includes(user.id) ||
+        report.sharedWith.includes(user.userId) ||
         user.role === 'admin';
 
       if (!hasAccess) {
@@ -121,9 +120,9 @@ class CustomReportController {
       // Build query based on user permissions
       const query = {
         $or: [
-          { createdBy: user.id },
+          { createdBy: user.userId },
           { isPublic: true },
-          { sharedWith: user.id }
+          { sharedWith: user.userId }
         ]
       };
 
@@ -181,7 +180,7 @@ class CustomReportController {
       }
 
       // Check permissions - only creator or admin can update
-      if (report.createdBy !== user.id && user.role !== 'admin') {
+      if (report.createdBy !== user.userId && user.role !== 'admin') {
         return res.status(403).json({ message: 'Not authorized to update this report' });
       }
 
@@ -195,8 +194,8 @@ class CustomReportController {
       }
 
       // Update report
+      await CustomReport.updateOne({ reportId: report.reportId }, req.body);
       Object.assign(report, req.body);
-      await report.save();
 
       // Update in ZeroDB
       try {
@@ -240,7 +239,7 @@ class CustomReportController {
       }
 
       // Check permissions
-      if (report.createdBy !== user.id && user.role !== 'admin') {
+      if (report.createdBy !== user.userId && user.role !== 'admin') {
         return res.status(403).json({ message: 'Not authorized to delete this report' });
       }
 
@@ -278,9 +277,9 @@ class CustomReportController {
 
       // Check access permissions
       const hasAccess =
-        report.createdBy === user.id ||
+        report.createdBy === user.userId ||
         report.isPublic ||
-        report.sharedWith.includes(user.id) ||
+        report.sharedWith.includes(user.userId) ||
         user.role === 'admin';
 
       if (!hasAccess) {
@@ -303,9 +302,10 @@ class CustomReportController {
       const results = await reportAggregationService.executeReport(report, filterQuery);
 
       // Update execution statistics
-      report.executionCount += 1;
-      report.lastExecutedAt = new Date();
-      await report.save();
+      await CustomReport.updateOne({ reportId: report.reportId }, {
+        executionCount: (report.executionCount || 0) + 1,
+        lastExecutedAt: new Date()
+      });
 
       return res.status(200).json({
         reportId: report.reportId,

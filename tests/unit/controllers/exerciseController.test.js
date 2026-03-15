@@ -601,8 +601,7 @@ describe('ExerciseController', () => {
         _id: 'request-123',
         status: 'completed',
         optionType: 'ISO',
-        form3921Generated: false,
-        save: jest.fn().mockResolvedValue({})
+        form3921Generated: false
       };
 
       const mockForm3921 = {
@@ -612,6 +611,7 @@ describe('ExerciseController', () => {
 
       ExerciseService.getExerciseRequestById = jest.fn().mockResolvedValue(mockExerciseRequest);
       ExerciseService.generateForm3921 = jest.fn().mockResolvedValue(mockForm3921);
+      ExerciseService.updateExerciseRequest = jest.fn().mockResolvedValue({});
 
       await exerciseController.generateForm3921(mockReq, mockRes);
 

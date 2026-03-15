@@ -3,16 +3,22 @@
  * Feature: Issue #39 - Controller Test Coverage
  */
 
-jest.mock('../../../models/SAFE', () => {
-  const mc = jest.fn().mockImplementation((d) => ({ ...d, save: jest.fn().mockResolvedValue(true) }));
-  mc.find = jest.fn(); mc.findOne = jest.fn(); mc.countDocuments = jest.fn();
-  mc.getTotalFundedAmount = jest.fn(); mc.getPendingConversion = jest.fn();
-  return mc;
-});
-jest.mock('../../../models/SignatureRequest', () => {
-  const mc = jest.fn().mockImplementation((d) => ({ ...d, save: jest.fn().mockResolvedValue(true), send: jest.fn().mockResolvedValue(true) }));
-  return mc;
-});
+jest.mock('../../../models/SAFE', () => ({
+  create: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  countDocuments: jest.fn(),
+  updateOne: jest.fn(),
+  canTransitionTo: jest.fn(),
+  transitionTo: jest.fn(),
+  addInvestorSignature: jest.fn(),
+  addCompanySignature: jest.fn(),
+  getTotalFundedAmount: jest.fn(),
+  getPendingConversion: jest.fn()
+}));
+jest.mock('../../../models/SignatureRequest', () => ({
+  create: jest.fn()
+}));
 jest.mock('../../../models/SAFEConversion');
 jest.mock('../../../services/safeConversionService');
 
@@ -32,13 +38,15 @@ describe('SAFE Controller', () => {
   describe('createSAFE', () => {
     it('should create successfully', async () => {
       req.body = { companyId: 'c1', investorId: 'i1', investorName: 'J', investorEmail: 'j@i.com', investmentAmount: 100000, safeType: 'post-money', valuationCap: 5000000 };
-      SAFE.mockImplementation(() => ({ ...req.body, save: jest.fn().mockResolvedValue(true) }));
+      const createdSafe = { ...req.body, safeId: 'safe_123', status: 'draft' };
+      SAFE.create.mockResolvedValue(createdSafe);
       await ctrl.createSAFE(req, res);
       expect(res.status).toHaveBeenCalledWith(201);
+      expect(SAFE.create).toHaveBeenCalled();
     });
     it('should return 400 for invalid data', async () => {
       req.body = {};
-      SAFE.mockImplementation(() => ({ save: jest.fn().mockRejectedValue(new Error('Validation failed')) }));
+      SAFE.create.mockRejectedValue(new Error('Validation failed'));
       await ctrl.createSAFE(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
     });
@@ -48,17 +56,17 @@ describe('SAFE Controller', () => {
     it('should return paginated SAFEs', async () => {
       req.params.companyId = 'c1'; req.query = { page: '1', limit: '20' };
       const safes = [{ safeId: 's1' }, { safeId: 's2' }];
-      const q = { populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue(safes) };
-      SAFE.find.mockReturnValue(q); SAFE.countDocuments.mockResolvedValue(2);
+      SAFE.find.mockResolvedValue(safes);
+      SAFE.countDocuments.mockResolvedValue(2);
       await ctrl.getCompanySAFEs(req, res);
       expect(res.json).toHaveBeenCalledWith({ success: true, data: safes, pagination: { page: 1, limit: 20, total: 2, pages: 1 } });
     });
     it('should filter by status', async () => {
       req.params.companyId = 'c1'; req.query = { status: 'funded' };
-      const q = { populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), skip: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) };
-      SAFE.find.mockReturnValue(q); SAFE.countDocuments.mockResolvedValue(0);
+      SAFE.find.mockResolvedValue([]);
+      SAFE.countDocuments.mockResolvedValue(0);
       await ctrl.getCompanySAFEs(req, res);
-      expect(SAFE.find).toHaveBeenCalledWith({ companyId: 'c1', status: 'funded' });
+      expect(SAFE.find).toHaveBeenCalledWith({ companyId: 'c1', status: 'funded' }, expect.objectContaining({ sort: { createdAt: -1 } }));
     });
   });
 
@@ -66,17 +74,13 @@ describe('SAFE Controller', () => {
     it('should return a SAFE', async () => {
       req.params.safeId = 'safe_123';
       const safe = { safeId: 'safe_123' };
-      const q = { populate: jest.fn().mockReturnThis() };
-      q.populate.mockReturnValueOnce(q).mockReturnValueOnce(q).mockReturnValueOnce(q).mockReturnValueOnce(q).mockResolvedValueOnce(safe);
-      SAFE.findOne.mockReturnValue(q);
+      SAFE.findOne.mockResolvedValue(safe);
       await ctrl.getSAFE(req, res);
       expect(res.json).toHaveBeenCalledWith({ success: true, data: safe });
     });
     it('should return 404', async () => {
       req.params.safeId = 'x';
-      const q = { populate: jest.fn().mockReturnThis() };
-      q.populate.mockReturnValueOnce(q).mockReturnValueOnce(q).mockReturnValueOnce(q).mockReturnValueOnce(q).mockResolvedValueOnce(null);
-      SAFE.findOne.mockReturnValue(q);
+      SAFE.findOne.mockResolvedValue(null);
       await ctrl.getSAFE(req, res);
       expect(res.status).toHaveBeenCalledWith(404);
     });
@@ -85,11 +89,13 @@ describe('SAFE Controller', () => {
   describe('updateSAFE', () => {
     it('should update draft SAFE', async () => {
       req.params.safeId = 's1'; req.body = { investmentAmount: 75000, notes: 'Updated' };
-      const safe = { safeId: 's1', status: 'draft', save: jest.fn().mockResolvedValue(true) };
-      SAFE.findOne.mockResolvedValue(safe);
+      const safe = { safeId: 's1', status: 'draft', investmentAmount: 50000 };
+      const updatedSafe = { safeId: 's1', status: 'draft', investmentAmount: 75000, notes: 'Updated', updatedBy: 'uid' };
+      SAFE.findOne.mockResolvedValueOnce(safe).mockResolvedValueOnce(updatedSafe);
+      SAFE.updateOne.mockResolvedValue({ modifiedCount: 1 });
       await ctrl.updateSAFE(req, res);
-      expect(safe.investmentAmount).toBe(75000);
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: safe });
+      expect(SAFE.updateOne).toHaveBeenCalledWith({ safeId: 's1' }, { $set: expect.objectContaining({ investmentAmount: 75000, notes: 'Updated', updatedBy: 'uid' }) });
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: updatedSafe });
     });
     it('should prevent updates to non-draft', async () => {
       req.params.safeId = 's1'; req.body = { investmentAmount: 75000 };
@@ -102,29 +108,62 @@ describe('SAFE Controller', () => {
   describe('sendSAFE', () => {
     it('should send for signatures', async () => {
       req.params.safeId = 's1'; req.body = { message: 'Sign' };
-      const safe = { _id: 'oid', safeId: 's1', investorName: 'Inv', investorEmail: 'i@t.com', companyId: { _id: 'cid', name: 'Co' }, canTransitionTo: jest.fn().mockReturnValue(true), transitionTo: jest.fn().mockResolvedValue(true) };
-      const q = { populate: jest.fn().mockReturnThis() };
-      q.populate.mockReturnValueOnce(q).mockResolvedValueOnce(safe);
-      SAFE.findOne.mockReturnValue(q);
-      const sr = { save: jest.fn().mockResolvedValue(true), send: jest.fn().mockResolvedValue(true) };
-      SignatureRequest.mockImplementation(() => sr);
+      const safe = { _id: 'oid', safeId: 's1', status: 'draft', investorName: 'Inv', investorEmail: 'i@t.com', companyId: 'cid' };
+      SAFE.findOne.mockResolvedValue(safe);
+      SAFE.canTransitionTo.mockReturnValue(true);
+      const updatedSafe = { ...safe, status: 'sent' };
+      SAFE.transitionTo.mockResolvedValue(updatedSafe);
+      const sr = { requestId: 'sr1' };
+      SignatureRequest.create.mockResolvedValue(sr);
       await ctrl.sendSAFE(req, res);
-      expect(sr.save).toHaveBeenCalled();
-      expect(safe.transitionTo).toHaveBeenCalledWith('sent', expect.anything(), 'Sent for signatures');
+      expect(SignatureRequest.create).toHaveBeenCalled();
+      expect(SAFE.transitionTo).toHaveBeenCalledWith('s1', 'sent', expect.anything(), 'Sent for signatures');
+    });
+  });
+
+  describe('recordInvestorSignature', () => {
+    it('should record investor signature', async () => {
+      req.params.safeId = 's1';
+      req.body = { signatureData: 'sig', signerName: 'Inv', signerEmail: 'i@t.com', signerTitle: 'CEO' };
+      const safe = { safeId: 's1', status: 'sent' };
+      const updatedSafe = { ...safe, investorSignature: { signerName: 'Inv' } };
+      SAFE.findOne.mockResolvedValue(safe);
+      SAFE.addInvestorSignature.mockResolvedValue(updatedSafe);
+      await ctrl.recordInvestorSignature(req, res);
+      expect(SAFE.addInvestorSignature).toHaveBeenCalledWith('s1', expect.objectContaining({ signerName: 'Inv' }), 'uid');
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: updatedSafe });
+    });
+  });
+
+  describe('recordCompanySignature', () => {
+    it('should record company signature', async () => {
+      req.params.safeId = 's1';
+      req.body = { signatureData: 'sig', signerName: 'Rep', signerEmail: 'r@t.com', signerTitle: 'CFO' };
+      const safe = { safeId: 's1', status: 'sent' };
+      const updatedSafe = { ...safe, companySignature: { signerName: 'Rep' } };
+      SAFE.findOne.mockResolvedValue(safe);
+      SAFE.addCompanySignature.mockResolvedValue(updatedSafe);
+      await ctrl.recordCompanySignature(req, res);
+      expect(SAFE.addCompanySignature).toHaveBeenCalledWith('s1', expect.objectContaining({ signerName: 'Rep' }), 'uid');
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: updatedSafe });
     });
   });
 
   describe('markFunded', () => {
     it('should mark as funded', async () => {
       req.params.safeId = 's1'; req.body = { notes: 'Wire received' };
-      const safe = { safeId: 's1', investmentAmount: 100000, canTransitionTo: jest.fn().mockReturnValue(true), transitionTo: jest.fn().mockResolvedValue(true) };
+      const safe = { safeId: 's1', status: 'fully_signed', investmentAmount: 100000 };
       SAFE.findOne.mockResolvedValue(safe);
+      SAFE.canTransitionTo.mockReturnValue(true);
+      const updatedSafe = { ...safe, status: 'funded' };
+      SAFE.transitionTo.mockResolvedValue(updatedSafe);
       await ctrl.markFunded(req, res);
-      expect(safe.transitionTo).toHaveBeenCalledWith('funded', req.user._id, 'Wire received', expect.any(Object));
+      expect(SAFE.transitionTo).toHaveBeenCalledWith('s1', 'funded', req.user._id, 'Wire received', expect.any(Object));
     });
     it('should reject wrong status', async () => {
       req.params.safeId = 's1';
-      SAFE.findOne.mockResolvedValue({ status: 'draft', canTransitionTo: jest.fn().mockReturnValue(false) });
+      SAFE.findOne.mockResolvedValue({ status: 'draft' });
+      SAFE.canTransitionTo.mockReturnValue(false);
       await ctrl.markFunded(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
     });
@@ -133,10 +172,13 @@ describe('SAFE Controller', () => {
   describe('cancelSAFE', () => {
     it('should cancel', async () => {
       req.params.safeId = 's1'; req.body = { reason: 'Deal fell through' };
-      const safe = { canTransitionTo: jest.fn().mockReturnValue(true), transitionTo: jest.fn().mockResolvedValue(true) };
+      const safe = { safeId: 's1', status: 'draft' };
       SAFE.findOne.mockResolvedValue(safe);
+      SAFE.canTransitionTo.mockReturnValue(true);
+      const updatedSafe = { ...safe, status: 'cancelled' };
+      SAFE.transitionTo.mockResolvedValue(updatedSafe);
       await ctrl.cancelSAFE(req, res);
-      expect(safe.transitionTo).toHaveBeenCalledWith('cancelled', req.user._id, 'Deal fell through');
+      expect(SAFE.transitionTo).toHaveBeenCalledWith('s1', 'cancelled', req.user._id, 'Deal fell through');
     });
   });
 
