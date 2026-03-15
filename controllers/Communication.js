@@ -22,7 +22,7 @@ exports.createCommunication = async (req, res) => {
             Recipient,
             Timestamp,
             Content,
-            companyId: req.body.companyId || req.user?.companyId,
+            companyId: req.user?.companyId || req.body.companyId,
         };
 
         const savedCommunication = await databaseAdapter.create('Communication', communicationData);

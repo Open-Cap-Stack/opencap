@@ -27,7 +27,7 @@ exports.createDocumentAccess = async (req, res) => {
         // Generate unique accessId if not provided
         const accessId = req.body.accessId || `access_${uuidv4()}`;
 
-        req.body.companyId = req.body.companyId || req.user?.companyId;
+        req.body.companyId = req.user?.companyId || req.body.companyId;
         const accessData = {
             ...req.body,
             accessId,

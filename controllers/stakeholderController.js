@@ -63,10 +63,8 @@ exports.createStakeholder = async (req, res) => {
     if (data.role) data.role = data.role.toLowerCase().replace(/[\s-]+/g, '_');
     if (data.status) data.status = data.status.toLowerCase();
 
-    // Default companyId from authenticated user if not provided
-    if (!data.companyId) {
-      data.companyId = req.user?.companyId;
-    }
+    // Use authenticated user's companyId (prevents spoofing)
+    data.companyId = req.user?.companyId || data.companyId;
     if (!data.companyId) {
       return res.status(400).json({ error: 'companyId is required' });
     }

@@ -16,7 +16,7 @@ const Task = require('../models/Task');
  */
 exports.createTask = async (req, res) => {
   try {
-    req.body.companyId = req.body.companyId || req.user?.companyId;
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const task = await Task.create(req.body);
     res.status(201).json(task);
   } catch (error) {

@@ -6,7 +6,7 @@ const databaseAdapter = require('../services/databaseAdapter');
 
 exports.createEquityPlan = async (req, res) => {
     try {
-        req.body.companyId = req.body.companyId || req.user?.companyId;
+        req.body.companyId = req.user?.companyId || req.body.companyId;
         const savedPlan = await databaseAdapter.create('EquityPlan', req.body);
         res.status(201).json(savedPlan);
     } catch (error) {

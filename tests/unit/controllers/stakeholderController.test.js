@@ -68,6 +68,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.create).toHaveBeenCalledWith({
         ...stakeholderData,
+        companyId: 'company_123', // user's companyId overrides body
         role: 'investor'
       });
       expect(mockRes.status).toHaveBeenCalledWith(201);
@@ -562,7 +563,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         email: 'john@example.com',
         role: 'investor',
         projectId: 'PRJ-001',
-        companyId: 'COMP-001'
+        companyId: 'company_123' // user's companyId overrides body
       });
     });
 

@@ -26,7 +26,7 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
-    req.body.companyId = req.body.companyId || req.user?.companyId;
+    req.body.companyId = req.user?.companyId || req.body.companyId;
 
     // Check for existing employee with same EmployeeID (explicit duplicate check)
     const existingEmployee = await databaseAdapter.findOne('Employee', { EmployeeID });

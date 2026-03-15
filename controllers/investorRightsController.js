@@ -16,7 +16,7 @@ const investorRightsService = require('../services/investorRightsService');
  * @param {Object} res - Express response object
  */
 exports.createInvestorRight = async (req, res) => {
-  req.body.companyId = req.body.companyId || req.user?.companyId;
+  req.body.companyId = req.user?.companyId || req.body.companyId;
   const {
     rightId,
     investorId,

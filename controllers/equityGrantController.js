@@ -18,13 +18,17 @@ exports.createEquityGrant = async (req, res) => {
   try {
     const grantData = {
       ...req.body,
-      companyId: req.body.companyId || req.user?.companyId,
+      companyId: req.user?.companyId || req.body.companyId,
       grantId: req.body.grantId || equityGrantService.generateGrantId(),
       status: req.body.status || 'pending'
     };
 
     if (!grantData.companyId) {
       return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    if (grantData.numberOfShares !== undefined && grantData.numberOfShares <= 0) {
+      return res.status(400).json({ error: 'numberOfShares must be a positive number' });
     }
 
     const savedGrant = await databaseAdapter.create('EquityGrant', grantData);

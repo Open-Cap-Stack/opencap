@@ -33,7 +33,7 @@ exports.createComplianceCheck = async (req, res) => {
       Details,
       Timestamp,
       LastCheckedBy,
-      companyId: req.body.companyId || req.user?.companyId,
+      companyId: req.user?.companyId || req.body.companyId,
     };
 
     const savedComplianceCheck = await databaseAdapter.create('ComplianceCheck', complianceData);

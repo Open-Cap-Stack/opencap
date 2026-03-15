@@ -15,7 +15,7 @@ const webhookService = require('../services/webhookService');
  */
 exports.createWebhook = async (req, res) => {
   try {
-    req.body.companyId = req.body.companyId || req.user?.companyId;
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const webhookData = {
       companyId: req.body.companyId,
       name: req.body.name,

@@ -891,7 +891,7 @@ async function generateDocumentSummaryInternal(documentId) {
 // Legacy functions migrated to ZeroDB
 const createDocumentEmbedding = async (req, res) => {
   try {
-    req.body.companyId = req.body.companyId || req.user?.companyId;
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const embeddingData = {
       ...req.body,
       createdAt: new Date().toISOString(),

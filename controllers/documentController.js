@@ -131,7 +131,7 @@ exports.createDocument = async (req, res) => {
             id: documentId,
             _id: documentId,
             fileId: persistentFileId,
-            companyId: req.body.companyId || req.user?.companyId || null,
+            companyId: req.user?.companyId || req.body.companyId || null,
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
