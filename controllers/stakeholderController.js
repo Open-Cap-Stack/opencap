@@ -58,11 +58,18 @@ exports.createStakeholder = async (req, res) => {
     }
 
     // Normalize enum fields to lowercase for backend model validation
-    // Convert spaces/hyphens to underscores to match enum format (e.g., "Co-Founder" -> "co_founder")
     const data = { ...req.body };
     if (data.type) data.type = data.type.toLowerCase();
     if (data.role) data.role = data.role.toLowerCase().replace(/[\s-]+/g, '_');
     if (data.status) data.status = data.status.toLowerCase();
+
+    // Default companyId from authenticated user if not provided
+    if (!data.companyId) {
+      data.companyId = req.user?.companyId;
+    }
+    if (!data.companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
 
     const stakeholder = await Stakeholder.create(data);
     res.status(201).json(normalizeForDisplay(stakeholder));
@@ -81,9 +88,13 @@ exports.getAllStakeholders = async (req, res) => {
   try {
     // Build filter from query params
     const filter = {};
-    if (req.query.companyId) {
-      filter.companyId = req.query.companyId;
+
+    // Multi-tenant: scope to user's company, or allow explicit companyId query
+    filter.companyId = req.query.companyId || req.user?.companyId;
+    if (!filter.companyId) {
+      return res.status(400).json({ error: 'companyId is required (query param or user profile)' });
     }
+
     if (req.query.projectId) {
       filter.projectId = req.query.projectId;
     }

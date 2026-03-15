@@ -28,6 +28,9 @@ describe('Company Controller - ZeroDB Migration', () => {
     // Suppress console.error during tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
+    // Default: duplicate check returns no match
+    zerodbService.queryTable.mockResolvedValue([]);
+
     // Setup mock request and response
     mockReq = {
       body: {},
@@ -196,6 +199,17 @@ describe('Company Controller - ZeroDB Migration', () => {
           updatedAt: expect.any(String)
         })
       );
+    });
+
+    it('should return 409 when companyId already exists', async () => {
+      mockReq.body = { ...validCompanyData };
+      zerodbService.queryTable.mockResolvedValue([{ row_data: { companyId: 'COMP-001' } }]);
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(409);
+      expect(mockRes.json).toHaveBeenCalledWith({ message: 'Company with this companyId already exists' });
+      expect(zerodbService.insertRow).not.toHaveBeenCalled();
     });
   });
 

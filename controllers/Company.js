@@ -39,32 +39,6 @@ function unwrapZeroDBResponse(result) {
 }
 
 /**
- * Validate company data against schema requirements
- * @param {Object} data - Company data to validate
- * @returns {Object} - { valid: boolean, errors: string[] }
- */
-const validateCompanyData = (data) => {
-  const errors = [];
-  const { companyId, CompanyName, CompanyType, RegisteredAddress, TaxID, corporationDate } = data;
-
-  if (!companyId) errors.push('companyId is required');
-  if (!CompanyName) errors.push('CompanyName is required');
-  if (!CompanyType) errors.push('CompanyType is required');
-  if (!RegisteredAddress) errors.push('RegisteredAddress is required');
-  if (!TaxID) errors.push('TaxID is required');
-  if (!corporationDate) errors.push('corporationDate is required');
-
-  if (CompanyType && !VALID_COMPANY_TYPES.includes(CompanyType)) {
-    errors.push(`CompanyType must be one of: ${VALID_COMPANY_TYPES.join(', ')}`);
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-};
-
-/**
  * Create a new company
  * @route POST /api/companies
  */
@@ -108,6 +82,13 @@ exports.createCompany = async (req, res) => {
       if (req.body[field] !== undefined) {
         companyData[field] = req.body[field];
       }
+    }
+
+    // Check for duplicate companyId
+    const existing = await zerodbService.queryTable(TABLE_NAME, { filter: { companyId } });
+    const existingRows = unwrapZeroDBResponse(existing);
+    if (existingRows.length > 0) {
+      return res.status(409).json({ message: 'Company with this companyId already exists' });
     }
 
     // Insert into ZeroDB
@@ -271,7 +252,7 @@ exports.deleteCompanyById = async (req, res) => {
     if (orphanWarnings.length > 0 && req.query.force === 'true') {
       for (const table of orphanWarnings) {
         try {
-          await zerodbService.deleteRows(table, { companyId });
+          await zerodbService.deleteRows(table, { filter: { companyId } });
         } catch (e) {
           console.error(`Error deleting ${table} for company ${companyId}:`, e.message);
         }
@@ -279,7 +260,7 @@ exports.deleteCompanyById = async (req, res) => {
     }
 
     // Delete the company from ZeroDB
-    await zerodbService.deleteRows(TABLE_NAME, { _id: id });
+    await zerodbService.deleteRows(TABLE_NAME, { filter: { _id: id } });
 
     res.status(200).json({ message: 'Company deleted' });
   } catch (error) {

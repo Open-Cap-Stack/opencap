@@ -253,7 +253,7 @@ describe('authController.oauthLogin - Production Verification', () => {
       await authController.oauthLogin(req, res);
 
       expect(jwt.sign).toHaveBeenCalledWith(
-        { userId: 'user_abc', role: 'user' },
+        { userId: 'user_abc', email: 'user@example.com', role: 'user', permissions: [], companyId: null },
         'test-jwt-secret',
         { expiresIn: '1h' }
       );

@@ -30,6 +30,7 @@ describe('EquityGrant Controller', () => {
   beforeEach(() => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
+    req.user = { userId: 'user_123', companyId: 'COMP-001', role: 'user', permissions: [] };
     jest.clearAllMocks();
   });
 
@@ -96,7 +97,7 @@ describe('EquityGrant Controller', () => {
 
       await equityGrantController.getEquityGrants(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { companyId: 'COMP-001' });
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData())).toEqual(mockGrants);
     });
@@ -110,7 +111,7 @@ describe('EquityGrant Controller', () => {
 
       await equityGrantController.getEquityGrants(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { employeeId: 'EMP-001' });
+      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { companyId: 'COMP-001', employeeId: 'EMP-001' });
       expect(res.statusCode).toBe(200);
     });
 
@@ -123,7 +124,7 @@ describe('EquityGrant Controller', () => {
 
       await equityGrantController.getEquityGrants(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { status: 'active' });
+      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { companyId: 'COMP-001', status: 'active' });
       expect(res.statusCode).toBe(200);
     });
 

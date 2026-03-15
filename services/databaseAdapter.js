@@ -65,6 +65,16 @@ class DatabaseAdapter {
       const tableName = this._modelToTableName(modelName);
       const result = await zerodbService.insertRow(tableName, data);
       this._recordMetric(Date.now() - startTime, true);
+
+      // Unwrap: { data: [{ row_id, row_data }] } → flat object
+      const rows = result?.data || result?.rows || [];
+      if (Array.isArray(rows) && rows.length > 0) {
+        const item = rows[0];
+        if (item.row_data) {
+          return { ...item.row_data, row_id: item.row_id };
+        }
+        return item;
+      }
       return result;
     } catch (error) {
       this._recordMetric(0, false);
@@ -441,13 +451,25 @@ class DatabaseAdapter {
   async _findInZeroDB(tableName, query, options) {
     const { limit, sort, skip, projection } = options;
     try {
-      return await zerodbService.queryTable(tableName, {
+      const result = await zerodbService.queryTable(tableName, {
         filter: query,
         limit,
         sort,
         skip,
         projection
       });
+
+      // Unwrap ZeroDB response: { data: [{ row_id, row_data }] } → flat array
+      const rawData = result?.data || result?.rows || result || [];
+      if (Array.isArray(rawData)) {
+        return rawData.map(item => {
+          if (item.row_data) {
+            return { ...item.row_data, row_id: item.row_id };
+          }
+          return item;
+        });
+      }
+      return rawData;
     } catch (error) {
       // Handle table not found gracefully - return empty array
       if (error.response?.data?.detail?.includes('not found') ||

@@ -13,6 +13,7 @@
 
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { promisify } = require('util');
 
@@ -176,15 +177,13 @@ const authenticateToken = async (req, res, next) => {
           // Provision or retrieve local user record
           const localUser = await provisionAINativeUser(ainativeUser);
 
-          // Set user from local record (with AINative fallback)
+          // Set user from local record (same shape as normal auth path)
           req.user = {
             userId: localUser.userId,
             email: localUser.email,
-            name: localUser.displayName || localUser.name || ainativeUser.name,
             role: localUser.role || 'user',
             permissions: localUser.permissions || [],
-            companyId: localUser.companyId,
-            isAINativeUser: true
+            companyId: localUser.companyId
           };
 
           req.token = token;
@@ -221,12 +220,12 @@ const authenticateToken = async (req, res, next) => {
  */
 const validateAINativeToken = async (token) => {
   try {
-    const response = await axios.get(`${AINATIVE_API_URL}/v1/auth/me`, {
+    const response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      timeout: 45000
+      timeout: 10000
     });
 
     // AINative returns user object with id, email, name, etc.
@@ -278,7 +277,7 @@ const provisionUserFromToken = async (decoded) => {
       firstName: firstName,
       lastName: lastName,
       displayName: name,
-      password: `sso_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      password: crypto.randomBytes(32).toString('hex'),
       role: decoded.role || 'user',
       status: 'active',
       permissions: User.getPermissionsForRole(decoded.role || 'user'),
@@ -327,7 +326,7 @@ const provisionAINativeUser = async (ainativeUser) => {
       firstName: firstName,
       lastName: lastName,
       displayName: ainativeUser.name || ainativeUser.email.split('@')[0],
-      password: `ainative_sso_${Date.now()}`, // Placeholder - SSO users don't use password
+      password: crypto.randomBytes(32).toString('hex'), // Random — SSO users don't use password auth
       role: 'user',
       status: 'active',
       permissions: User.getPermissionsForRole('user'),

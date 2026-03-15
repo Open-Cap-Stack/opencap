@@ -18,9 +18,14 @@ exports.createEquityGrant = async (req, res) => {
   try {
     const grantData = {
       ...req.body,
+      companyId: req.body.companyId || req.user?.companyId,
       grantId: req.body.grantId || equityGrantService.generateGrantId(),
       status: req.body.status || 'pending'
     };
+
+    if (!grantData.companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
 
     const savedGrant = await databaseAdapter.create('EquityGrant', grantData);
     res.status(201).json(savedGrant);
@@ -36,12 +41,15 @@ exports.getEquityGrants = async (req, res) => {
   try {
     const query = {};
 
+    // Multi-tenant: scope to company
+    query.companyId = req.query.companyId || req.user?.companyId;
+    if (!query.companyId) {
+      return res.status(400).json({ error: 'companyId is required (query param or user profile)' });
+    }
+
     // Apply filters from query params
     if (req.query.employeeId) {
       query.employeeId = req.query.employeeId;
-    }
-    if (req.query.companyId) {
-      query.companyId = req.query.companyId;
     }
     if (req.query.status) {
       query.status = req.query.status;
@@ -126,7 +134,7 @@ exports.updateGrantStatus = async (req, res) => {
     // Add status-specific fields
     if (status === 'approved') {
       updateData.approvedDate = new Date().toISOString();
-      updateData.approvedBy = req.body.approvedBy || req.user?.id;
+      updateData.approvedBy = req.body.approvedBy || req.user?.userId;
     } else if (status === 'cancelled') {
       updateData.cancellationDate = new Date().toISOString();
       updateData.cancellationReason = cancellationReason;

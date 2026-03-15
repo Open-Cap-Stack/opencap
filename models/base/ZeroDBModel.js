@@ -287,10 +287,19 @@ class ZeroDBModel {
             delete newRowData.row_id;
             delete newRowData.id;
 
-            await zerodbService.client.put(
-                `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
-                { row_data: newRowData }
-            );
+            if (zerodbService.useLocalFallback) {
+                // Update in-memory store directly by row_id
+                const table = zerodbService._localStore[this.tableName] || [];
+                const entry = table.find(r => r.row_id === doc.row_id);
+                if (entry) {
+                    entry.row_data = newRowData;
+                }
+            } else {
+                await zerodbService.client.put(
+                    `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
+                    { row_data: newRowData }
+                );
+            }
 
             // Read-after-write verification: confirm our version won
             if (needsVersionVerify) {

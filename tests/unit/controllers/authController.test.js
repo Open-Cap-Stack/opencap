@@ -9,11 +9,13 @@ jest.mock('../../../models/User', () => ({
   findById: jest.fn(),
   create: jest.fn(),
   findOneAndUpdate: jest.fn(),
-  findByIdAndUpdate: jest.fn()
+  findByIdAndUpdate: jest.fn(),
+  updateLastLogin: jest.fn().mockResolvedValue({})
 }));
 
 jest.mock('../../../middleware/authMiddleware', () => ({
   blacklistToken: jest.fn().mockResolvedValue(true),
+  isTokenBlacklisted: jest.fn().mockResolvedValue(false),
   authenticateToken: jest.fn((req, res, next) => next()),
   provisionAINativeUser: jest.fn()
 }));
@@ -34,7 +36,7 @@ const User = require('../../../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
-const { provisionAINativeUser } = require('../../../middleware/authMiddleware');
+const { provisionAINativeUser, blacklistToken, isTokenBlacklisted } = require('../../../middleware/authMiddleware');
 
 // Spy on bcrypt and jwt (real modules, not mocked)
 jest.spyOn(bcrypt, 'hash');
@@ -129,18 +131,63 @@ describe('AuthController', () => {
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res._getData()).message).toContain('Role must be one of');
     });
+
+    it('should normalize email to lowercase and trimmed', async () => {
+      req.body = { firstName: 'John', lastName: 'Doe', email: '  John@Example.COM  ', password: 'Password123!' };
+      User.findOne.mockResolvedValue(null);
+      User.create.mockResolvedValue({ _id: 'user_123', email: 'john@example.com' });
+      await authController.registerUser(req, res);
+      expect(User.findOne).toHaveBeenCalledWith({ email: 'john@example.com' });
+    });
+
+    it('should accept emails with + tags', async () => {
+      req.body = { firstName: 'John', lastName: 'Doe', email: 'john+test@example.com', password: 'Password123!' };
+      User.findOne.mockResolvedValue(null);
+      User.create.mockResolvedValue({ _id: 'user_123', email: 'john+test@example.com' });
+      await authController.registerUser(req, res);
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('should accept founder and investor roles', async () => {
+      req.body = { firstName: 'John', lastName: 'Doe', email: 'founder@example.com', password: 'Password123!', role: 'founder' };
+      User.findOne.mockResolvedValue(null);
+      User.create.mockResolvedValue({ _id: 'user_123', email: 'founder@example.com', role: 'founder' });
+      await authController.registerUser(req, res);
+      expect(res.statusCode).toBe(201);
+    });
   });
 
   describe('loginUser', () => {
     it('should login a user successfully', async () => {
       req.body = { email: 'john@example.com', password: 'Password123!' };
-      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', password: 'hashed_password', role: 'user' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', password: 'hashed_password', role: 'user', permissions: ['read:users'], companyId: 'company_1' });
       bcrypt.compare.mockResolvedValue(true);
       await authController.loginUser(req, res);
       expect(res.statusCode).toBe(200);
       const data = JSON.parse(res._getData());
       expect(data).toHaveProperty('accessToken');
       expect(data).toHaveProperty('refreshToken');
+      // Verify JWT includes full claims
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user_123',
+          email: 'john@example.com',
+          role: 'user',
+          permissions: ['read:users'],
+          companyId: 'company_1'
+        }),
+        'test-secret',
+        { expiresIn: '1h' }
+      );
+      // Verify lastLogin is updated
+      expect(User.updateLastLogin).toHaveBeenCalledWith('user_123');
+    });
+
+    it('should normalize email to lowercase and trimmed', async () => {
+      req.body = { email: '  John@Example.COM  ', password: 'Password123!' };
+      User.findOne.mockResolvedValue(null);
+      await authController.loginUser(req, res);
+      expect(User.findOne).toHaveBeenCalledWith({ email: 'john@example.com' });
     });
 
     it('should return 400 when email is missing', async () => {
@@ -177,6 +224,7 @@ describe('AuthController', () => {
       await authController.logout(req, res);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData()).message).toBe('Logout successful');
+      expect(blacklistToken).toHaveBeenCalledWith('valid_token');
     });
 
     it('should return 400 when no token provided', async () => {
@@ -184,18 +232,39 @@ describe('AuthController', () => {
       await authController.logout(req, res);
       expect(res.statusCode).toBe(400);
     });
+
+    it('should also blacklist refresh token when provided', async () => {
+      req.token = 'access_token';
+      req.body = { refreshToken: 'refresh_token' };
+      await authController.logout(req, res);
+      expect(res.statusCode).toBe(200);
+      expect(blacklistToken).toHaveBeenCalledWith('access_token');
+      expect(blacklistToken).toHaveBeenCalledWith('refresh_token');
+      expect(blacklistToken).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('refreshToken', () => {
-    it('should refresh access token successfully', async () => {
+    it('should refresh access token successfully with full claims', async () => {
       req.body = { refreshToken: 'valid_refresh_token' };
-      // jwt.verify needs to actually work here, so we mock at a lower level
       jwt.verify.mockReturnValue({ userId: 'user_123' });
-      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', role: 'user' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'user', status: 'active', permissions: ['read:users'], companyId: 'company_1' });
       jwt.sign.mockReturnValue('new_access_token');
       await authController.refreshToken(req, res);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData()).accessToken).toBe('new_access_token');
+      // Verify JWT includes full claims
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user_123',
+          email: 'john@example.com',
+          role: 'user',
+          permissions: ['read:users'],
+          companyId: 'company_1'
+        }),
+        'test-secret',
+        { expiresIn: '1h' }
+      );
     });
 
     it('should return 400 when refresh token is missing', async () => {
@@ -209,6 +278,34 @@ describe('AuthController', () => {
       jwt.verify.mockImplementation(() => { throw new Error('Invalid token'); });
       await authController.refreshToken(req, res);
       expect(res.statusCode).toBe(401);
+    });
+
+    it('should return 401 if refresh token is blacklisted', async () => {
+      req.body = { refreshToken: 'blacklisted_token' };
+      isTokenBlacklisted.mockResolvedValueOnce(true);
+      await authController.refreshToken(req, res);
+      expect(res.statusCode).toBe(401);
+      expect(JSON.parse(res._getData()).message).toBe('Refresh token has been revoked');
+    });
+
+    it('should return 403 if user account is not active', async () => {
+      req.body = { refreshToken: 'valid_refresh_token' };
+      jwt.verify.mockReturnValue({ userId: 'user_123' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', role: 'user', status: 'suspended' });
+      await authController.refreshToken(req, res);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should fall back to _id lookup when userId not found', async () => {
+      req.body = { refreshToken: 'valid_refresh_token' };
+      jwt.verify.mockReturnValue({ userId: 'user_123' });
+      User.findOne
+        .mockResolvedValueOnce(null) // first call with { userId } returns null
+        .mockResolvedValueOnce({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'user', status: 'active', permissions: [] });
+      jwt.sign.mockReturnValue('new_access_token');
+      await authController.refreshToken(req, res);
+      expect(res.statusCode).toBe(200);
+      expect(User.findOne).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -303,8 +400,9 @@ describe('AuthController', () => {
     it('should update user profile successfully', async () => {
       req.user = { userId: 'user_123' };
       req.body = { firstName: 'Jane' };
-      const mockUser = { _id: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com', save: jest.fn().mockResolvedValue(true) };
+      const mockUser = { _id: 'user_123', userId: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com' };
       User.findOne.mockResolvedValue(mockUser);
+      User.findOneAndUpdate.mockResolvedValue({ ...mockUser, firstName: 'Jane' });
       await authController.updateUserProfile(req, res);
       expect(res.statusCode).toBe(200);
     });
@@ -321,10 +419,15 @@ describe('AuthController', () => {
     it('should persist companyId when provided', async () => {
       req.user = { userId: 'user_123' };
       req.body = { companyId: 'company-abc-123' };
-      const mockUser = { _id: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com', save: jest.fn().mockResolvedValue(true) };
+      const mockUser = { _id: 'user_123', userId: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com' };
       User.findOne.mockResolvedValue(mockUser);
+      User.findOneAndUpdate.mockResolvedValue({ ...mockUser, companyId: 'company-abc-123' });
       await authController.updateUserProfile(req, res);
-      expect(mockUser.companyId).toBe('company-abc-123');
+      expect(User.findOneAndUpdate).toHaveBeenCalledWith(
+        { userId: 'user_123' },
+        expect.objectContaining({ companyId: 'company-abc-123' }),
+        { new: true }
+      );
       expect(res.statusCode).toBe(200);
     });
   });
@@ -351,7 +454,7 @@ describe('AuthController', () => {
       req.body = { ainativeToken: 'valid-ainative-token' };
 
       axios.get.mockResolvedValue({
-        data: { id: 'ainative-user-1', email: 'user@example.com', name: 'Test User' }
+        data: { id: 'ainative-user-1', email: 'User@Example.COM', name: 'Test User' }
       });
 
       const mockLocalUser = {
@@ -379,20 +482,35 @@ describe('AuthController', () => {
       expect(data.user.userId).toBe('local-user-1');
       expect(data.user.companyId).toBe('company-1');
 
+      // Verify correct API path
       expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/auth/me'),
+        expect.stringContaining('/api/v1/auth/me'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer valid-ainative-token'
-          })
+          }),
+          timeout: 10000
         })
       );
+      // Verify email was normalized before provisioning
       expect(provisionAINativeUser).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'ainative-user-1',
           email: 'user@example.com',
           isAINativeUser: true
         })
+      );
+      // Verify JWT has consistent claim shape (no 'name', matches login)
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'local-user-1',
+          email: 'user@example.com',
+          role: 'user',
+          permissions: ['read'],
+          companyId: 'company-1'
+        }),
+        'test-secret',
+        { expiresIn: '1h' }
       );
     });
 

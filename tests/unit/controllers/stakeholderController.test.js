@@ -34,7 +34,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
     mockReq = {
       body: {},
       params: {},
-      query: {}
+      query: {},
+      user: { userId: 'user_123', companyId: 'company_123', role: 'user', permissions: [] }
     };
 
     mockRes = {
@@ -50,7 +51,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         name: 'John Doe',
         email: 'john@example.com',
         role: 'Investor',
-        projectId: 'PRJ-001'
+        projectId: 'PRJ-001',
+        companyId: 'COMP-001'
       };
       mockReq.body = stakeholderData;
 
@@ -105,7 +107,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(parsePagination).toHaveBeenCalledWith({});
-      expect(Stakeholder.find).toHaveBeenCalledWith({}, { limit: 20, skip: 0 });
+      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 20, skip: 0 });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(expect.arrayContaining([
         expect.objectContaining({ stakeholderId: 'STK-001' }),
@@ -134,7 +136,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { projectId: 'PRJ-001' },
+        { companyId: 'company_123', projectId: 'PRJ-001' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -147,7 +149,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { role: 'investor' },
+        { companyId: 'company_123', role: 'investor' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -160,7 +162,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { status: 'active' },
+        { companyId: 'company_123', status: 'active' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -191,7 +193,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(parsePagination).toHaveBeenCalledWith({ limit: '10', skip: '5' });
-      expect(Stakeholder.find).toHaveBeenCalledWith({}, { limit: 10, skip: 5 });
+      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 10, skip: 5 });
     });
   });
 
@@ -484,7 +486,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       mockReq.body = {
         name: 'Jane Doe',
         email: 'jane@example.com',
-        role: 'Venture Capitalist'
+        role: 'Venture Capitalist',
+        companyId: 'COMP-001'
       };
 
       Stakeholder.create.mockResolvedValue({ _id: '1', ...mockReq.body, role: 'venture_capitalist' });
@@ -505,7 +508,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
-        { role: 'board_member' },
+        { companyId: 'company_123', role: 'board_member' },
         expect.objectContaining({ limit: 20, skip: 0 })
       );
     });
@@ -545,7 +548,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         name: 'John Doe',
         email: 'john@example.com',
         role: 'Investor',
-        projectId: 'PRJ-001'
+        projectId: 'PRJ-001',
+        companyId: 'COMP-001'
       };
 
       Stakeholder.create.mockResolvedValue({ _id: '1', ...mockReq.body });
@@ -557,7 +561,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
         name: 'John Doe',
         email: 'john@example.com',
         role: 'investor',
-        projectId: 'PRJ-001'
+        projectId: 'PRJ-001',
+        companyId: 'COMP-001'
       });
     });
 
