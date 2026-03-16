@@ -133,7 +133,7 @@ describe('UserController', () => {
     });
 
     it('should return user profile using _id as fallback', async () => {
-      req.user = { id: 'mongo-id-456' };
+      req.user = { _id: 'mongo-id-456' };
       User.findOne.mockResolvedValue(null);
       User.findById.mockResolvedValue({ _id: 'mongo-id-456', userId: 'user-456', name: 'Jane Doe', email: 'jane@example.com' });
       await userController.getProfile(req, res);

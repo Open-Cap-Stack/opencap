@@ -31,7 +31,9 @@ describe('Document Access Controller - ZeroDB Migration', () => {
 
     mockReq = {
       body: {},
-      params: {}
+      params: {},
+      query: {},
+      user: {}
     };
   });
 

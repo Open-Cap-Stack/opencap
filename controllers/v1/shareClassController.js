@@ -82,6 +82,11 @@ exports.createShareClass = async (req, res) => {
       });
     }
     
+    // Default companyId from user context
+    if (!req.body.companyId && req.user?.companyId) {
+      req.body.companyId = req.user.companyId;
+    }
+
     // Create new share class using ZeroDB-compatible create method
     const newShareClass = await ShareClass.create(req.body);
 
@@ -103,7 +108,11 @@ exports.getAllShareClasses = async (req, res) => {
   try {
     // Build filter object from query params
     const filter = {};
-    
+
+    // Multi-tenant: scope to company
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) filter.companyId = companyId;
+
     // Name filter (exact match)
     if (req.query.name) {
       filter.name = req.query.name;
@@ -324,7 +333,10 @@ exports.bulkCreateShareClasses = async (req, res) => {
     }
     
     // Check for existing shareClassIds in database
-    const allShareClasses = await ShareClass.find({});
+    const scQuery = {};
+    const companyId = req.user?.companyId;
+    if (companyId) scQuery.companyId = companyId;
+    const allShareClasses = await ShareClass.find(scQuery);
     const existingIds = allShareClasses.filter(sc =>
       shareClassIds.includes(sc.shareClassId)
     );
@@ -355,7 +367,10 @@ exports.bulkCreateShareClasses = async (req, res) => {
 exports.getShareClassAnalytics = async (req, res) => {
   try {
     // Fetch all share classes for analytics calculation
-    const shareClasses = await ShareClass.find({});
+    const analyticsQuery = {};
+    const analyticsCompanyId = req.query.companyId || req.user?.companyId;
+    if (analyticsCompanyId) analyticsQuery.companyId = analyticsCompanyId;
+    const shareClasses = await ShareClass.find(analyticsQuery);
 
     if (shareClasses.length === 0) {
       return res.status(200).json({

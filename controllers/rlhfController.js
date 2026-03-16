@@ -31,7 +31,7 @@ exports.submitFeedback = async (req, res) => {
 
     const feedback = {
       interactionId,
-      userId: req.user?.id || req.body.userId,
+      userId: req.user?.userId || req.body.userId,
       feedbackType,
       rating,
       comment,
@@ -84,7 +84,7 @@ exports.recordInteraction = async (req, res) => {
     }
 
     const interaction = {
-      userId: req.user?.id || req.body.userId,
+      userId: req.user?.userId || req.body.userId,
       sessionId,
       prompt,
       response,
@@ -131,7 +131,7 @@ exports.trackUsage = async (req, res) => {
     }
 
     const usage = {
-      userId: req.user?.id || req.body.userId,
+      userId: req.user?.userId || req.body.userId,
       sessionId,
       feature,
       action,
@@ -179,7 +179,7 @@ exports.submitCorrection = async (req, res) => {
 
     const correction = {
       interactionId,
-      userId: req.user?.id || req.body.userId,
+      userId: req.user?.userId || req.body.userId,
       originalResponse,
       correctedResponse,
       correctionType,
@@ -337,7 +337,7 @@ exports.updateConsent = async (req, res) => {
     } = req.body;
 
     const consent = {
-      userId: req.user?.id || req.body.userId,
+      userId: req.user?.userId || req.body.userId,
       collectInteractions,
       collectFeedback,
       allowAnalytics,
@@ -362,7 +362,7 @@ exports.updateConsent = async (req, res) => {
  */
 exports.getConsent = async (req, res) => {
   try {
-    const userId = req.user?.id || req.query.userId;
+    const userId = req.user?.userId || req.query.userId;
 
     const result = await rlhfService.getConsentSettings(userId);
 
@@ -382,7 +382,7 @@ exports.getConsent = async (req, res) => {
  */
 exports.deleteUserData = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     const result = await rlhfService.deleteUserData(userId);
 
@@ -402,7 +402,7 @@ exports.deleteUserData = async (req, res) => {
  */
 exports.exportUserData = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     const result = await rlhfService.exportForUser(userId);
 

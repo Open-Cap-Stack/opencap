@@ -24,7 +24,7 @@ describe('ExerciseController', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-001' }
+      user: { id: 'user-001', userId: 'user-001', companyId: 'company-123', role: 'user' }
     };
 
     mockRes = {
@@ -63,10 +63,12 @@ describe('ExerciseController', () => {
 
       await exerciseController.createExerciseRequest(mockReq, mockRes);
 
-      expect(ExerciseService.createExerciseRequest).toHaveBeenCalledWith({
-        ...validRequestData,
-        requestedBy: 'user-001'
-      });
+      expect(ExerciseService.createExerciseRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...validRequestData,
+          requestedBy: 'user-001'
+        })
+      );
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith(mockCreatedRequest);
     });
@@ -599,8 +601,7 @@ describe('ExerciseController', () => {
         _id: 'request-123',
         status: 'completed',
         optionType: 'ISO',
-        form3921Generated: false,
-        save: jest.fn().mockResolvedValue({})
+        form3921Generated: false
       };
 
       const mockForm3921 = {
@@ -610,6 +611,7 @@ describe('ExerciseController', () => {
 
       ExerciseService.getExerciseRequestById = jest.fn().mockResolvedValue(mockExerciseRequest);
       ExerciseService.generateForm3921 = jest.fn().mockResolvedValue(mockForm3921);
+      ExerciseService.updateExerciseRequest = jest.fn().mockResolvedValue({});
 
       await exerciseController.generateForm3921(mockReq, mockRes);
 

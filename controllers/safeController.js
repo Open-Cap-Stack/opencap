@@ -28,7 +28,7 @@ exports.createSAFE = async (req, res) => {
       metadata
     } = req.body;
 
-    const safe = new SAFE({
+    const safe = await SAFE.create({
       companyId,
       investorId,
       investorName,
@@ -53,8 +53,6 @@ exports.createSAFE = async (req, res) => {
       }]
     });
 
-    await safe.save();
-
     res.status(201).json({
       success: true,
       data: safe
@@ -76,12 +74,14 @@ exports.getCompanySAFEs = async (req, res) => {
     const query = { companyId };
     if (status) query.status = status;
 
-    const safes = await SAFE.find(query)
-      .populate('investorId', 'name email')
-      .populate('companyId', 'name')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    const safes = await SAFE.find(query, {
+      sort: { createdAt: -1 },
+      skip: (pageNum - 1) * limitNum,
+      limit: limitNum
+    });
 
     const total = await SAFE.countDocuments(query);
 
@@ -89,10 +89,10 @@ exports.getCompanySAFEs = async (req, res) => {
       success: true,
       data: safes,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
@@ -108,12 +108,7 @@ exports.getSAFE = async (req, res) => {
   try {
     const { safeId } = req.params;
 
-    const safe = await SAFE.findOne({ safeId })
-      .populate('investorId', 'name email type')
-      .populate('companyId', 'name')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('convertedToRound', 'name')
-      .populate('convertedToShareClass', 'name');
+    const safe = await SAFE.findOne({ safeId });
 
     if (!safe) {
       return res.status(404).json({
@@ -138,7 +133,7 @@ exports.getSAFE = async (req, res) => {
 exports.updateSAFE = async (req, res) => {
   try {
     const { safeId } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
 
     const safe = await SAFE.findOne({ safeId });
     if (!safe) {
@@ -160,13 +155,14 @@ exports.updateSAFE = async (req, res) => {
     delete updates.status;
     delete updates.statusHistory;
 
-    Object.assign(safe, updates);
-    safe.updatedBy = req.user._id;
-    await safe.save();
+    updates.updatedBy = req.user._id;
+
+    await SAFE.updateOne({ safeId }, { $set: updates });
+    const updatedSafe = await SAFE.findOne({ safeId });
 
     res.json({
       success: true,
-      data: safe
+      data: updatedSafe
     });
   } catch (error) {
     res.status(400).json({
@@ -182,9 +178,7 @@ exports.sendSAFE = async (req, res) => {
     const { safeId } = req.params;
     const { message } = req.body;
 
-    const safe = await SAFE.findOne({ safeId })
-      .populate('investorId', 'name email')
-      .populate('companyId', 'name');
+    const safe = await SAFE.findOne({ safeId });
 
     if (!safe) {
       return res.status(404).json({
@@ -193,7 +187,7 @@ exports.sendSAFE = async (req, res) => {
       });
     }
 
-    if (!safe.canTransitionTo('sent')) {
+    if (!SAFE.canTransitionTo(safe.status, 'sent')) {
       return res.status(400).json({
         success: false,
         error: `Cannot send SAFE in ${safe.status} status`
@@ -201,11 +195,11 @@ exports.sendSAFE = async (req, res) => {
     }
 
     // Create signature request
-    const signatureRequest = new SignatureRequest({
+    const signatureRequest = await SignatureRequest.create({
       documentType: 'safe',
       documentId: safe._id,
       documentModel: 'SAFE',
-      companyId: safe.companyId._id,
+      companyId: safe.companyId,
       title: `SAFE Agreement - ${safe.investorName}`,
       message,
       signers: [
@@ -226,16 +220,16 @@ exports.sendSAFE = async (req, res) => {
       createdBy: req.user._id
     });
 
-    await signatureRequest.save();
-    await signatureRequest.send(req.user._id);
+    // Send signature request to signers
+    await SignatureRequest.send(signatureRequest._id, req.user._id);
 
     // Update SAFE status
-    await safe.transitionTo('sent', req.user._id, 'Sent for signatures');
+    const updatedSafe = await SAFE.transitionTo(safeId, 'sent', req.user._id, 'Sent for signatures');
 
     res.json({
       success: true,
       data: {
-        safe,
+        safe: updatedSafe,
         signatureRequest
       }
     });
@@ -261,7 +255,7 @@ exports.recordInvestorSignature = async (req, res) => {
       });
     }
 
-    await safe.addInvestorSignature({
+    const updatedSafe = await SAFE.addInvestorSignature(safeId, {
       signerName,
       signerEmail,
       signerTitle,
@@ -272,7 +266,7 @@ exports.recordInvestorSignature = async (req, res) => {
 
     res.json({
       success: true,
-      data: safe
+      data: updatedSafe
     });
   } catch (error) {
     res.status(400).json({
@@ -296,7 +290,7 @@ exports.recordCompanySignature = async (req, res) => {
       });
     }
 
-    await safe.addCompanySignature({
+    const updatedSafe = await SAFE.addCompanySignature(safeId, {
       signerId: req.user._id,
       signerName: signerName || req.user.displayName,
       signerEmail: signerEmail || req.user.email,
@@ -308,7 +302,7 @@ exports.recordCompanySignature = async (req, res) => {
 
     res.json({
       success: true,
-      data: safe
+      data: updatedSafe
     });
   } catch (error) {
     res.status(400).json({
@@ -332,21 +326,21 @@ exports.markFunded = async (req, res) => {
       });
     }
 
-    if (!safe.canTransitionTo('funded')) {
+    if (!SAFE.canTransitionTo(safe.status, 'funded')) {
       return res.status(400).json({
         success: false,
         error: `Cannot mark as funded from ${safe.status} status`
       });
     }
 
-    await safe.transitionTo('funded', req.user._id, notes || 'Investment received', {
+    const updatedSafe = await SAFE.transitionTo(safeId, 'funded', req.user._id, notes || 'Investment received', {
       fundedAmount: fundedAmount || safe.investmentAmount,
       fundedDate: fundedDate || new Date()
     });
 
     res.json({
       success: true,
-      data: safe
+      data: updatedSafe
     });
   } catch (error) {
     res.status(400).json({
@@ -370,18 +364,18 @@ exports.cancelSAFE = async (req, res) => {
       });
     }
 
-    if (!safe.canTransitionTo('cancelled')) {
+    if (!SAFE.canTransitionTo(safe.status, 'cancelled')) {
       return res.status(400).json({
         success: false,
         error: `Cannot cancel SAFE in ${safe.status} status`
       });
     }
 
-    await safe.transitionTo('cancelled', req.user._id, reason || 'Cancelled');
+    const updatedSafe = await SAFE.transitionTo(safeId, 'cancelled', req.user._id, reason || 'Cancelled');
 
     res.json({
       success: true,
-      data: safe
+      data: updatedSafe
     });
   } catch (error) {
     res.status(400).json({

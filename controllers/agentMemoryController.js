@@ -14,7 +14,7 @@ const storeMemory = async (req, res) => {
     if (!agentId) return res.status(400).json({ error: 'Agent ID is required' });
     if (!content) return res.status(400).json({ error: 'Content is required' });
 
-    const memoryData = { agentId, content, type, tags, companyId, ttl, sessionId, category, userId: req.user?.id };
+    const memoryData = { agentId, content, type, tags, companyId, ttl, sessionId, category, userId: req.user?.userId };
     const result = await agentMemoryService.storeMemory(memoryData);
     return res.status(201).json(result);
   } catch (error) {
@@ -190,7 +190,7 @@ const storeMemoriesBatch = async (req, res) => {
     const { memories } = req.body;
     if (!Array.isArray(memories)) return res.status(400).json({ error: 'Memories must be an array' });
     if (memories.length === 0) return res.status(400).json({ error: 'At least one memory is required' });
-    const memoriesWithUser = memories.map(m => ({ ...m, userId: req.user?.id }));
+    const memoriesWithUser = memories.map(m => ({ ...m, userId: req.user?.userId }));
     const results = await agentMemoryService.storeMemoriesBatch(memoriesWithUser);
     return res.status(201).json(results);
   } catch (error) {

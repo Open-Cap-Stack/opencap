@@ -26,6 +26,8 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
+    req.body.companyId = req.user?.companyId || req.body.companyId;
+
     // Check for existing employee with same EmployeeID (explicit duplicate check)
     const existingEmployee = await databaseAdapter.findOne('Employee', { EmployeeID });
     if (existingEmployee) {
@@ -69,7 +71,11 @@ exports.getEmployees = async (req, res) => {
     const limit = Math.max(parseInt(req.query.limit) || 10, 1);
     const skip = (page - 1) * limit;
 
-    const employees = await databaseAdapter.find('Employee', {}, { skip, limit });
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+
+    const employees = await databaseAdapter.find('Employee', query, { skip, limit });
 
     res.status(200).json(employees);
   } catch (error) {

@@ -497,6 +497,18 @@ if (process.env.NODE_ENV !== 'test') {
   server.then(srv => {
     if (srv) setupGracefulShutdown(srv);
   });
+
+  // Catch unhandled promise rejections and uncaught exceptions
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Promise Rejection:', reason);
+    // Don't crash — log and continue
+  });
+
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Give time for logging, then exit
+    setTimeout(() => process.exit(1), 1000);
+  });
 }
 
 module.exports = app;

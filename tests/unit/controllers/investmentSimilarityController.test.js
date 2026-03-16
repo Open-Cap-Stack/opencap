@@ -208,7 +208,7 @@ describe('Investment Similarity Controller', () => {
 
   describe('GET /investments/recommendations - getRecommendations', () => {
     it('should return investment recommendations', async () => {
-      req.user = { id: 'user_001' };
+      req.user = { userId: 'user_001' };
       req.query = {
         sectors: 'fintech,healthtech',
         investmentTypes: 'Series A,Series B',
@@ -242,7 +242,7 @@ describe('Investment Similarity Controller', () => {
     });
 
     it('should parse preferences from query parameters', async () => {
-      req.user = { id: 'user_002' };
+      req.user = { userId: 'user_002' };
       req.query = {
         sectors: 'fintech,saas',
         investmentTypes: 'Seed',
@@ -277,7 +277,7 @@ describe('Investment Similarity Controller', () => {
     });
 
     it('should handle empty preferences', async () => {
-      req.user = { id: 'user_003' };
+      req.user = { userId: 'user_003' };
       req.query = {};
 
       investmentSimilarityService.getInvestmentRecommendations.mockResolvedValue({

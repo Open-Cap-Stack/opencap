@@ -3,21 +3,22 @@ const router = express.Router();
 const authController = require('../../controllers/authController');
 const { authenticateToken } = require('../../middleware/authMiddleware.js');
 const { debugTokenEndpoint } = require('../../middleware/authErrorLogger');
+const { createEndpointRateLimiter } = require('../../middleware/rateLimiter');
 
 // Debug endpoint for troubleshooting authentication issues (Issue #250)
 router.get('/debug-token', debugTokenEndpoint);
 
 // Existing routes
-router.post('/register', authController.registerUser);
-router.post('/login', authController.loginUser);
+router.post('/register', createEndpointRateLimiter('/api/v1/auth/register'), authController.registerUser);
+router.post('/login', createEndpointRateLimiter('/api/v1/auth/login'), authController.loginUser);
 router.post('/oauth-login', authController.oauthLogin);
 
-// Token exchange: convert AINative token to fast local JWT (unprotected)
-router.post('/exchange-token', authController.exchangeAINativeToken);
+// Token exchange: convert AINative token to fast local JWT (unprotected, rate-limited)
+router.post('/exchange-token', createEndpointRateLimiter('/api/v1/auth/login'), authController.exchangeAINativeToken);
 
 // New routes for OCAE-203
 // Token management
-router.post('/token/refresh', authController.refreshToken);
+router.post('/token/refresh', createEndpointRateLimiter('/api/v1/auth/login'), authController.refreshToken);
 router.post('/logout', authenticateToken, authController.logout);
 
 // Password reset flow

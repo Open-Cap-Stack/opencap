@@ -163,7 +163,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
       expect(zerodbService.queryTable).toHaveBeenCalledWith('documents', expect.objectContaining({
         filter: expect.objectContaining({
-          ownerCompany: 'company-456'
+          companyId: 'company-456'
         })
       }));
     });

@@ -68,7 +68,7 @@ const searchDocuments = async (req, res) => {
         pageSize: Math.min(pageSize || CONFIG.DEFAULT_PAGE_SIZE, CONFIG.MAX_PAGE_SIZE)
       },
       filters: filters || {},
-      userId: req.user?.id,
+      userId: req.user?.userId,
       minRelevance: minRelevance || 0,
       highlight: highlight || false,
       includeContent: includeContent || false

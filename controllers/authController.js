@@ -16,7 +16,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
-const { blacklistToken, provisionAINativeUser } = require('../middleware/authMiddleware');
+const { blacklistToken, isTokenBlacklisted, provisionAINativeUser } = require('../middleware/authMiddleware');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 
 // AINative API URL for token validation
@@ -55,7 +55,8 @@ const createEmailTransporter = () => {
  */
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, confirmPassword, role = 'user', companyId } = req.body;
+    const { firstName, lastName, password, confirmPassword, role = 'user', companyId } = req.body;
+    const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     // Validate required fields
     const errors = [];
@@ -63,7 +64,7 @@ const registerUser = async (req, res) => {
     if (!lastName) errors.push('Last name is required');
     if (!email) errors.push('Email is required');
     if (!password) errors.push('Password is required');
-    
+
     if (errors.length > 0) {
       return res.status(400).json({
         message: 'Validation failed',
@@ -71,8 +72,8 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Validate email format
-    const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
+    // Validate email format (supports + tags, international TLDs)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
@@ -86,7 +87,7 @@ const registerUser = async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
-    
+
     // Check for password complexity
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
     if (!passwordRegex.test(password)) {
@@ -95,8 +96,8 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Validate role is one of the allowed values
-    const allowedRoles = ['admin', 'manager', 'user', 'client'];
+    // Validate role matches User model schema
+    const allowedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({
         message: `Role must be one of: ${allowedRoles.join(', ')}`
@@ -109,16 +110,16 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password
+    // Hash password (User.create also checks, but we hash here to control salt rounds)
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Check if we're in development mode
     const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    // Generate a userId if not provided (using email prefix + timestamp for uniqueness)
-    const userId = req.body.userId || 
+
+    // Generate a userId if not provided
+    const userId = req.body.userId ||
                  `${email.split('@')[0]}_${Date.now().toString(36).slice(-6)}`;
-    
+
     // Create user object
     const userData = {
       userId,
@@ -128,9 +129,9 @@ const registerUser = async (req, res) => {
       password: hashedPassword,
       role,
       companyId,
-      status: isDevelopment ? 'active' : 'pending' // Auto-activate in development
+      status: isDevelopment ? 'active' : 'pending'
     };
-    
+
     // Only add verification token if not in development
     if (!isDevelopment) {
       const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -144,7 +145,9 @@ const registerUser = async (req, res) => {
 
     // Send verification email in background if not in development
     if (!isDevelopment) {
-      await sendVerificationEmailToUser(user);
+      sendVerificationEmailToUser(user).catch(err =>
+        console.error('Failed to send verification email:', err.message)
+      );
     }
 
     // Generate auth token for immediate login in development
@@ -153,9 +156,15 @@ const registerUser = async (req, res) => {
       if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET environment variable is required');
       }
-      
+
       token = jwt.sign(
-        { userId: user._id, role: user.role },
+        {
+          userId: user.userId || user._id,
+          email: user.email,
+          role: user.role,
+          permissions: user.permissions || [],
+          companyId: user.companyId || null
+        },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -164,20 +173,20 @@ const registerUser = async (req, res) => {
     // Return success response
     const response = {
       success: true,
-      message: isDevelopment 
+      message: isDevelopment
         ? 'Registration successful. You are now logged in.'
         : 'Registration successful. Please check your email to verify your account.',
       userId: user._id
     };
-    
+
     if (isDevelopment) {
       response.token = token;
     }
-    
+
     return res.status(201).json(response);
   } catch (error) {
     console.error('Registration error:', error.message);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: 'Internal server error',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -191,15 +200,13 @@ const registerUser = async (req, res) => {
  */
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     // Validate input
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
-
-    // Log the incoming request for debugging
-    console.log('Login attempt:', { email, passwordProvided: !!password });
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -213,18 +220,29 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate tokens
+    const userId = user.userId || user._id;
+
+    // Generate tokens with full claims
     const accessToken = jwt.sign(
-      { userId: user.userId || user._id, role: user.role },
+      {
+        userId,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions || [],
+        companyId: user.companyId || null
+      },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
-      { userId: user.userId || user._id },
+      { userId },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Update last login timestamp (fire-and-forget)
+    User.updateLastLogin(userId).catch(() => {});
 
     // Remove sensitive fields from response
     const userResponse = sanitizeUser(user);
@@ -287,7 +305,6 @@ const oauthLogin = async (req, res) => {
 
       try {
         // Exchange authorization code for access token
-        const https = require('https');
         const tokenParams = new URLSearchParams({
           grant_type: 'authorization_code',
           code,
@@ -335,6 +352,9 @@ const oauthLogin = async (req, res) => {
       return res.status(400).json({ message: 'Unsupported OAuth provider' });
     }
 
+    // Normalize email
+    userInfo.email = (userInfo.email || '').trim().toLowerCase();
+
     // Check if user already exists (Issue #382 - race condition fix)
     let user = await User.findOne({ email: userInfo.email });
 
@@ -378,15 +398,23 @@ const oauthLogin = async (req, res) => {
       console.warn('Failed to update lastLogin for OAuth user:', updateError.message);
     }
 
-    // Generate tokens
+    const userId = user.userId || user._id;
+
+    // Generate tokens (same claim shape as login)
     const accessToken = jwt.sign(
-      { userId: user.userId || user._id, role: user.role },
+      {
+        userId,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions || [],
+        companyId: user.companyId || null
+      },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     const refreshToken = jwt.sign(
-      { userId: user.userId || user._id },
+      { userId },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
@@ -419,36 +447,53 @@ const refreshToken = async (req, res) => {
       return res.status(400).json({ message: 'Refresh token is required' });
     }
 
+    // Check if refresh token has been blacklisted (e.g. after logout)
+    if (await isTokenBlacklisted(token)) {
+      return res.status(401).json({ message: 'Refresh token has been revoked' });
+    }
+
+    let decoded;
     try {
-      // Verify refresh token
-      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-
-      // Find user
-      const user = await User.findOne({
-        $or: [
-          { _id: decoded.userId },
-          { userId: decoded.userId }
-        ]
-      });
-      
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      // Generate new access token
-      const accessToken = jwt.sign(
-        { userId: user.userId || user._id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      return res.status(200).json({
-        message: 'Token refreshed successfully',
-        accessToken
-      });
+      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     } catch (error) {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
+
+    // Find user by userId (ZeroDB-compatible — no $or)
+    const userId = decoded.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      user = await User.findOne({ _id: userId });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user is still active
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active' });
+    }
+
+    const resolvedUserId = user.userId || user._id;
+
+    // Generate new access token (same claims as login)
+    const accessToken = jwt.sign(
+      {
+        userId: resolvedUserId,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions || [],
+        companyId: user.companyId || null
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    return res.status(200).json({
+      message: 'Token refreshed successfully',
+      accessToken
+    });
   } catch (error) {
     console.error('Token refresh error:', error.message);
     return res.status(500).json({ message: 'Internal server error' });
@@ -463,20 +508,26 @@ const refreshToken = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    // Get the token from the request (added by the authenticateToken middleware)
+    // Get the access token from the request (set by authenticateToken middleware)
     const token = req.token;
-    
+
     if (!token) {
       return res.status(400).json({ message: 'No token provided' });
     }
-    
-    // Blacklist the token to prevent reuse using the improved function
+
+    // Blacklist the access token
     const success = await blacklistToken(token);
-    
+
     if (!success) {
       return res.status(500).json({ message: 'Failed to invalidate token' });
     }
-    
+
+    // Also blacklist the refresh token if provided
+    const { refreshToken: refreshTokenValue } = req.body || {};
+    if (refreshTokenValue) {
+      await blacklistToken(refreshTokenValue);
+    }
+
     return res.status(200).json({ message: 'Logout successful' });
   } catch (error) {
     console.error('Logout error:', error);
@@ -492,7 +543,7 @@ const logout = async (req, res) => {
  */
 const requestPasswordReset = async (req, res) => {
   try {
-    const { email } = req.body;
+    const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -547,44 +598,33 @@ const requestPasswordReset = async (req, res) => {
 const verifyResetToken = async (req, res) => {
   try {
     const { token } = req.params || req.body;
-    
-    // Check if token is provided
+
     if (!token) {
       return res.status(400).json({ message: 'Token is required' });
     }
-    
+
+    let decoded;
     try {
-      // Verify token in a nested try-catch to ensure proper error handling
-      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
-      
-      try {
-        // Check if user exists - wrap in another try-catch to separate database errors
-        const user = await User.findOne({
-          $or: [
-            { _id: decoded.userId },
-            { userId: decoded.userId }
-          ]
-        });
-        
-        // If user not found
-        if (!user) {
-          return res.status(404).json({ message: 'User not found' });
-        }
-        
-        // Token is valid
-        return res.status(200).json({ 
-          message: 'Token is valid', 
-          userId: decoded.userId 
-        });
-      } catch (dbError) {
-        // Database errors should return 500
-        console.error('Token verification error:', dbError.message);
-        return res.status(500).json({ message: 'Internal server error' });
-      }
+      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
     } catch (tokenError) {
-      // Handle JWT errors - always return 400 for invalid tokens
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
+
+    // Find user (ZeroDB-compatible — no $or)
+    const userId = decoded.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      user = await User.findOne({ _id: userId });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Token is valid',
+      userId: decoded.userId
+    });
   } catch (error) {
     console.error('Token verification error:', error.message);
     return res.status(500).json({ message: 'Internal server error' });
@@ -601,21 +641,20 @@ const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { password } = req.body;
-    
-    // Validate inputs
+
     if (!token) {
       return res.status(400).json({ message: 'Token is required' });
     }
-    
+
     if (!password) {
       return res.status(400).json({ message: 'Password is required' });
     }
-    
+
     // Validate password strength
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
-    
+
     // Validate password complexity
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!passwordRegex.test(password)) {
@@ -623,54 +662,34 @@ const resetPassword = async (req, res) => {
         message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
       });
     }
-    
+
+    let decoded;
     try {
-      // Verify token - wrap this in another try-catch to return 400 instead of 500
-      const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
-      
-      try {
-        // Database operations in separate try-catch for proper error handling
-        // Find user
-        const user = await User.findOne({
-          $or: [
-            { _id: decoded.userId },
-            { userId: decoded.userId }
-          ]
-        });
-        
-        // If user not found
-        if (!user) {
-          return res.status(404).json({ message: 'User not found' });
-        }
-        
-        // Hash the new password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Update user's password
-        if (user.userId) {
-          await User.findOneAndUpdate(
-            { userId: user.userId },
-            { password: hashedPassword },
-            { new: true }
-          );
-        } else {
-          await User.findByIdAndUpdate(
-            user._id,
-            { password: hashedPassword },
-            { new: true }
-          );
-        }
-        
-        return res.status(200).json({ message: 'Password has been reset successfully' });
-      } catch (dbError) {
-        // Database errors should return 500
-        console.error('Password reset error:', dbError.message);
-        return res.status(500).json({ message: 'Internal server error' });
-      }
+      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
     } catch (tokenError) {
-      // Handle JWT errors - always return 400 for invalid tokens
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
+
+    // Find user (ZeroDB-compatible — no $or)
+    const userId = decoded.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      user = await User.findOne({ _id: userId });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Hash and update password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.findOneAndUpdate(
+      { userId: user.userId || user._id },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    return res.status(200).json({ message: 'Password has been reset successfully' });
   } catch (error) {
     console.error('Password reset error:', error.message);
     return res.status(500).json({ message: 'Internal server error' });
@@ -737,50 +756,53 @@ const updateUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update basic info
-    if (firstName) user.firstName = firstName;
-    if (lastName) user.lastName = lastName;
-    if (companyId) user.companyId = companyId;
-    
+    // Build update object
+    const updates = {};
+    if (firstName) updates.firstName = firstName;
+    if (lastName) updates.lastName = lastName;
+    if (companyId) updates.companyId = companyId;
+
     // Update email if provided and different
     if (email && email !== user.email) {
+      const normalizedEmail = email.trim().toLowerCase();
       // Check if email is already used by another user
-      const existingUser = await User.findOne({ email });
-      if (existingUser && (existingUser._id.toString() !== userId.toString()) && 
-          (existingUser.userId !== userId)) {
+      const existingUser = await User.findOne({ email: normalizedEmail });
+      if (existingUser && existingUser.userId !== userId && existingUser._id !== userId) {
         return res.status(400).json({ message: 'Email already in use' });
       }
-      
-      user.email = email;
-      user.emailVerified = false;
-      
-      // Send verification email for new email
-      await sendVerificationEmailToUser(user);
+
+      updates.email = normalizedEmail;
+      updates.emailVerified = false;
+
+      // Send verification email for new email (fire-and-forget)
+      sendVerificationEmailToUser({ ...user, email: normalizedEmail }).catch(err =>
+        console.error('Failed to send verification email:', err.message)
+      );
     }
 
     // Update password if both current and new passwords are provided
     if (currentPassword && newPassword) {
-      // Validate current password
       const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
       if (!isPasswordValid) {
         return res.status(401).json({ message: 'Current password is incorrect' });
       }
 
-      // Validate new password strength
       const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
       if (!passwordRegex.test(newPassword)) {
         return res.status(400).json({ message: 'New password does not meet requirements' });
       }
 
-      // Hash and set new password
-      user.password = await bcrypt.hash(newPassword, 10);
+      updates.password = await bcrypt.hash(newPassword, 10);
     }
 
-    // Save updates
-    await user.save();
+    // Persist updates via ZeroDB-compatible call
+    const updatedUser = await User.findOneAndUpdate(
+      { userId: user.userId || user._id },
+      updates,
+      { new: true }
+    );
 
-    // Remove sensitive fields from response
-    const userResponse = sanitizeUser(user);
+    const userResponse = sanitizeUser(updatedUser || { ...user, ...updates });
 
     return res.status(200).json({
       message: 'Profile updated successfully',
@@ -842,43 +864,36 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: 'Verification token is required' });
     }
 
+    let decoded;
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET);
-
-      // Find user
-      const user = await User.findOne({
-        $or: [
-          { _id: decoded.userId },
-          { userId: decoded.userId }
-        ]
-      });
-      
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      // Mark email as verified
-      user.emailVerified = true;
-      await user.save();
-
-      return res.status(200).json({ message: 'Email verified successfully' });
+      decoded = jwt.verify(token, process.env.JWT_VERIFICATION_SECRET);
     } catch (error) {
       return res.status(400).json({ message: 'Invalid or expired verification token' });
     }
+
+    // Find user (ZeroDB-compatible — no $or)
+    const userId = decoded.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      user = await User.findOne({ _id: userId });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Mark email as verified and activate account
+    await User.findOneAndUpdate(
+      { userId: user.userId || user._id },
+      { emailVerified: true, status: 'active' },
+      { new: true }
+    );
+
+    return res.status(200).json({ message: 'Email verified successfully' });
   } catch (error) {
     console.error('Email verification error:', error.message);
     return res.status(500).json({ message: 'Internal server error' });
   }
-};
-
-/**
- * Check verification token
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-const checkVerificationToken = (req, res) => {
-  return res.status(400).json({ message: 'Verification token is required' });
 };
 
 /**
@@ -924,20 +939,20 @@ const exchangeAINativeToken = async (req, res) => {
       return res.status(400).json({ message: 'ainativeToken is required' });
     }
 
-    // Validate token against AINative /v1/auth/me
+    // Validate token against AINative /api/v1/auth/me
     let ainativeUser;
     try {
-      const response = await axios.get(`${AINATIVE_API_URL}/v1/auth/me`, {
+      const response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
         headers: {
           'Authorization': `Bearer ${ainativeToken}`,
           'Content-Type': 'application/json'
         },
-        timeout: 45000
+        timeout: 10000
       });
 
       ainativeUser = {
         userId: response.data.id,
-        email: response.data.email,
+        email: (response.data.email || '').trim().toLowerCase(),
         name: response.data.name,
         role: 'user',
         permissions: [],
@@ -950,22 +965,24 @@ const exchangeAINativeToken = async (req, res) => {
     // Provision or retrieve local user record
     const localUser = await provisionAINativeUser(ainativeUser);
 
-    // Generate local JWT
+    const userId = localUser.userId;
+    const displayName = localUser.displayName || localUser.name || ainativeUser.name;
+
+    // Generate local JWT (same claim shape as login)
     const accessToken = jwt.sign(
       {
-        userId: localUser.userId,
+        userId,
         email: localUser.email,
-        name: localUser.displayName || localUser.name || ainativeUser.name,
         role: localUser.role || 'user',
         permissions: localUser.permissions || [],
-        companyId: localUser.companyId
+        companyId: localUser.companyId || null
       },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     const localRefreshToken = jwt.sign(
-      { userId: localUser.userId },
+      { userId },
       process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -975,9 +992,9 @@ const exchangeAINativeToken = async (req, res) => {
       accessToken,
       refreshToken: localRefreshToken,
       user: {
-        userId: localUser.userId,
+        userId,
         email: localUser.email,
-        name: localUser.displayName || localUser.name || ainativeUser.name,
+        name: displayName,
         role: localUser.role || 'user',
         permissions: localUser.permissions || [],
         companyId: localUser.companyId
@@ -1003,7 +1020,5 @@ module.exports = {
   updateUserProfile,
   sendVerificationEmail,
   verifyEmail,
-  checkVerificationToken,
-  createEmailTransporter,
   exchangeAINativeToken
 };

@@ -458,6 +458,93 @@ class DilutionCalculationService {
         scored.sort((a, b) => b.score - a.score);
         return scored[0].name;
     }
+
+    /**
+     * Calculate dilution for a funding round (controller-facing API)
+     * Bridges the controller's flat params to calculateProFormaCapTable
+     */
+    static calculateFundingRound({ companyId, preMoney, newInvestment, existingShares, sharePrice, stakeholders = [], shareClasses = [] }) {
+        const defaultShareClasses = [
+            { shareClassId: 'common', name: 'Common', shares: existingShares, sharesAuthorized: existingShares, sharesIssued: existingShares, pricePerShare: sharePrice, preferenceType: 'common' }
+        ];
+        const baseCapTable = {
+            totalShares: existingShares,
+            shareClasses: shareClasses.length > 0 ? shareClasses : defaultShareClasses,
+            stakeholders,
+            optionPool: { total: 0, allocated: 0, available: 0 }
+        };
+
+        const financing = {
+            amount: newInvestment,
+            pricePerShare: sharePrice,
+            preMoneyValuation: preMoney
+        };
+
+        const proForma = this.calculateProFormaCapTable(baseCapTable, financing);
+        const dilution = this.calculateDilution(baseCapTable, proForma);
+
+        return {
+            companyId,
+            preMoney,
+            postMoney: preMoney + newInvestment,
+            newInvestment,
+            sharePrice,
+            existingShares,
+            newShares: proForma.totalShares - existingShares,
+            totalShares: proForma.totalShares,
+            dilutionPercentage: dilution.overallDilutionPercentage,
+            proFormaCapTable: proForma,
+            dilutionAnalysis: dilution
+        };
+    }
+
+    /**
+     * Calculate fully diluted cap table for a company
+     */
+    static async calculateFullyDiluted({ companyId, includeOptions = true, includeWarrants = true, includeSAFEs = true }) {
+        const DilutionScenario = require('../models/DilutionScenario');
+        const scenarios = await DilutionScenario.find({ companyId });
+
+        return {
+            companyId,
+            includeOptions,
+            includeWarrants,
+            includeSAFEs,
+            scenarioCount: scenarios.length,
+            scenarios: scenarios.map(s => ({
+                scenarioId: s.scenarioId,
+                name: s.name,
+                type: s.type
+            }))
+        };
+    }
+
+    /**
+     * Get dilution history for a company
+     */
+    static async getCompanyDilutionHistory(companyId) {
+        const DilutionCalculation = require('../models/DilutionCalculation');
+        const calculations = await DilutionCalculation.find({ companyId }, { sort: { createdAt: -1 } });
+        return calculations;
+    }
+
+    /**
+     * Compare multiple scenarios by ID
+     */
+    static async compareScenarios(scenarioIds) {
+        const DilutionScenario = require('../models/DilutionScenario');
+        const scenarios = [];
+        for (const id of scenarioIds) {
+            const scenario = await DilutionScenario.findByScenarioId(id);
+            if (scenario) scenarios.push(scenario);
+        }
+
+        if (scenarios.length < 2) {
+            throw new Error('At least 2 valid scenarios are required for comparison');
+        }
+
+        return this.generateComparisonReport(scenarios);
+    }
 }
 
 module.exports = DilutionCalculationService;

@@ -15,6 +15,7 @@ jest.mock('../../../../models/financialReport', () => {
   mockConstructor.findByIdAndUpdate = jest.fn();
   mockConstructor.findByIdAndDelete = jest.fn();
   mockConstructor.create = jest.fn();
+  mockConstructor.updateOne = jest.fn();
   mockConstructor.aggregate = jest.fn();
   mockConstructor.countDocuments = jest.fn();
   mockConstructor.deleteMany = jest.fn();
@@ -39,7 +40,7 @@ describe('Financial Report Controller', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-123' }
+      user: { userId: 'user-123' }
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -66,20 +67,17 @@ describe('Financial Report Controller', () => {
         userId: 'user-123',
         totalRevenue: 155000,
         totalExpenses: 100000,
-        netIncome: 55000,
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockResolvedValue(true)
+        netIncome: 55000
       };
 
-      FinancialReport.mockImplementation(() => mockReport);
+      FinancialReport.create.mockResolvedValue(mockReport);
       vectorService.indexDocument.mockResolvedValue({});
       streamingService.publishFinancialTransaction.mockResolvedValue({});
 
       await financialReportController.createFinancialReport(req, res);
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(mockReport.calculateTotals).toHaveBeenCalled();
-      expect(mockReport.save).toHaveBeenCalled();
+      expect(FinancialReport.create).toHaveBeenCalled();
     });
 
     it('should return 400 for missing companyId', async () => {
@@ -130,10 +128,7 @@ describe('Financial Report Controller', () => {
       const duplicateError = new Error('Duplicate key');
       duplicateError.code = 11000;
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(duplicateError)
-      }));
+      FinancialReport.create.mockRejectedValue(duplicateError);
 
       await financialReportController.createFinancialReport(req, res);
 
@@ -146,10 +141,7 @@ describe('Financial Report Controller', () => {
       const validationError = new Error('Validation failed');
       validationError.name = 'ValidationError';
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(validationError)
-      }));
+      FinancialReport.create.mockRejectedValue(validationError);
 
       await financialReportController.createFinancialReport(req, res);
 
@@ -159,10 +151,7 @@ describe('Financial Report Controller', () => {
     it('should handle database errors gracefully', async () => {
       req.body = validReportData;
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(new Error('Database error'))
-      }));
+      FinancialReport.create.mockRejectedValue(new Error('Database error'));
 
       await financialReportController.createFinancialReport(req, res);
 
@@ -180,12 +169,10 @@ describe('Financial Report Controller', () => {
         _id: { toString: () => 'report-123' },
         totalRevenue: 155000,
         totalExpenses: 100000,
-        netIncome: 55000,
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockResolvedValue(true)
+        netIncome: 55000
       };
 
-      FinancialReport.mockImplementation(() => mockReport);
+      FinancialReport.create.mockResolvedValue(mockReport);
       vectorService.indexDocument.mockRejectedValue(new Error('ZeroDB error'));
 
       await financialReportController.createFinancialReport(req, res);
@@ -402,15 +389,19 @@ describe('Financial Report Controller', () => {
       const updatedReport = {
         ...existingReport,
         ...updateData,
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockResolvedValue(true)
+        totalRevenue: 188000,
+        totalExpenses: 0,
+        netIncome: 188000
       };
 
-      FinancialReport.findById.mockResolvedValue(existingReport);
-      FinancialReport.findByIdAndUpdate.mockResolvedValue(updatedReport);
+      FinancialReport.findById
+        .mockResolvedValueOnce(existingReport)   // first call: check existence
+        .mockResolvedValueOnce(updatedReport);     // second call: after updateOne
+      FinancialReport.updateOne.mockResolvedValue({ modifiedCount: 1 });
 
       await financialReportController.updateFinancialReport(req, res);
 
+      expect(FinancialReport.updateOne).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -448,7 +439,7 @@ describe('Financial Report Controller', () => {
       validationError.name = 'ValidationError';
 
       FinancialReport.findById.mockResolvedValue(existingReport);
-      FinancialReport.findByIdAndUpdate.mockRejectedValue(validationError);
+      FinancialReport.updateOne.mockRejectedValue(validationError);
 
       await financialReportController.updateFinancialReport(req, res);
 
@@ -462,7 +453,7 @@ describe('Financial Report Controller', () => {
       const existingReport = { _id: '507f1f77bcf86cd799439011' };
 
       FinancialReport.findById.mockResolvedValue(existingReport);
-      FinancialReport.findByIdAndUpdate.mockRejectedValue(new Error('Database error'));
+      FinancialReport.updateOne.mockRejectedValue(new Error('Database error'));
 
       await financialReportController.updateFinancialReport(req, res);
 
@@ -669,14 +660,14 @@ describe('Financial Report Controller', () => {
     it('should create multiple financial reports', async () => {
       req.body = bulkReports;
 
-      FinancialReport.mockImplementation((data) => {
-        const report = { ...data, calculateTotals: jest.fn(), save: jest.fn().mockResolvedValue(true) };
-        return report;
+      FinancialReport.create.mockImplementation((data) => {
+        return Promise.resolve({ ...data, _id: 'report-' + Math.random() });
       });
 
       await financialReportController.bulkCreateFinancialReports(req, res);
 
       expect(res.status).toHaveBeenCalledWith(201);
+      expect(FinancialReport.create).toHaveBeenCalledTimes(2);
     });
 
     it('should return 400 for non-array input', async () => {
@@ -698,10 +689,7 @@ describe('Financial Report Controller', () => {
       const duplicateError = new Error('Duplicate key');
       duplicateError.code = 11000;
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(duplicateError)
-      }));
+      FinancialReport.create.mockRejectedValue(duplicateError);
 
       await financialReportController.bulkCreateFinancialReports(req, res);
 
@@ -714,10 +702,7 @@ describe('Financial Report Controller', () => {
       const validationError = new Error('Validation failed');
       validationError.name = 'ValidationError';
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(validationError)
-      }));
+      FinancialReport.create.mockRejectedValue(validationError);
 
       await financialReportController.bulkCreateFinancialReports(req, res);
 
@@ -727,10 +712,7 @@ describe('Financial Report Controller', () => {
     it('should handle database errors', async () => {
       req.body = bulkReports;
 
-      FinancialReport.mockImplementation(() => ({
-        calculateTotals: jest.fn(),
-        save: jest.fn().mockRejectedValue(new Error('Database error'))
-      }));
+      FinancialReport.create.mockRejectedValue(new Error('Database error'));
 
       await financialReportController.bulkCreateFinancialReports(req, res);
 

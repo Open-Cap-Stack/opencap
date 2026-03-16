@@ -22,6 +22,7 @@ exports.createCommunication = async (req, res) => {
             Recipient,
             Timestamp,
             Content,
+            companyId: req.user?.companyId || req.body.companyId,
         };
 
         const savedCommunication = await databaseAdapter.create('Communication', communicationData);
@@ -35,7 +36,10 @@ exports.createCommunication = async (req, res) => {
 exports.getCommunications = async (req, res) => {
     try {
         const { limit, skip } = parsePagination(req.query);
-        const communications = await databaseAdapter.find('Communication', {}, { limit, skip });
+        const query = {};
+        const companyId = req.query.companyId || req.user?.companyId;
+        if (companyId) query.companyId = companyId;
+        const communications = await databaseAdapter.find('Communication', query, { limit, skip });
         if (communications.length === 0) {
             return res.status(404).json({ message: 'No communications found' });
         }

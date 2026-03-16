@@ -3,20 +3,15 @@
  * Issue #197: Build Custom Report Builder Engine
  */
 
-// Mock models as constructor functions that return objects with save()
-const mockSave = jest.fn();
-let mockCustomReportInstance = {};
-
+// Mock models with static methods (no constructor usage)
 jest.mock('../../../models/CustomReport', () => {
-  const MockCustomReport = jest.fn().mockImplementation((data) => {
-    Object.assign(mockCustomReportInstance, data);
-    mockCustomReportInstance.save = mockSave;
-    return mockCustomReportInstance;
-  });
+  const MockCustomReport = jest.fn();
   MockCustomReport.findOne = jest.fn();
   MockCustomReport.find = jest.fn();
   MockCustomReport.countDocuments = jest.fn();
   MockCustomReport.deleteOne = jest.fn();
+  MockCustomReport.create = jest.fn();
+  MockCustomReport.updateOne = jest.fn();
   return MockCustomReport;
 });
 
@@ -47,12 +42,11 @@ describe('CustomReportController Tests', () => {
       params: {},
       query: {},
       body: {},
-      user: { id: 'user-001', companyId: 'company-001', role: 'user' }
+      user: { userId: 'user-001', companyId: 'company-001', role: 'user' }
     };
     res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
     next = jest.fn();
     jest.clearAllMocks();
-    mockCustomReportInstance = {};
   });
 
   describe('createCustomReport', () => {
@@ -60,13 +54,14 @@ describe('CustomReportController Tests', () => {
       const reportData = { name: 'Test Report', dataSources: ['stakeholders'], fields: ['name', 'email'], companyId: 'company-001' };
       req.body = reportData;
       queryBuilderService.validateReportConfig = jest.fn().mockResolvedValue({ isValid: true, errors: [] });
-      mockSave.mockResolvedValue({ reportId: 'report-001', ...reportData });
+      const createdReport = { reportId: 'report-001', ...reportData, createdBy: 'user-001' };
+      CustomReport.create.mockResolvedValue(createdReport);
       zeroDbService.insertRow = jest.fn().mockResolvedValue({});
 
       await customReportController.createCustomReport(req, res, next);
 
       expect(queryBuilderService.validateReportConfig).toHaveBeenCalledWith(reportData);
-      expect(mockSave).toHaveBeenCalled();
+      expect(CustomReport.create).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalled();
     });
@@ -74,7 +69,7 @@ describe('CustomReportController Tests', () => {
     it('should handle ZeroDB insertion failure gracefully', async () => {
       req.body = { name: 'Test Report', dataSources: ['stakeholders'], fields: ['name'], companyId: 'company-001' };
       queryBuilderService.validateReportConfig = jest.fn().mockResolvedValue({ isValid: true, errors: [] });
-      mockSave.mockResolvedValue({ reportId: 'report-002' });
+      CustomReport.create.mockResolvedValue({ reportId: 'report-002' });
       zeroDbService.insertRow = jest.fn().mockRejectedValue(new Error('ZeroDB error'));
 
       await customReportController.createCustomReport(req, res, next);
@@ -114,7 +109,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return report when report is public', async () => {
       req.params.id = 'report-002';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-002', createdBy: 'user-001', isPublic: true, sharedWith: [] });
 
       await customReportController.getCustomReport(req, res, next);
@@ -123,7 +118,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return report when user is in sharedWith list', async () => {
       req.params.id = 'report-003';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-003', createdBy: 'user-001', isPublic: false, sharedWith: ['user-002'] });
 
       await customReportController.getCustomReport(req, res, next);
@@ -132,7 +127,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return report when user is admin', async () => {
       req.params.id = 'report-004';
-      req.user.id = 'admin-001';
+      req.user.userId = 'admin-001';
       req.user.role = 'admin';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-004', createdBy: 'user-001', isPublic: false, sharedWith: [] });
 
@@ -151,7 +146,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return 403 when user lacks access', async () => {
       req.params.id = 'report-005';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-005', createdBy: 'user-001', isPublic: false, sharedWith: [] });
 
       await customReportController.getCustomReport(req, res, next);
@@ -199,15 +194,16 @@ describe('CustomReportController Tests', () => {
   describe('executeCustomReport', () => {
     it('should execute report successfully', async () => {
       req.params.id = 'report-001';
-      const mockReport = { reportId: 'report-001', name: 'Test Report', createdBy: 'user-001', fields: ['name'], executionCount: 0, save: jest.fn().mockResolvedValue({}) };
+      const mockReport = { reportId: 'report-001', name: 'Test Report', createdBy: 'user-001', fields: ['name'], executionCount: 0, isPublic: false, sharedWith: [] };
       CustomReport.findOne.mockResolvedValue(mockReport);
+      CustomReport.updateOne.mockResolvedValue({ modifiedCount: 1 });
       ReportFilter.find.mockResolvedValue([]);
       queryBuilderService.buildFilterQuery = jest.fn().mockReturnValue({});
       const mockResults = [{ name: 'John' }, { name: 'Jane' }];
       reportAggregationService.executeReport = jest.fn().mockResolvedValue(mockResults);
 
       await customReportController.executeCustomReport(req, res, next);
-      expect(mockReport.executionCount).toBe(1);
+      expect(CustomReport.updateOne).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -220,7 +216,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return 403 when user lacks access', async () => {
       req.params.id = 'report-002';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-002', createdBy: 'user-001', isPublic: false, sharedWith: [] });
       await customReportController.executeCustomReport(req, res, next);
       expect(res.status).toHaveBeenCalledWith(403);
@@ -279,19 +275,20 @@ describe('CustomReportController Tests', () => {
     it('should update report successfully', async () => {
       req.params.id = 'report-001';
       req.body = { name: 'Updated Report', fields: ['name', 'email', 'phone'] };
-      const mockReport = { reportId: 'report-001', createdBy: 'user-001', save: jest.fn().mockResolvedValue({}) };
+      const mockReport = { reportId: 'report-001', createdBy: 'user-001' };
       CustomReport.findOne.mockResolvedValue(mockReport);
+      CustomReport.updateOne.mockResolvedValue({ modifiedCount: 1 });
       queryBuilderService.validateReportConfig = jest.fn().mockResolvedValue({ isValid: true, errors: [] });
       zeroDbService.updateRows = jest.fn().mockResolvedValue({});
 
       await customReportController.updateCustomReport(req, res, next);
-      expect(mockReport.save).toHaveBeenCalled();
+      expect(CustomReport.updateOne).toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it('should return 403 when user is not creator', async () => {
       req.params.id = 'report-001';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       req.body = { name: 'Updated' };
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-001', createdBy: 'user-001' });
 
@@ -315,7 +312,7 @@ describe('CustomReportController Tests', () => {
 
     it('should return 403 when user is not creator', async () => {
       req.params.id = 'report-001';
-      req.user.id = 'user-002';
+      req.user.userId = 'user-002';
       CustomReport.findOne.mockResolvedValue({ reportId: 'report-001', createdBy: 'user-001' });
 
       await customReportController.deleteCustomReport(req, res, next);

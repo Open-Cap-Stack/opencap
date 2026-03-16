@@ -16,6 +16,7 @@ const investorRightsService = require('../services/investorRightsService');
  * @param {Object} res - Express response object
  */
 exports.createInvestorRight = async (req, res) => {
+  req.body.companyId = req.user?.companyId || req.body.companyId;
   const {
     rightId,
     investorId,
@@ -39,7 +40,7 @@ exports.createInvestorRight = async (req, res) => {
   }
 
   try {
-    const userId = req.user?.id || 'system';
+    const userId = req.user?.userId || 'system';
 
     const rightData = {
       rightId,
@@ -95,7 +96,8 @@ exports.getInvestorRightById = async (req, res) => {
  */
 exports.getAllInvestorRights = async (req, res) => {
   try {
-    const { investorId, companyId, shareClassId, rightType, status } = req.query;
+    const { investorId, shareClassId, rightType, status } = req.query;
+    const companyId = req.query.companyId || req.user?.companyId;
 
     // Build query from filters
     const query = {};
@@ -123,7 +125,7 @@ exports.getAllInvestorRights = async (req, res) => {
  */
 exports.updateInvestorRight = async (req, res) => {
   try {
-    const userId = req.user?.id || 'system';
+    const userId = req.user?.userId || 'system';
 
     const investorRight = await investorRightsService.updateRight(
       req.params.id,
@@ -172,7 +174,7 @@ exports.deleteInvestorRight = async (req, res) => {
  */
 exports.exerciseRight = async (req, res) => {
   try {
-    const userId = req.user?.id || 'system';
+    const userId = req.user?.userId || 'system';
 
     // First check if the right exists
     const existingRight = await databaseAdapter.findById('InvestorRights', req.params.id);
@@ -341,7 +343,7 @@ exports.generateReport = async (req, res) => {
  */
 exports.waiveRight = async (req, res) => {
   try {
-    const userId = req.user?.id || 'system';
+    const userId = req.user?.userId || 'system';
     const { reason, documentReference } = req.body;
 
     const investorRight = await investorRightsService.waiveRight(

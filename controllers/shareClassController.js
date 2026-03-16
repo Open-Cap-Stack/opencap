@@ -26,7 +26,10 @@ const createShareClass = async (req, res) => {
 
 const getAllShareClasses = async (req, res) => {
   try {
-    const shareClasses = await databaseAdapter.find(MODEL_NAME, {});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const shareClasses = await databaseAdapter.find(MODEL_NAME, query);
     res.status(200).json({ shareClasses });
   } catch (error) {
     errorResponse(res, 500, 'Error fetching share classes', error);

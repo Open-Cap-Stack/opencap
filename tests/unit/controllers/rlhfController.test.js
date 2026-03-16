@@ -22,7 +22,7 @@ describe('RLHF Controller', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-001' }
+      user: { userId: 'user-001' }
     };
 
     mockRes = {

@@ -33,6 +33,7 @@ exports.createComplianceCheck = async (req, res) => {
       Details,
       Timestamp,
       LastCheckedBy,
+      companyId: req.user?.companyId || req.body.companyId,
     };
 
     const savedComplianceCheck = await databaseAdapter.create('ComplianceCheck', complianceData);
@@ -49,7 +50,10 @@ exports.createComplianceCheck = async (req, res) => {
 // Get all compliance checks
 exports.getComplianceChecks = async (req, res) => {
   try {
-    const complianceChecks = await databaseAdapter.find('ComplianceCheck', {});
+    const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
+    const complianceChecks = await databaseAdapter.find('ComplianceCheck', query);
     res.status(200).json({ complianceChecks });
   } catch (error) {
     console.error('Error retrieving compliance checks:', error.message);

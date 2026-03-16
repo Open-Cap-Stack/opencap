@@ -81,6 +81,10 @@ exports.getActivities = async (req, res) => {
   try {
     // Build filter from query parameters
     const filter = buildActivityFilter(req.query);
+    // Default companyId from user context if not in query
+    if (!filter.companyId && req.user?.companyId) {
+      filter.companyId = req.user.companyId;
+    }
 
     // Handle pagination - support both offset-based and page-based
     const limit = Math.max(parseInt(req.query.limit) || 100, 1);

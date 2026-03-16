@@ -20,7 +20,7 @@ const Company = require('../models/Company');
 const getUserSettings = async (req, res) => {
     try {
         // Get userId from authenticated user
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
 
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
@@ -53,7 +53,7 @@ const getUserSettings = async (req, res) => {
 const updateUserSettings = async (req, res) => {
     try {
         // Get userId from authenticated user
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
 
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
@@ -117,7 +117,7 @@ const getCompanySettings = async (req, res) => {
         }
 
         // Check if user has access to this company
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
         const user = await User.findByUserId(userId) || await User.findById(userId);
 
         if (!user) {
@@ -175,7 +175,7 @@ const updateCompanySettings = async (req, res) => {
         }
 
         // Check if user has access to modify this company's settings
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
         const user = await User.findByUserId(userId) || await User.findById(userId);
 
         if (!user) {
@@ -234,7 +234,7 @@ const updateCompanySettings = async (req, res) => {
  */
 const resetUserSettings = async (req, res) => {
     try {
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
 
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
@@ -279,7 +279,7 @@ const resetCompanySettings = async (req, res) => {
         }
 
         // Check if user has admin access
-        const userId = req.user.userId || req.user.id;
+        const userId = req.user.userId;
         const user = await User.findByUserId(userId) || await User.findById(userId);
 
         if (!user) {

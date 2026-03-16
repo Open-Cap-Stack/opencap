@@ -11,11 +11,11 @@ const express = require('express');
 const router = express.Router();
 const SecurityAudit = require('../../models/SecurityAudit');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
-const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
-router.use(authenticateJWT);
+router.use(authenticateToken);
 
 // Apply admin/security role requirement to all routes
 router.use(hasRole(['admin', 'security_analyst']));
@@ -106,11 +106,7 @@ router.get('/', async (req, res) => {
 
     // Execute query
     const [logs, total] = await Promise.all([
-      SecurityAudit.find(filter)
-        .sort({ timestamp: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .populate('reviewedBy', 'email'),
+      SecurityAudit.find(filter, { sort: { timestamp: -1 }, skip, limit: parseInt(limit) }),
       SecurityAudit.countDocuments(filter)
     ]);
 
@@ -266,7 +262,10 @@ router.patch('/:id/review', async (req, res) => {
       return res.status(404).json({ error: 'Audit log not found' });
     }
 
-    await auditLog.markReviewed(req.user.id, notes);
+    await SecurityAudit.updateOne(
+      { _id: auditLog._id },
+      { reviewed: true, reviewedBy: req.user?.userId, reviewedAt: new Date().toISOString(), ...(notes ? { notes } : {}) }
+    );
 
     // Log this review action
     securityLogger.logAuditEvent(
@@ -279,9 +278,11 @@ router.patch('/:id/review', async (req, res) => {
       req
     );
 
+    // Re-fetch to return updated data
+    const updatedLog = await SecurityAudit.findById(id);
     res.json({
       message: 'Audit log marked as reviewed',
-      auditLog
+      auditLog: updatedLog || auditLog
     });
 
   } catch (error) {
@@ -388,9 +389,7 @@ router.get('/export', async (req, res) => {
     
     if (level) filter.level = level;
 
-    const logs = await SecurityAudit.find(filter)
-      .sort({ timestamp: -1 })
-      .limit(10000); // Limit to prevent memory issues
+    const logs = await SecurityAudit.find(filter, { sort: { timestamp: -1 }, limit: 10000 });
 
     // Log this export
     securityLogger.logAuditEvent(

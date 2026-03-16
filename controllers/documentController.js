@@ -131,6 +131,7 @@ exports.createDocument = async (req, res) => {
             id: documentId,
             _id: documentId,
             fileId: persistentFileId,
+            companyId: req.user?.companyId || req.body.companyId || null,
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
@@ -213,9 +214,10 @@ exports.getDocuments = async (req, res) => {
         // Build simple filter object (ZeroDB only supports basic equality)
         let filter = {};
 
-        // Add companyId filter if provided
-        if (companyId) {
-            filter.ownerCompany = companyId;
+        // Multi-tenant: scope to company
+        const effectiveCompanyId = companyId || req.user?.companyId;
+        if (effectiveCompanyId) {
+            filter.companyId = effectiveCompanyId;
         }
 
         // Add category filter

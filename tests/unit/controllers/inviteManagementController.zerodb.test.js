@@ -32,6 +32,8 @@ describe('Invite Management Controller - ZeroDB Migration', () => {
     req = {
       body: {},
       params: {},
+      query: {},
+      user: { userId: 'user_123', companyId: 'company_123', role: 'user' },
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -86,7 +88,7 @@ describe('Invite Management Controller - ZeroDB Migration', () => {
 
       await getAllInvites(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('Invite', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('Invite', { companyId: 'company_123' });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(mockInvites);
     });

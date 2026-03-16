@@ -30,6 +30,8 @@ exports.createTermination = async (req, res) => {
       });
     }
 
+    req.body.companyId = req.user?.companyId || req.body.companyId;
+
     const termination = await terminationService.processTermination(req.body);
     res.status(201).json(termination);
   } catch (error) {

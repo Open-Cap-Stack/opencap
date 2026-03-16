@@ -32,6 +32,8 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
     req = {
       body: {},
       params: {},
+      query: {},
+      user: { userId: 'user_123', companyId: 'company_123', role: 'user' },
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -109,7 +111,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
 
       await getTaxCalculations(req, res);
 
-      expect(TaxCalculator.find).toHaveBeenCalledWith({});
+      expect(TaxCalculator.find).toHaveBeenCalledWith({ companyId: 'company_123' });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ taxCalculations: mockCalculations });
     });

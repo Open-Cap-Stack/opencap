@@ -32,6 +32,8 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
     req = {
       body: {},
       params: {},
+      query: {},
+      user: { userId: 'user_123', companyId: 'company_123', role: 'user' },
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -109,7 +111,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
 
       await getAllShareClasses(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', { companyId: 'company_123' });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ shareClasses: mockShareClasses });
     });

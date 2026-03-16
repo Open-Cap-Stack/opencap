@@ -98,6 +98,10 @@ exports.getNotifications = async (req, res) => {
   try {
     // Build filter from query parameters
     const filter = buildNotificationFilter(req.query);
+    // Default companyId from user context
+    if (!filter.companyId && req.user?.companyId) {
+      filter.companyId = req.user.companyId;
+    }
 
     // Handle pagination with enforced limits
     const { limit, skip } = parsePagination({

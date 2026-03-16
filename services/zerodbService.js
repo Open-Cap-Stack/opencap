@@ -1,12 +1,14 @@
 /**
  * ZeroDB Service Layer
- * 
+ *
  * Provides integration with ZeroDB API for lakehouse functionality
- * including vector search, real-time streaming, and memory management
+ * including vector search, real-time streaming, and memory management.
+ * Falls back to in-memory store when remote API is unreachable.
  */
 
 const axios = require('axios');
 const config = require('../config');
+const { v4: uuidv4 } = require('uuid');
 
 class ZeroDBService {
   constructor() {
@@ -14,6 +16,8 @@ class ZeroDBService {
     this.baseURL = baseHost.startsWith('http') ? baseHost : `https://${baseHost}`;
     this.projectId = null;
     this.token = process.env.AINATIVE_API_TOKEN || null;
+    this.useLocalFallback = false;
+    this._localStore = {};  // tableName -> [{ row_id, row_data }]
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
@@ -21,7 +25,7 @@ class ZeroDBService {
         'Content-Type': 'application/json'
       }
     });
-    
+
     // Add request interceptor for authentication
     this.client.interceptors.request.use(
       (config) => {
@@ -32,12 +36,14 @@ class ZeroDBService {
       },
       (error) => Promise.reject(error)
     );
-    
+
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        console.error('ZeroDB API Error:', error.response?.data || error.message);
+        if (!this.useLocalFallback) {
+          console.error('ZeroDB API Error:', error.response?.data || error.message);
+        }
         return Promise.reject(error);
       }
     );
@@ -49,24 +55,35 @@ class ZeroDBService {
    */
   async initialize(token) {
     this.token = token;
-    
+
     try {
       // Create or get OpenCap project
       const project = await this.initializeProject();
       this.projectId = project.id;
-      
+
       // Check database status
       const dbStatus = await this.getDatabaseStatus();
       console.log('ZeroDB initialized successfully:', {
         projectId: this.projectId,
         databaseStatus: dbStatus
       });
-      
+
       return {
         projectId: this.projectId,
         databaseStatus: dbStatus
       };
     } catch (error) {
+      // Fall back to in-memory store for local development
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️  ZeroDB remote API unreachable, using in-memory fallback');
+        console.warn(`   Reason: ${error.message}`);
+        this.useLocalFallback = true;
+        this.projectId = process.env.ZERODB_PROJECT_ID || 'local-dev';
+        return {
+          projectId: this.projectId,
+          databaseStatus: { status: 'local-fallback' }
+        };
+      }
       console.error('Failed to initialize ZeroDB:', error.message);
       throw error;
     }
@@ -131,6 +148,10 @@ class ZeroDBService {
    * @returns {Object} Created table details
    */
   async createTable(tableName, schemaDefinition) {
+    if (this.useLocalFallback) {
+      if (!this._localStore[tableName]) this._localStore[tableName] = [];
+      return { table_name: tableName, schema: schemaDefinition };
+    }
     try {
       const response = await this.client.post(`/v1/public/zerodb/${this.projectId}/database/tables`, {
         table_name: tableName,
@@ -163,6 +184,9 @@ class ZeroDBService {
    * @returns {Array} List of tables
    */
   async listTables() {
+    if (this.useLocalFallback) {
+      return Object.keys(this._localStore).map(name => ({ table_name: name }));
+    }
     try {
       const response = await this.client.get(`/v1/public/zerodb/${this.projectId}/database/tables`);
       return response.data.tables || response.data || [];
@@ -179,6 +203,16 @@ class ZeroDBService {
    * @returns {Array} Inserted rows
    */
   async insertRows(tableName, rows) {
+    if (this.useLocalFallback) {
+      if (!this._localStore[tableName]) this._localStore[tableName] = [];
+      const results = rows.map(row => {
+        const rowId = uuidv4();
+        const entry = { row_id: rowId, row_data: { ...row, _id: row._id || rowId } };
+        this._localStore[tableName].push(entry);
+        return entry;
+      });
+      return { data: results };
+    }
     try {
       // Insert each row individually using row_data format
       const results = [];
@@ -208,6 +242,9 @@ class ZeroDBService {
    * @returns {Array} Query results
    */
   async queryTable(tableName, options = {}) {
+    if (this.useLocalFallback) {
+      return this._localQuery(tableName, options);
+    }
     try {
       const { filter = {}, skip = 0, limit = 100, sort = {}, projection = {} } = options;
 
@@ -265,6 +302,9 @@ class ZeroDBService {
    * @returns {Object} Update result
    */
   async updateRows(tableName, options) {
+    if (this.useLocalFallback) {
+      return this._localUpdate(tableName, options);
+    }
     try {
       const { filter, update } = options;
 
@@ -308,6 +348,9 @@ class ZeroDBService {
    * @returns {Object} Delete result
    */
   async deleteRows(tableName, options) {
+    if (this.useLocalFallback) {
+      return this._localDelete(tableName, options);
+    }
     try {
       const { filter } = options;
 
@@ -345,6 +388,11 @@ class ZeroDBService {
    * @returns {number} Count of matching rows
    */
   async countRows(tableName, filter = {}) {
+    if (this.useLocalFallback) {
+      const results = this._localQuery(tableName, { filter });
+      const data = results.data || results || [];
+      return data.length;
+    }
     try {
       const response = await this.client.post(
         `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/query`,
@@ -640,6 +688,10 @@ class ZeroDBService {
    * @returns {Object} Insert result with created row IDs
    */
   async insertRow(tableName, rowData) {
+    if (this.useLocalFallback) {
+      const rows = Array.isArray(rowData) ? rowData : [rowData];
+      return this.insertRows(tableName, rows);
+    }
     try {
       // If array, insert each row individually
       if (Array.isArray(rowData)) {
@@ -720,6 +772,13 @@ class ZeroDBService {
    * @returns {Object} Delete result
    */
   async deleteRowById(tableName, rowId) {
+    if (this.useLocalFallback) {
+      const table = this._localStore[tableName] || [];
+      const idx = table.findIndex(r => r.row_id === rowId);
+      if (idx === -1) return { deleted_count: 0 };
+      table.splice(idx, 1);
+      return { deleted_count: 1 };
+    }
     try {
       await this.client.delete(
         `/v1/public/zerodb/${this.projectId}/database/tables/${tableName}/rows/${rowId}`
@@ -732,6 +791,82 @@ class ZeroDBService {
       console.error('Error deleting row by ID:', error.message);
       throw error;
     }
+  }
+
+  // =========================================================================
+  // In-memory fallback implementations (used when remote ZeroDB is unreachable)
+  // =========================================================================
+
+  _localMatchesFilter(item, filter) {
+    if (!filter || Object.keys(filter).length === 0) return true;
+    return Object.entries(filter).every(([key, value]) => {
+      const actual = item[key];
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        if (value.$in) return value.$in.includes(actual);
+        if (value.$ne) return actual !== value.$ne;
+        if (value.$gt) return actual > value.$gt;
+        if (value.$gte) return actual >= value.$gte;
+        if (value.$lt) return actual < value.$lt;
+        if (value.$lte) return actual <= value.$lte;
+        if (value.$regex) return new RegExp(value.$regex, value.$options || '').test(actual);
+      }
+      return actual === value;
+    });
+  }
+
+  _localQuery(tableName, options = {}) {
+    const { filter = {}, skip = 0, limit = 100, sort = {} } = options;
+    const table = this._localStore[tableName] || [];
+
+    let results = table.filter(entry =>
+      this._localMatchesFilter(entry.row_data, filter)
+    );
+
+    // Sort
+    const sortKeys = Object.entries(sort);
+    if (sortKeys.length > 0) {
+      results.sort((a, b) => {
+        for (const [key, dir] of sortKeys) {
+          const av = a.row_data[key], bv = b.row_data[key];
+          if (av < bv) return dir === -1 ? 1 : -1;
+          if (av > bv) return dir === -1 ? -1 : 1;
+        }
+        return 0;
+      });
+    }
+
+    const total = results.length;
+    if (limit > 0) {
+      results = results.slice(skip, skip + limit);
+    } else {
+      results = [];
+    }
+    return { data: results, total };
+  }
+
+  _localUpdate(tableName, options) {
+    const { filter, update } = options;
+    const table = this._localStore[tableName] || [];
+    const updateData = update.$set || update;
+    let modifiedCount = 0;
+
+    for (const entry of table) {
+      if (this._localMatchesFilter(entry.row_data, filter)) {
+        Object.assign(entry.row_data, updateData);
+        modifiedCount++;
+      }
+    }
+    return { modified_count: modifiedCount, matched_count: modifiedCount };
+  }
+
+  _localDelete(tableName, options) {
+    const { filter } = options;
+    if (!this._localStore[tableName]) return { deleted_count: 0 };
+    const before = this._localStore[tableName].length;
+    this._localStore[tableName] = this._localStore[tableName].filter(
+      entry => !this._localMatchesFilter(entry.row_data, filter)
+    );
+    return { deleted_count: before - this._localStore[tableName].length };
   }
 }
 

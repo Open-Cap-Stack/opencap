@@ -15,6 +15,7 @@ const webhookService = require('../services/webhookService');
  */
 exports.createWebhook = async (req, res) => {
   try {
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const webhookData = {
       companyId: req.body.companyId,
       name: req.body.name,
@@ -23,7 +24,7 @@ exports.createWebhook = async (req, res) => {
       events: req.body.events,
       retryConfig: req.body.retryConfig,
       headers: req.body.headers,
-      createdBy: req.body.createdBy || req.user?.id,
+      createdBy: req.body.createdBy || req.user?.userId,
       metadata: req.body.metadata
     };
 
@@ -40,8 +41,9 @@ exports.createWebhook = async (req, res) => {
  */
 exports.getWebhooks = async (req, res) => {
   try {
-    const { companyId, status } = req.query;
     const query = {};
+    const companyId = req.query.companyId || req.user?.companyId;
+    const { status } = req.query;
 
     if (companyId) query.companyId = companyId;
     if (status) query.status = status;

@@ -287,10 +287,19 @@ class ZeroDBModel {
             delete newRowData.row_id;
             delete newRowData.id;
 
-            await zerodbService.client.put(
-                `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
-                { row_data: newRowData }
-            );
+            if (zerodbService.useLocalFallback) {
+                // Update in-memory store directly by row_id
+                const table = zerodbService._localStore[this.tableName] || [];
+                const entry = table.find(r => r.row_id === doc.row_id);
+                if (entry) {
+                    entry.row_data = newRowData;
+                }
+            } else {
+                await zerodbService.client.put(
+                    `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
+                    { row_data: newRowData }
+                );
+            }
 
             // Read-after-write verification: confirm our version won
             if (needsVersionVerify) {
@@ -750,7 +759,18 @@ class ZeroDBModel {
  * @returns {ZeroDBModel} Model instance
  */
 function createModel(tableName, schema = {}) {
-    return new ZeroDBModel(tableName, schema);
+    const instance = new ZeroDBModel(tableName, schema);
+
+    // Copy prototype methods to own properties so they survive object spread
+    // Models use { ...baseModel, customMethods } which drops prototype methods
+    const proto = Object.getPrototypeOf(instance);
+    Object.getOwnPropertyNames(proto).forEach(name => {
+        if (name !== 'constructor' && typeof proto[name] === 'function') {
+            instance[name] = proto[name].bind(instance);
+        }
+    });
+
+    return instance;
 }
 
 module.exports = { ZeroDBModel, createModel };

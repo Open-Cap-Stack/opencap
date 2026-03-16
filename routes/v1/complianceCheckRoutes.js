@@ -27,8 +27,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const complianceCheck = new ComplianceCheck(req.body);
-    const savedCheck = await complianceCheck.save();
+    const savedCheck = await ComplianceCheck.create(req.body);
     
     res.status(201).json(savedCheck);
   } catch (error) {
@@ -60,7 +59,7 @@ router.post('/', async (req, res) => {
 // Get all compliance checks
 router.get('/', async (req, res) => {
   try {
-    const checks = await ComplianceCheck.find().sort({ Timestamp: -1 }).exec();
+    const checks = await ComplianceCheck.find({}, { sort: { Timestamp: -1 } });
     res.status(200).json({
       success: true,
       complianceChecks: checks,

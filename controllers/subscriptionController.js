@@ -42,7 +42,8 @@ exports.getSubscription = async (req, res) => {
  */
 exports.getSubscriptions = async (req, res) => {
   try {
-    const { companyId, status } = req.query;
+    const companyId = req.query.companyId || req.user?.companyId;
+    const { status } = req.query;
     const filters = {};
     if (status) filters.status = status;
 
