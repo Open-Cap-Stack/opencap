@@ -16,6 +16,7 @@ const databaseAdapter = require('../services/databaseAdapter');
  */
 exports.createFundraisingRound = async (req, res) => {
   try {
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const savedRound = await databaseAdapter.create('FundraisingRound', req.body);
     res.status(201).json(savedRound);
   } catch (error) {

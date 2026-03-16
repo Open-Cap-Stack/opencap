@@ -10,6 +10,7 @@ const MODEL_NAME = 'Invite';
 
 exports.createInvite = async (req, res) => {
   try {
+    req.body.companyId = req.user?.companyId || req.body.companyId;
     const savedInvite = await databaseAdapter.create(MODEL_NAME, req.body);
     res.status(201).json(savedInvite);
   } catch (error) {

@@ -38,6 +38,7 @@ exports.createSPVAsset = async (req, res) => {
       Value,
       Description,
       AcquisitionDate,
+      companyId: req.user?.companyId || req.body.companyId,
     };
 
     const savedAsset = await SPVAsset.create(assetData);

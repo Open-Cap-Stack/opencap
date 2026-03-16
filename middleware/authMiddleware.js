@@ -131,6 +131,7 @@ const authenticateToken = async (req, res, next) => {
     if (!user && decoded.role) {
       req.user = {
         userId: tokenUserId,
+        _id: tokenUserId,
         email: decoded.email,
         role: decoded.role,
         permissions: decoded.permissions || [],
@@ -152,6 +153,7 @@ const authenticateToken = async (req, res, next) => {
     // Add user data to request
     req.user = {
       userId: user.userId,
+      _id: user._id || user.userId,
       email: user.email,
       role: user.role,
       permissions: user.permissions || [],
@@ -180,6 +182,7 @@ const authenticateToken = async (req, res, next) => {
           // Set user from local record (same shape as normal auth path)
           req.user = {
             userId: localUser.userId,
+            _id: localUser._id || localUser.userId,
             email: localUser.email,
             role: localUser.role || 'user',
             permissions: localUser.permissions || [],
