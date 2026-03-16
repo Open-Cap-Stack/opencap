@@ -278,9 +278,11 @@ router.patch('/:id/review', async (req, res) => {
       req
     );
 
+    // Re-fetch to return updated data
+    const updatedLog = await SecurityAudit.findById(id);
     res.json({
       message: 'Audit log marked as reviewed',
-      auditLog
+      auditLog: updatedLog || auditLog
     });
 
   } catch (error) {

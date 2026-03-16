@@ -193,9 +193,10 @@ class CustomReportController {
         });
       }
 
-      // Update report
+      // Update report and re-fetch for fresh data
       await CustomReport.updateOne({ reportId: report.reportId }, req.body);
-      Object.assign(report, req.body);
+      const updatedReport = await CustomReport.findOne({ reportId: report.reportId });
+      if (updatedReport) Object.assign(report, updatedReport);
 
       // Update in ZeroDB
       try {

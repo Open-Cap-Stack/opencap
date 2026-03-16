@@ -113,10 +113,12 @@ describe('SAFE Controller', () => {
       SAFE.canTransitionTo.mockReturnValue(true);
       const updatedSafe = { ...safe, status: 'sent' };
       SAFE.transitionTo.mockResolvedValue(updatedSafe);
-      const sr = { requestId: 'sr1' };
+      const sr = { _id: 'sr1', requestId: 'sr1' };
       SignatureRequest.create.mockResolvedValue(sr);
+      SignatureRequest.send = jest.fn().mockResolvedValue(true);
       await ctrl.sendSAFE(req, res);
       expect(SignatureRequest.create).toHaveBeenCalled();
+      expect(SignatureRequest.send).toHaveBeenCalledWith('sr1', expect.anything());
       expect(SAFE.transitionTo).toHaveBeenCalledWith('s1', 'sent', expect.anything(), 'Sent for signatures');
     });
   });

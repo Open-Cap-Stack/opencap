@@ -220,6 +220,9 @@ exports.sendSAFE = async (req, res) => {
       createdBy: req.user._id
     });
 
+    // Send signature request to signers
+    await SignatureRequest.send(signatureRequest._id, req.user._id);
+
     // Update SAFE status
     const updatedSafe = await SAFE.transitionTo(safeId, 'sent', req.user._id, 'Sent for signatures');
 

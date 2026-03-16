@@ -72,17 +72,16 @@ exports.getCompanyEvents = async (req, res) => {
       query.triggersValuation = triggersValuation === 'true';
     }
 
-    const allEvents = await MaterialEvent.find(query);
-
-    // Sort by eventDate descending
-    allEvents.sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate));
-
-    // Paginate in-memory
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
-    const startIndex = (pageNum - 1) * limitNum;
-    const events = allEvents.slice(startIndex, startIndex + limitNum);
-    const total = allEvents.length;
+
+    const events = await MaterialEvent.find(query, {
+      sort: { eventDate: -1 },
+      skip: (pageNum - 1) * limitNum,
+      limit: limitNum
+    });
+
+    const total = await MaterialEvent.countDocuments(query);
 
     res.json({
       success: true,
