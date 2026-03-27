@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "frontend:dev": "cd frontend && npm run dev",
-    "frontend:build": "cd frontend && npm run build",
-    "frontend:preview": "cd frontend && npm run preview",
+    "frontend:dev": "cd client && npm run dev",
+    "frontend:build": "cd client && npm run build",
+    "frontend:start": "cd client && npm run start",
+    "frontend:test": "cd client && npm test",
     "dev:full": "concurrently \"npm run dev\" \"npm run frontend:dev\"",
     "test": "cross-env NODE_ENV=test jest --config config/jest.config.js --detectOpenHandles --forceExit",
     "test:ci": "cross-env NODE_ENV=test CI=true jest --ci --config config/jest.config.js --coverage --maxWorkers=2 --detectOpenHandles --forceExit",

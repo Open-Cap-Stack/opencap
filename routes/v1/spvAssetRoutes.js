@@ -5,10 +5,9 @@
  */
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const SPVAsset = require('../../models/SPVAssetModel');
 const router = express.Router();
 const SPVAssetController = require('../../controllers/SPVasset');
-const responseDebugger = require('../../middleware/responseDebugger');
+const responseDebugger = process.env.NODE_ENV !== 'production' ? require('../../middleware/responseDebugger') : (req, res, next) => next();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
