@@ -133,9 +133,6 @@ const zerodbReady = (async () => {
   if (!process.env.AINATIVE_API_TOKEN) {
     const msg = 'ZeroDB enabled but AINATIVE_API_TOKEN not set';
     console.warn(`⚠️  ${msg}`);
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(msg);
-    }
     return;
   }
 
@@ -147,9 +144,7 @@ const zerodbReady = (async () => {
     console.log('✅ DatabaseAdapter initialized');
   } catch (err) {
     console.error('❌ ZeroDB initialization failed:', err.message);
-    if (process.env.NODE_ENV === 'production') {
-      throw err; // Fatal in production - server should not start without DB
-    }
+    // Server continues running — DB ops will fail gracefully per request
   }
 })();
 
@@ -471,18 +466,17 @@ app.use('*', (req, res) => {
 // Set up server and start listening
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 3000;
-  // T2-2: Wait for ZeroDB before accepting requests in production
+  // Start HTTP server immediately so healthcheck responds during DB init
   const startServer = async () => {
-    try {
-      await zerodbReady;
-    } catch (err) {
-      console.error('Fatal: Cannot start server without database:', err.message);
-      process.exit(1);
-    }
-    return app.listen(PORT, () => {
+    const srv = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
     });
+    // ZeroDB initializes in background — startup failure is logged but not fatal
+    zerodbReady.catch(err => {
+      console.error('⚠️  ZeroDB initialization failed (server still running):', err.message);
+    });
+    return srv;
   };
   const server = startServer().catch(err => {
     console.error('Server startup failed:', err);
