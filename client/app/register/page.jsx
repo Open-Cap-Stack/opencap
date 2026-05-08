@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
+import { trackSignUpStart, trackSignUpComplete } from '@/lib/analytics';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
@@ -19,8 +20,10 @@ export default function RegisterPage() {
     setError('');
     if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
     setLoading(true);
+    trackSignUpStart('email');
     try {
       await register({ firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password });
+      trackSignUpComplete('email');
       router.push('/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed.');

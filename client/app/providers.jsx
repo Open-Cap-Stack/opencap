@@ -1,8 +1,9 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { AuthProvider } from '@/lib/AuthContext';
+import { GAPageTracker } from '@/components/GAPageTracker';
 
 export function Providers({ children }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -13,7 +14,12 @@ export function Providers({ children }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        <Suspense fallback={null}>
+          <GAPageTracker />
+        </Suspense>
+        {children}
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
