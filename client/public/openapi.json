@@ -1,0 +1,355 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenCap Stack API",
+    "description": "Cap table and equity management REST API aligned with OCTA v2.0 schema. Manage stakeholders, share classes, equity grants, SAFE notes, 409A valuations, and investor reports.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "OpenCap Stack",
+      "url": "https://opencapstack.com/support",
+      "email": "support@opencapstack.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/Open-Cap-Stack/opencapstack/blob/main/LICENSE"
+    },
+    "x-logo": "https://opencapstack.com/logo.png"
+  },
+  "servers": [
+    { "url": "https://opencapstack.com/api/v1", "description": "Production" },
+    { "url": "http://localhost:3000/api/v1", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "auth", "description": "Authentication and account management" },
+    { "name": "agents", "description": "Agent onboarding and programmatic access" },
+    { "name": "stakeholders", "description": "Cap table participants — founders, investors, employees, advisors" },
+    { "name": "share-classes", "description": "Share class definitions" },
+    { "name": "equity-grants", "description": "Option grants, RSUs, warrants" },
+    { "name": "safe-notes", "description": "SAFE instruments" },
+    { "name": "valuations", "description": "409A and fair market value determinations" },
+    { "name": "fundraising", "description": "Funding rounds and dilution modeling" },
+    { "name": "documents", "description": "Document management and digital signing" },
+    { "name": "reports", "description": "Financial reports and analytics" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Stakeholder": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "type": { "type": "string", "enum": ["FOUNDER", "INVESTOR", "EMPLOYEE", "ADVISOR", "BOARD_MEMBER"] },
+          "company_id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ShareClass": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["COMMON", "PREFERRED", "OPTIONS", "WARRANT"] },
+          "authorized_shares": { "type": "number" },
+          "par_value": { "type": "number" },
+          "company_id": { "type": "string", "format": "uuid" }
+        }
+      },
+      "SAFENote": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "investor_id": { "type": "string", "format": "uuid" },
+          "investment_amount": { "type": "number", "description": "USD cents" },
+          "valuation_cap": { "type": "number", "description": "USD cents" },
+          "discount_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+          "type": { "type": "string", "enum": ["PRE_MONEY", "POST_MONEY", "MFN"] },
+          "status": { "type": "string", "enum": ["OPEN", "CONVERTED", "CANCELLED"] }
+        }
+      },
+      "AgentOnboardRequest": {
+        "type": "object",
+        "required": ["agent_id"],
+        "properties": {
+          "agent_id": { "type": "string", "description": "Unique identifier for this agent instance" },
+          "agent_name": { "type": "string", "description": "Human-readable agent name" },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["read:cap-table", "write:stakeholders", "write:equity", "read:financials", "write:documents", "read:analytics"]
+            }
+          },
+          "company_context": { "type": "string", "description": "Optional company identifier to scope access" }
+        }
+      },
+      "AgentOnboardResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "description": "JWT for API access" },
+          "api_key": { "type": "string", "description": "Long-lived API key (ocs_ prefix)" },
+          "company_id": { "type": "string", "format": "uuid" },
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "provisioned_at": { "type": "string", "format": "date-time" },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "items": {} },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "limit": { "type": "integer" },
+              "total": { "type": "integer" },
+              "pages": { "type": "integer" }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "request_id": { "type": "string", "format": "uuid" }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "status": { "type": "integer" },
+              "docs": { "type": "string", "format": "uri" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register new user account",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Account created, returns JWT" },
+          "400": { "$ref": "#/components/schemas/Error" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login and obtain JWT",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Returns { token, refreshToken }" },
+          "401": { "$ref": "#/components/schemas/Error" }
+        }
+      }
+    },
+    "/agents/onboard": {
+      "post": {
+        "tags": ["agents"],
+        "summary": "Agent self-onboarding — zero human steps",
+        "description": "Agents can register and receive a JWT with no human intervention. POST agent_id and requested capabilities, receive token immediately.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AgentOnboardRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent provisioned, returns token and credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentOnboardResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/schemas/Error" }
+        }
+      }
+    },
+    "/stakeholders": {
+      "get": {
+        "tags": ["stakeholders"],
+        "summary": "List all stakeholders",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["FOUNDER", "INVESTOR", "EMPLOYEE", "ADVISOR"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of stakeholders",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaginatedResponse" } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["stakeholders"],
+        "summary": "Create a stakeholder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Stakeholder" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Stakeholder created" },
+          "400": { "$ref": "#/components/schemas/Error" }
+        }
+      }
+    },
+    "/share-classes": {
+      "get": {
+        "tags": ["share-classes"],
+        "summary": "List share classes",
+        "responses": { "200": { "description": "List of share classes" } }
+      },
+      "post": {
+        "tags": ["share-classes"],
+        "summary": "Create share class",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ShareClass" } }
+          }
+        },
+        "responses": { "201": { "description": "Share class created" } }
+      }
+    },
+    "/safe-notes": {
+      "get": {
+        "tags": ["safe-notes"],
+        "summary": "List SAFE instruments",
+        "responses": { "200": { "description": "List of SAFE notes" } }
+      },
+      "post": {
+        "tags": ["safe-notes"],
+        "summary": "Create SAFE note",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SAFENote" } }
+          }
+        },
+        "responses": { "201": { "description": "SAFE created" } }
+      }
+    },
+    "/valuations/409a": {
+      "get": {
+        "tags": ["valuations"],
+        "summary": "List 409A valuations",
+        "responses": { "200": { "description": "List of 409A valuations" } }
+      }
+    },
+    "/fundraising-rounds": {
+      "get": {
+        "tags": ["fundraising"],
+        "summary": "List fundraising rounds",
+        "responses": { "200": { "description": "List of rounds" } }
+      }
+    },
+    "/dilution/simulate": {
+      "post": {
+        "tags": ["fundraising"],
+        "summary": "Simulate dilution for a new round",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["round_size", "pre_money_valuation"],
+                "properties": {
+                  "round_size": { "type": "number", "description": "New money raised in USD cents" },
+                  "pre_money_valuation": { "type": "number", "description": "Pre-money valuation in USD cents" },
+                  "option_pool_increase": { "type": "number", "description": "New option pool shares to add" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dilution scenario results" } }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Health check — no auth required",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

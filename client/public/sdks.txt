@@ -1,0 +1,42 @@
+# OpenCap Stack SDKs
+
+## Official SDKs
+
+### JavaScript / TypeScript
+- Package: (coming soon — use REST API directly)
+- REST API base: https://opencapstack.com/api/v1
+- OpenAPI spec for codegen: https://opencapstack.com/openapi.json
+
+### Python
+- Package: (coming soon — use REST API directly)
+- LangChain compatible via REST
+
+### API-First (Any Language)
+- OpenAPI 3.0 spec: https://opencapstack.com/openapi.json
+- Generate client: `npx openapi-typescript-codegen --input https://opencapstack.com/openapi.json`
+
+## MCP Integration
+
+OpenCap Stack exposes tools via MCP protocol:
+- MCP endpoint: https://opencapstack.com/api/v1/mcp
+- MCP server card: https://opencapstack.com/mcp-server-card.json
+- Compatible with: Claude Code, Claude Desktop, Cursor, Windsurf
+
+## Quick Integration
+
+```bash
+# Get your agent token (no human steps)
+curl -X POST https://opencapstack.com/api/v1/agents/onboard \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"my-agent","capabilities":["read:cap-table","write:equity"]}'
+
+# Start using the API
+curl https://opencapstack.com/api/v1/stakeholders \
+  -H "Authorization: Bearer <your_token>"
+```
+
+## Source
+
+- GitHub: https://github.com/Open-Cap-Stack/opencapstack
+- Issues: https://github.com/Open-Cap-Stack/opencapstack/issues
+- Schema Standard: https://www.opencaptablecoalition.com/

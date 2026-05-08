@@ -1,0 +1,22 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "OpenCap Stack",
+  "name_for_model": "opencapstack",
+  "description_for_human": "Manage your startup's cap table, equity grants, SAFE notes, and investor reports.",
+  "description_for_model": "OpenCap Stack is a cap table management API aligned with OCTA schema. Use it to read and write stakeholders, share classes, equity grants, SAFE notes, 409A valuations, fundraising rounds, dilution scenarios, and financial reports. All endpoints under /api/v1/. Auth: POST /api/v1/agents/onboard returns a JWT with zero human steps.",
+  "auth": {
+    "type": "oauth",
+    "authorization_url": "https://opencapstack.com/api/v1/auth/login",
+    "client_url": "https://opencapstack.com/api/v1/agents/onboard",
+    "scope": "read:cap-table write:equity",
+    "authorization_content_type": "application/json"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://opencapstack.com/openapi.json",
+    "is_user_authenticated": true
+  },
+  "logo_url": "https://opencapstack.com/logo.png",
+  "contact_email": "support@opencapstack.com",
+  "legal_info_url": "https://opencapstack.com/legal"
+}

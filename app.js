@@ -172,6 +172,10 @@ const safeRequire = (routePath) => {
   }
 };
 
+// AX discovery routes (public, no auth) — served at root paths for agent discoverability
+const axDiscoveryRoutes = require('./routes/axDiscoveryRoutes');
+app.use('/', axDiscoveryRoutes);
+
 // Import route modules using absolute paths
 const path = require('path');
 const routes = {
@@ -247,6 +251,7 @@ const routes = {
   taxDocumentRoutes: safeRequire(path.join(__dirname, 'routes/v1/taxDocumentRoutes')), // Issue #246: Tax Document Download Endpoint
   bulkReportsRoutes: safeRequire(path.join(__dirname, 'routes/v1/bulkReportsRoutes')), // Issue #238: Bulk Reports Endpoint
   dilutionRoutes: safeRequire(path.join(__dirname, 'routes/v1/dilutionRoutes')), // Dilution calculator
+  agentOnboardingRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentOnboardingRoutes')), // AX: Agent self-onboarding
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -256,7 +261,7 @@ const routes = {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health'];
+  const skipPaths = ['/auth', '/health', '/agents'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -404,6 +409,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/companies';
     } else if (key === 'fundraiseModelRoutes') {
       path = '/api/v1/fundraise-models'; // Issue #195: Fundraising Modeling Engine
+    } else if (key === 'agentOnboardingRoutes') {
+      path = '/api/v1/agents';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

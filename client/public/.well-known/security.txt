@@ -1,0 +1,8 @@
+Contact: mailto:security@opencapstack.com
+Contact: https://github.com/Open-Cap-Stack/opencapstack/security/advisories/new
+Expires: 2027-01-01T00:00:00.000Z
+Acknowledgments: https://opencapstack.com/security/acknowledgments
+Preferred-Languages: en
+Canonical: https://opencapstack.com/.well-known/security.txt
+Policy: https://opencapstack.com/security/policy
+Hiring: https://opencapstack.com/careers
