@@ -171,6 +171,10 @@ const safeRequire = (routePath) => {
 const axDiscoveryRoutes = require('./routes/axDiscoveryRoutes');
 app.use('/', axDiscoveryRoutes);
 
+// Agent self-onboarding (public, no auth required) — mounted before auth-protected routes
+const agentOnboardingRoutes = require('./routes/v1/agentOnboardingRoutes');
+app.use('/api/v1/agents', agentOnboardingRoutes);
+
 // Import route modules using absolute paths
 const path = require('path');
 const routes = {
