@@ -348,6 +348,77 @@ const oauthLogin = async (req, res) => {
         console.error('LinkedIn OAuth error:', error.message);
         return res.status(401).json({ message: 'LinkedIn authentication failed' });
       }
+    } else if (provider === 'github') {
+      if (!code) {
+        return res.status(400).json({ message: 'Authorization code is required for GitHub OAuth' });
+      }
+
+      const githubClientId = process.env.GITHUB_CLIENT_ID;
+      const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+      if (!githubClientId || !githubClientSecret) {
+        return res.status(503).json({ message: 'GitHub OAuth not configured on server' });
+      }
+
+      try {
+        // Exchange authorization code for access token
+        const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: githubClientId,
+            client_secret: githubClientSecret,
+            code,
+            redirect_uri: redirect_uri || '',
+          }),
+        });
+
+        const tokenData = await tokenResponse.json();
+        if (tokenData.error || !tokenData.access_token) {
+          return res.status(401).json({ message: 'GitHub authorization code exchange failed' });
+        }
+
+        // Fetch user profile
+        const profileResponse = await fetch('https://api.github.com/user', {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            'User-Agent': 'OpenCapStack',
+          },
+        });
+        const profileData = await profileResponse.json();
+
+        // GitHub may not expose email publicly — fetch via emails endpoint
+        let email = profileData.email;
+        if (!email) {
+          const emailsResponse = await fetch('https://api.github.com/user/emails', {
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+              'User-Agent': 'OpenCapStack',
+            },
+          });
+          const emails = await emailsResponse.json();
+          const primary = emails.find(e => e.primary && e.verified);
+          email = primary?.email || emails[0]?.email || null;
+        }
+
+        if (!email) {
+          return res.status(400).json({ message: 'GitHub account does not have a verified email address' });
+        }
+
+        const nameParts = (profileData.name || profileData.login || '').split(' ');
+        userInfo = {
+          email,
+          given_name: nameParts[0] || profileData.login,
+          family_name: nameParts.slice(1).join(' ') || '',
+          sub: String(profileData.id),
+        };
+      } catch (error) {
+        console.error('GitHub OAuth error:', error.message);
+        return res.status(401).json({ message: 'GitHub authentication failed' });
+      }
     } else {
       return res.status(400).json({ message: 'Unsupported OAuth provider' });
     }
