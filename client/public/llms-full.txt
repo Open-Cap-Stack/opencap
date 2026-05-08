@@ -1,0 +1,280 @@
+# OpenCap Stack — Full LLM Context
+
+## Product Overview
+
+OpenCap Stack is an open-source financial management platform for startup equity and cap table management. It is fully aligned with the Open Cap Table Alliance (OCTA) v2.0 schema standard. The platform serves founders, legal counsel, CFOs, and investors who need a programmatic, API-first interface for equity management.
+
+**GitHub**: https://github.com/Open-Cap-Stack/opencapstack
+**API Base**: https://opencapstack.com/api/v1
+**OpenAPI Spec**: https://opencapstack.com/openapi.json
+**Schema Standard**: OCTA v2.0 (https://www.opencaptablecoalition.com/)
+
+---
+
+## Architecture
+
+- **Backend**: Node.js + Express.js, RESTful API with JWT auth
+- **Database**: ZeroDB (vector + document store via AINative API)
+- **Frontend**: Next.js 14 App Router (server-side rendered)
+- **Storage**: ZeroDB File Storage + MinIO (S3-compatible)
+- **Real-time**: Socket.IO + WebSockets for live cap table updates
+
+---
+
+## Core Data Model (OCTA v2.0)
+
+### Stakeholder
+Represents any person or entity with a relationship to the company's equity.
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "email": "string",
+  "type": "FOUNDER | INVESTOR | EMPLOYEE | ADVISOR | BOARD_MEMBER",
+  "relationship": "string",
+  "company_id": "uuid",
+  "created_at": "ISO8601"
+}
+```
+
+### ShareClass
+Defines a class of stock (common, preferred, options pool).
+```json
+{
+  "id": "uuid",
+  "name": "Common Stock | Series A Preferred | ...",
+  "type": "COMMON | PREFERRED | OPTIONS",
+  "authorized_shares": "number",
+  "par_value": "number (USD cents)",
+  "liquidation_preference": "number",
+  "anti_dilution": "NONE | BROAD_BASED | NARROW_BASED",
+  "voting_rights": "boolean"
+}
+```
+
+### EquityGrant
+An individual grant of options or restricted stock to a stakeholder.
+```json
+{
+  "id": "uuid",
+  "stakeholder_id": "uuid",
+  "share_class_id": "uuid",
+  "quantity": "number",
+  "exercise_price": "number (USD cents)",
+  "grant_date": "ISO8601 date",
+  "expiration_date": "ISO8601 date",
+  "vesting_schedule": "4y-1y-cliff | custom",
+  "status": "OUTSTANDING | EXERCISED | CANCELLED | EXPIRED"
+}
+```
+
+### SAFENote
+Simple Agreement for Future Equity instrument.
+```json
+{
+  "id": "uuid",
+  "investor_id": "uuid (stakeholder)",
+  "investment_amount": "number (USD cents)",
+  "valuation_cap": "number (USD cents)",
+  "discount_rate": "number (0-1)",
+  "pro_rata_rights": "boolean",
+  "type": "PRE_MONEY | POST_MONEY | MFN",
+  "date": "ISO8601 date",
+  "status": "OPEN | CONVERTED | CANCELLED"
+}
+```
+
+### Valuation409A
+IRS Section 409A fair market value determination.
+```json
+{
+  "id": "uuid",
+  "valuation_date": "ISO8601 date",
+  "fair_market_value": "number (USD cents per share)",
+  "methodology": "OPM | PWERM | DCF | HYBRID",
+  "provider": "string",
+  "valid_until": "ISO8601 date",
+  "report_url": "string"
+}
+```
+
+### FundraisingRound
+A priced equity financing round.
+```json
+{
+  "id": "uuid",
+  "name": "Seed | Series A | Series B | ...",
+  "round_size": "number (USD cents)",
+  "pre_money_valuation": "number (USD cents)",
+  "post_money_valuation": "number (USD cents)",
+  "price_per_share": "number (USD cents)",
+  "close_date": "ISO8601 date",
+  "lead_investor_id": "uuid (stakeholder)"
+}
+```
+
+---
+
+## Complete API Reference
+
+### Authentication
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/v1/auth/register | Register new user account |
+| POST | /api/v1/auth/login | Login, returns JWT + refresh token |
+| POST | /api/v1/auth/refresh | Refresh expired JWT |
+| POST | /api/v1/auth/logout | Invalidate session |
+| GET | /api/v1/auth/me | Get current user profile |
+
+### Agent Onboarding (Zero Human Steps)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/v1/agents/onboard | Register agent, returns JWT immediately |
+| GET | /api/v1/agents/capabilities | List available capability scopes |
+| POST | /api/v1/agents/rotate-key | Rotate agent API key |
+
+### Stakeholders
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/stakeholders | List all stakeholders (paginated) |
+| POST | /api/v1/stakeholders | Create stakeholder |
+| GET | /api/v1/stakeholders/:id | Get stakeholder by ID |
+| PUT | /api/v1/stakeholders/:id | Update stakeholder |
+| DELETE | /api/v1/stakeholders/:id | Delete stakeholder |
+
+### Share Classes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/share-classes | List share classes |
+| POST | /api/v1/share-classes | Create share class |
+| GET | /api/v1/share-classes/:id | Get share class |
+| PUT | /api/v1/share-classes/:id | Update share class |
+
+### Equity Plans & Grants
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/equity-plans | List equity plans |
+| POST | /api/v1/equity-plans | Create equity plan (e.g., 2024 Stock Option Plan) |
+| GET | /api/v1/equity-grants | List all grants |
+| POST | /api/v1/equity-grants | Issue new grant |
+| GET | /api/v1/equity-grants/:id | Get grant details |
+| PUT | /api/v1/equity-grants/:id | Update grant |
+| POST | /api/v1/equity-grants/:id/exercise | Process exercise |
+
+### SAFE Notes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/safe-notes | List SAFE instruments |
+| POST | /api/v1/safe-notes | Create SAFE |
+| GET | /api/v1/safe-notes/:id | Get SAFE details |
+| PUT | /api/v1/safe-notes/:id | Update SAFE |
+| POST | /api/v1/safe-notes/:id/convert | Convert SAFE on priced round |
+
+### Valuations
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/valuations/409a | List 409A valuations |
+| POST | /api/v1/valuations/409a | Create 409A record |
+| GET | /api/v1/valuations/409a/:id | Get specific 409A |
+
+### Fundraising
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/fundraising-rounds | List funding rounds |
+| POST | /api/v1/fundraising-rounds | Create round |
+| GET | /api/v1/fundraising-rounds/:id | Get round details |
+| POST | /api/v1/dilution/simulate | Model dilution scenario |
+| GET | /api/v1/waterfall-analysis | Run liquidation waterfall |
+
+### Documents
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/documents | List documents |
+| POST | /api/v1/documents | Upload document |
+| GET | /api/v1/documents/:id | Get document |
+| POST | /api/v1/documents/:id/sign | Request digital signature |
+
+### Reports & Analytics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/v1/reports/generate | Generate cap table report |
+| GET | /api/v1/reports/cap-table | Cap table as of date |
+| GET | /api/v1/financial-reporting | Financial summaries |
+| GET | /api/v1/analytics/equity | Equity analytics |
+
+---
+
+## Response Format
+
+All API responses:
+```json
+{
+  "data": { ... } | [ ... ],
+  "pagination": { "page": 1, "limit": 50, "total": 200, "pages": 4 },
+  "meta": { "version": "1.0", "timestamp": "2026-05-07T00:00:00Z", "request_id": "uuid" }
+}
+```
+
+## Error Format
+
+```json
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "Human-readable description",
+    "status": 404,
+    "docs": "https://opencapstack.com/api-docs#errors"
+  }
+}
+```
+
+---
+
+## Rate Limits
+
+- Default: 100 req/min per token
+- Agent tier: 500 req/min
+- Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+## Agent Onboarding Example
+
+```bash
+curl -X POST https://opencapstack.com/api/v1/agents/onboard \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "my-agent-001",
+    "agent_name": "Equity Analysis Agent",
+    "capabilities": ["read:cap-table", "read:financials"],
+    "company_context": "optional"
+  }'
+
+# Response:
+# {
+#   "token": "eyJ...",
+#   "api_key": "ocs_...",
+#   "company_id": "uuid",
+#   "capabilities": ["read:cap-table", "read:financials"],
+#   "provisioned_at": "2026-05-07T00:00:00Z",
+#   "expires_at": "2027-05-07T00:00:00Z"
+# }
+```
+
+---
+
+## Compliance & Legal Context
+
+- OCTA v2.0 schema compliance for all equity instruments
+- SOC 2 Type II controls in place
+- Data encrypted at rest (AES-256) and in transit (TLS 1.3)
+- Audit log for all equity events
+- Supports Delaware C-Corp, LLC, and international structures

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "name": "OpenCap Stack",
+  "description": "Cap table and equity management platform aligned with OCTA schema",
+  "url": "https://opencapstack.com",
+  "api_base": "https://opencapstack.com/api/v1",
+  "openapi": "https://opencapstack.com/openapi.json",
+  "agent_onboarding": {
+    "endpoint": "https://opencapstack.com/api/v1/agents/onboard",
+    "human_steps": 0
+  },
+  "mcp": {
+    "endpoint": "https://opencapstack.com/api/v1/mcp",
+    "card": "https://opencapstack.com/mcp-server-card.json"
+  }
+}

@@ -1,0 +1,35 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /settings
+
+# AI crawlers — welcome, read llms.txt for structured context
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /settings
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+Disallow: /settings
+
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /settings
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+Sitemap: https://opencapstack.com/sitemap.xml
+LLMs: https://opencapstack.com/llms.txt
+Agents: https://opencapstack.com/AGENTS.md

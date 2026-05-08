@@ -1,0 +1,100 @@
+{
+  "schema_version": "1.0",
+  "name": "opencapstack",
+  "display_name": "OpenCap Stack MCP Server",
+  "description": "MCP server for OpenCap Stack — manage cap tables, equity, stakeholders, SAFE notes, and 409A valuations from any MCP-compatible agent or IDE.",
+  "version": "1.0.0",
+  "url": "https://opencapstack.com",
+  "repository": "https://github.com/Open-Cap-Stack/opencapstack",
+  "transport": {
+    "type": "http",
+    "endpoint": "https://opencapstack.com/api/v1/mcp"
+  },
+  "auth": {
+    "type": "bearer",
+    "token_endpoint": "https://opencapstack.com/api/v1/auth/login",
+    "agent_onboarding": "https://opencapstack.com/api/v1/agents/onboard"
+  },
+  "tools": [
+    {
+      "name": "list_stakeholders",
+      "description": "List all stakeholders in the cap table with ownership percentages",
+      "input_schema": { "type": "object", "properties": { "page": { "type": "integer" }, "limit": { "type": "integer" } } }
+    },
+    {
+      "name": "get_cap_table_summary",
+      "description": "Get a full cap table summary including all share classes and ownership breakdown",
+      "input_schema": { "type": "object", "properties": { "company_id": { "type": "string" } } }
+    },
+    {
+      "name": "create_stakeholder",
+      "description": "Add a new stakeholder (founder, investor, employee, advisor) to the cap table",
+      "input_schema": {
+        "type": "object",
+        "required": ["name", "email", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "type": { "type": "string", "enum": ["FOUNDER", "INVESTOR", "EMPLOYEE", "ADVISOR"] }
+        }
+      }
+    },
+    {
+      "name": "issue_equity_grant",
+      "description": "Issue stock options or RSUs to a stakeholder",
+      "input_schema": {
+        "type": "object",
+        "required": ["stakeholder_id", "share_class_id", "quantity"],
+        "properties": {
+          "stakeholder_id": { "type": "string" },
+          "share_class_id": { "type": "string" },
+          "quantity": { "type": "number" },
+          "vesting_schedule": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "create_safe_note",
+      "description": "Create a SAFE (Simple Agreement for Future Equity) instrument",
+      "input_schema": {
+        "type": "object",
+        "required": ["investor_id", "investment_amount"],
+        "properties": {
+          "investor_id": { "type": "string" },
+          "investment_amount": { "type": "number" },
+          "valuation_cap": { "type": "number" },
+          "discount_rate": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "simulate_dilution",
+      "description": "Model dilution impact of a new fundraising round",
+      "input_schema": {
+        "type": "object",
+        "required": ["round_size", "pre_money_valuation"],
+        "properties": {
+          "round_size": { "type": "number" },
+          "pre_money_valuation": { "type": "number" },
+          "new_share_class": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "get_409a_valuation",
+      "description": "Retrieve the most recent 409A valuation for a company",
+      "input_schema": { "type": "object", "properties": { "company_id": { "type": "string" } } }
+    },
+    {
+      "name": "generate_investor_report",
+      "description": "Generate an investor-ready cap table report",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "string", "enum": ["pdf", "csv", "json"] },
+          "as_of_date": { "type": "string", "format": "date" }
+        }
+      }
+    }
+  ]
+}
