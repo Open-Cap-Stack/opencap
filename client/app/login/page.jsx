@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
@@ -37,20 +37,23 @@ function GitHubIcon() {
   );
 }
 
-export default function LoginPage() {
+function SearchParamsHandler({ setError }) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('error') === 'verify-email') {
+      setError('Please verify your email address before logging in. Check your inbox for a verification link.');
+    }
+  }, [searchParams, setError]);
+  return null;
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (searchParams.get('error') === 'verify-email') {
-      setError('Please verify your email address before logging in. Check your inbox for a verification link.');
-    }
-  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -95,6 +98,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Suspense fallback={null}>
+        <SearchParamsHandler setError={setError} />
+      </Suspense>
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
         <h1 className="text-2xl font-bold text-center mb-6">OpenCap Stack</h1>
         <h2 className="text-lg text-gray-600 text-center mb-8">Sign in to your account</h2>
@@ -170,4 +176,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return <LoginForm />;
 }
