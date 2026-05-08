@@ -55,6 +55,16 @@ function validateEnvironment() {
     }
   }
 
+  // JWT_REFRESH_SECRET is required for login to work
+  if (!process.env.JWT_REFRESH_SECRET) {
+    const msg = 'JWT_REFRESH_SECRET is not set — login will crash when issuing refresh tokens';
+    if (isProd) {
+      errors.push(msg);
+    } else {
+      warnings.push(msg);
+    }
+  }
+
   // NODE_ENV should be explicitly set
   if (!process.env.NODE_ENV) {
     warnings.push('NODE_ENV is not explicitly set (defaulting to development behavior)');

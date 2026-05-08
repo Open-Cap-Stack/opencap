@@ -5,8 +5,10 @@ const { authenticateToken } = require('../../middleware/authMiddleware.js');
 const { debugTokenEndpoint } = require('../../middleware/authErrorLogger');
 const { createEndpointRateLimiter } = require('../../middleware/rateLimiter');
 
-// Debug endpoint for troubleshooting authentication issues (Issue #250)
-router.get('/debug-token', debugTokenEndpoint);
+// Debug endpoint disabled in production (Issue #250)
+if (process.env.NODE_ENV !== 'production') {
+  router.get('/debug-token', debugTokenEndpoint);
+}
 
 // Existing routes
 router.post('/register', createEndpointRateLimiter('/api/v1/auth/register'), authController.registerUser);

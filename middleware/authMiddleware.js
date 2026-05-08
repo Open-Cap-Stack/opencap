@@ -127,6 +127,21 @@ const authenticateToken = async (req, res, next) => {
       user = await provisionUserFromToken(decoded);
     }
 
+    // Agent tokens: type==='agent' in payload — authenticate without DB user lookup
+    if (!user && decoded.type === 'agent') {
+      req.user = {
+        userId: tokenUserId,
+        _id: tokenUserId,
+        email: null,
+        role: 'agent',
+        capabilities: decoded.capabilities || [],
+        companyId: decoded.company_id || null,
+        isAgent: true,
+      };
+      req.token = token;
+      return next();
+    }
+
     // If still no user, check if token has role (test/admin tokens)
     if (!user && decoded.role) {
       req.user = {

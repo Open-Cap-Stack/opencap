@@ -89,7 +89,7 @@ const registerUser = async (req, res) => {
     }
 
     // Check for password complexity
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
         message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
@@ -554,6 +554,14 @@ const requestPasswordReset = async (req, res) => {
     
     // Only generate token and send email if user exists
     if (user) {
+      // If SMTP is not configured, return graceful degradation instead of crashing
+      if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        console.warn('Password reset requested but SMTP not configured — skipping email send');
+        return res.status(200).json({
+          message: 'If an account exists with that email, a password reset link has been sent'
+        });
+      }
+
       // Generate reset token
       const resetToken = jwt.sign(
         { userId: user.userId || user._id },
