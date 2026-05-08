@@ -462,9 +462,35 @@ app.use((err, req, res, next) => {
   errorResponse(res, status, message, err);
 });
 
-// 404 handler - must be last
+// Proxy non-API requests to Next.js frontend (port 5173 in same container)
+// This allows a single Railway port (8080) to serve both the API and the UI.
+const NEXT_PORT = process.env.NEXT_PORT || 5173;
+const http = require('http');
 app.use('*', (req, res) => {
-  errorResponse(res, 404, 'Route not found');
+  // Only proxy GET/HEAD for UI routes — everything else is a real 404
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return errorResponse(res, 404, 'Route not found');
+  }
+
+  const options = {
+    hostname: '127.0.0.1',
+    port: NEXT_PORT,
+    path: req.originalUrl,
+    method: req.method,
+    headers: { ...req.headers, host: `localhost:${NEXT_PORT}` },
+  };
+
+  const proxy = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+
+  proxy.on('error', () => {
+    // Next.js not running — fall back to 404
+    errorResponse(res, 404, 'Route not found');
+  });
+
+  req.pipe(proxy, { end: true });
 });
 
 // Set up server and start listening
