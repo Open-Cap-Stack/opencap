@@ -10,15 +10,18 @@ const PLANS = {
     free: {
         id: 'free',
         name: 'Free',
-        price: 0,
+        price: 1, // $1/month service fee
         interval: 'month',
-        stripePriceId: null,
-        stripeProductId: null,
+        stripePriceId: process.env.STRIPE_FREE_PRICE_ID || null,
+        stripeProductId: process.env.STRIPE_FREE_PRODUCT_ID || null,
         trialPeriodDays: 0,
         features: [
-            'Basic features',
-            'Limited storage',
-            '1 user'
+            'Up to 10 stakeholders',
+            '100 documents',
+            '1 GB storage',
+            '1 user',
+            'Basic cap table management',
+            'Community support'
         ],
         limits: {
             stakeholders: 10,
