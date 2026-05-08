@@ -17,9 +17,11 @@ function getRedirectUri(provider) {
 export const authService = {
   async login(email, password) {
     const { data } = await api.post('/auth/login', { email, password });
-    if (data.token) {
-      localStorage.setItem('token', data.token);
+    const token = data.token || data.accessToken;
+    if (token) {
+      localStorage.setItem('token', token);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }
     return data;
   },
@@ -42,7 +44,8 @@ export const authService = {
   async refreshToken() {
     const refreshToken = localStorage.getItem('refreshToken');
     const { data } = await api.post('/auth/token/refresh', { refreshToken });
-    if (data.token) localStorage.setItem('token', data.token);
+    const token = data.token || data.accessToken;
+    if (token) localStorage.setItem('token', token);
     return data;
   },
 
@@ -148,9 +151,11 @@ export const authService = {
       redirect_uri: getRedirectUri(provider),
     });
 
-    if (data.token) {
-      localStorage.setItem('token', data.token);
+    const token = data.token || data.accessToken;
+    if (token) {
+      localStorage.setItem('token', token);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }
     return data;
   },
@@ -162,9 +167,11 @@ export const authService = {
 
     const { data } = await api.post('/auth/exchange-token', { token });
 
-    if (data.token) {
-      localStorage.setItem('token', data.token);
+    const resolvedToken = data.token || data.accessToken;
+    if (resolvedToken) {
+      localStorage.setItem('token', resolvedToken);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }
     return data;
   },

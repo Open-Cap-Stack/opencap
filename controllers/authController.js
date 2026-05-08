@@ -129,11 +129,12 @@ const registerUser = async (req, res) => {
       password: hashedPassword,
       role,
       companyId,
-      status: isDevelopment ? 'active' : 'pending'
+      // Require email verification only when SMTP is configured
+      status: (isDevelopment || !process.env.EMAIL_HOST) ? 'active' : 'pending'
     };
 
-    // Only add verification token if not in development
-    if (!isDevelopment) {
+    // Only add verification token when SMTP is configured and can send the email
+    if (!isDevelopment && process.env.EMAIL_HOST) {
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       userData.verificationToken = verificationToken;
