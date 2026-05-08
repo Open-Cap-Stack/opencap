@@ -32,9 +32,8 @@ FROM node:20.13.1-alpine3.19
 
 WORKDIR /app
 
-# Install system deps + process manager
-RUN apk add --no-cache python3 make g++ && \
-    npm install -g concurrently
+# Install system deps
+RUN apk add --no-cache python3 make g++
 
 # Install backend deps
 COPY package*.json ./
@@ -57,9 +56,8 @@ ENV NEXT_PORT=5173
 EXPOSE 3000
 EXPOSE 5173
 
-# Run backend (port 3000) + Next.js (port 5173) together
-CMD ["concurrently", \
-     "--names", "api,web", \
-     "--prefix-colors", "blue,green", \
-     "node app.js", \
-     "cd client && node_modules/.bin/next start -p 5173"]
+# Run backend + Next.js together via start script
+COPY scripts/start.sh /app/scripts/start.sh
+RUN chmod +x /app/scripts/start.sh
+
+CMD ["/bin/sh", "/app/scripts/start.sh"]

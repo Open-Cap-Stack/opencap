@@ -3,9 +3,9 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "concurrently --names api,web --prefix-colors blue,green \"node app.js\" \"cd client && node_modules/.bin/next start -p 5173\""
+startCommand = "/bin/sh /app/scripts/start.sh"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
