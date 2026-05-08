@@ -27,4 +27,4 @@ scripts/start_servers.py
 scripts/test-node.js
 scripts/server-with-websocket.js
 config/codecov.yml
-backup/
+backup/.claude
