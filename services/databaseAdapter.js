@@ -419,8 +419,11 @@ class DatabaseAdapter {
       'EventAuditLog': 'event_audit_log',
       'Task': 'tasks',
       'Communication': 'communications',
-      'Notification': 'compliance_events',
+      'Notification': 'notifications',
       'Activity': 'activities',
+      'EquityPlan': 'equity_plans',
+      'ShareClass': 'share_classes',
+      'FinancialReport': 'financial_reports',
       'IntegrationMarketplaceItem': 'integration_marketplace_items',
       'InstalledIntegration': 'installed_integrations',
       'FinancialReport': 'financial_reports'

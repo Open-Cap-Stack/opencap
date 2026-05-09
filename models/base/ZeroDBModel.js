@@ -296,7 +296,7 @@ class ZeroDBModel {
                 }
             } else {
                 await zerodbService.client.put(
-                    `/v1/public/zerodb/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
+                    `/api/v1/projects/${zerodbService.projectId}/database/tables/${this.tableName}/rows/${doc.row_id}`,
                     { row_data: newRowData }
                 );
             }
