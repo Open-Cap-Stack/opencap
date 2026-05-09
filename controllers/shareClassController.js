@@ -38,7 +38,10 @@ const getAllShareClasses = async (req, res) => {
 
 const getShareClassById = async (req, res) => {
   try {
-    const shareClass = await databaseAdapter.findById(MODEL_NAME, req.params.id);
+    // Look up by shareClassId first, fall back to _id
+    const results = await databaseAdapter.find(MODEL_NAME, { shareClassId: req.params.id });
+    const shareClass = results && results.length > 0 ? results[0]
+      : await databaseAdapter.findById(MODEL_NAME, req.params.id);
     if (!shareClass) {
       return errorResponse(res, 404, 'Share class not found');
     }
@@ -50,7 +53,11 @@ const getShareClassById = async (req, res) => {
 
 const updateShareClassById = async (req, res) => {
   try {
-    const updatedShareClass = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, req.params.id, req.body, { new: true });
+    // Find by shareClassId first to get the internal _id
+    const results = await databaseAdapter.find(MODEL_NAME, { shareClassId: req.params.id });
+    const existing = results && results.length > 0 ? results[0] : null;
+    const lookupId = existing ? existing._id : req.params.id;
+    const updatedShareClass = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, lookupId, req.body, { new: true });
     if (!updatedShareClass) {
       return errorResponse(res, 404, 'Share class not found');
     }
@@ -62,7 +69,11 @@ const updateShareClassById = async (req, res) => {
 
 const deleteShareClassById = async (req, res) => {
   try {
-    const deletedShareClass = await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
+    // Find by shareClassId first to get the internal _id
+    const results = await databaseAdapter.find(MODEL_NAME, { shareClassId: req.params.id });
+    const existing = results && results.length > 0 ? results[0] : null;
+    const lookupId = existing ? existing._id : req.params.id;
+    const deletedShareClass = await databaseAdapter.findByIdAndDelete(MODEL_NAME, lookupId);
     if (!deletedShareClass) {
       return errorResponse(res, 404, 'Share class not found');
     }
