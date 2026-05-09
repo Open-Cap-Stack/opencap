@@ -410,6 +410,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/fundraise-models'; // Issue #195: Fundraising Modeling Engine
     } else if (key === 'agentOnboardingRoutes') {
       path = '/api/v1/agents';
+    } else if (key === 'activityRoutes') {
+      path = '/api/v1/activities';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
