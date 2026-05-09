@@ -19,4 +19,7 @@ router.post('/admins/login', adminController.loginAdmin);                  // Ro
 router.post('/admins/logout', adminController.logoutAdmin);                // Route for admin logout
 router.put('/admins/:id/change-password', adminController.changePassword); // Route for changing admin password
 
+// Issue #513: Bulk-activate pending user accounts
+router.post('/users/activate-pending', adminController.activatePendingUsers);
+
 module.exports = router;

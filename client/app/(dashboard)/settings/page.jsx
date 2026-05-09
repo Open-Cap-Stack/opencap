@@ -35,9 +35,9 @@ export default function SettingsPage() {
         <h2 className="text-lg font-semibold mb-4">Profile</h2>
         {message && <div className={`p-3 rounded mb-4 text-sm ${message.includes('success') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{message}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div><label className="block text-sm font-medium mb-1">First Name</label><input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Last Name</label><input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Email</label><input type="email" value={form.email} disabled className="w-full px-3 py-2 border rounded-md bg-gray-50" /></div>
+          <div><label htmlFor="settings-firstName" className="block text-sm font-medium mb-1">First Name</label><input id="settings-firstName" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full px-3 py-2 border rounded-md" /></div>
+          <div><label htmlFor="settings-lastName" className="block text-sm font-medium mb-1">Last Name</label><input id="settings-lastName" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full px-3 py-2 border rounded-md" /></div>
+          <div><label htmlFor="settings-email" className="block text-sm font-medium mb-1">Email</label><input id="settings-email" type="email" value={form.email} disabled className="w-full px-3 py-2 border rounded-md bg-gray-50" /></div>
           <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
         </form>
       </div>

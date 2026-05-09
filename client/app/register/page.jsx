@@ -10,6 +10,8 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const { register } = useAuth();
   const router = useRouter();
 
@@ -24,13 +26,30 @@ export default function RegisterPage() {
     try {
       await register({ firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password });
       trackSignUpComplete('email');
-      router.push('/login');
+      setRegisteredEmail(form.email);
+      setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
+          <p className="text-gray-600 mb-6">
+            We sent a verification link to <strong>{registeredEmail}</strong>. Click the link to activate your account, then sign in.
+          </p>
+          <Link href="/login" className="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
+            Go to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

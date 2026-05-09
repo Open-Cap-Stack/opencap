@@ -32,8 +32,8 @@ FROM node:20.13.1-alpine3.19
 
 WORKDIR /app
 
-# Install system deps
-RUN apk add --no-cache python3 make g++
+# Install system deps (bash required by start.sh — busybox ash lacks 'wait -n')
+RUN apk add --no-cache python3 make g++ bash
 
 # Install backend deps
 COPY package*.json ./
@@ -60,4 +60,4 @@ EXPOSE 5173
 COPY scripts/start.sh /app/scripts/start.sh
 RUN chmod +x /app/scripts/start.sh
 
-CMD ["/bin/sh", "/app/scripts/start.sh"]
+CMD ["/bin/bash", "/app/scripts/start.sh"]

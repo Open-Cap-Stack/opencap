@@ -57,7 +57,17 @@ router.post(
       iat: now,
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET || 'opencap-dev-secret', {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        error: {
+          code: 'CONFIGURATION_ERROR',
+          message: 'Server is not properly configured',
+          status: 500,
+        },
+      });
+    }
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn,
     });
 

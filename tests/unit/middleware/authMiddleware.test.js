@@ -138,6 +138,7 @@ describe('AuthMiddleware', () => {
       expect(next).toHaveBeenCalled();
       expect(req.user).toEqual({
         userId: 'user123',
+        _id: 'user123',
         email: 'test@example.com',
         role: 'admin',
         permissions: ['read:users', 'write:users'],
@@ -170,6 +171,7 @@ describe('AuthMiddleware', () => {
       expect(next).toHaveBeenCalled();
       expect(req.user).toEqual({
         userId: 'user123',
+        _id: 'user123',
         email: 'test@example.com',
         role: 'user',
         permissions: ['read:companies'],

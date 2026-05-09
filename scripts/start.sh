@@ -1,8 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 # Start both Express backend and Next.js frontend in the same container.
-# Railway exposes a single port (PORT env var, default 8080).
+# Railway exposes a single port (PORT env var, default 3000).
 # Express listens on PORT; Next.js listens on NEXT_PORT (default 5173).
 # Express proxies all non-API GET requests to Next.js on NEXT_PORT.
+#
+# NOTE: requires bash (not busybox ash) for 'wait -n'. The Dockerfile installs
+# bash via: apk add --no-cache bash
 
 set -e
 
@@ -17,11 +20,14 @@ cd /app && node app.js &
 API_PID=$!
 
 # Forward signals to both children
-trap "kill $NEXT_PID $API_PID 2>/dev/null; exit 0" TERM INT
+trap "kill $NEXT_PID $API_PID 2>/dev/null; wait $NEXT_PID $API_PID 2>/dev/null; exit 0" TERM INT
 
-# Wait for either process to exit; if one exits, kill the other and exit
-wait -n 2>/dev/null || true
+# Wait for either process to exit; if one exits, kill the other and terminate.
+# 'wait -n' requires bash 4.3+ — available on Alpine when bash is installed.
+wait -n $NEXT_PID $API_PID 2>/dev/null
+EXIT_CODE=$?
 
+echo "[start] A child process exited (code $EXIT_CODE). Stopping all processes..."
 kill $NEXT_PID $API_PID 2>/dev/null
 wait $NEXT_PID $API_PID 2>/dev/null
-exit 0
+exit $EXIT_CODE

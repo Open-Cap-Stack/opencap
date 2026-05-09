@@ -20,7 +20,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
 async function run() {
   console.log(`\nPending account migration — ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE RUN'}\n`);
 
-  await zerodbService.initialize();
+  await zerodbService.initialize(process.env.AINATIVE_API_TOKEN || process.env.ZERODB_API_KEY);
 
   const User = createModel('users', {});
 

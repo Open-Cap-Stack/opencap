@@ -13,6 +13,7 @@ const express = require('express');
 const router = express.Router();
 const zerodbService = require('../../services/zerodbService');
 const os = require('os');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 /**
  * GET /api/v1/health
@@ -205,10 +206,9 @@ router.get('/startup', (req, res) => {
 
 /**
  * GET /api/v1/health/detailed
- * Detailed system information (restricted in production)
+ * Detailed system information — requires authentication in all environments.
  */
-router.get('/detailed', (req, res) => {
-  // In production, require authentication or limit information
+router.get('/detailed', authenticateToken, (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
 
   const response = {

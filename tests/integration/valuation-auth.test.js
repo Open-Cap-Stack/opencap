@@ -353,7 +353,7 @@ describe('Valuation Routes Authentication', () => {
 
     afterAll(async () => {
       if (inactiveUser && inactiveUser.userId) {
-        await User.delete(inactiveUser.userId);
+        await User.deleteOne({ userId: inactiveUser.userId });
       }
     });
 

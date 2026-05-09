@@ -26,6 +26,7 @@ export default function OverviewPage() {
   }));
 
   if (stakeholders.isLoading || shareClasses.isLoading) return <LoadingSpinner />;
+  if (stakeholders.error || shareClasses.error) return <ErrorMessage message={(stakeholders.error || shareClasses.error)?.message || 'Failed to load dashboard data'} onRetry={() => { stakeholders.refetch(); shareClasses.refetch(); }} />;
 
   return (
     <div>

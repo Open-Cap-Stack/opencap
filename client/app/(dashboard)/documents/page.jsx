@@ -11,7 +11,7 @@ const columns = [
   { key: 'type', label: 'Type', render: (v) => v || '-' },
   { key: 'createdAt', label: 'Uploaded', render: (v) => v ? new Date(v).toLocaleDateString() : '-' },
   { key: 'size', label: 'Size', render: (v) => v ? `${(v / 1024).toFixed(1)} KB` : '-' },
-  { key: 'actions', label: '' },
+  { key: '_actions', label: '', render: (_, row) => row._actions },
 ];
 
 export default function DocumentsPage() {
@@ -21,7 +21,11 @@ export default function DocumentsPage() {
   const qc = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['documents'], queryFn: () => documentService.getDocuments() });
-  const deleteMut = useMutation({ mutationFn: (id) => documentService.deleteDocument(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['documents'] }); setDeleteId(null); } });
+  const deleteMut = useMutation({
+    mutationFn: (id) => documentService.deleteDocument(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['documents'] }); setDeleteId(null); },
+    onError: (err) => { alert(err.response?.data?.message || 'Failed to delete document'); },
+  });
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -34,14 +38,17 @@ export default function DocumentsPage() {
       await documentService.uploadDocument(formData);
       qc.invalidateQueries({ queryKey: ['documents'] });
     } catch (err) {
-      alert(err.response?.data?.message || 'Upload failed');
+      alert(err.response?.data?.message || err.message || 'Upload failed');
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
   };
 
-  const rows = (Array.isArray(data) ? data : []).map((r) => ({ ...r, actions: (<button onClick={(e) => { e.stopPropagation(); setDeleteId(r.id || r._id); }} className="text-red-600 text-sm hover:underline">Delete</button>) }));
+  const rows = (Array.isArray(data) ? data : []).map((r) => ({
+    ...r,
+    _actions: (<button onClick={(e) => { e.stopPropagation(); setDeleteId(r.id || r._id); }} className="text-red-600 text-sm hover:underline">Delete</button>),
+  }));
 
   return (
     <div>
@@ -50,7 +57,7 @@ export default function DocumentsPage() {
         <div><input ref={fileRef} type="file" onChange={handleUpload} className="hidden" id="file-upload" /><label htmlFor="file-upload" className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>{uploading ? 'Uploading...' : 'Upload Document'}</label></div>
       </div>
       <div className="bg-white rounded-lg shadow"><DataTable columns={columns} data={rows} isLoading={isLoading} error={error?.message} onRetry={refetch} emptyMessage="No documents uploaded" /></div>
-      <ConfirmDialog isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteMut.mutate(deleteId)} title="Delete Document" message="Are you sure?" />
+      <ConfirmDialog isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteMut.mutate(deleteId)} title="Delete Document" message="Are you sure you want to delete this document?" />
     </div>
   );
 }

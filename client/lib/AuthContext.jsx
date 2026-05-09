@@ -40,6 +40,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const setUserFromOAuth = useCallback((userData) => {
+    setUser(userData);
+  }, []);
+
   const value = {
     user,
     isAuthenticated: !!user,
@@ -47,6 +51,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    setUserFromOAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { authService } from '@/lib/authService';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackInner() {
   const { provider } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { login: _login } = useAuth();
+  const { setUserFromOAuth } = useAuth();
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -19,7 +19,10 @@ export default function OAuthCallbackPage() {
           const token = searchParams.get('token');
           if (!token) throw new Error('Missing token in AINative callback');
           const data = await authService.handleAINativeCallback(token);
-          if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+          if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+            setUserFromOAuth(data.user);
+          }
           router.replace('/');
           return;
         }
@@ -37,7 +40,10 @@ export default function OAuthCallbackPage() {
         }
 
         const data = await authService.handleOAuthCallback(provider, code, state);
-        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          setUserFromOAuth(data.user);
+        }
         router.replace('/');
       } catch (err) {
         console.error('OAuth callback error:', err);
@@ -46,7 +52,7 @@ export default function OAuthCallbackPage() {
     };
 
     processCallback();
-  }, [provider, searchParams, router]);
+  }, [provider, searchParams, router, setUserFromOAuth]);
 
   if (error) {
     return (
@@ -73,5 +79,13 @@ export default function OAuthCallbackPage() {
         <p className="text-gray-600">Completing {provider} sign-in...</p>
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+      <OAuthCallbackInner />
+    </Suspense>
   );
 }
