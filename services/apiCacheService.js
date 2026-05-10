@@ -35,7 +35,7 @@ class ApiCacheService {
     };
 
     // Start cleanup interval
-    this.cleanupInterval = setInterval(() => this.cleanupExpired(), 60000);
+    this.cleanupInterval = setInterval(() => this.cleanupExpired(), 60000).unref();
   }
 
   /**

@@ -255,7 +255,7 @@ const cleanupRateLimitStore = () => {
 };
 
 // Run cleanup every minute
-setInterval(cleanupRateLimitStore, 60000);
+setInterval(cleanupRateLimitStore, 60000).unref();
 
 module.exports = {
   authenticateApiKey,
