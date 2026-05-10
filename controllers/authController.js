@@ -635,26 +635,28 @@ const requestPasswordReset = async (req, res) => {
       }
 
       // Generate reset token
+      const resetSecret = process.env.JWT_RESET_SECRET || process.env.JWT_SECRET;
       const resetToken = jwt.sign(
         { userId: user.userId || user._id },
-        process.env.JWT_RESET_SECRET,
+        resetSecret,
         { expiresIn: '1h' }
       );
 
       // Send reset email
       const transporter = createEmailTransporter();
+      const resetUrl = `${process.env.FRONTEND_URL || 'https://opencapstack.com'}/reset-password?token=${resetToken}`;
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'support@opencap.com',
+        from: process.env.EMAIL_FROM || 'noreply@news.ainative.studio',
         to: user.email,
-        subject: 'OpenCap - Password Reset',
+        subject: 'OpenCap Stack — Password Reset',
         html: `
           <h1>Password Reset</h1>
-          <p>You requested a password reset. Please click the link below to reset your password:</p>
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}">
-            Reset Password
-          </a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
+          <p>You requested a password reset for your OpenCap Stack account.</p>
+          <p>Click the link below to set a new password. This link expires in 1 hour.</p>
+          <p><a href="${resetUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Reset Password</a></p>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+          <hr/>
+          <p style="font-size:12px;color:#6b7280;">OpenCap Stack — Cap Table Management</p>
         `
       });
     }
@@ -685,7 +687,7 @@ const verifyResetToken = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || process.env.JWT_SECRET);
     } catch (tokenError) {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
@@ -719,7 +721,7 @@ const verifyResetToken = async (req, res) => {
  */
 const resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
+    const token = req.body.token || req.params.token;
     const { password } = req.body;
 
     if (!token) {
@@ -745,7 +747,7 @@ const resetPassword = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_RESET_SECRET || process.env.JWT_SECRET);
     } catch (tokenError) {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
