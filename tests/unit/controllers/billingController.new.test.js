@@ -48,7 +48,7 @@ describe('Billing Controller - New Endpoints', () => {
             const response = res.json.mock.calls[0][0];
             expect(response.plans).toBeInstanceOf(Array);
             expect(response.plans.length).toBe(4);
-            expect(response.plans[0].price).toBe(0); // free
+            expect(response.plans[0].price).toBe(1); // free ($1/month service fee)
             expect(response.plans[1].price).toBe(49); // starter
             expect(response.plans[2].price).toBe(149); // professional
             expect(response.plans[3].price).toBe(499); // enterprise

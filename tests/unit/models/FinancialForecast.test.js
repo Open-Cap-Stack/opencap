@@ -236,7 +236,7 @@ describe('FinancialForecast Model', () => {
       const startDate = new Date('2026-01-01');
       const endDate = new Date('2030-12-31');
 
-      const yearsDiff = endDate.getFullYear() - startDate.getFullYear();
+      const yearsDiff = endDate.getUTCFullYear() - startDate.getUTCFullYear();
       expect(yearsDiff).toBe(4); // 4 years difference for 5 year coverage
     });
   });

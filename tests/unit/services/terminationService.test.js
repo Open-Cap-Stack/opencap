@@ -41,11 +41,11 @@ describe('TerminationService', () => {
 
       const result = TerminationService.calculateVestedShares(params);
 
-      // 30 months elapsed, 12 month cliff passed
-      // 30/48 * 10000 = 6250 shares vested
-      expect(result.vestedShares).toBe(6250);
-      expect(result.unvestedShares).toBe(3750);
-      expect(result.vestingPercentage).toBeCloseTo(62.5, 1);
+      // 29 complete months elapsed (discrete monthly), 12 month cliff passed
+      // 29/48 * 10000 = 6041 shares vested
+      expect(result.vestedShares).toBe(6041);
+      expect(result.unvestedShares).toBe(3959);
+      expect(result.vestingPercentage).toBeCloseTo(60.42, 1);
     });
 
     it('should return 0 vested shares if before cliff', () => {

@@ -62,6 +62,7 @@ describe('validateEnvironment', () => {
 
     it('should not throw when JWT_SECRET is 32+ characters', () => {
       process.env.JWT_SECRET = 'a'.repeat(32);
+      process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
       process.env.ZERODB_API_KEY = 'valid-key';
 
       const result = validateEnvironment();
@@ -87,6 +88,7 @@ describe('validateEnvironment', () => {
 
     it('should not throw when all required vars are properly set with ZERODB_API_KEY', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
+      process.env.JWT_REFRESH_SECRET = 'r1e2f3r4e5s6h7s8e9c0r1e2t3k4e5y6';
       process.env.ZERODB_API_KEY = 'valid-zerodb-key';
       process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
@@ -98,6 +100,7 @@ describe('validateEnvironment', () => {
 
     it('should not throw when all required vars are properly set with AINATIVE_API_TOKEN', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
+      process.env.JWT_REFRESH_SECRET = 'r1e2f3r4e5s6h7s8e9c0r1e2t3k4e5y6';
       process.env.AINATIVE_API_TOKEN = 'valid-ainative-token';
       process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
       process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
@@ -145,6 +148,7 @@ describe('validateEnvironment', () => {
 
     it('should not warn when all vars are set with sufficient length', () => {
       process.env.JWT_SECRET = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
+      process.env.JWT_REFRESH_SECRET = 'r1e2f3r4e5s6h7s8e9c0r1e2t3k4e5y6';
       process.env.ZERODB_API_KEY = 'dev-key';
       process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
 

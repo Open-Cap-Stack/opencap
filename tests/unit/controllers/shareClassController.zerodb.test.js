@@ -139,18 +139,39 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
   });
 
   describe('getShareClassById', () => {
-    it('should return a share class by ID', async () => {
+    it('should return a share class by shareClassId', async () => {
       const mockShareClass = {
-        _id: 'shareclass123',
+        _id: 'internal-uuid-123',
+        shareClassId: 'shareclass123',
         name: 'Common Stock',
         description: 'Common stock class',
       };
       req.params.id = 'shareclass123';
 
+      // Controller finds by shareClassId first, returns the record
+      databaseAdapter.find.mockResolvedValue([mockShareClass]);
+
+      await getShareClassById(req, res);
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', { shareClassId: 'shareclass123' });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ shareClass: mockShareClass });
+    });
+
+    it('should fall back to findById when shareClassId not found', async () => {
+      const mockShareClass = {
+        _id: 'shareclass123',
+        name: 'Common Stock',
+      };
+      req.params.id = 'shareclass123';
+
+      // find returns empty (no match by shareClassId), fallback to findById
+      databaseAdapter.find.mockResolvedValue([]);
       databaseAdapter.findById.mockResolvedValue(mockShareClass);
 
       await getShareClassById(req, res);
 
+      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', { shareClassId: 'shareclass123' });
       expect(databaseAdapter.findById).toHaveBeenCalledWith('ShareClass', 'shareclass123');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ shareClass: mockShareClass });
@@ -158,6 +179,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
 
     it('should return 404 when share class not found', async () => {
       req.params.id = 'nonexistent';
+      databaseAdapter.find.mockResolvedValue([]);
       databaseAdapter.findById.mockResolvedValue(null);
 
       await getShareClassById(req, res);
@@ -171,7 +193,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
 
     it('should return 500 on database error', async () => {
       req.params.id = 'shareclass123';
-      databaseAdapter.findById.mockRejectedValue(new Error('Database error'));
+      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
 
       await getShareClassById(req, res);
 
@@ -189,19 +211,23 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
       req.params.id = 'shareclass123';
       req.body = updateData;
 
+      const existingShareClass = { _id: 'internal-uuid-456', shareClassId: 'shareclass123' };
       const mockUpdatedShareClass = {
-        _id: 'shareclass123',
+        _id: 'internal-uuid-456',
         name: 'Updated Common Stock',
         description: 'Common stock class',
       };
 
+      // find returns the existing record so controller gets internal _id
+      databaseAdapter.find.mockResolvedValue([existingShareClass]);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedShareClass);
 
       await updateShareClassById(req, res);
 
+      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', { shareClassId: 'shareclass123' });
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
         'ShareClass',
-        'shareclass123',
+        'internal-uuid-456',
         updateData,
         { new: true }
       );
@@ -212,6 +238,8 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
     it('should return 404 when share class not found', async () => {
       req.params.id = 'nonexistent';
       req.body = { name: 'Updated' };
+      // find returns empty, falls back to raw id
+      databaseAdapter.find.mockResolvedValue([]);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue(null);
 
       await updateShareClassById(req, res);
@@ -226,7 +254,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
     it('should return 500 on database error', async () => {
       req.params.id = 'shareclass123';
       req.body = { name: 'Updated' };
-      databaseAdapter.findByIdAndUpdate.mockRejectedValue(new Error('Database error'));
+      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
 
       await updateShareClassById(req, res);
 
@@ -241,19 +269,23 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
   describe('deleteShareClassById', () => {
     it('should delete a share class successfully', async () => {
       req.params.id = 'shareclass123';
-      const mockDeletedShareClass = { _id: 'shareclass123', name: 'Common' };
+      const existingShareClass = { _id: 'internal-uuid-789', shareClassId: 'shareclass123' };
+      const mockDeletedShareClass = { _id: 'internal-uuid-789', name: 'Common' };
 
+      databaseAdapter.find.mockResolvedValue([existingShareClass]);
       databaseAdapter.findByIdAndDelete.mockResolvedValue(mockDeletedShareClass);
 
       await deleteShareClassById(req, res);
 
-      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('ShareClass', 'shareclass123');
+      expect(databaseAdapter.find).toHaveBeenCalledWith('ShareClass', { shareClassId: 'shareclass123' });
+      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('ShareClass', 'internal-uuid-789');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ message: 'Share class deleted' });
     });
 
     it('should return 404 when share class not found', async () => {
       req.params.id = 'nonexistent';
+      databaseAdapter.find.mockResolvedValue([]);
       databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
 
       await deleteShareClassById(req, res);
@@ -267,7 +299,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
 
     it('should return 500 on database error', async () => {
       req.params.id = 'shareclass123';
-      databaseAdapter.findByIdAndDelete.mockRejectedValue(new Error('Database error'));
+      databaseAdapter.find.mockRejectedValue(new Error('Database error'));
 
       await deleteShareClassById(req, res);
 

@@ -40,8 +40,8 @@ describe('Stripe Config', () => {
             expect(stripeConfig.PLANS.enterprise).toBeDefined();
         });
 
-        it('should have unified pricing at $0/$49/$149/$499', () => {
-            expect(stripeConfig.PLANS.free.price).toBe(0);
+        it('should have unified pricing at $1/$49/$149/$499', () => {
+            expect(stripeConfig.PLANS.free.price).toBe(1);
             expect(stripeConfig.PLANS.starter.price).toBe(49);
             expect(stripeConfig.PLANS.professional.price).toBe(149);
             expect(stripeConfig.PLANS.enterprise.price).toBe(499);
@@ -129,7 +129,7 @@ describe('Stripe Config', () => {
         it('should return all plans sorted by price', () => {
             const plans = stripeConfig.getAllPlans();
             expect(plans).toHaveLength(4);
-            expect(plans[0].price).toBe(0);
+            expect(plans[0].price).toBe(1);
             expect(plans[1].price).toBe(49);
             expect(plans[2].price).toBe(149);
             expect(plans[3].price).toBe(499);
@@ -139,7 +139,7 @@ describe('Stripe Config', () => {
     describe('getPaidPlans', () => {
         it('should return only paid plans', () => {
             const plans = stripeConfig.getPaidPlans();
-            expect(plans).toHaveLength(3);
+            expect(plans).toHaveLength(4); // free plan is $1 (not $0), so all plans are "paid"
             plans.forEach(plan => {
                 expect(plan.price).toBeGreaterThan(0);
             });

@@ -333,7 +333,7 @@ describe('Input Sanitizer Utilities', () => {
     test('Should parse valid date strings', () => {
       const date = sanitizeDate('2024-01-01');
       expect(date).toBeInstanceOf(Date);
-      expect(date.getFullYear()).toBe(2024);
+      expect(date.getUTCFullYear()).toBe(2024);
     });
 
     test('Should handle Date objects', () => {

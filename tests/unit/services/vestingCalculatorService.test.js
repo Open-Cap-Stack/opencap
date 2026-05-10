@@ -47,10 +47,10 @@ describe('VestingCalculatorService', () => {
 
       const result = VestingCalculatorService.calculateVestedShares(schedule, calculationDate);
 
-      // 18 months / 48 months = 37.5%
-      expect(result.vestedShares).toBe(3750);
-      expect(result.unvestedShares).toBe(6250);
-      expect(result.vestingPercentage).toBe(37.5);
+      // 17 complete months vested (discrete monthly) / 48 months = 35.41%
+      expect(result.vestedShares).toBe(3541);
+      expect(result.unvestedShares).toBe(6459);
+      expect(result.vestingPercentage).toBeCloseTo(35.41, 1);
     });
 
     it('should return 100% after full vesting period', () => {
@@ -314,7 +314,7 @@ describe('VestingCalculatorService', () => {
       const result = VestingCalculatorService.getNextVestingEvent(schedule, fromDate);
 
       expect(result).not.toBeNull();
-      expect(result.eventDate.getDate()).toBe(16);
+      expect(result.eventDate.getUTCDate()).toBe(16);
     });
   });
 

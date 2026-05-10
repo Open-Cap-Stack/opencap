@@ -155,7 +155,7 @@ describe('Database Adapter Service', () => {
 
         await databaseAdapter.create('ShareClass', { name: 'Common' });
 
-        expect(zerodbService.insertRow).toHaveBeenCalledWith('share_class', { name: 'Common' });
+        expect(zerodbService.insertRow).toHaveBeenCalledWith('share_classes', { name: 'Common' });
       });
 
       it('should use mapped table names for known models', async () => {
@@ -367,7 +367,7 @@ describe('Database Adapter Service', () => {
 
         const result = await databaseAdapter.delete('Notification', { notificationId: 'NOTIF_001' });
 
-        expect(zerodbService.deleteRows).toHaveBeenCalledWith('compliance_events', {
+        expect(zerodbService.deleteRows).toHaveBeenCalledWith('notifications', {
           filter: { notificationId: 'NOTIF_001' }
         });
         expect(result).toEqual(mockResult);
@@ -705,8 +705,9 @@ describe('Database Adapter Service', () => {
     });
 
     it('should convert unmapped CamelCase model names to snake_case', async () => {
+      // ShareClass is now in the tableNameMap → share_classes
       await databaseAdapter.create('ShareClass', {});
-      expect(zerodbService.insertRow).toHaveBeenCalledWith('share_class', {});
+      expect(zerodbService.insertRow).toHaveBeenCalledWith('share_classes', {});
     });
   });
 
