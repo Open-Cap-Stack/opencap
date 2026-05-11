@@ -22,20 +22,15 @@ function formatDate(iso) {
   }
 }
 
-function formatPct(value) {
-  const num = Number(value);
-  if (value === '' || value === null || value === undefined || Number.isNaN(num)) return '-';
-  return `${num.toFixed(1)}%`;
-}
-
 // ─── asset types ──────────────────────────────────────────────────────────────
 
-const ASSET_TYPES = ['IP', 'Equipment', 'Real Estate', 'Other'];
+const ASSET_TYPES = ['IP', 'Equipment', 'Real Estate', 'Cash', 'Other'];
 
 const TYPE_COLORS = {
   IP: 'bg-purple-100 text-purple-800',
   Equipment: 'bg-blue-100 text-blue-800',
   'Real Estate': 'bg-green-100 text-green-800',
+  Cash: 'bg-yellow-100 text-yellow-800',
   Other: 'bg-gray-100 text-gray-700',
 };
 
@@ -45,6 +40,27 @@ function AssetTypeBadge({ type }) {
       {type || 'Other'}
     </span>
   );
+}
+
+// ─── localStorage helpers ─────────────────────────────────────────────────────
+
+const LS_KEY = 'ocs_assets';
+
+function loadFromLS() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToLS(assets) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(assets));
+  } catch {
+    // ignore quota errors
+  }
 }
 
 // ─── primitives ───────────────────────────────────────────────────────────────
@@ -106,25 +122,11 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-// ─── depreciation helper (straight-line) ─────────────────────────────────────
-
-function calcDepreciation(cost, acquisitionDate, usefulLifeYears = 5) {
-  if (!cost || !acquisitionDate) return null;
-  const acquired = new Date(acquisitionDate);
-  const now = new Date();
-  const yearsHeld = (now - acquired) / (1000 * 60 * 60 * 24 * 365.25);
-  const annualDep = Number(cost) / usefulLifeYears;
-  const accumulated = Math.min(annualDep * yearsHeld, Number(cost));
-  const bookValue = Math.max(Number(cost) - accumulated, 0);
-  const depPct = Number(cost) > 0 ? (accumulated / Number(cost)) * 100 : 0;
-  return { accumulated, bookValue, depPct };
-}
-
 // ─── add asset form ───────────────────────────────────────────────────────────
 
-const EMPTY_FORM = { name: '', type: 'IP', acquisitionDate: '', cost: '' };
+const EMPTY_FORM = { name: '', type: 'IP', acquisitionDate: '', cost: '', currentValue: '' };
 
-function AddAssetForm({ onAdd, adding }) {
+function AddAssetForm({ onAdd, onCancel, adding }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [err, setErr] = useState('');
 
@@ -134,17 +136,22 @@ function AddAssetForm({ onAdd, adding }) {
     e.preventDefault();
     setErr('');
     if (!form.name.trim()) { setErr('Asset name is required.'); return; }
-    if (!form.cost || Number(form.cost) <= 0) { setErr('Enter a valid cost.'); return; }
+    if (!form.cost || Number(form.cost) < 0) { setErr('Enter a valid cost.'); return; }
     onAdd(form, () => setForm(EMPTY_FORM));
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <ErrorBanner message={err} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <Label required>Asset name</Label>
-          <Input type="text" placeholder="e.g. Patent Portfolio" value={form.name} onChange={(e) => setField('name', e.target.value)} />
+          <Input
+            type="text"
+            placeholder="e.g. Patent Portfolio"
+            value={form.name}
+            onChange={(e) => setField('name', e.target.value)}
+          />
         </div>
         <div>
           <Label required>Type</Label>
@@ -154,14 +161,45 @@ function AddAssetForm({ onAdd, adding }) {
         </div>
         <div>
           <Label>Acquisition date</Label>
-          <Input type="date" value={form.acquisitionDate} onChange={(e) => setField('acquisitionDate', e.target.value)} />
+          <Input
+            type="date"
+            value={form.acquisitionDate}
+            onChange={(e) => setField('acquisitionDate', e.target.value)}
+          />
         </div>
         <div>
           <Label required>Cost ($)</Label>
-          <Input type="number" min="0" step="any" placeholder="e.g. 50000" value={form.cost} onChange={(e) => setField('cost', e.target.value)} />
+          <Input
+            type="number"
+            min="0"
+            step="any"
+            placeholder="e.g. 50000"
+            value={form.cost}
+            onChange={(e) => setField('cost', e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>Current value ($)</Label>
+          <Input
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Leave blank to use cost"
+            value={form.currentValue}
+            onChange={(e) => setField('currentValue', e.target.value)}
+          />
         </div>
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2 pt-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="submit"
           disabled={adding}
@@ -185,8 +223,8 @@ function EmptyState() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
         </svg>
       </div>
-      <p className="text-sm font-semibold text-gray-700 mb-1">No assets recorded</p>
-      <p className="text-xs text-gray-400 max-w-xs">Use the form above to add your first asset to the portfolio.</p>
+      <p className="text-sm font-semibold text-gray-700 mb-1">No assets recorded — add your first asset</p>
+      <p className="text-xs text-gray-400 max-w-xs">Use the "Add asset" button to record company assets, costs, and current values.</p>
     </div>
   );
 }
@@ -202,6 +240,7 @@ export default function AssetsPage() {
   const [apiMode, setApiMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
+  // Load assets — try API first, fall back to localStorage
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -212,8 +251,8 @@ export default function AssetsPage() {
         setAssets(list.map((a) => ({ ...a, id: a.id || a._id })));
         setApiMode(true);
       } catch {
-        // Assets endpoint not available — start with empty
-        setAssets([]);
+        // API not available — fall back to localStorage
+        setAssets(loadFromLS());
       } finally {
         setLoading(false);
       }
@@ -221,24 +260,33 @@ export default function AssetsPage() {
     load();
   }, []);
 
+  function persistAssets(updated) {
+    setAssets(updated);
+    if (!apiMode) saveToLS(updated);
+  }
+
   async function handleAdd(form, reset) {
     setAdding(true);
-    const dep = calcDepreciation(form.cost, form.acquisitionDate);
+    const cost = Number(form.cost) || 0;
+    const currentValue = form.currentValue !== '' ? Number(form.currentValue) : cost;
+
     const newAsset = {
       ...form,
       id: `asset_${Date.now()}`,
-      currentValue: dep ? dep.bookValue : Number(form.cost),
-      depreciation: dep ? dep.depPct : 0,
+      cost,
+      currentValue,
     };
+
     try {
       if (apiMode) {
-        const res = await api.post('/assets', form);
+        const res = await api.post('/assets', { ...form, cost, currentValue });
         newAsset.id = res.data?.id || res.data?._id || newAsset.id;
       }
     } catch {
-      // ignore — keep local
+      // ignore API error — keep local record
     }
-    setAssets((p) => [...p, newAsset]);
+
+    persistAssets([...assets, newAsset]);
     reset();
     setShowForm(false);
     setAdding(false);
@@ -249,14 +297,14 @@ export default function AssetsPage() {
     try {
       if (apiMode) await api.delete(`/assets/${id}`);
     } catch {
-      // ignore
+      // ignore API error — still remove locally
     }
-    setAssets((p) => p.filter((a) => a.id !== id));
+    persistAssets(assets.filter((a) => a.id !== id));
     setDeleting(null);
   }
 
   // Summary stats
-  const totalValue = assets.reduce((s, a) => s + (Number(a.currentValue || a.cost) || 0), 0);
+  const totalValue = assets.reduce((s, a) => s + (Number(a.currentValue) || Number(a.cost) || 0), 0);
   const uniqueTypes = new Set(assets.map((a) => a.type).filter(Boolean)).size;
 
   const HEADERS = ['Name', 'Type', 'Acquired', 'Cost', 'Current Value', 'Depreciation', 'Actions'];
@@ -267,7 +315,7 @@ export default function AssetsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Asset Portfolio</h1>
-          <p className="text-sm text-gray-500 mt-1">Track company assets, acquisition costs, and depreciation.</p>
+          <p className="text-sm text-gray-500 mt-1">Track company assets, acquisition costs, and book values.</p>
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
@@ -281,29 +329,48 @@ export default function AssetsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Summary cards */}
-        {assets.length > 0 && (
+        {/* Summary cards — always visible once loaded */}
+        {!loading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard label="Total asset value" value={formatCurrency(totalValue)} sub="book value (after depreciation)" />
-            <StatCard label="Total assets" value={String(assets.length)} />
-            <StatCard label="Asset types" value={String(uniqueTypes)} />
+            <StatCard
+              label="Total asset value"
+              value={formatCurrency(totalValue)}
+              sub="sum of current values"
+            />
+            <StatCard
+              label="Total assets"
+              value={String(assets.length)}
+            />
+            <StatCard
+              label="Asset types"
+              value={String(uniqueTypes)}
+            />
           </div>
         )}
 
-        {/* Add asset form */}
+        {/* Inline add asset form */}
         {showForm && (
           <div className="bg-white rounded-lg shadow">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Add Asset</h2>
-              <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
             <div className="px-6 py-5">
-              <AddAssetForm onAdd={handleAdd} adding={adding} />
+              <AddAssetForm
+                onAdd={handleAdd}
+                onCancel={() => setShowForm(false)}
+                adding={adding}
+              />
             </div>
           </div>
         )}
 
-        {/* Error */}
+        {/* Error banner */}
         {error && <ErrorBanner message={error} />}
 
         {/* Assets table */}
@@ -311,6 +378,7 @@ export default function AssetsPage() {
           <div className="px-6 py-5 border-b border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900">Assets</h2>
           </div>
+
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-gray-500 py-12 justify-center">
               <Spinner className="h-5 w-5 text-blue-500" /> Loading assets...
@@ -323,7 +391,11 @@ export default function AssetsPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     {HEADERS.map((h) => (
-                      <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      <th
+                        key={h}
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                      >
                         {h}
                       </th>
                     ))}
@@ -331,32 +403,44 @@ export default function AssetsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {assets.map((asset, i) => {
-                    const dep = calcDepreciation(asset.cost, asset.acquisitionDate);
-                    const currentValue = asset.currentValue ?? (dep ? dep.bookValue : Number(asset.cost));
-                    const depPct = asset.depreciation ?? (dep ? dep.depPct : null);
+                    const cost = Number(asset.cost) || 0;
+                    const currentValue = asset.currentValue !== undefined && asset.currentValue !== ''
+                      ? Number(asset.currentValue)
+                      : cost;
+                    const depreciation = cost - currentValue;
 
                     return (
                       <tr key={asset.id || i} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">{asset.name || '-'}</td>
-                        <td className="px-4 py-3 whitespace-nowrap"><AssetTypeBadge type={asset.type} /></td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">{formatDate(asset.acquisitionDate)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">{formatCurrency(asset.cost)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">{formatCurrency(currentValue)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
+                          {asset.name || '-'}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {depPct !== null ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(depPct, 100)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500">{formatPct(depPct)}</span>
-                            </div>
-                          ) : '-'}
+                          <AssetTypeBadge type={asset.type} />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                          {formatDate(asset.acquisitionDate)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                          {formatCurrency(cost)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">
+                          {formatCurrency(currentValue)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {depreciation !== 0 ? (
+                            <span className={depreciation > 0 ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
+                              {depreciation > 0 ? '-' : '+'}{formatCurrency(Math.abs(depreciation))}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <button
                             onClick={() => handleDelete(asset.id)}
                             disabled={deleting === asset.id}
-                            className="text-red-500 hover:text-red-700 text-xs font-medium disabled:opacity-50"
+                            className="text-red-500 hover:text-red-700 text-xs font-medium disabled:opacity-50 transition-colors"
+                            aria-label={`Delete ${asset.name}`}
                           >
                             {deleting === asset.id ? 'Deleting...' : 'Delete'}
                           </button>
