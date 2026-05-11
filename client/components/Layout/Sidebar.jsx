@@ -22,6 +22,12 @@ const navItems = [
   { path: '/valuations', label: '409A Valuation' },
   { path: '/tax', label: 'Tax Center' },
   { path: '/compliance', label: 'Compliance' },
+  { path: '/messages', label: 'Messages' },
+  { path: '/notifications', label: 'Notifications' },
+  { path: '/tasks', label: 'Tasks' },
+  { path: '/communications', label: 'Communications' },
+  { path: '/billing', label: 'Billing' },
+  { path: '/integrations', label: 'Integrations' },
   { path: '/settings', label: 'Settings' },
 ];
 

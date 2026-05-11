@@ -13,6 +13,7 @@ const PUBLIC_PREFIXES = [
   '/pricing',
   '/onboarding',
   '/company-setup',
+  '/checkout',
   '/auth/',
   '/api/',
   '/_next/',
