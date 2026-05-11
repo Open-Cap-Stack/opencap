@@ -23,7 +23,7 @@ function OAuthCallbackInner() {
             localStorage.setItem('user', JSON.stringify(data.user));
             setUserFromOAuth(data.user);
           }
-          router.replace('/');
+          router.replace('/dashboard');
           return;
         }
 
@@ -44,7 +44,7 @@ function OAuthCallbackInner() {
           localStorage.setItem('user', JSON.stringify(data.user));
           setUserFromOAuth(data.user);
         }
-        router.replace('/');
+        router.replace('/dashboard');
       } catch (err) {
         console.error('OAuth callback error:', err);
         setError(err.message || 'Authentication failed');

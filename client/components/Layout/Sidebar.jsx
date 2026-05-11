@@ -13,9 +13,12 @@ const navItems = [
   { path: '/equity-plans', label: 'Equity Plans' },
   { path: '/securities', label: 'Securities' },
   { path: '/fundraise', label: 'Fundraise' },
+  { path: '/board', label: 'Board', href: '/board/meetings' },
   { path: '/documents', label: 'Documents' },
   { path: '/reports', label: 'Reports' },
   { path: '/valuations', label: '409A Valuation' },
+  { path: '/tax', label: 'Tax Center' },
+  { path: '/compliance', label: 'Compliance' },
   { path: '/settings', label: 'Settings' },
 ];
 
@@ -37,7 +40,7 @@ export default function Sidebar() {
           return (
             <Link
               key={item.path}
-              href={item.path}
+              href={item.href ?? item.path}
               className={`block px-3 py-2 rounded-md text-sm transition-colors ${
                 isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               }`}
