@@ -7,6 +7,7 @@ import OCSLogo from '@/components/OCSLogo';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview' },
+  { path: '/search', label: 'Search' },
   { path: '/cap-table', label: 'Cap Table' },
   { path: '/stakeholders', label: 'Stakeholders' },
   { path: '/share-classes', label: 'Share Classes' },
@@ -15,7 +16,9 @@ const navItems = [
   { path: '/my-equity', label: 'My Equity' },
   { path: '/investor-portal', label: 'Investor Portal' },
   { path: '/securities', label: 'Securities' },
+  { path: '/scenarios', label: 'Scenarios' },
   { path: '/fundraise', label: 'Fundraise' },
+  { path: '/assets', label: 'Assets' },
   { path: '/board', label: 'Board', href: '/board/meetings' },
   { path: '/documents', label: 'Documents' },
   { path: '/data-rooms', label: 'Data Rooms', indent: true },
@@ -31,6 +34,8 @@ const navItems = [
   { path: '/communications', label: 'Communications' },
   { path: '/billing', label: 'Billing' },
   { path: '/integrations', label: 'Integrations' },
+  { path: '/exports', label: 'Exports' },
+  { path: '/profile', label: 'Profile' },
   { path: '/settings', label: 'Settings' },
 ];
 
