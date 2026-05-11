@@ -284,6 +284,77 @@ describe('Billing Controller - Stripe Endpoints', () => {
     });
   });
 
+  describe('createCustomerPortalSession', () => {
+    it('should return 503 when Stripe is not configured', async () => {
+      stripeService.isConfigured.mockReturnValue(false);
+      const { req, res } = createMockReqRes({ body: { returnUrl: 'http://test.com/billing' } });
+
+      await billingController.createCustomerPortalSession(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Stripe is not configured'
+      });
+    });
+
+    it('should return 400 when companyId is missing', async () => {
+      const { req, res } = createMockReqRes({
+        user: {},
+        body: { returnUrl: 'http://test.com/billing' }
+      });
+
+      await billingController.createCustomerPortalSession(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should lazily create Stripe customer and return portal URL', async () => {
+      const customerMapping = { companyId: 'comp_123', stripeCustomerId: 'cus_lazy' };
+      BillingService.getOrCreateStripeCustomer.mockResolvedValue(customerMapping);
+
+      const mockPortalSession = { url: 'https://billing.stripe.com/session/test' };
+      const mockStripe = {
+        billingPortal: {
+          sessions: {
+            create: jest.fn().mockResolvedValue(mockPortalSession)
+          }
+        }
+      };
+      stripeService.getStripe.mockReturnValue(mockStripe);
+
+      const { req, res } = createMockReqRes({
+        body: { returnUrl: 'http://test.com/billing' },
+        headers: { origin: 'http://test.com' }
+      });
+
+      await billingController.createCustomerPortalSession(req, res);
+
+      expect(BillingService.getOrCreateStripeCustomer).toHaveBeenCalledWith(
+        'comp_123', 'test@test.com', 'Test'
+      );
+      expect(mockStripe.billingPortal.sessions.create).toHaveBeenCalledWith({
+        customer: 'cus_lazy',
+        return_url: 'http://test.com/billing'
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ url: 'https://billing.stripe.com/session/test' });
+    });
+
+    it('should handle Stripe not configured error from service as 503', async () => {
+      BillingService.getOrCreateStripeCustomer.mockRejectedValue(
+        new Error('Stripe is not configured')
+      );
+
+      const { req, res } = createMockReqRes({
+        body: { returnUrl: 'http://test.com/billing' }
+      });
+
+      await billingController.createCustomerPortalSession(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+    });
+  });
+
   describe('setDefaultPaymentMethod', () => {
     it('should set default payment method', async () => {
       BillingService.setDefaultPaymentMethod.mockResolvedValue({ success: true });

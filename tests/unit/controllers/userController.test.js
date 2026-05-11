@@ -184,9 +184,10 @@ describe('UserController', () => {
   });
 
   describe('deleteUserById', () => {
-    it('should delete user successfully', async () => {
+    it('should soft-delete user successfully', async () => {
       req.params = { id: 'user-id-123' };
-      User.findByIdAndDelete.mockResolvedValue({ _id: 'user-id-123' });
+      User.findById.mockResolvedValue({ _id: 'user-id-123', deletedAt: null });
+      User.findByIdAndUpdate.mockResolvedValue({ _id: 'user-id-123', deletedAt: new Date(), status: 'inactive' });
       await userController.deleteUserById(req, res);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData()).message).toBe('User deleted successfully');
@@ -194,14 +195,14 @@ describe('UserController', () => {
 
     it('should return 404 when user not found for deletion', async () => {
       req.params = { id: 'non-existent-id' };
-      User.findByIdAndDelete.mockResolvedValue(null);
+      User.findById.mockResolvedValue(null);
       await userController.deleteUserById(req, res);
       expect(res.statusCode).toBe(404);
     });
 
     it('should return 500 on database error during deletion', async () => {
       req.params = { id: 'error-id' };
-      User.findByIdAndDelete.mockRejectedValue(new Error('Delete failed'));
+      User.findById.mockRejectedValue(new Error('Delete failed'));
       await userController.deleteUserById(req, res);
       expect(res.statusCode).toBe(500);
     });

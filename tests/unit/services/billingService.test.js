@@ -40,7 +40,7 @@ describe('BillingService', () => {
         limits: {
           stakeholders: 100,
           documents: -1,
-          users: 25
+          apiCallsPerMonth: 25000
         }
       };
 
@@ -83,7 +83,6 @@ describe('BillingService', () => {
         limits: {
           stakeholders: 100,
           documents: -1,
-          users: 25,
           apiCallsPerMonth: 50000,
           storageGB: 10
         }
@@ -95,8 +94,7 @@ describe('BillingService', () => {
 
       databaseAdapter.count
         .mockResolvedValueOnce(45) // stakeholders
-        .mockResolvedValueOnce(120) // documents
-        .mockResolvedValueOnce(8); // users
+        .mockResolvedValueOnce(120); // documents
 
       const result = await BillingService.getUsageMetrics('company-123');
 
@@ -105,7 +103,7 @@ describe('BillingService', () => {
       expect(result.stakeholders.limit).toBe(100);
       expect(result.stakeholders.percentUsed).toBe(45);
       expect(result.documents.unlimited).toBe(true);
-      expect(result.users.current).toBe(8);
+      expect(result.apiCalls.limit).toBe(50000);
     });
 
     it('should handle unlimited limits (-1)', async () => {
@@ -120,7 +118,7 @@ describe('BillingService', () => {
         limits: {
           stakeholders: -1,
           documents: -1,
-          users: -1
+          apiCallsPerMonth: -1
         }
       };
 
@@ -130,14 +128,13 @@ describe('BillingService', () => {
 
       databaseAdapter.count
         .mockResolvedValueOnce(500)
-        .mockResolvedValueOnce(1000)
-        .mockResolvedValueOnce(50);
+        .mockResolvedValueOnce(1000);
 
       const result = await BillingService.getUsageMetrics('company-123');
 
       expect(result.stakeholders.unlimited).toBe(true);
       expect(result.documents.unlimited).toBe(true);
-      expect(result.users.unlimited).toBe(true);
+      expect(result.apiCalls.unlimited).toBe(true);
     });
 
     it('should calculate percentage used correctly', async () => {
@@ -152,7 +149,7 @@ describe('BillingService', () => {
         limits: {
           stakeholders: 50,
           documents: 100,
-          users: 10
+          apiCallsPerMonth: 10000
         }
       };
 
@@ -162,14 +159,12 @@ describe('BillingService', () => {
 
       databaseAdapter.count
         .mockResolvedValueOnce(25) // 50%
-        .mockResolvedValueOnce(75) // 75%
-        .mockResolvedValueOnce(9); // 90%
+        .mockResolvedValueOnce(75); // 75%
 
       const result = await BillingService.getUsageMetrics('company-123');
 
       expect(result.stakeholders.percentUsed).toBe(50);
       expect(result.documents.percentUsed).toBe(75);
-      expect(result.users.percentUsed).toBe(90);
     });
   });
 
@@ -420,7 +415,7 @@ describe('BillingService', () => {
 
       const mockCurrentPlan = {
         planId: 'PLAN-BASIC',
-        price: 49
+        price: 25
       };
 
       const mockNewPlan = {
@@ -485,7 +480,7 @@ describe('BillingService', () => {
 
       const mockNewPlan = {
         planId: 'PLAN-BASIC',
-        price: 49,
+        price: 25,
         isActive: true
       };
 
@@ -515,7 +510,7 @@ describe('BillingService', () => {
 
       const mockCurrentPlan = {
         planId: 'PLAN-BASIC',
-        price: 49
+        price: 25
       };
 
       const mockNewPlan = {

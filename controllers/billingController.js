@@ -26,9 +26,11 @@ function getErrorStatusCode(error) {
   if (message.includes('not found')) {
     return 404;
   }
+  if (message.includes('not configured')) {
+    return 503;
+  }
   if (message.includes('required') || message.includes('invalid') || message.includes('cannot') ||
-      message.includes('no active') || message.includes('already on') || message.includes('not completed') ||
-      message.includes('not configured')) {
+      message.includes('no active') || message.includes('already on') || message.includes('not completed')) {
     return 400;
   }
   if (message.includes('unauthorized') || message.includes('forbidden')) {

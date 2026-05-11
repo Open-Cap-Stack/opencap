@@ -466,8 +466,8 @@ describe('SubscriptionController', () => {
 
   describe('updatePlan', () => {
     it('should update plan and return 200', async () => {
-      const updateData = { price: 149 };
-      const mockUpdated = { planId: 'PLAN-001', price: 149 };
+      const updateData = { price: 75 };
+      const mockUpdated = { planId: 'PLAN-001', price: 75 };
 
       SubscriptionService.updatePlan.mockResolvedValue(mockUpdated);
 

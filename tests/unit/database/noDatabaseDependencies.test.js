@@ -261,7 +261,7 @@ function findJavaScriptFiles(dir, fileList = []) {
 
     if (stat.isDirectory()) {
       // Skip node_modules, .git, coverage, etc.
-      if (!['node_modules', '.git', 'coverage', 'dist', 'build', '.next'].includes(file)) {
+      if (!['node_modules', '.git', 'coverage', 'dist', 'build', '.next', '.claude'].includes(file)) {
         findJavaScriptFiles(filePath, fileList);
       }
     } else if (file.endsWith('.js')) {

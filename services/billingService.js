@@ -981,9 +981,14 @@ class BillingService {
    * @returns {Object} Payment method
    */
   static async syncPaymentMethodFromStripe(companyId, stripePaymentMethodId, setAsDefault = false) {
-    const customer = await databaseAdapter.findOne('StripeCustomer', { companyId });
+    if (!stripeService.isConfigured()) {
+      throw new Error('Stripe is not configured');
+    }
+
+    // Lazily create the Stripe customer if one does not exist yet
+    let customer = await databaseAdapter.findOne('StripeCustomer', { companyId });
     if (!customer) {
-      throw new Error('Stripe customer not found');
+      customer = await this.getOrCreateStripeCustomer(companyId);
     }
 
     // Attach to customer in Stripe

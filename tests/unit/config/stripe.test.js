@@ -40,11 +40,11 @@ describe('Stripe Config', () => {
             expect(stripeConfig.PLANS.enterprise).toBeDefined();
         });
 
-        it('should have unified pricing at $1/$49/$149/$499', () => {
-            expect(stripeConfig.PLANS.free.price).toBe(1);
-            expect(stripeConfig.PLANS.starter.price).toBe(49);
-            expect(stripeConfig.PLANS.professional.price).toBe(149);
-            expect(stripeConfig.PLANS.enterprise.price).toBe(499);
+        it('should have pricing at $0/$25/$75/$250', () => {
+            expect(stripeConfig.PLANS.free.price).toBe(0);
+            expect(stripeConfig.PLANS.starter.price).toBe(25);
+            expect(stripeConfig.PLANS.professional.price).toBe(75);
+            expect(stripeConfig.PLANS.enterprise.price).toBe(250);
         });
 
         it('should read Stripe price IDs from env vars', () => {
@@ -65,19 +65,25 @@ describe('Stripe Config', () => {
             });
         });
 
-        it('should define limits for all plans', () => {
+        it('should define usage-based limits for all plans', () => {
             Object.values(stripeConfig.PLANS).forEach(plan => {
                 expect(plan.limits).toBeDefined();
                 expect(plan.limits.stakeholders).toBeDefined();
                 expect(plan.limits.documents).toBeDefined();
-                expect(plan.limits.users).toBeDefined();
+                expect(plan.limits.apiCallsPerMonth).toBeDefined();
             });
         });
 
         it('should have unlimited (-1) limits for enterprise', () => {
             expect(stripeConfig.PLANS.enterprise.limits.stakeholders).toBe(-1);
             expect(stripeConfig.PLANS.enterprise.limits.documents).toBe(-1);
-            expect(stripeConfig.PLANS.enterprise.limits.users).toBe(-1);
+            expect(stripeConfig.PLANS.enterprise.limits.apiCallsPerMonth).toBe(-1);
+        });
+
+        it('should not have per-seat user limits', () => {
+            Object.values(stripeConfig.PLANS).forEach(plan => {
+                expect(plan.limits.users).toBeUndefined();
+            });
         });
     });
 
@@ -105,7 +111,7 @@ describe('Stripe Config', () => {
             const plan = stripeConfig.getPlanById('starter');
             expect(plan).toBeDefined();
             expect(plan.name).toBe('Starter');
-            expect(plan.price).toBe(49);
+            expect(plan.price).toBe(25);
         });
 
         it('should return null for unknown plan', () => {
@@ -129,17 +135,17 @@ describe('Stripe Config', () => {
         it('should return all plans sorted by price', () => {
             const plans = stripeConfig.getAllPlans();
             expect(plans).toHaveLength(4);
-            expect(plans[0].price).toBe(1);
-            expect(plans[1].price).toBe(49);
-            expect(plans[2].price).toBe(149);
-            expect(plans[3].price).toBe(499);
+            expect(plans[0].price).toBe(0);
+            expect(plans[1].price).toBe(25);
+            expect(plans[2].price).toBe(75);
+            expect(plans[3].price).toBe(250);
         });
     });
 
     describe('getPaidPlans', () => {
-        it('should return only paid plans', () => {
+        it('should return only paid plans (excludes free)', () => {
             const plans = stripeConfig.getPaidPlans();
-            expect(plans).toHaveLength(4); // free plan is $1 (not $0), so all plans are "paid"
+            expect(plans).toHaveLength(3);
             plans.forEach(plan => {
                 expect(plan.price).toBeGreaterThan(0);
             });

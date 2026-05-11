@@ -251,6 +251,9 @@ const routes = {
   bulkReportsRoutes: safeRequire(path.join(__dirname, 'routes/v1/bulkReportsRoutes')), // Issue #238: Bulk Reports Endpoint
   dilutionRoutes: safeRequire(path.join(__dirname, 'routes/v1/dilutionRoutes')), // Dilution calculator
   agentOnboardingRoutes: safeRequire(path.join(__dirname, 'routes/v1/agentOnboardingRoutes')), // AX: Agent self-onboarding
+  mcpRoutes: safeRequire(path.join(__dirname, 'routes/v1/mcpRoutes')), // Issue #495: MCP Server
+  pluginAuthRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginAuthRoutes')), // Issue #505: Plugin OAuth
+  pluginRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginRoutes')), // Issue #506: Plugin tools
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -260,7 +263,7 @@ const routes = {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/mcp'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -410,6 +413,12 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/fundraise-models'; // Issue #195: Fundraising Modeling Engine
     } else if (key === 'agentOnboardingRoutes') {
       path = '/api/v1/agents';
+    } else if (key === 'mcpRoutes') {
+      path = '/api/v1/mcp'; // Issue #495: MCP Server — accessible at /api/v1/mcp and /api/v1/mcp/sse
+    } else if (key === 'pluginAuthRoutes') {
+      path = '/api/v1/auth/plugin'; // Issue #505: Plugin OAuth
+    } else if (key === 'pluginRoutes') {
+      path = '/api/v1/plugin'; // Issue #506: Plugin tools
     } else if (key === 'activityRoutes') {
       path = '/api/v1/activities';
     } else {

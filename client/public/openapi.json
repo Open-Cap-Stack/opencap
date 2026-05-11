@@ -16,7 +16,7 @@
     "x-logo": "https://opencapstack.com/logo.png"
   },
   "servers": [
-    { "url": "https://opencapstack.com/api/v1", "description": "Production" },
+    { "url": "https://api.opencapstack.com/api/v1", "description": "Production" },
     { "url": "http://localhost:3000/api/v1", "description": "Local development" }
   ],
   "tags": [
@@ -28,8 +28,11 @@
     { "name": "safe-notes", "description": "SAFE instruments" },
     { "name": "valuations", "description": "409A and fair market value determinations" },
     { "name": "fundraising", "description": "Funding rounds and dilution modeling" },
+    { "name": "dilution", "description": "Dilution calculation and scenario modeling" },
     { "name": "documents", "description": "Document management and digital signing" },
-    { "name": "reports", "description": "Financial reports and analytics" }
+    { "name": "reports", "description": "Financial reports and analytics" },
+    { "name": "plugin", "description": "Plugin-optimized endpoints for AI chat interfaces" },
+    { "name": "equity-plans", "description": "Equity compensation plans and option pools" }
   ],
   "components": {
     "securitySchemes": {
@@ -74,6 +77,44 @@
           "status": { "type": "string", "enum": ["OPEN", "CONVERTED", "CANCELLED"] }
         }
       },
+      "CapTableSummary": {
+        "type": "object",
+        "properties": {
+          "companyId": { "type": "string", "format": "uuid" },
+          "stakeholders": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "byType": { "type": "object", "additionalProperties": { "type": "integer" } }
+            }
+          },
+          "shareClasses": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "totalAuthorizedShares": { "type": "number" }
+            }
+          },
+          "safes": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "open": { "type": "integer" },
+              "totalInvestment": { "type": "number" }
+            }
+          },
+          "latestValuation": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "fairMarketValue": { "type": "number" },
+              "effectiveDate": { "type": "string", "format": "date" },
+              "status": { "type": "string" }
+            }
+          },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
       "AgentOnboardRequest": {
         "type": "object",
         "required": ["agent_id"],
@@ -99,6 +140,15 @@
           "capabilities": { "type": "array", "items": { "type": "string" } },
           "provisioned_at": { "type": "string", "format": "date-time" },
           "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DilutionRequest": {
+        "type": "object",
+        "required": ["round_size", "pre_money_valuation"],
+        "properties": {
+          "round_size": { "type": "number", "description": "New money raised in USD cents" },
+          "pre_money_valuation": { "type": "number", "description": "Pre-money valuation in USD cents" },
+          "option_pool_increase": { "type": "number", "description": "New option pool shares to add" }
         }
       },
       "PaginatedResponse": {
@@ -195,6 +245,95 @@
         }
       }
     },
+    "/auth/plugin/authorize": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "OAuth authorization endpoint for plugin integrations",
+        "description": "Initiates the OAuth authorization code flow. Requires the user to be logged in. Returns an authorization code via redirect to the specified redirect_uri.",
+        "parameters": [
+          { "name": "client_id", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "redirect_uri", "in": "query", "required": true, "schema": { "type": "string", "format": "uri" } },
+          { "name": "state", "in": "query", "schema": { "type": "string" } },
+          { "name": "response_type", "in": "query", "schema": { "type": "string", "default": "code" } }
+        ],
+        "responses": {
+          "302": { "description": "Redirects to redirect_uri with code and state parameters" },
+          "400": { "description": "Invalid client_id or redirect_uri" },
+          "401": { "description": "User not authenticated" }
+        }
+      }
+    },
+    "/auth/plugin/token": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Exchange authorization code for access token",
+        "description": "Exchanges a short-lived authorization code for a JWT access token. Used by plugin hosts after the user completes the OAuth consent flow.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "client_id"],
+                "properties": {
+                  "code": { "type": "string", "description": "Authorization code from the authorize step" },
+                  "client_id": { "type": "string" },
+                  "client_secret": { "type": "string" },
+                  "redirect_uri": { "type": "string", "format": "uri" },
+                  "grant_type": { "type": "string", "default": "authorization_code" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": { "type": "string" },
+                    "token_type": { "type": "string", "example": "bearer" },
+                    "expires_in": { "type": "integer", "example": 3600 }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid code or client_id" },
+          "401": { "description": "Invalid client_secret" }
+        }
+      }
+    },
+    "/auth/plugin/userinfo": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get current plugin user info",
+        "description": "Returns basic user information for the authenticated plugin session. Requires a valid Bearer token.",
+        "responses": {
+          "200": {
+            "description": "User info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "email": { "type": "string", "format": "email" },
+                    "companyId": { "type": "string" },
+                    "role": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    },
     "/agents/onboard": {
       "post": {
         "tags": ["agents"],
@@ -225,7 +364,8 @@
     "/stakeholders": {
       "get": {
         "tags": ["stakeholders"],
-        "summary": "List all stakeholders",
+        "summary": "List all stakeholders and their equity ownership",
+        "description": "Returns a paginated list of all cap table participants including founders, investors, employees, and advisors with their ownership details.",
         "parameters": [
           { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
@@ -240,7 +380,8 @@
       },
       "post": {
         "tags": ["stakeholders"],
-        "summary": "Create a stakeholder",
+        "summary": "Add a new stakeholder to the cap table",
+        "description": "Creates a new stakeholder record. This is a write operation — confirm with the user before executing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -258,12 +399,14 @@
     "/share-classes": {
       "get": {
         "tags": ["share-classes"],
-        "summary": "List share classes",
+        "summary": "List all share classes (common, preferred, options)",
+        "description": "Returns all share class definitions for the company, including common stock, preferred stock, and option pools.",
         "responses": { "200": { "description": "List of share classes" } }
       },
       "post": {
         "tags": ["share-classes"],
-        "summary": "Create share class",
+        "summary": "Create a new share class",
+        "description": "Defines a new share class. This is a write operation — confirm with the user before executing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -273,15 +416,17 @@
         "responses": { "201": { "description": "Share class created" } }
       }
     },
-    "/safe-notes": {
+    "/safes": {
       "get": {
         "tags": ["safe-notes"],
-        "summary": "List SAFE instruments",
+        "summary": "List all SAFE notes",
+        "description": "Returns all SAFE (Simple Agreement for Future Equity) instruments for the company, including their status, investment amounts, and valuation caps.",
         "responses": { "200": { "description": "List of SAFE notes" } }
       },
       "post": {
         "tags": ["safe-notes"],
-        "summary": "Create SAFE note",
+        "summary": "Create a new SAFE note",
+        "description": "Creates a new SAFE instrument. This is a write operation that creates a financial commitment — confirm all details with the user before executing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -294,38 +439,59 @@
     "/valuations/409a": {
       "get": {
         "tags": ["valuations"],
-        "summary": "List 409A valuations",
+        "summary": "Get 409A valuation history",
+        "description": "Returns the history of 409A fair market value determinations for the company, ordered by effective date.",
         "responses": { "200": { "description": "List of 409A valuations" } }
+      }
+    },
+    "/equity-plans": {
+      "get": {
+        "tags": ["equity-plans"],
+        "summary": "List equity plans and option pools",
+        "description": "Returns all equity compensation plans including stock option pools, RSU plans, and their utilization status.",
+        "responses": { "200": { "description": "List of equity plans" } }
+      }
+    },
+    "/dilution/calculate": {
+      "post": {
+        "tags": ["dilution"],
+        "summary": "Calculate dilution for a new funding round",
+        "description": "Models the dilution impact of a new funding round on existing stakeholders. Provide the round size and pre-money valuation to see how ownership percentages change.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DilutionRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dilution scenario results" } }
       }
     },
     "/fundraising-rounds": {
       "get": {
         "tags": ["fundraising"],
         "summary": "List fundraising rounds",
+        "description": "Returns all fundraising rounds for the company including seed, Series A, B, etc. with amounts raised and valuations.",
         "responses": { "200": { "description": "List of rounds" } }
       }
     },
-    "/dilution/simulate": {
-      "post": {
-        "tags": ["fundraising"],
-        "summary": "Simulate dilution for a new round",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["round_size", "pre_money_valuation"],
-                "properties": {
-                  "round_size": { "type": "number", "description": "New money raised in USD cents" },
-                  "pre_money_valuation": { "type": "number", "description": "Pre-money valuation in USD cents" },
-                  "option_pool_increase": { "type": "number", "description": "New option pool shares to add" }
-                }
+    "/plugin/summary": {
+      "get": {
+        "tags": ["plugin"],
+        "summary": "Get cap table summary overview",
+        "description": "Returns a structured overview of the company's cap table including stakeholder count by type, total authorized shares, open SAFE count and total investment, and the latest 409A valuation. Ideal as a first call to understand the current state of the cap table.",
+        "responses": {
+          "200": {
+            "description": "Cap table summary",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CapTableSummary" }
               }
             }
-          }
-        },
-        "responses": { "200": { "description": "Dilution scenario results" } }
+          },
+          "401": { "description": "Not authenticated" }
+        }
       }
     },
     "/health": {

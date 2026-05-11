@@ -10,11 +10,18 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
 // Mock axios to prevent real HTTP calls to AINative API during token fallback
+const mockInterceptors = { request: { use: jest.fn() }, response: { use: jest.fn() } };
 jest.mock('axios', () => ({
   get: jest.fn().mockRejectedValue(new Error('Mock: AINative validation rejected')),
   post: jest.fn().mockRejectedValue(new Error('Mock: AINative validation rejected')),
-  create: jest.fn().mockReturnThis(),
-  defaults: { headers: { common: {} } }
+  create: jest.fn(() => ({
+    get: jest.fn().mockRejectedValue(new Error('Mock')),
+    post: jest.fn().mockRejectedValue(new Error('Mock')),
+    interceptors: mockInterceptors,
+    defaults: { headers: { common: {} } }
+  })),
+  defaults: { headers: { common: {} } },
+  interceptors: mockInterceptors
 }));
 
 // Mock the models before requiring routes

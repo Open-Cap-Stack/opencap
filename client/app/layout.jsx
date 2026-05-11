@@ -40,7 +40,7 @@ export const metadata = {
       'Open-source cap table management for startups. Track stakeholders, issue equity, manage SAFE notes, run 409A valuations.',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-image.svg',
         width: 1200,
         height: 630,
         alt: 'OpenCap Stack — Cap Table Management',
@@ -51,7 +51,12 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'OpenCap Stack — Cap Table & Equity Management',
     description: 'Open-source cap table management for startups.',
-    images: ['/og-image.png'],
+    images: ['/og-image.svg'],
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
   },
   alternates: {
     canonical: 'https://opencapstack.com',

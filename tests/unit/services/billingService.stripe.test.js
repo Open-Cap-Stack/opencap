@@ -82,13 +82,13 @@ describe('BillingService - Stripe Integration', () => {
 
         const mockCurrentPlan = {
             planId: 'starter',
-            price: 49,
+            price: 25,
             isActive: true
         };
 
         const mockNewPlan = {
             planId: 'professional',
-            price: 149,
+            price: 75,
             isActive: true,
             stripePriceId: 'price_pro'
         };
@@ -512,6 +512,121 @@ describe('BillingService - Stripe Integration', () => {
 
             expect(stripeService.setDefaultPaymentMethod).toHaveBeenCalledWith('cus_1', 'pm_stripe_1');
             expect(result.success).toBe(true);
+        });
+    });
+
+    describe('syncPaymentMethodFromStripe - lazy customer creation', () => {
+        it('should throw when Stripe is not configured', async () => {
+            stripeService.isConfigured.mockReturnValue(false);
+
+            await expect(
+                BillingService.syncPaymentMethodFromStripe('comp_1', 'pm_stripe_1', false)
+            ).rejects.toThrow('Stripe is not configured');
+        });
+
+        it('should lazily create Stripe customer when mapping is missing', async () => {
+            // First findOne for StripeCustomer returns null (no existing mapping)
+            databaseAdapter.findOne
+                .mockResolvedValueOnce(null)   // syncPaymentMethodFromStripe: no customer mapping
+                .mockResolvedValueOnce(null);  // getOrCreateStripeCustomer: no existing mapping either
+
+            // getOrCreateStripeCustomer creates a new Stripe customer
+            stripeService.createCustomer.mockResolvedValue({ id: 'cus_new' });
+
+            const customerMapping = {
+                companyId: 'comp_1',
+                stripeCustomerId: 'cus_new',
+                email: undefined,
+                name: undefined
+            };
+            databaseAdapter.create.mockResolvedValueOnce(customerMapping);
+
+            // attachPaymentMethod succeeds
+            stripeService.attachPaymentMethod.mockResolvedValue({});
+
+            // listPaymentMethods returns the method
+            stripeService.listPaymentMethods.mockResolvedValue({
+                data: [{
+                    id: 'pm_stripe_1',
+                    type: 'card',
+                    card: { last4: '4242', brand: 'visa', exp_month: 12, exp_year: 2027 },
+                    billing_details: { name: 'Test User', email: 'test@test.com' }
+                }]
+            });
+
+            // addPaymentMethod internals
+            databaseAdapter.find.mockResolvedValue([]);
+            databaseAdapter.create.mockResolvedValueOnce({
+                methodId: 'PM-TEST',
+                customerId: 'comp_1',
+                last4: '4242'
+            });
+
+            const result = await BillingService.syncPaymentMethodFromStripe('comp_1', 'pm_stripe_1', false);
+
+            expect(stripeService.createCustomer).toHaveBeenCalled();
+            expect(stripeService.attachPaymentMethod).toHaveBeenCalledWith('pm_stripe_1', 'cus_new');
+            expect(result.last4).toBe('4242');
+        });
+
+        it('should use existing customer mapping when available', async () => {
+            const existingCustomer = { companyId: 'comp_1', stripeCustomerId: 'cus_existing' };
+            databaseAdapter.findOne.mockResolvedValueOnce(existingCustomer);
+
+            stripeService.attachPaymentMethod.mockResolvedValue({});
+            stripeService.listPaymentMethods.mockResolvedValue({
+                data: [{
+                    id: 'pm_stripe_1',
+                    type: 'card',
+                    card: { last4: '1234', brand: 'mastercard', exp_month: 6, exp_year: 2028 },
+                    billing_details: {}
+                }]
+            });
+
+            databaseAdapter.find.mockResolvedValue([]);
+            databaseAdapter.create.mockResolvedValue({
+                methodId: 'PM-TEST2',
+                customerId: 'comp_1',
+                last4: '1234'
+            });
+
+            const result = await BillingService.syncPaymentMethodFromStripe('comp_1', 'pm_stripe_1', false);
+
+            expect(stripeService.createCustomer).not.toHaveBeenCalled();
+            expect(stripeService.attachPaymentMethod).toHaveBeenCalledWith('pm_stripe_1', 'cus_existing');
+            expect(result.last4).toBe('1234');
+        });
+    });
+
+    describe('createCheckoutSession - lazy customer creation', () => {
+        it('should create Stripe customer lazily when none exists', async () => {
+            // getOrCreateStripeCustomer: no existing mapping
+            databaseAdapter.findOne.mockResolvedValueOnce(null);
+
+            stripeService.createCustomer.mockResolvedValue({ id: 'cus_lazy' });
+            databaseAdapter.create.mockResolvedValueOnce({
+                companyId: 'comp_1',
+                stripeCustomerId: 'cus_lazy'
+            });
+
+            stripeService.createCheckoutSession.mockResolvedValue({
+                id: 'cs_test',
+                url: 'https://checkout.stripe.com/cs_test'
+            });
+
+            const result = await BillingService.createCheckoutSession(
+                'comp_1', 'price_pro',
+                'http://localhost/success', 'http://localhost/cancel',
+                { email: 'user@example.com', name: 'User', userId: 'user_1' }
+            );
+
+            expect(stripeService.createCustomer).toHaveBeenCalledWith({
+                email: 'user@example.com',
+                name: 'User',
+                metadata: { companyId: 'comp_1' }
+            });
+            expect(result.sessionId).toBe('cs_test');
+            expect(result.url).toBe('https://checkout.stripe.com/cs_test');
         });
     });
 });

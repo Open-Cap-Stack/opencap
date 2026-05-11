@@ -128,13 +128,22 @@ router.post('/settings/reset', settingsController.resetUserSettings);
 // Get all users
 router.get('/', userController.getAllUsers);
 
+// Bulk delete users (admin only, requires confirmation, max 10)
+// Issue #487: Prevent mass user wipe with safety guards
+// NOTE: Must be registered before /:id to avoid route collision
+router.post('/bulk-delete', userController.bulkDeleteUsers);
+
 // Get user by ID
 router.get('/:id', userController.getUserById);
 
 // Update user by ID
 router.put('/:id', userController.updateUserById);
 
-// Delete user by ID
+// Delete user by ID (soft-delete)
 router.delete('/:id', userController.deleteUserById);
+
+// Hard-delete user by ID (admin only, cleans up related data)
+// Issue #485: Ensure orphaned data cleanup on user deletion
+router.delete('/:id/hard', userController.hardDeleteUserById);
 
 module.exports = router;

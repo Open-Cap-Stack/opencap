@@ -324,7 +324,7 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-starter',
         name: 'starter',
         displayName: 'Starter',
-        monthlyPrice: 49,
+        monthlyPrice: 25,
         sortOrder: 2,
         isPublic: true
       },
@@ -332,7 +332,7 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-professional',
         name: 'professional',
         displayName: 'Professional',
-        monthlyPrice: 149,
+        monthlyPrice: 75,
         sortOrder: 3,
         isPublic: true
       },
@@ -340,7 +340,7 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-enterprise',
         name: 'enterprise',
         displayName: 'Enterprise',
-        monthlyPrice: 499,
+        monthlyPrice: 250,
         sortOrder: 4,
         isPublic: true
       }
@@ -429,8 +429,8 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-starter',
         name: 'starter',
         displayName: 'Starter',
-        monthlyPrice: 49,
-        annualPrice: 470,
+        monthlyPrice: 25,
+        annualPrice: 240,
         features: {
           basicCapTable: true,
           documentStorage: true,
@@ -448,8 +448,8 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-professional',
         name: 'professional',
         displayName: 'Professional',
-        monthlyPrice: 149,
-        annualPrice: 1430,
+        monthlyPrice: 75,
+        annualPrice: 720,
         features: {
           basicCapTable: true,
           documentStorage: true,
@@ -510,8 +510,8 @@ describe('Feature Gating Service', () => {
 
       const comparison = await featureGatingService.compareTiers('starter', 'professional');
 
-      expect(comparison.priceDifference.monthly).toBe(100); // 149 - 49
-      expect(comparison.priceDifference.annual).toBe(960); // 1430 - 470
+      expect(comparison.priceDifference.monthly).toBe(50); // 75 - 25
+      expect(comparison.priceDifference.annual).toBe(480); // 720 - 240
     });
 
     it('should throw error for non-existent tier', async () => {
@@ -560,7 +560,7 @@ describe('Feature Gating Service', () => {
         tierId: 'tier-professional',
         name: 'professional',
         displayName: 'Professional',
-        monthlyPrice: 149
+        monthlyPrice: 75
       };
 
       zerodbService.queryTable.mockResolvedValue([mockTier]);
