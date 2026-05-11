@@ -6,7 +6,8 @@ import { useAuth } from '@/lib/AuthContext';
 import OCSLogo from '@/components/OCSLogo';
 
 const navItems = [
-  { path: '/', label: 'Overview' },
+  { path: '/dashboard', label: 'Overview' },
+  { path: '/cap-table', label: 'Cap Table' },
   { path: '/stakeholders', label: 'Stakeholders' },
   { path: '/share-classes', label: 'Share Classes' },
   { path: '/equity-plans', label: 'Equity Plans' },
@@ -25,14 +26,14 @@ export default function Sidebar() {
   return (
     <div className="w-56 h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-4 border-b border-gray-700">
-        <Link href="/">
+        <Link href="/dashboard">
           <OCSLogo variant="full" color="light" height={28} />
         </Link>
         {user && <p className="text-xs text-gray-400 mt-2 truncate">{user.email}</p>}
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
+          const isActive = item.path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.path);
           return (
             <Link
               key={item.path}

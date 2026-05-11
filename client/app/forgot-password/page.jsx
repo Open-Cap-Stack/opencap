@@ -15,11 +15,11 @@ export default function ForgotPasswordPage() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/api/v1/auth/password/reset-request', { email });
+      await api.post('/api/v1/auth/forgot-password', { email });
       setSubmitted(true);
     } catch (err) {
-      // Show generic message regardless of whether account exists
-      setSubmitted(true);
+      const msg = err.response?.data?.message || 'Something went wrong. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

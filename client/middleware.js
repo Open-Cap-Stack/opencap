@@ -10,6 +10,9 @@ const SESSION_COOKIE = 'session';
 const PUBLIC_PREFIXES = [
   '/login',
   '/register',
+  '/pricing',
+  '/onboarding',
+  '/company-setup',
   '/auth/',
   '/api/',
   '/_next/',
@@ -17,7 +20,11 @@ const PUBLIC_PREFIXES = [
   '/public',
 ];
 
+// Exact paths that are public (no auth needed)
+const PUBLIC_EXACT = new Set(['/']);
+
 function isPublicRoute(pathname) {
+  if (PUBLIC_EXACT.has(pathname)) return true;
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
@@ -49,6 +56,6 @@ export function middleware(request) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon|.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)|login|register|auth/|api/).*)',
+    '/((?!_next/static|_next/image|favicon|.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)|login|register|pricing|auth/|api/).*)',
   ],
 };

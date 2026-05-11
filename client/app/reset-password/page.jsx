@@ -44,9 +44,9 @@ function ResetPasswordForm() {
 
     setLoading(true);
     try {
-      await api.post('/api/v1/auth/password/reset', { token, password });
+      await api.post('/api/v1/auth/reset-password', { token, password });
       setSuccess(true);
-      setTimeout(() => router.push('/login'), 3000);
+      setTimeout(() => router.push('/login'), 2000);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to reset password. The link may have expired.';
       setError(msg);

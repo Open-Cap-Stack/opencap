@@ -64,7 +64,7 @@ function LoginForm() {
     try {
       await login(email, password);
       trackLoginComplete('email');
-      router.push('/');
+      router.push('/dashboard');
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
       trackLoginFailed('email', msg);

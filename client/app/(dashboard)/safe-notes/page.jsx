@@ -39,17 +39,75 @@ function StatusBadge({ status }) {
   );
 }
 
+// ─── summary cards ────────────────────────────────────────────────────────────
+
+function SummaryCards({ notes }) {
+  const totalAmount = notes.reduce((sum, n) => sum + (Number(n.investmentAmount) || 0), 0);
+  const count = notes.length;
+  const caps = notes.filter((n) => Number(n.valuationCap) > 0).map((n) => Number(n.valuationCap));
+  const avgCap = caps.length > 0 ? caps.reduce((a, b) => a + b, 0) / caps.length : 0;
+  const uniqueInvestors = new Set(notes.map((n) => n.investorName).filter(Boolean)).size;
+
+  const cards = [
+    {
+      label: 'Total SAFE Amount Raised',
+      value: formatCurrency(totalAmount),
+      sub: count === 0 ? 'No SAFEs yet' : `Across ${count} SAFE${count !== 1 ? 's' : ''}`,
+      color: 'text-blue-600',
+    },
+    {
+      label: 'Number of SAFEs',
+      value: count.toString(),
+      sub: `${notes.filter((n) => n.status === 'open').length} active`,
+      color: 'text-indigo-600',
+    },
+    {
+      label: 'Average Valuation Cap',
+      value: avgCap > 0 ? formatCurrency(avgCap) : '-',
+      sub: caps.length > 0 ? `Based on ${caps.length} capped SAFE${caps.length !== 1 ? 's' : ''}` : 'No caps set',
+      color: 'text-purple-600',
+    },
+    {
+      label: 'Total Investors',
+      value: uniqueInvestors.toString(),
+      sub: uniqueInvestors === 1 ? '1 unique investor' : `${uniqueInvestors} unique investors`,
+      color: 'text-emerald-600',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card) => (
+        <div key={card.label} className="bg-white rounded-lg shadow p-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{card.label}</p>
+          <p className={`text-2xl font-bold mt-1 ${card.color}`}>{card.value}</p>
+          <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── status filter ────────────────────────────────────────────────────────────
+
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'open', label: 'Active' },
+  { value: 'converted', label: 'Converted' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
 // ─── columns ─────────────────────────────────────────────────────────────────
 
 const columns = [
   {
     key: 'investorName',
     label: 'Investor',
-    render: (v) => v || '-',
+    render: (v) => <span className="font-medium text-gray-900">{v || '-'}</span>,
   },
   {
     key: 'investmentAmount',
-    label: 'Investment Amount',
+    label: 'Amount',
     render: (v) => formatCurrency(v),
   },
   {
@@ -61,6 +119,16 @@ const columns = [
     key: 'discountRate',
     label: 'Discount Rate',
     render: (v) => (v !== undefined && v !== null && v !== '' ? `${v}%` : '-'),
+  },
+  {
+    key: 'safeType',
+    label: 'Type',
+    render: (v) => {
+      if (!v) return <span className="text-gray-400">-</span>;
+      const label = v === 'post-money' ? 'Post-Money' : v === 'pre-money' ? 'Pre-Money' : v;
+      const style = v === 'post-money' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700';
+      return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style}`}>{label}</span>;
+    },
   },
   {
     key: 'status',
@@ -86,9 +154,34 @@ const emptyForm = {
   investmentAmount: '',
   valuationCap: '',
   discountRate: '',
+  safeType: 'post-money',
   status: 'open',
   date: '',
 };
+
+// ─── empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ onAdd }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+        <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+      <h3 className="text-base font-semibold text-gray-900 mb-1">No SAFE notes yet</h3>
+      <p className="text-sm text-gray-500 mb-4 max-w-sm">
+        Start tracking your SAFE agreements. Add your first SAFE note to see summary metrics and manage investor details.
+      </p>
+      <button
+        onClick={onAdd}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium transition-colors"
+      >
+        Add SAFE note
+      </button>
+    </div>
+  );
+}
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
@@ -97,6 +190,7 @@ export default function SafeNotesPage() {
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
   const [mutationError, setMutationError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('');
   const qc = useQueryClient();
 
   // ── queries & mutations ──────────────────────────────────────────────────
@@ -160,8 +254,8 @@ export default function SafeNotesPage() {
       investmentAmount: row.investmentAmount ?? '',
       valuationCap: row.valuationCap ?? '',
       discountRate: row.discountRate ?? '',
+      safeType: row.safeType || 'post-money',
       status: row.status || 'open',
-      // Normalize ISO date string to YYYY-MM-DD for the date input
       date: row.date ? row.date.slice(0, 10) : '',
     });
     setMutationError(null);
@@ -170,7 +264,6 @@ export default function SafeNotesPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Coerce numeric strings to numbers before sending
     const payload = {
       ...form,
       investmentAmount: form.investmentAmount !== '' ? Number(form.investmentAmount) : undefined,
@@ -186,9 +279,14 @@ export default function SafeNotesPage() {
 
   const isSaving = createMut.isPending || updateMut.isPending;
 
-  // ── row assembly ──────────────────────────────────────────────────────────
+  // ── data assembly ─────────────────────────────────────────────────────────
 
-  const rows = (Array.isArray(data) ? data : []).map((r) => ({
+  const allNotes = Array.isArray(data) ? data : [];
+  const filteredNotes = statusFilter
+    ? allNotes.filter((n) => n.status === statusFilter)
+    : allNotes;
+
+  const rows = filteredNotes.map((r) => ({
     ...r,
     _actions: (
       <div className="flex gap-2">
@@ -213,26 +311,66 @@ export default function SafeNotesPage() {
   return (
     <div>
       {/* Page header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">SAFE Notes</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">SAFE Notes</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Track Simple Agreements for Future Equity across all investors
+          </p>
+        </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+          className="self-start sm:self-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium transition-colors"
         >
           New SAFE
         </button>
       </div>
 
-      {/* Table card */}
+      {/* Summary cards — always shown, zero-state when no data */}
+      <SummaryCards notes={allNotes} />
+
+      {/* Table section */}
       <div className="bg-white rounded-lg shadow">
-        <DataTable
-          columns={columns}
-          data={rows}
-          isLoading={isLoading}
-          error={error?.message}
-          onRetry={refetch}
-          emptyMessage="No SAFE notes yet. Click 'New SAFE' to add one."
-        />
+        {/* Table header with filter */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700">SAFE Agreements</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 font-medium">Filter:</label>
+            <div className="flex gap-1">
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setStatusFilter(f.value)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === f.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Empty state when no SAFE notes at all */}
+        {!isLoading && !error && allNotes.length === 0 ? (
+          <EmptyState onAdd={openCreate} />
+        ) : (
+          <DataTable
+            columns={columns}
+            data={rows}
+            isLoading={isLoading}
+            error={error?.message}
+            onRetry={refetch}
+            emptyMessage={
+              statusFilter
+                ? `No ${statusFilter} SAFE notes. Try a different filter.`
+                : "No SAFE notes yet. Click 'New SAFE' to add one."
+            }
+          />
+        )}
       </div>
 
       {/* Create / Edit modal */}
@@ -307,6 +445,21 @@ export default function SafeNotesPage() {
               placeholder="e.g. 20"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              SAFE Type
+            </label>
+            <select
+              value={form.safeType}
+              onChange={(e) => setForm({ ...form, safeType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="post-money">Post-Money SAFE</option>
+              <option value="pre-money">Pre-Money SAFE</option>
+              <option value="mfn">MFN SAFE</option>
+            </select>
           </div>
 
           <div>
