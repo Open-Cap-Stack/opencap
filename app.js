@@ -473,12 +473,25 @@ app.use((err, req, res, next) => {
   errorResponse(res, status, message, err);
 });
 
-// Proxy non-API requests to Next.js frontend (port 5173 in same container)
-// This allows a single Railway port (8080) to serve both the API and the UI.
+// Domain-based routing:
+//   api.opencapstack.com  → Express API only (returns 404 for non-API routes)
+//   opencapstack.com      → Proxy all non-API requests to Next.js (port 5173)
+//
+// Both domains point to the same Railway container. The Host header determines
+// whether a request is for the API or the UI.
 const NEXT_PORT = process.env.NEXT_PORT || 5173;
+const API_HOST = process.env.API_HOST || 'api.opencapstack.com';
 const http = require('http');
+
 app.use('*', (req, res) => {
-  // Only proxy GET/HEAD for UI routes — everything else is a real 404
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+
+  // If request is coming to the API domain, don't proxy — it's a real 404
+  if (host === API_HOST || host === 'localhost' || host === '127.0.0.1') {
+    return errorResponse(res, 404, 'Route not found');
+  }
+
+  // Frontend domain (opencapstack.com) — proxy GET/HEAD to Next.js
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return errorResponse(res, 404, 'Route not found');
   }
@@ -497,7 +510,6 @@ app.use('*', (req, res) => {
   });
 
   proxy.on('error', () => {
-    // Next.js not running — fall back to 404
     errorResponse(res, 404, 'Route not found');
   });
 
