@@ -1,0 +1,54 @@
+/**
+ * Next.js Edge Middleware — Server-Side Route Protection
+ * Issue #518: Next.js server-side route protection
+ */
+
+import { NextResponse } from 'next/server';
+
+const SESSION_COOKIE = 'session';
+
+const PUBLIC_PREFIXES = [
+  '/login',
+  '/register',
+  '/auth/',
+  '/api/',
+  '/_next/',
+  '/favicon',
+  '/public',
+];
+
+function isPublicRoute(pathname) {
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
+
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  const sessionCookie =
+    request.cookies.get(SESSION_COOKIE)?.value ||
+    request.cookies.get('token')?.value;
+
+  if (sessionCookie) {
+    return NextResponse.next();
+  }
+
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return NextResponse.next();
+  }
+
+  const loginUrl = new URL('/login', request.url);
+  loginUrl.searchParams.set('redirect', pathname);
+
+  return NextResponse.redirect(loginUrl);
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|login|register|auth/|api/).*)',
+  ],
+};
