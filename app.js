@@ -436,7 +436,7 @@ Object.entries(routes).forEach(([key, route]) => {
 
 // Health check endpoint - must be before error handlers
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Server is running' });
+  res.status(200).json({ status: 'ok', message: 'Server is running', build: process.env.BUILD_SHA || 'unknown' });
 });
 
 // ZeroDB health check endpoint
