@@ -18,6 +18,9 @@ const navItems = [
   { path: '/fundraise', label: 'Fundraise' },
   { path: '/board', label: 'Board', href: '/board/meetings' },
   { path: '/documents', label: 'Documents' },
+  { path: '/data-rooms', label: 'Data Rooms', indent: true },
+  { path: '/document-access', label: 'Doc Access', indent: true },
+  { path: '/templates', label: 'Templates', indent: true },
   { path: '/reports', label: 'Reports' },
   { path: '/valuations', label: '409A Valuation' },
   { path: '/tax', label: 'Tax Center' },
@@ -45,15 +48,27 @@ export default function Sidebar() {
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = item.path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.path);
+          const isActive =
+            item.path === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.path);
           return (
             <Link
               key={item.path}
               href={item.href ?? item.path}
-              className={`block px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              className={`block rounded-md text-sm transition-colors ${
+                item.indent ? 'pl-6 pr-3 py-1.5' : 'px-3 py-2'
+              } ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : item.indent
+                  ? 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               }`}
             >
+              {item.indent && (
+                <span className="inline-block w-2 h-px bg-current opacity-40 mr-1.5 align-middle" />
+              )}
               {item.label}
             </Link>
           );

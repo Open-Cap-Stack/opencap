@@ -50,13 +50,48 @@ export default function DocumentsPage() {
     _actions: (<button onClick={(e) => { e.stopPropagation(); setDeleteId(r.id || r._id); }} className="text-red-600 text-sm hover:underline">Delete</button>),
   }));
 
+  const docTabs = [
+    { label: 'Documents', href: '/documents' },
+    { label: 'Data Rooms', href: '/data-rooms' },
+    { label: 'Access Control', href: '/document-access' },
+    { label: 'Templates', href: '/templates' },
+  ];
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Documents</h1>
-        <div><input ref={fileRef} type="file" onChange={handleUpload} className="hidden" id="file-upload" /><label htmlFor="file-upload" className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>{uploading ? 'Uploading...' : 'Upload Document'}</label></div>
+        <div>
+          <input ref={fileRef} type="file" onChange={handleUpload} className="hidden" id="file-upload" />
+          <label
+            htmlFor="file-upload"
+            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            {uploading ? 'Uploading...' : 'Upload Document'}
+          </label>
+        </div>
       </div>
-      <div className="bg-white rounded-lg shadow"><DataTable columns={columns} data={rows} isLoading={isLoading} error={error?.message} onRetry={refetch} emptyMessage="No documents uploaded" /></div>
+
+      {/* Section tab navigation */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {docTabs.map((tab) => (
+          <a
+            key={tab.href}
+            href={tab.href}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab.href === '/documents'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            {tab.label}
+          </a>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <DataTable columns={columns} data={rows} isLoading={isLoading} error={error?.message} onRetry={refetch} emptyMessage="No documents uploaded" />
+      </div>
       <ConfirmDialog isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => deleteMut.mutate(deleteId)} title="Delete Document" message="Are you sure you want to delete this document?" />
     </div>
   );
