@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Github,
-  Slack,
+  GitBranch,
+  MessageSquare,
   HardDrive,
   Zap,
   BookOpen,
@@ -25,7 +25,7 @@ const INTEGRATIONS = [
     name: 'GitHub',
     description: 'Sync equity grants with GitHub org members and manage team access.',
     category: 'Developer',
-    icon: Github,
+    icon: GitBranch,
     iconBg: 'bg-gray-900',
     iconColor: 'text-white',
     status: 'available',
@@ -35,7 +35,7 @@ const INTEGRATIONS = [
     name: 'Slack',
     description: 'Get cap table notifications and alerts directly in your Slack workspace.',
     category: 'Communication',
-    icon: Slack,
+    icon: MessageSquare,
     iconBg: 'bg-purple-600',
     iconColor: 'text-white',
     status: 'available',
