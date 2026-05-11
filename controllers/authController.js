@@ -323,7 +323,7 @@ const oauthLogin = async (req, res) => {
         if (!tokenResponse.ok) {
           const errorData = await tokenResponse.text();
           console.error('LinkedIn token exchange failed:', errorData);
-          return res.status(401).json({ message: 'LinkedIn authorization code exchange failed' });
+          return res.status(401).json({ message: 'LinkedIn authorization code exchange failed', detail: errorData });
         }
 
         const tokenData = await tokenResponse.json();
@@ -379,7 +379,8 @@ const oauthLogin = async (req, res) => {
 
         const tokenData = await tokenResponse.json();
         if (tokenData.error || !tokenData.access_token) {
-          return res.status(401).json({ message: 'GitHub authorization code exchange failed' });
+          console.error('GitHub token exchange error:', JSON.stringify(tokenData));
+          return res.status(401).json({ message: 'GitHub authorization code exchange failed', detail: tokenData.error_description || tokenData.error });
         }
 
         // Fetch user profile
