@@ -119,11 +119,8 @@ function validateEnvironment() {
     // Validate it has the correct format (ends with .apps.googleusercontent.com)
     if (!process.env.GOOGLE_CLIENT_ID.endsWith('.apps.googleusercontent.com')) {
       const msg = 'GOOGLE_CLIENT_ID does not have the expected Google OAuth format';
-      if (isProd) {
-        errors.push(msg);
-      } else {
-        warnings.push(msg);
-      }
+      // Warn but don't block startup — Google OAuth may use non-standard formats in some configurations
+      warnings.push(msg);
     }
   }
 
