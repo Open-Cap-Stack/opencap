@@ -48,7 +48,7 @@ const SAMPLE_CONVERSATIONS = [
     unread: 2,
     messages: [
       { id: 'm1', from: 'Alex Johnson', text: 'Hey! Do you have a minute to chat?', ts: new Date(Date.now() - 20 * 60000).toISOString(), sent: false },
-      { id: 'm2', from: 'me', text: 'Sure, what's up?', ts: new Date(Date.now() - 18 * 60000).toISOString(), sent: true },
+      { id: 'm2', from: 'me', text: "Sure, what's up?", ts: new Date(Date.now() - 18 * 60000).toISOString(), sent: true },
       { id: 'm3', from: 'Alex Johnson', text: 'Can you review the cap table update before the board meeting?', ts: new Date(Date.now() - 3 * 60000).toISOString(), sent: false },
     ],
   },
@@ -60,7 +60,7 @@ const SAMPLE_CONVERSATIONS = [
     unread: 0,
     messages: [
       { id: 'm4', from: 'Maria Garcia', text: 'Hi, the 409A valuation report is ready for your signature.', ts: new Date(Date.now() - 2 * 3600000).toISOString(), sent: false },
-      { id: 'm5', from: 'me', text: 'Thanks! I'll take a look this afternoon.', ts: new Date(Date.now() - 90 * 60000).toISOString(), sent: true },
+      { id: 'm5', from: 'me', text: "Thanks! I'll take a look this afternoon.", ts: new Date(Date.now() - 90 * 60000).toISOString(), sent: true },
     ],
   },
   {

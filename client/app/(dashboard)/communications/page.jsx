@@ -21,7 +21,7 @@ const STARTER_TEMPLATES = [
   {
     id: 'tpl-2',
     name: 'Equity Grant Notification',
-    subject: 'You've received an equity grant',
+    subject: "You've received an equity grant",
     lastEdited: new Date(Date.now() - 14 * 86400000).toISOString(),
   },
   {
