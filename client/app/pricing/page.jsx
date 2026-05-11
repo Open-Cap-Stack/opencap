@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import OCSLogo from '@/components/OCSLogo';
 
 const plans = [
   {
@@ -100,13 +101,8 @@ export default function PricingPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="18" width="7" height="11" rx="1.5" fill="#2563EB"/>
-            <rect x="12.5" y="11" width="7" height="18" rx="1.5" fill="#2563EB"/>
-            <rect x="22" y="3" width="7" height="26" rx="1.5" fill="#2563EB"/>
-          </svg>
-          <span className="font-bold text-gray-900">OpenCap Stack</span>
+        <Link href="/">
+          <OCSLogo variant="full" color="dark" height={32} />
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">Sign in</Link>

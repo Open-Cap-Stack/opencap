@@ -55,8 +55,10 @@ export const metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/ocs-icon.png', type: 'image/png' },
     ],
+    shortcut: '/ocs-icon.png',
+    apple: '/ocs-icon.png',
   },
   alternates: {
     canonical: 'https://opencapstack.com',

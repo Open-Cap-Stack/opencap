@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { authService } from '@/lib/authService';
+import OCSLogo from '@/components/OCSLogo';
 import {
   trackLoginStart, trackLoginComplete, trackLoginFailed,
   trackOAuthClick,
@@ -102,7 +103,11 @@ function LoginForm() {
         <SearchParamsHandler setError={setError} />
       </Suspense>
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-2xl font-bold text-center mb-6">OpenCap Stack</h1>
+        <div className="flex justify-center mb-6">
+          <Link href="/">
+            <OCSLogo variant="full" color="dark" height={36} />
+          </Link>
+        </div>
         <h2 className="text-lg text-gray-600 text-center mb-8">Sign in to your account</h2>
 
         {error && (

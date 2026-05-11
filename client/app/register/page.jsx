@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { trackSignUpStart, trackSignUpComplete } from '@/lib/analytics';
+import OCSLogo from '@/components/OCSLogo';
 
 const features = [
   { icon: '📊', text: 'Cap table management aligned with OCTA v2.0 schema' },
@@ -63,13 +64,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex">
       {/* Left panel — value prop */}
       <div className="hidden lg:flex lg:w-1/2 bg-blue-600 text-white flex-col justify-center px-12 py-16">
-        <Link href="/" className="flex items-center gap-2 mb-12">
-          <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="18" width="7" height="11" rx="1.5" fill="white" fillOpacity="0.7"/>
-            <rect x="12.5" y="11" width="7" height="18" rx="1.5" fill="white" fillOpacity="0.85"/>
-            <rect x="22" y="3" width="7" height="26" rx="1.5" fill="white"/>
-          </svg>
-          <span className="font-bold text-white text-lg">OpenCap Stack</span>
+        <Link href="/" className="inline-block mb-12">
+          <OCSLogo variant="full" color="light" height={36} />
         </Link>
 
         <h1 className="text-3xl font-bold mb-4 leading-tight">
@@ -98,13 +94,8 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="18" width="7" height="11" rx="1.5" fill="#2563EB"/>
-                <rect x="12.5" y="11" width="7" height="18" rx="1.5" fill="#2563EB"/>
-                <rect x="22" y="3" width="7" height="26" rx="1.5" fill="#2563EB"/>
-              </svg>
-              <span className="font-bold text-gray-900 text-lg">OpenCap Stack</span>
+            <Link href="/">
+              <OCSLogo variant="full" color="dark" height={36} />
             </Link>
           </div>
 
