@@ -1,8 +1,8 @@
 import api from '@/lib/api';
 
 export const stakeholderService = {
-  async getStakeholders(params) {
-    const { data } = await api.get('/stakeholders', { params });
+  async getStakeholders(companyId, params) {
+    const { data } = await api.get('/stakeholders', { params: { companyId, ...params } });
     return data;
   },
   async getStakeholder(id) {

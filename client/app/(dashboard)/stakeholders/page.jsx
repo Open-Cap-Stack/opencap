@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stakeholderService } from '@/lib/stakeholderService';
+import { useAuth } from '@/lib/AuthContext';
 import DataTable from '@/components/ui/DataTable';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -23,9 +24,11 @@ export default function StakeholdersPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [mutationError, setMutationError] = useState(null);
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const companyId = profile?.companyId;
 
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['stakeholders'], queryFn: () => stakeholderService.getStakeholders() });
-  const createMut = useMutation({ mutationFn: (d) => stakeholderService.createStakeholder(d), onSuccess: () => { setMutationError(null); qc.invalidateQueries({ queryKey: ['stakeholders'] }); setModal({ open: false, editing: null }); }, onError: (err) => { setMutationError(err.response?.data?.message || 'Failed to create stakeholder'); } });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['stakeholders', companyId], queryFn: () => stakeholderService.getStakeholders(companyId), enabled: !!companyId });
+  const createMut = useMutation({ mutationFn: (d) => stakeholderService.createStakeholder({ ...d, companyId }), onSuccess: () => { setMutationError(null); qc.invalidateQueries({ queryKey: ['stakeholders'] }); setModal({ open: false, editing: null }); }, onError: (err) => { setMutationError(err.response?.data?.message || 'Failed to create stakeholder'); } });
   const updateMut = useMutation({ mutationFn: ({ id, ...d }) => stakeholderService.updateStakeholder(id, d), onSuccess: () => { setMutationError(null); qc.invalidateQueries({ queryKey: ['stakeholders'] }); setModal({ open: false, editing: null }); }, onError: (err) => { setMutationError(err.response?.data?.message || 'Failed to update stakeholder'); } });
   const deleteMut = useMutation({ mutationFn: (id) => stakeholderService.deleteStakeholder(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['stakeholders'] }); setDeleteId(null); }, onError: (err) => { alert(err.response?.data?.message || 'Failed to delete stakeholder'); } });
 
