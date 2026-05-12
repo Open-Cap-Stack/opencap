@@ -258,7 +258,7 @@ test.describe('SAFE Notes — create SAFE flow', () => {
     const successBanner = page.locator('text=SAFE note added successfully');
     const newRow = page.locator('text=Test Ventures');
 
-    await expect(successBanner.or(newRow)).toBeVisible({ timeout: 10000 });
+    await expect(successBanner.or(newRow).first()).toBeVisible({ timeout: 10000 });
 
     await snap(page, 'create-success');
   });
