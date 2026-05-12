@@ -16,9 +16,9 @@ function OAuthCallbackInner() {
     const processCallback = async () => {
       try {
         if (provider === 'ainative') {
-          const token = searchParams.get('token');
-          if (!token) throw new Error('Missing token in AINative callback');
-          const data = await authService.handleAINativeCallback(token);
+          const code = searchParams.get('code');
+          if (!code) throw new Error('Missing authorization code in AINative callback');
+          const data = await authService.handleAINativeCallback(code);
           if (data.user) {
             localStorage.setItem('user', JSON.stringify(data.user));
             setUserFromOAuth(data.user);

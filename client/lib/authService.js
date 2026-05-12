@@ -3,6 +3,18 @@ import api from '@/lib/api';
 // OAuth helpers — GitHub and LinkedIn use authorization code redirect flow
 const OAUTH_STATE_KEY = 'oauth_state';
 const OAUTH_PROVIDER_KEY = 'oauth_provider';
+const PKCE_VERIFIER_KEY = 'pkce_code_verifier';
+
+// PKCE helpers for AINative OAuth 2.1
+async function generatePKCE() {
+  const verifier = generateState() + generateState(); // 128 hex chars
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return { verifier, challenge };
+}
 
 // ── Cookie helpers ─────────────────────────────────────────────────────────────
 
@@ -152,14 +164,27 @@ export const authService = {
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   },
 
-  initiateAINativeLogin() {
-    const state = generateState();
-    sessionStorage.setItem(OAUTH_STATE_KEY, state);
-    sessionStorage.setItem(OAUTH_PROVIDER_KEY, 'ainative');
-    const redirectUri = getRedirectUri('ainative');
-    const ainativeBase = process.env.NEXT_PUBLIC_AINATIVE_URL || 'https://ainative.studio';
-    const params = new URLSearchParams({ redirect_uri: redirectUri, state });
-    window.location.href = `${ainativeBase}/login?${params}`;
+  // initiateAINativeLogin is intentionally a no-op redirect —
+  // AINative OAuth 2.1 restricts redirect_uri to localhost only.
+  // The login page handles AINative sign-in via ainativeCredentialLogin() instead.
+  async initiateAINativeLogin() {
+    // Signal the login page to show the AINative credentials modal
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('show-ainative-modal'));
+    }
+  },
+
+  // Sign in with AINative email + password via server-side proxy
+  async ainativeCredentialLogin(email, password) {
+    const { data } = await api.post('/auth/ainative-login', { email, password });
+    const token = data.accessToken || data.token;
+    if (token) {
+      localStorage.setItem('token', token);
+      setTokenCookie(token);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+    }
+    return data;
   },
 
   // Handle callback for GitHub/LinkedIn/Google (authorization code flow)
@@ -192,12 +217,37 @@ export const authService = {
     return data;
   },
 
-  // Handle AINative SSO callback — exchanges AINative JWT for OCS JWT
-  async handleAINativeCallback(token) {
+  // Handle AINative OAuth 2.1 callback — exchanges auth code + PKCE verifier for tokens
+  async handleAINativeCallback(code) {
+    const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
     sessionStorage.removeItem(OAUTH_STATE_KEY);
     sessionStorage.removeItem(OAUTH_PROVIDER_KEY);
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
 
-    const { data } = await api.post('/auth/exchange-token', { ainativeToken: token });
+    if (!verifier) throw new Error('Missing PKCE verifier — restart the login flow');
+
+    // Exchange the AINative auth code for an AINative access token
+    const ainativeApiBase = process.env.NEXT_PUBLIC_AINATIVE_API_URL || 'https://api.ainative.studio';
+    const tokenRes = await fetch(`${ainativeApiBase}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: getRedirectUri('ainative'),
+        client_id: 'opencapstack',
+        code_verifier: verifier,
+      }),
+    });
+    if (!tokenRes.ok) {
+      const err = await tokenRes.json().catch(() => ({}));
+      throw new Error(err.error_description || err.detail || 'AINative token exchange failed');
+    }
+    const tokenData = await tokenRes.json();
+    const ainativeToken = tokenData.access_token;
+
+    // Exchange AINative token for OpenCap Stack session
+    const { data } = await api.post('/auth/exchange-token', { ainativeToken });
 
     const resolvedToken = data.token || data.accessToken;
     if (resolvedToken) {

@@ -18,6 +18,9 @@ router.post('/oauth-login', authController.oauthLogin);
 // Token exchange: convert AINative token to fast local JWT (unprotected, rate-limited)
 router.post('/exchange-token', createEndpointRateLimiter('/api/v1/auth/login'), authController.exchangeAINativeToken);
 
+// AINative credential login: authenticate directly with AINative email/password (rate-limited)
+router.post('/ainative-login', createEndpointRateLimiter('/api/v1/auth/login'), authController.ainativeLogin);
+
 // New routes for OCAE-203
 // Token management
 router.post('/token/refresh', createEndpointRateLimiter('/api/v1/auth/login'), authController.refreshToken);

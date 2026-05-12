@@ -1139,6 +1139,73 @@ const exchangeAINativeToken = async (req, res) => {
   }
 };
 
+/**
+ * POST /auth/ainative-login
+ * Accepts AINative credentials, authenticates server-side against AINative,
+ * and returns an OpenCap Stack session. This avoids browser OAuth redirect
+ * limitations while AINative OAuth 2.1 only allows localhost redirect URIs.
+ */
+const ainativeLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'email and password are required' });
+    }
+
+    // Authenticate against AINative
+    let ainativeToken;
+    try {
+      const { data } = await axios.post(`${AINATIVE_API_URL}/api/v1/auth/login`, { email, password }, { timeout: 10000 });
+      ainativeToken = data.access_token;
+    } catch {
+      return res.status(401).json({ message: 'Invalid AINative credentials' });
+    }
+
+    // Validate token and get user profile
+    let ainativeUser;
+    try {
+      const { data } = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${ainativeToken}` },
+        timeout: 10000,
+      });
+      ainativeUser = {
+        userId: data.id,
+        email: (data.email || '').trim().toLowerCase(),
+        name: data.name,
+        role: 'user',
+        permissions: [],
+        isAINativeUser: true,
+      };
+    } catch {
+      return res.status(401).json({ message: 'AINative token validation failed' });
+    }
+
+    const localUser = await provisionAINativeUser(ainativeUser);
+    const userId = localUser.userId;
+
+    const accessToken = jwt.sign(
+      { userId, email: localUser.email, role: localUser.role || 'user', permissions: localUser.permissions || [], companyId: localUser.companyId || null },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    const localRefreshToken = jwt.sign(
+      { userId },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.status(200).json({
+      message: 'Login successful',
+      accessToken,
+      refreshToken: localRefreshToken,
+      user: { userId, email: localUser.email, name: localUser.displayName || localUser.name || ainativeUser.name, role: localUser.role || 'user', permissions: localUser.permissions || [], companyId: localUser.companyId },
+    });
+  } catch (error) {
+    console.error('AINative login error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Export all controller functions
 module.exports = {
   registerUser,
@@ -1155,6 +1222,7 @@ module.exports = {
   verifyEmail,
   resendVerification,
   exchangeAINativeToken,
+  ainativeLogin,
   adminToken
 };
 

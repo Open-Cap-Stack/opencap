@@ -445,6 +445,23 @@ fs.writeFileSync(
   JSON.stringify(swaggerSpec, null, 2)
 );
 
+// Relaxed CSP for Swagger UI routes — swagger-ui-express loads inline scripts and CDN assets
+const swaggerCsp = (req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
+      "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
+      "img-src 'self' data: https:",
+      "font-src 'self' data: https://unpkg.com https://cdn.jsdelivr.net",
+      "connect-src 'self'",
+      "worker-src blob:",
+    ].join('; ')
+  );
+  next();
+};
+
 /**
  * Set up Swagger documentation middleware
  * @param {Object} app - Express application
@@ -455,26 +472,30 @@ const setupSwagger = (app) => {
     return;
   }
 
-  // Setup Swagger UI middleware
-  console.log('Setting up Swagger UI at /api-docs');
-  app.use('/api-docs', swaggerUi.serve);
-  app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
+  // /docs → /api-docs/ redirect for discoverable URL
+  app.get('/docs', (req, res) => res.redirect(301, '/api-docs/'));
+  app.get('/docs/', (req, res) => res.redirect(301, '/api-docs/'));
+
+  // Apply relaxed CSP only on swagger routes, then serve UI
+  app.use('/api-docs', swaggerCsp, swaggerUi.serve);
+  app.get('/api-docs', swaggerCsp, swaggerUi.setup(swaggerSpec, {
     explorer: true,
+    customSiteTitle: 'OpenCap Stack API',
     swaggerOptions: {
-      docExpansion: 'none', // Collapse all sections by default
-      filter: true,         // Enable filtering
-      displayRequestDuration: true // Show API call duration
-    }
+      docExpansion: 'none',
+      filter: true,
+      displayRequestDuration: true,
+      url: '/api-docs.json',
+    },
   }));
 
-  // Setup Swagger JSON endpoint
-  console.log('Setting up Swagger JSON endpoint at /api-docs.json');
+  // Swagger JSON endpoint
   app.get('/api-docs.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });
-  
-  console.log('🚀 Swagger documentation available at /api-docs');
+
+  console.log('API documentation available at /docs');
 };
 
 module.exports = {

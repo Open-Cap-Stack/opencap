@@ -55,8 +55,38 @@ function LoginForm() {
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [resendStatus, setResendStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [showAINativeModal, setShowAINativeModal] = useState(false);
+  const [ainativeEmail, setAinativeEmail] = useState('');
+  const [ainativePassword, setAinativePassword] = useState('');
+  const [ainativeLoading, setAinativeLoading] = useState(false);
+  const [ainativeError, setAinativeError] = useState('');
+  const { login, setUserFromOAuth } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    const handler = () => setShowAINativeModal(true);
+    window.addEventListener('show-ainative-modal', handler);
+    return () => window.removeEventListener('show-ainative-modal', handler);
+  }, []);
+
+  const handleAINativeModalSubmit = async (e) => {
+    e.preventDefault();
+    setAinativeError('');
+    setAinativeLoading(true);
+    try {
+      const data = await authService.ainativeCredentialLogin(ainativeEmail, ainativePassword);
+      if (data.user) setUserFromOAuth(data.user);
+      trackLoginComplete('ainative');
+      setShowAINativeModal(false);
+      router.push('/dashboard');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Invalid AINative credentials';
+      trackLoginFailed('ainative', msg);
+      setAinativeError(msg);
+    } finally {
+      setAinativeLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,7 +127,7 @@ function LoginForm() {
     }
   };
 
-  const handleOAuth = (provider) => {
+  const handleOAuth = async (provider) => {
     setError('');
     trackOAuthClick(provider);
     trackLoginStart(provider);
@@ -106,7 +136,7 @@ function LoginForm() {
         case 'google': authService.initiateGoogleLogin(); break;
         case 'linkedin': authService.initiateLinkedInLogin(); break;
         case 'github': authService.initiateGitHubLogin(); break;
-        case 'ainative': authService.initiateAINativeLogin(); break;
+        case 'ainative': await authService.initiateAINativeLogin(); break;
       }
     } catch (err) {
       trackLoginFailed(provider, err.message);
@@ -125,6 +155,59 @@ function LoginForm() {
       <Suspense fallback={null}>
         <SearchParamsHandler setError={setError} />
       </Suspense>
+
+      {showAINativeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Sign in with AINative</h3>
+            <p className="text-sm text-gray-500 mb-6">Enter your AINative account credentials</p>
+            {ainativeError && (
+              <div className="bg-red-50 text-red-600 p-3 rounded mb-4 text-sm">{ainativeError}</div>
+            )}
+            <form onSubmit={handleAINativeModalSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={ainativeEmail}
+                  onChange={(e) => setAinativeEmail(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="you@ainative.studio"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={ainativePassword}
+                  onChange={(e) => setAinativePassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAINativeModal(false); setAinativeError(''); }}
+                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={ainativeLoading}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {ainativeLoading ? 'Signing in…' : 'Sign in'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
         <div className="flex justify-center mb-6">
           <Link href="/">
