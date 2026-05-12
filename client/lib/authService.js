@@ -4,6 +4,32 @@ import api from '@/lib/api';
 const OAUTH_STATE_KEY = 'oauth_state';
 const OAUTH_PROVIDER_KEY = 'oauth_provider';
 
+// ── Cookie helpers ─────────────────────────────────────────────────────────────
+
+const TOKEN_COOKIE = 'token';
+// 7 days in seconds
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
+function setTokenCookie(token) {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = [
+    `${TOKEN_COOKIE}=${encodeURIComponent(token)}`,
+    'path=/',
+    `max-age=${COOKIE_MAX_AGE}`,
+    'SameSite=Lax',
+    secure,
+  ].join('; ');
+}
+
+function clearTokenCookie() {
+  if (typeof document === 'undefined') return;
+  // Expire the cookie immediately by setting max-age=0
+  document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+export { setTokenCookie, clearTokenCookie };
+
 function generateState() {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
@@ -20,6 +46,7 @@ export const authService = {
     const token = data.token || data.accessToken;
     if (token) {
       localStorage.setItem('token', token);
+      setTokenCookie(token);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }
@@ -38,6 +65,7 @@ export const authService = {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      clearTokenCookie();
     }
   },
 
@@ -45,7 +73,10 @@ export const authService = {
     const refreshToken = localStorage.getItem('refreshToken');
     const { data } = await api.post('/auth/token/refresh', { refreshToken });
     const token = data.token || data.accessToken;
-    if (token) localStorage.setItem('token', token);
+    if (token) {
+      localStorage.setItem('token', token);
+      setTokenCookie(token);
+    }
     return data;
   },
 
@@ -154,6 +185,7 @@ export const authService = {
     const token = data.token || data.accessToken;
     if (token) {
       localStorage.setItem('token', token);
+      setTokenCookie(token);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }
@@ -170,6 +202,7 @@ export const authService = {
     const resolvedToken = data.token || data.accessToken;
     if (resolvedToken) {
       localStorage.setItem('token', resolvedToken);
+      setTokenCookie(resolvedToken);
       if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
     }

@@ -8,7 +8,7 @@ import {
   useRef,
   useCallback,
 } from 'react';
-import { authService } from '@/lib/authService';
+import { authService, setTokenCookie, clearTokenCookie } from '@/lib/authService';
 import { setRefreshHandler } from '@/lib/api';
 
 // ── JWT helpers ────────────────────────────────────────────────────────────────
@@ -139,6 +139,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      clearTokenCookie();
     }
     localStorage.removeItem(PROFILE_KEY);
     setUser(null);
@@ -162,6 +163,17 @@ export function AuthProvider({ children }) {
       if (!token) {
         setIsLoading(false);
         return;
+      }
+
+      // Ensure the Edge Middleware cookie is in sync with localStorage.
+      // If the user had a token from a previous session but the cookie was
+      // cleared (e.g. browser cookie expiry), re-set it so the middleware
+      // does not redirect them back to /login on every request.
+      const cookiePresent =
+        typeof document !== 'undefined' &&
+        document.cookie.split(';').some((c) => c.trim().startsWith('token='));
+      if (!cookiePresent) {
+        setTokenCookie(token);
       }
 
       // If the token is expired, try to silently refresh before fetching /me.
