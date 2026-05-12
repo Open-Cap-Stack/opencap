@@ -254,6 +254,7 @@ const routes = {
   mcpRoutes: safeRequire(path.join(__dirname, 'routes/v1/mcpRoutes')), // Issue #495: MCP Server
   pluginAuthRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginAuthRoutes')), // Issue #505: Plugin OAuth
   pluginRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginRoutes')), // Issue #506: Plugin tools
+  boardMeetingRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardMeetingRoutes')), // Board meeting management
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -421,6 +422,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/plugin'; // Issue #506: Plugin tools
     } else if (key === 'activityRoutes') {
       path = '/api/v1/activities';
+    } else if (key === 'boardMeetingRoutes') {
+      path = '/api/v1/board-meetings';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
