@@ -197,7 +197,7 @@ export const authService = {
     sessionStorage.removeItem(OAUTH_STATE_KEY);
     sessionStorage.removeItem(OAUTH_PROVIDER_KEY);
 
-    const { data } = await api.post('/auth/exchange-token', { token });
+    const { data } = await api.post('/auth/exchange-token', { ainativeToken: token });
 
     const resolvedToken = data.token || data.accessToken;
     if (resolvedToken) {
