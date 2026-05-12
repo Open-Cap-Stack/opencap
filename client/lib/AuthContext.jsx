@@ -132,18 +132,23 @@ export function AuthProvider({ children }) {
   // ── Logout (extracted so doRefresh can call it) ────────────────────────────
 
   const performLogout = useCallback(async () => {
+    // Always clear local credentials first, regardless of whether the server
+    // call succeeds.  This guarantees the user is logged out locally even when
+    // the network request fails or the server returns an error.
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem(PROFILE_KEY);
+    clearTokenCookie();
+    setUser(null);
+    setProfile({ ...DEFAULT_PROFILE });
+
     try {
       await authService.logout();
     } catch {
-      // Even if the server call fails, clear local state.
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      clearTokenCookie();
+      // Server-side logout failed — local state is already cleared above, so
+      // there is nothing more to do here.
     }
-    localStorage.removeItem(PROFILE_KEY);
-    setUser(null);
-    setProfile({ ...DEFAULT_PROFILE });
   }, []);
 
   // ── Register the refresh handler with the axios instance ───────────────────

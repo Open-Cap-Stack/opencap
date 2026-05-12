@@ -181,8 +181,18 @@ const authenticateToken = async (req, res, next) => {
     // Continue with the request
     next();
   } catch (error) {
-    // If local JWT verification fails, try AINative token validation
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+    // Preserve the original JWT error name before any async work that could
+    // overwrite the error reference in scope.
+    const originalErrorName = error.name;
+
+    // If local JWT verification fails with a token-level error, attempt
+    // AINative token validation as a fallback (tokens issued by AINative
+    // are not signed with our JWT_SECRET).
+    if (
+      originalErrorName === 'JsonWebTokenError' ||
+      originalErrorName === 'TokenExpiredError' ||
+      originalErrorName === 'NotBeforeError'
+    ) {
       try {
         // Extract token again for AINative validation
         const authHeader = req.headers.authorization;
@@ -208,18 +218,25 @@ const authenticateToken = async (req, res, next) => {
           return next();
         }
       } catch (ainativeError) {
-        // AINative validation also failed, return original error
+        // AINative validation also failed — fall through to the 401 response
+        // below using the *original* JWT error name.
         console.error('AINative token validation failed:', ainativeError.message);
       }
     }
 
-    if (error.name === 'TokenExpiredError') {
+    // Return the appropriate 4xx response based on the original error.
+    // All JWT-level errors (invalid signature, expired, not-yet-valid, timeout)
+    // are client errors and must never produce a 500.
+    if (originalErrorName === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
     }
-    if (error.name === 'JsonWebTokenError') {
+    if (
+      originalErrorName === 'JsonWebTokenError' ||
+      originalErrorName === 'NotBeforeError'
+    ) {
       return res.status(401).json({ message: 'Invalid token' });
     }
-    if (error.name === 'TokenVerificationTimeoutError') {
+    if (originalErrorName === 'TokenVerificationTimeoutError') {
       return res.status(401).json({ message: 'Token verification timed out' });
     }
 
