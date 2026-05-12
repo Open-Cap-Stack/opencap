@@ -18,7 +18,7 @@ const navItems = [
   { path: '/securities', label: 'Securities' },
   { path: '/scenarios', label: 'Scenarios' },
   { path: '/fundraise', label: 'Fundraise' },
-  { path: '/assets', label: 'Assets' },
+  { path: '/company-assets', label: 'Assets' },
   { path: '/board', label: 'Board', href: '/board/meetings' },
   { path: '/documents', label: 'Documents' },
   { path: '/data-rooms', label: 'Data Rooms', indent: true },
