@@ -190,6 +190,7 @@ export default function SafeNotesPage() {
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState(null);
   const [mutationError, setMutationError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const qc = useQueryClient();
 
@@ -206,9 +207,11 @@ export default function SafeNotesPage() {
       setMutationError(null);
       qc.invalidateQueries({ queryKey: ['safeNotes'] });
       setModal({ open: false, editing: null });
+      setSuccessMessage('SAFE note added successfully');
+      setTimeout(() => setSuccessMessage(null), 5000);
     },
     onError: (err) => {
-      setMutationError(err.response?.data?.message || 'Failed to create SAFE note');
+      setMutationError(err.response?.data?.message || err.response?.data?.error || 'Failed to create SAFE note');
     },
   });
 
@@ -220,7 +223,7 @@ export default function SafeNotesPage() {
       setModal({ open: false, editing: null });
     },
     onError: (err) => {
-      setMutationError(err.response?.data?.message || 'Failed to update SAFE note');
+      setMutationError(err.response?.data?.message || err.response?.data?.error || 'Failed to update SAFE note');
     },
   });
 
@@ -310,6 +313,20 @@ export default function SafeNotesPage() {
 
   return (
     <div>
+      {/* Success banner */}
+      {successMessage && (
+        <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700 flex items-center justify-between">
+          <span>{successMessage}</span>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="ml-4 text-green-500 hover:text-green-700 font-medium"
+            aria-label="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
