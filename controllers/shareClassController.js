@@ -10,14 +10,19 @@ const { errorResponse } = require('../middleware/errorResponse');
 const MODEL_NAME = 'ShareClass';
 
 const createShareClass = async (req, res) => {
-  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate } = req.body;
+  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio } = req.body;
 
   if (!name) {
     return errorResponse(res, 400, 'Name is required');
   }
 
+  const companyId = req.body.companyId || req.user?.companyId;
+  if (!companyId) {
+    return errorResponse(res, 400, 'companyId is required');
+  }
+
   try {
-    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate });
+    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio, companyId });
     res.status(201).json({ shareClass });
   } catch (error) {
     errorResponse(res, 500, 'Error creating share class', error);
