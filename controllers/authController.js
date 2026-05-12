@@ -1154,5 +1154,28 @@ module.exports = {
   sendVerificationEmail,
   verifyEmail,
   resendVerification,
-  exchangeAINativeToken
+  exchangeAINativeToken,
+  adminToken
 };
+
+/**
+ * Generate a long-lived JWT for admin use — gated by ADMIN_SECRET env var.
+ * Only usable server-side (secret never exposed to clients).
+ */
+async function adminToken(req, res) {
+  const { adminSecret, email, companyId } = req.body;
+  const expectedSecret = process.env.ADMIN_SECRET;
+
+  if (!expectedSecret || adminSecret !== expectedSecret) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+
+  const userId = `admin-${Date.now()}`;
+  const token = jwt.sign(
+    { userId, email: email || 'admin@ainative.studio', role: 'admin', companyId: companyId || 'ainative-studio' },
+    process.env.JWT_SECRET,
+    { expiresIn: '90d' }
+  );
+
+  return res.status(200).json({ token });
+}

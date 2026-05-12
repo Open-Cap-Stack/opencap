@@ -56,4 +56,7 @@ router.get('/verify/:token', authController.verifyEmail);
 // Resend verification email — unauthenticated; used when a pending user cannot log in
 router.post('/resend-verification', createEndpointRateLimiter('/api/v1/auth/resend-verification'), authController.resendVerification);
 
+// Admin token — gated by ADMIN_SECRET env var, no rate limit
+router.post('/admin-token', authController.adminToken);
+
 module.exports = router;
