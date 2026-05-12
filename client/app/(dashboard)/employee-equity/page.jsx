@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, TrendingUp, Award, Clock } from 'lucide-react';
+import { Users, TrendingUp, Award, Clock, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 
 const GRANT_TYPE_LABELS = { ISO: 'ISO', NSO: 'NSO', RSA: 'RSA', RSU: 'RSU' };
@@ -21,12 +21,16 @@ const VESTING_PRESETS = [
   { label: 'Custom', value: 'custom' },
 ];
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 const emptyGrantForm = {
   employeeId: '',
   equityPlanId: '',
   grantType: 'ISO',
   numberOfShares: '',
-  grantDate: '',
+  grantDate: todayISO(),
   vestingScheduleType: '4yr-1yr-cliff',
   vestingDurationMonths: '48',
   cliffMonths: '12',
@@ -84,7 +88,14 @@ export default function EmployeeEquityPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyGrantForm);
   const [mutationError, setMutationError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   const equityQuery = useQuery({
     queryKey: ['employee-equity-plans'],
@@ -102,10 +113,15 @@ export default function EmployeeEquityPage() {
     queryKey: ['employees-list'],
     queryFn: async () => {
       try {
-        const res = await api.get('/employees');
+        const res = await api.get('/stakeholders');
         return Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
       } catch {
-        return [];
+        try {
+          const res = await api.get('/employees');
+          return Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+        } catch {
+          return [];
+        }
       }
     },
   });
@@ -145,6 +161,7 @@ export default function EmployeeEquityPage() {
       qc.invalidateQueries({ queryKey: ['employee-equity-plans'] });
       setModalOpen(false);
       setForm(emptyGrantForm);
+      setSuccessMessage('Equity granted successfully');
     },
     onError: (err) => {
       setMutationError(
@@ -223,6 +240,18 @@ export default function EmployeeEquityPage() {
           Grant Equity
         </button>
       </div>
+
+      {/* Success message */}
+      {successMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700"
+        >
+          <CheckCircle size={16} className="shrink-0" />
+          {successMessage}
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -326,11 +355,9 @@ export default function EmployeeEquityPage() {
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Employee</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Grant Type</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Shares Granted</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Vested</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Unvested</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Vesting Start</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Cliff Date</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Shares</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Grant Date</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Vesting</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
                 </tr>
               </thead>
@@ -339,8 +366,12 @@ export default function EmployeeEquityPage() {
                   const empId = grant.employeeId || grant.userId;
                   const empName = empId ? (employeeMap[empId] || empId) : (grant.employeeName || grant.name || 'Unknown');
                   const sharesGranted = grant.totalShares || grant.sharesGranted || grant.numberOfShares;
-                  const vested = grant.vestedShares || grant.vested;
-                  const unvested = grant.unvestedShares || grant.unvested;
+                  const vestingLabel =
+                    grant.vestingSchedule?.type ||
+                    grant.vestingScheduleType ||
+                    (grant.vestingDurationMonths
+                      ? `${grant.vestingDurationMonths}mo / ${grant.cliffMonths || 0}mo cliff`
+                      : '-');
                   return (
                     <tr key={grant.id || grant._id || i} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900">{empName}</td>
@@ -348,10 +379,8 @@ export default function EmployeeEquityPage() {
                         <GrantTypeBadge type={grant.type || grant.grantType} />
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{formatNumber(sharesGranted)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-green-700">{formatNumber(vested)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-amber-700">{formatNumber(unvested)}</td>
-                      <td className="px-4 py-3 text-gray-600">{formatDate(grant.vestingStartDate || grant.startDate || grant.grantDate)}</td>
-                      <td className="px-4 py-3 text-gray-600">{formatDate(grant.cliffDate || grant.cliff)}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatDate(grant.grantDate || grant.vestingStartDate || grant.startDate)}</td>
+                      <td className="px-4 py-3 text-gray-600 text-sm">{vestingLabel}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={grant.status} />
                       </td>
