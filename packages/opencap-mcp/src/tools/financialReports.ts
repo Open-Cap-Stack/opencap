@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt, coerceBool } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const financialReportTools: ToolDefinition[] = [
@@ -18,7 +19,7 @@ export const financialReportTools: ToolDefinition[] = [
         ])
         .optional()
         .describe('Filter by report type'),
-      limit: z.number().optional().default(20).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(20),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/financial-reports', { params: input });
@@ -30,9 +31,12 @@ export const financialReportTools: ToolDefinition[] = [
   },
   {
     name: 'get_financial_report',
-    description: 'Get the full contents of a specific financial report by ID.',
+    description:
+      'Get the full contents of a specific financial report by ID. Use the `row_id` field from `list_financial_reports`.',
     inputSchema: z.object({
-      id: z.string().describe('Financial report ID'),
+      id: z
+        .string()
+        .describe('Financial report ID — use the `row_id` field from list_financial_reports'),
     }),
     handler: async (input, client) => {
       const { data } = await client.get(`/api/v1/financial-reports/${input.id}`);
@@ -58,25 +62,41 @@ export const financialReportTools: ToolDefinition[] = [
         .string()
         .optional()
         .describe('Generate the report as of this date (ISO 8601 YYYY-MM-DD). Defaults to today.'),
-      includeConvertibles: z
-        .boolean()
+      includeConvertibles: coerceBool(
+        'Include convertible instruments (SAFEs, notes) in the report'
+      )
         .optional()
-        .default(true)
-        .describe('Include convertible instruments (SAFEs, notes) in the report'),
-      includeOptionPool: z
-        .boolean()
+        .default(true),
+      includeOptionPool: coerceBool(
+        'Include option pool (granted and unissued) in the report'
+      )
         .optional()
-        .default(true)
-        .describe('Include option pool (granted and unissued) in the report'),
+        .default(true),
       title: z.string().optional().describe('Custom report title'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.post('/api/v1/financial-reports', input);
-      return {
-        content: [
-          { type: 'text', text: `Financial report created: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      const { data: created } = await client.post('/api/v1/financial-reports', input);
+      const id = created.row_id ?? created._id;
+      try {
+        const { data: confirmed } = await client.get(`/api/v1/financial-reports/${id}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Financial report created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Financial report created (could not confirm persisted state — verify with get_financial_report):\n${JSON.stringify(created, null, 2)}`,
+            },
+          ],
+        };
+      }
     },
   },
 ];

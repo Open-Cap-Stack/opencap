@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt, coerceFloat } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const valuationTools: ToolDefinition[] = [
@@ -10,10 +11,9 @@ export const valuationTools: ToolDefinition[] = [
       companyId: z.string().describe('Company ID'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.get(
-        `/api/v1/valuations/latest`,
-        { params: { companyId: input.companyId } }
-      );
+      const { data } = await client.get('/api/v1/valuations/latest', {
+        params: { companyId: input.companyId },
+      });
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     },
   },
@@ -22,7 +22,7 @@ export const valuationTools: ToolDefinition[] = [
     description: 'Get the historical valuation timeline for the company.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
-      limit: z.number().optional().default(20).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(20),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/valuations', { params: input });
@@ -42,15 +42,8 @@ export const valuationTools: ToolDefinition[] = [
         .enum(['409A', 'board_approved', 'preferred_round', 'other'])
         .describe('Type of valuation'),
       valuationDate: z.string().describe('Effective date in ISO 8601 format (YYYY-MM-DD)'),
-      commonStockFMV: z
-        .number()
-        .positive()
-        .describe('Fair market value per common share in USD'),
-      postMoneyValuation: z
-        .number()
-        .positive()
-        .optional()
-        .describe('Total post-money company valuation in USD'),
+      commonStockFMV: coerceFloat('Fair market value per common share in USD'),
+      postMoneyValuation: coerceFloat('Total post-money company valuation in USD').optional(),
       provider: z
         .string()
         .optional()
@@ -62,12 +55,28 @@ export const valuationTools: ToolDefinition[] = [
         .describe('URL to the valuation report document'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.post('/api/v1/valuations', input);
-      return {
-        content: [
-          { type: 'text', text: `Valuation recorded: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      const { data: created } = await client.post('/api/v1/valuations', input);
+      const id = created.row_id ?? created._id;
+      try {
+        const { data: confirmed } = await client.get(`/api/v1/valuations/${id}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Valuation recorded:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Valuation recorded (could not confirm persisted state — verify with get_valuation_history):\n${JSON.stringify(created, null, 2)}`,
+            },
+          ],
+        };
+      }
     },
   },
 ];

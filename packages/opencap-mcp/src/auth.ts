@@ -15,5 +15,11 @@ export function getApiKey(): string {
 }
 
 export function getBaseUrl(): string {
-  return process.env.OPENCAP_BASE_URL ?? 'https://api.opencapstack.com';
+  const url = process.env.OPENCAP_BASE_URL ?? 'https://api.opencapstack.com';
+  if (url.includes('/api/v1')) {
+    process.stderr.write(
+      `Warning: OPENCAP_BASE_URL should not include /api/v1 — tools already prefix this path. Current value: ${url}\n`
+    );
+  }
+  return url;
 }

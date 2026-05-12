@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt, coerceBool } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const dilutionTools: ToolDefinition[] = [
@@ -9,21 +10,19 @@ export const dilutionTools: ToolDefinition[] = [
       'Returns pre- and post-dilution ownership percentages for each stakeholder.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
-      newSharesIssued: z
-        .number()
-        .int()
-        .positive()
-        .describe('Number of new shares to be issued in the scenario'),
-      includeOptionPool: z
-        .boolean()
+      newSharesIssued: coerceInt(
+        'Number of new shares to be issued in the scenario'
+      ),
+      includeOptionPool: coerceBool(
+        'Whether to include unissued option pool shares in the denominator'
+      )
         .optional()
-        .default(false)
-        .describe('Whether to include unissued option pool shares in the denominator'),
-      includeSafes: z
-        .boolean()
+        .default(false),
+      includeSafes: coerceBool(
+        'Whether to include SAFEs in conversion when calculating dilution'
+      )
         .optional()
-        .default(true)
-        .describe('Whether to include SAFEs in conversion when calculating dilution'),
+        .default(true),
     }),
     handler: async (input, client) => {
       const { data } = await client.post('/api/v1/dilution/calculate', input);

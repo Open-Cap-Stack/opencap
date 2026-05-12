@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const stakeholderTools: ToolDefinition[] = [
@@ -8,7 +9,7 @@ export const stakeholderTools: ToolDefinition[] = [
       'List all stakeholders in the cap table. Returns name, email, role, and ownership details.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
-      limit: z.number().optional().default(50).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(50),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/stakeholders', { params: input });
@@ -20,9 +21,10 @@ export const stakeholderTools: ToolDefinition[] = [
   },
   {
     name: 'get_stakeholder',
-    description: 'Get details for a specific stakeholder by ID.',
+    description:
+      'Get details for a specific stakeholder by ID. Use the `row_id` field from `list_stakeholders`.',
     inputSchema: z.object({
-      id: z.string().describe('Stakeholder ID'),
+      id: z.string().describe('Stakeholder ID — use the `row_id` field from list_stakeholders'),
     }),
     handler: async (input, client) => {
       const { data } = await client.get(`/api/v1/stakeholders/${input.id}`);
@@ -41,19 +43,36 @@ export const stakeholderTools: ToolDefinition[] = [
       companyId: z.string().describe('Company ID to add the stakeholder to'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.post('/api/v1/stakeholders', input);
-      return {
-        content: [
-          { type: 'text', text: `Stakeholder created: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      const { data: created } = await client.post('/api/v1/stakeholders', input);
+      const id = created.row_id ?? created._id;
+      try {
+        const { data: confirmed } = await client.get(`/api/v1/stakeholders/${id}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Stakeholder created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Stakeholder created (could not confirm persisted state — verify with get_stakeholder):\n${JSON.stringify(created, null, 2)}`,
+            },
+          ],
+        };
+      }
     },
   },
   {
     name: 'update_stakeholder',
-    description: 'Update an existing stakeholder by ID.',
+    description:
+      'Update an existing stakeholder by ID. Use the `row_id` field from `list_stakeholders`.',
     inputSchema: z.object({
-      id: z.string().describe('Stakeholder ID'),
+      id: z.string().describe('Stakeholder ID — use the `row_id` field from list_stakeholders'),
       name: z.string().optional().describe('Full name'),
       email: z.string().email().optional().describe('Email address'),
       role: z
@@ -63,12 +82,27 @@ export const stakeholderTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { id, ...body } = input;
-      const { data } = await client.put(`/api/v1/stakeholders/${id}`, body);
-      return {
-        content: [
-          { type: 'text', text: `Stakeholder updated: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      const { data: updated } = await client.put(`/api/v1/stakeholders/${id}`, body);
+      try {
+        const { data: confirmed } = await client.get(`/api/v1/stakeholders/${id}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Stakeholder updated:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Stakeholder updated (could not confirm persisted state — verify with get_stakeholder):\n${JSON.stringify(updated, null, 2)}`,
+            },
+          ],
+        };
+      }
     },
   },
 ];

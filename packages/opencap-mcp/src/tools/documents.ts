@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const documentTools: ToolDefinition[] = [
@@ -23,7 +24,7 @@ export const documentTools: ToolDefinition[] = [
         .string()
         .optional()
         .describe('Filter documents associated with a stakeholder'),
-      limit: z.number().optional().default(50).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(50),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/documents', { params: input });
@@ -61,7 +62,7 @@ export const documentTools: ToolDefinition[] = [
         ])
         .optional()
         .describe('Filter by document type'),
-      limit: z.number().optional().default(20).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(20),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/documents/search', { params: input });

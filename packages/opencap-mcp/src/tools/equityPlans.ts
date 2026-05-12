@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceInt } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const equityPlanTools: ToolDefinition[] = [
@@ -8,7 +9,7 @@ export const equityPlanTools: ToolDefinition[] = [
       'List all equity plans (stock option plans, RSU plans, etc.) in the company.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
-      limit: z.number().optional().default(50).describe('Max results to return'),
+      limit: coerceInt('Max results to return').optional().default(50),
     }),
     handler: async (input, client) => {
       const { data } = await client.get('/api/v1/equity-plans', { params: input });
@@ -20,9 +21,10 @@ export const equityPlanTools: ToolDefinition[] = [
   },
   {
     name: 'get_equity_plan',
-    description: 'Get details for a specific equity plan by ID.',
+    description:
+      'Get details for a specific equity plan by ID. Use the `row_id` field from `list_equity_plans`.',
     inputSchema: z.object({
-      id: z.string().describe('Equity plan ID'),
+      id: z.string().describe('Equity plan ID — use the `row_id` field from list_equity_plans'),
     }),
     handler: async (input, client) => {
       const { data } = await client.get(`/api/v1/equity-plans/${input.id}`);
@@ -37,11 +39,7 @@ export const equityPlanTools: ToolDefinition[] = [
       planType: z
         .enum(['ISO', 'NSO', 'RSA', 'RSU', 'SAR', 'other'])
         .describe('Type of equity plan'),
-      sharesReserved: z
-        .number()
-        .int()
-        .positive()
-        .describe('Number of shares reserved for this plan'),
+      sharesReserved: coerceInt('Number of shares reserved for this plan'),
       companyId: z.string().describe('Company ID this plan belongs to'),
       expirationDate: z
         .string()
@@ -49,19 +47,35 @@ export const equityPlanTools: ToolDefinition[] = [
         .describe('Plan expiration date in ISO 8601 format (YYYY-MM-DD)'),
       defaultVestingSchedule: z
         .object({
-          totalMonths: z.number().int().positive().describe('Total vesting period in months'),
-          cliffMonths: z.number().int().min(0).describe('Cliff period in months'),
+          totalMonths: coerceInt('Total vesting period in months'),
+          cliffMonths: coerceInt('Cliff period in months'),
         })
         .optional()
         .describe('Default vesting schedule for grants under this plan'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.post('/api/v1/equity-plans', input);
-      return {
-        content: [
-          { type: 'text', text: `Equity plan created: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      const { data: created } = await client.post('/api/v1/equity-plans', input);
+      const id = created.row_id ?? created._id;
+      try {
+        const { data: confirmed } = await client.get(`/api/v1/equity-plans/${id}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Equity plan created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Equity plan created (could not confirm persisted state — verify with get_equity_plan):\n${JSON.stringify(created, null, 2)}`,
+            },
+          ],
+        };
+      }
     },
   },
 ];

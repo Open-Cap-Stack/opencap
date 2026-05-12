@@ -22,12 +22,16 @@ import { valuationTools } from './tools/valuations.js';
 import { dilutionTools } from './tools/dilution.js';
 import { waterfallTools } from './tools/waterfall.js';
 import { financialReportTools } from './tools/financialReports.js';
+import { equityGrantTools } from './tools/equityGrants.js';
+import { metaTools } from './tools/meta.js';
 import { type ToolDefinition } from './types.js';
 
 const ALL_TOOLS: ToolDefinition[] = [
+  ...metaTools,
   ...stakeholderTools,
   ...shareClassTools,
   ...equityPlanTools,
+  ...equityGrantTools,
   ...safeTools,
   ...documentTools,
   ...valuationTools,
@@ -40,7 +44,7 @@ export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '0.1.0',
+      version: '1.6.0',
     },
     {
       capabilities: {

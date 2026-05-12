@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coerceFloat, coerceBool } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const waterfallTools: ToolDefinition[] = [
@@ -10,29 +11,25 @@ export const waterfallTools: ToolDefinition[] = [
       'Returns proceeds per stakeholder and per share class at the given exit amount.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
-      exitAmount: z
-        .number()
-        .positive()
-        .describe('Total exit/acquisition proceeds in USD'),
+      exitAmount: coerceFloat('Total exit/acquisition proceeds in USD'),
       exitType: z
         .enum(['acquisition', 'ipo', 'dissolution'])
         .optional()
         .default('acquisition')
         .describe('Type of exit event'),
-      deductTransactionCosts: z
-        .boolean()
+      deductTransactionCosts: coerceBool(
+        'Whether to deduct estimated transaction costs before distribution'
+      )
         .optional()
-        .default(false)
-        .describe('Whether to deduct estimated transaction costs before distribution'),
-      transactionCostsAmount: z
-        .number()
+        .default(false),
+      transactionCostsAmount: coerceFloat(
+        'Transaction costs amount in USD (used if deductTransactionCosts is true)'
+      ).optional(),
+      includeOptionPoolSweep: coerceBool(
+        'Whether to include pre-exit option pool sweep'
+      )
         .optional()
-        .describe('Transaction costs amount in USD (used if deductTransactionCosts is true)'),
-      includeOptionPoolSweep: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe('Whether to include pre-exit option pool sweep'),
+        .default(false),
       asOfDate: z
         .string()
         .optional()
