@@ -216,6 +216,85 @@ describe('AuthController', () => {
       await authController.loginUser(req, res);
       expect(res.statusCode).toBe(401);
     });
+
+    it('should return 401 with EMAIL_NOT_VERIFIED code when account status is pending', async () => {
+      req.body = { email: 'pending@example.com', password: 'Password123!' };
+      User.findOne.mockResolvedValue({
+        _id: 'user_pending',
+        userId: 'user_pending',
+        email: 'pending@example.com',
+        password: 'hashed_password',
+        status: 'pending'
+      });
+      bcrypt.compare.mockResolvedValue(true);
+      await authController.loginUser(req, res);
+      expect(res.statusCode).toBe(401);
+      const data = JSON.parse(res._getData());
+      expect(data.code).toBe('EMAIL_NOT_VERIFIED');
+      expect(data.message).toMatch(/verify your email/i);
+    });
+
+    it('should not reveal pending status when password is wrong', async () => {
+      req.body = { email: 'pending@example.com', password: 'WrongPass123!' };
+      User.findOne.mockResolvedValue({
+        _id: 'user_pending',
+        email: 'pending@example.com',
+        password: 'hashed_password',
+        status: 'pending'
+      });
+      bcrypt.compare.mockResolvedValue(false);
+      await authController.loginUser(req, res);
+      expect(res.statusCode).toBe(401);
+      const data = JSON.parse(res._getData());
+      expect(data.code).toBeUndefined();
+    });
+  });
+
+  describe('resendVerification', () => {
+    it('should return 200 and send email when user exists with pending status', async () => {
+      process.env.EMAIL_HOST = 'smtp.example.com';
+      process.env.EMAIL_USER = 'user@example.com';
+      process.env.EMAIL_PASSWORD = 'secret';
+      req.body = { email: 'pending@example.com' };
+      User.findOne.mockResolvedValue({
+        _id: 'user_pending',
+        userId: 'user_pending',
+        email: 'pending@example.com',
+        status: 'pending',
+        emailVerified: false
+      });
+      await authController.resendVerification(req, res);
+      expect(res.statusCode).toBe(200);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toMatch(/verification email sent/i);
+    });
+
+    it('should return 200 even when user does not exist (avoid enumeration)', async () => {
+      req.body = { email: 'nobody@example.com' };
+      User.findOne.mockResolvedValue(null);
+      await authController.resendVerification(req, res);
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should return 400 when email is missing', async () => {
+      req.body = {};
+      await authController.resendVerification(req, res);
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should return 400 when account is already active', async () => {
+      req.body = { email: 'active@example.com' };
+      User.findOne.mockResolvedValue({
+        _id: 'user_active',
+        email: 'active@example.com',
+        status: 'active',
+        emailVerified: true
+      });
+      await authController.resendVerification(req, res);
+      expect(res.statusCode).toBe(400);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toMatch(/already verified/i);
+    });
   });
 
   describe('logout', () => {

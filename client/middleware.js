@@ -10,6 +10,9 @@ const SESSION_COOKIE = 'session';
 const PUBLIC_PREFIXES = [
   '/login',
   '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
   '/pricing',
   '/onboarding',
   '/company-setup',

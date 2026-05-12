@@ -221,6 +221,14 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Reject login for unverified accounts (password was correct but account not active)
+    if (user.status === 'pending') {
+      return res.status(401).json({
+        message: 'Please verify your email before logging in.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+    }
+
     const userId = user.userId || user._id;
 
     // Generate tokens with full claims
@@ -1009,6 +1017,48 @@ const sendVerificationEmailToUser = async (user) => {
 };
 
 /**
+ * Resend email verification link to a user with a pending account
+ * Unauthenticated endpoint — takes only email to avoid locking out users who cannot log in.
+ * Returns 200 regardless of whether the user exists to prevent email enumeration.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const resendVerification = async (req, res) => {
+  try {
+    const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Short-circuit when user not found — return success to prevent enumeration
+    if (!user) {
+      return res.status(200).json({ message: 'If that email is registered and unverified, a verification email has been sent.' });
+    }
+
+    // If already verified/active, tell the user explicitly so they can just log in
+    if (user.emailVerified || user.status === 'active') {
+      return res.status(400).json({ message: 'This account is already verified. Please log in.' });
+    }
+
+    // If SMTP is not configured, log warning and return graceful response
+    if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      console.warn('Resend verification requested but SMTP not configured');
+      return res.status(200).json({ message: 'If that email is registered and unverified, a verification email has been sent.' });
+    }
+
+    await sendVerificationEmailToUser(user);
+
+    return res.status(200).json({ message: 'Verification email sent. Please check your inbox.' });
+  } catch (error) {
+    console.error('Resend verification error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
  * Exchange an AINative token for a local JWT
  * This avoids slow AINative API round-trips on every subsequent request.
  * @param {Object} req - Express request object
@@ -1103,5 +1153,6 @@ module.exports = {
   updateUserProfile,
   sendVerificationEmail,
   verifyEmail,
+  resendVerification,
   exchangeAINativeToken
 };

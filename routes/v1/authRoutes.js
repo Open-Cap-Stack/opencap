@@ -53,4 +53,7 @@ router.get('/me', authenticateToken, (req, res) => {
 router.post('/verify/send', authenticateToken, authController.sendVerificationEmail);
 router.get('/verify/:token', authController.verifyEmail);
 
+// Resend verification email — unauthenticated; used when a pending user cannot log in
+router.post('/resend-verification', createEndpointRateLimiter('/api/v1/auth/resend-verification'), authController.resendVerification);
+
 module.exports = router;
