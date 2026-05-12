@@ -6,10 +6,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DataTable from '@/components/ui/DataTable';
 import Modal from '@/components/ui/Modal';
 
-const STATUS_LABELS = {
-  scheduled: { label: 'Scheduled', className: 'bg-blue-100 text-blue-700' },
-  completed: { label: 'Completed', className: 'bg-green-100 text-green-700' },
-  cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-700' },
+const TYPE_LABELS = {
+  Regular: { label: 'Regular', className: 'bg-blue-100 text-blue-700' },
+  Special: { label: 'Special', className: 'bg-purple-100 text-purple-700' },
+  Annual: { label: 'Annual', className: 'bg-green-100 text-green-700' },
 };
 
 const columns = [
@@ -20,38 +20,30 @@ const columns = [
     render: (v) => (v ? new Date(v).toLocaleDateString() : '-'),
   },
   {
-    key: 'time',
-    label: 'Time',
-    render: (v) => v || '-',
-  },
-  {
-    key: 'status',
-    label: 'Status',
+    key: 'type',
+    label: 'Type',
     render: (v) => {
-      const s = STATUS_LABELS[v] || { label: v || 'Scheduled', className: 'bg-gray-100 text-gray-700' };
+      const t = TYPE_LABELS[v] || { label: v || 'Regular', className: 'bg-gray-100 text-gray-700' };
       return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.className}`}>
-          {s.label}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${t.className}`}>
+          {t.label}
         </span>
       );
     },
   },
   {
-    key: 'attendees',
-    label: 'Attendees',
-    render: (v) => {
-      const count = Array.isArray(v) ? v.length : (v ?? '-');
-      return count;
-    },
+    key: 'location',
+    label: 'Location',
+    render: (v) => v || '-',
   },
 ];
 
 const emptyForm = {
   title: '',
   date: '',
-  time: '',
+  type: 'Regular',
+  location: '',
   agenda: '',
-  status: 'scheduled',
 };
 
 async function fetchMeetings() {
@@ -68,10 +60,20 @@ async function createMeeting(data) {
   return res.data;
 }
 
+function ExpandedRow({ row }) {
+  return (
+    <div className="px-4 py-3 bg-gray-50 text-sm text-gray-700">
+      <p className="font-medium mb-1">Agenda</p>
+      <p className="whitespace-pre-wrap">{row.agenda || 'No agenda provided.'}</p>
+    </div>
+  );
+}
+
 export default function MeetingsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [mutationError, setMutationError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const qc = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery({
@@ -86,10 +88,12 @@ export default function MeetingsPage() {
       qc.invalidateQueries({ queryKey: ['board-meetings'] });
       setModalOpen(false);
       setForm(emptyForm);
+      setSuccessMessage('Meeting scheduled');
+      setTimeout(() => setSuccessMessage(null), 4000);
     },
     onError: (err) => {
       setMutationError(
-        err.response?.data?.message || 'Failed to schedule meeting. The endpoint may not be available yet.'
+        err.response?.data?.message || err.response?.data?.error || 'Failed to schedule meeting.'
       );
     },
   });
@@ -120,6 +124,12 @@ export default function MeetingsPage() {
         </button>
       </div>
 
+      {successMessage && (
+        <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700 font-medium">
+          {successMessage}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow">
         <DataTable
           columns={columns}
@@ -127,6 +137,7 @@ export default function MeetingsPage() {
           isLoading={isLoading}
           onRetry={refetch}
           emptyMessage="No board meetings scheduled yet"
+          expandedRowContent={(row) => <ExpandedRow row={row} />}
         />
       </div>
 
@@ -163,29 +174,29 @@ export default function MeetingsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Time</label>
-              <input
-                type="time"
-                value={form.time}
-                onChange={(e) => setForm({ ...form, time: e.target.value })}
+              <label className="block text-sm font-medium mb-1">Type</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="Regular">Regular</option>
+                <option value="Special">Special</option>
+                <option value="Annual">Annual</option>
+              </select>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
+            <label className="block text-sm font-medium mb-1">Location</label>
+            <input
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="e.g. Conference Room A or Zoom link"
               className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Agenda</label>
+            <label className="block text-sm font-medium mb-1">Description / Agenda</label>
             <textarea
               rows={4}
               value={form.agenda}
