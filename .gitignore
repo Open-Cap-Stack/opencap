@@ -160,3 +160,4 @@ __tests__/controllers/temp/
 *.bak
 .claude/mcp.json
 uploads/
+client/
