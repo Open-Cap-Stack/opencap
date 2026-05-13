@@ -451,6 +451,41 @@ app.post('/api/v1/scenarios', (req, res) => res.status(201).json({ ...req.body, 
 app.put('/api/v1/scenarios/:id', (req, res) => res.json({ ...req.body, id: req.params.id }));
 app.delete('/api/v1/scenarios/:id', (req, res) => res.json({ success: true }));
 
+// Stub routes for frontend pages that have no backend implementation yet
+// Returns empty arrays so pages load gracefully without errors
+const _stub = (req, res) => res.json([]);
+const _stubObj = (req, res) => res.json({});
+app.get('/api/v1/assets', _stub);
+app.post('/api/v1/assets', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+app.get('/api/v1/board-resolutions', _stub);
+app.post('/api/v1/board-resolutions', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+app.get('/api/v1/email-templates', _stub);
+app.get('/api/v1/email-templates/history', _stub);
+app.post('/api/v1/email-templates', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+app.get('/api/v1/exports', _stub);
+app.post('/api/v1/exports', (req, res) => res.status(202).json({ status: 'queued', id: Date.now().toString() }));
+// document-access (frontend) → document-accesses (backend)
+const documentAccessRouteModule = safeRequire(path.join(__dirname, 'routes/v1/documentAccessRoutes'));
+if (documentAccessRouteModule) app.use('/api/v1/document-access', documentAccessRouteModule);
+// billing sub-routes — /billing/current and /billing/invoices already exist under /api/v1/billing
+// frontend calls /billing/current but backend has /billing/current-plan
+app.get('/api/v1/billing/current', (req, res, next) => {
+  req.url = '/current-plan';
+  next('route');
+});
+// integrations — alias /integrations/connected → integration-modules list
+app.get('/api/v1/integrations/connected', _stub);
+app.post('/api/v1/integrations/connect', _stubObj);
+app.post('/api/v1/integrations/disconnect', _stubObj);
+// fundraising-analytics — alias → /api/v1/fundraising
+const fundraisingAnalyticsRouteModule = safeRequire(path.join(__dirname, 'routes/v1/fundraisingAnalyticsRoutes'));
+if (fundraisingAnalyticsRouteModule) app.use('/api/v1/fundraising-analytics', fundraisingAnalyticsRouteModule);
+// advanced analytics summary stub
+app.get('/api/v1/advanced-analytics/summary', _stubObj);
+// fundraising-scenarios stub (used by fundraise model page)
+app.get('/api/v1/fundraising-scenarios', _stub);
+app.post('/api/v1/fundraising-scenarios', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+
 // Health check endpoint - must be before error handlers
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running', build: process.env.BUILD_SHA || 'unknown' });
