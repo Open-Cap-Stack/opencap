@@ -437,6 +437,20 @@ Object.entries(routes).forEach(([key, route]) => {
   }
 });
 
+// Route aliases for frontend compatibility
+// These map alternative path names the frontend uses to the actual backend routes
+const stakeholderRouteModule = safeRequire(path.join(__dirname, 'routes/v1/stakeholderRoutes'));
+const securityIssuanceRouteModule = safeRequire(path.join(__dirname, 'routes/v1/securityIssuanceRoutes'));
+const safeRouteModule = safeRequire(path.join(__dirname, 'routes/v1/safeRoutes'));
+if (stakeholderRouteModule) app.use('/api/v1/shareholders', stakeholderRouteModule);
+if (securityIssuanceRouteModule) app.use('/api/v1/securities', securityIssuanceRouteModule);
+if (safeRouteModule) app.use('/api/v1/safe-agreements', safeRouteModule);
+// Scenarios — no persistent backend yet; return empty list so the frontend uses localStorage
+app.get('/api/v1/scenarios', (req, res) => res.json([]));
+app.post('/api/v1/scenarios', (req, res) => res.status(201).json({ ...req.body, id: req.body.id || Date.now().toString() }));
+app.put('/api/v1/scenarios/:id', (req, res) => res.json({ ...req.body, id: req.params.id }));
+app.delete('/api/v1/scenarios/:id', (req, res) => res.json({ success: true }));
+
 // Health check endpoint - must be before error handlers
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running', build: process.env.BUILD_SHA || 'unknown' });

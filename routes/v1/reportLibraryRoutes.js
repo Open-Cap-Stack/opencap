@@ -13,6 +13,9 @@ const { authenticateToken } = require('../../middleware/authMiddleware');
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
+// Root list endpoint — investor portal calls GET /reports
+router.get('/', reportLibraryController.getCategories);
+
 // Library endpoint - must be before parameterized routes
 router.get('/library', reportLibraryController.getLibrary);
 
