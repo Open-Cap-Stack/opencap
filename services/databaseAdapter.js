@@ -58,7 +58,7 @@ class DatabaseAdapter {
    * @returns {Object} Created document
    */
   async create(modelName, data) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -91,7 +91,7 @@ class DatabaseAdapter {
    * @returns {Array} Found documents
    */
   async find(modelName, query = {}, options = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -114,7 +114,7 @@ class DatabaseAdapter {
    * @returns {Object} Found document
    */
   async findOne(modelName, query = {}, options = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -137,7 +137,7 @@ class DatabaseAdapter {
    * @returns {Object} Found document
    */
   async findById(modelName, id, options = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -161,7 +161,7 @@ class DatabaseAdapter {
    * @returns {Object} Update result
    */
   async update(modelName, query, update, options = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -184,7 +184,7 @@ class DatabaseAdapter {
    * @returns {Object} Updated document
    */
   async findByIdAndUpdate(modelName, id, update, options = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -206,7 +206,7 @@ class DatabaseAdapter {
    * @returns {Object} Delete result
    */
   async delete(modelName, query) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -228,7 +228,7 @@ class DatabaseAdapter {
    * @returns {Object} Deleted document
    */
   async findByIdAndDelete(modelName, id) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -250,7 +250,7 @@ class DatabaseAdapter {
    * @returns {number} Count of matching documents
    */
   async count(modelName, query = {}) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -272,7 +272,7 @@ class DatabaseAdapter {
    * @returns {Array} Aggregation result
    */
   async aggregate(modelName, pipeline) {
-    this._checkInitialized();
+    await this._ensureInitialized();
 
     try {
       const startTime = Date.now();
@@ -371,6 +371,16 @@ class DatabaseAdapter {
   }
 
   // Private helper methods
+
+  async _ensureInitialized() {
+    if (!this.initialized) {
+      const token = process.env.AINATIVE_API_TOKEN;
+      if (!token) {
+        throw new Error('DatabaseAdapter not initialized and AINATIVE_API_TOKEN not set.');
+      }
+      await this.initialize(token);
+    }
+  }
 
   _checkInitialized() {
     if (!this.initialized) {
