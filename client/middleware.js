@@ -14,6 +14,8 @@ const PUBLIC_PREFIXES = [
   '/forgot-password',
   '/reset-password',
   '/pricing',
+  '/developers',
+  '/open-source',
   '/onboarding',
   '/company-setup',
   '/checkout',
@@ -60,6 +62,6 @@ export function middleware(request) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon|.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)|login|register|pricing|auth/|api/).*)',
+    '/((?!_next/static|_next/image|favicon|.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)|login|register|pricing|developers|open-source|auth/|api/).*)',
   ],
 };
