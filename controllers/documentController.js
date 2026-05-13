@@ -86,42 +86,25 @@ exports.createDocument = async (req, res) => {
             };
             console.log('File uploaded locally:', { name: file.originalname, size: file.size, type: file.mimetype });
 
-            // Upload file to persistent storage (ZeroDB file storage)
-            // CRITICAL: On Railway (ephemeral storage), this MUST succeed or the file will be lost
-            const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME;
+            // Embed file content as base64 directly in the document record (ZeroDB-native storage)
+            // This avoids a separate storage API call and works reliably on Railway
             try {
-                const uploadResult = await fileStorageService.uploadFileFromPath(file.path, {
-                    companyId: req.user?.companyId,
-                    uploadedBy: req.user?.userId,
-                    category: req.body.category,
-                    metadata: {
-                        documentId: documentId,
-                        originalName: file.originalname
-                    }
-                });
-                persistentFileId = uploadResult.id || uploadResult.fileKey;
+                const fsSync = require('fs');
+                const fileBuffer = fsSync.readFileSync(file.path);
+                fileMetadata.fileContentBase64 = fileBuffer.toString('base64');
+                persistentFileId = documentId; // document record IS the storage
                 fileMetadata.fileId = persistentFileId;
-                console.log('File uploaded to persistent storage:', { fileId: persistentFileId });
+                console.log('File content embedded in document record:', { size: fileBuffer.length });
 
-                // Clean up local temp file after successful upload
-                const fs = require('fs');
-                fs.unlink(file.path, (err) => {
+                // Clean up local temp file
+                fsSync.unlink(file.path, (err) => {
                     if (err) console.warn('Failed to clean up temp file:', err.message);
                 });
-                // Clear local paths since file is now in persistent storage
                 delete fileMetadata.storagePath;
                 delete fileMetadata.filePath;
             } catch (uploadError) {
-                console.error('Failed to upload to persistent storage:', uploadError.message);
-                // On Railway, fail the request - local files won't persist
-                if (isRailway) {
-                    // Clean up the temp file
-                    const fs = require('fs');
-                    fs.unlink(file.path, () => {});
-                    return errorResponse(res, 500, 'Failed to upload file to storage. Please try again.', uploadError);
-                }
-                // On local dev, keep local file as fallback
-                console.warn('Keeping local file as fallback (development only)');
+                console.error('Failed to read file for embedding:', uploadError.message);
+                // Keep local path as fallback
             }
         }
 
