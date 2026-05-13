@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import OCSLogo from '@/components/OCSLogo';
+import MarketingNav from '@/components/MarketingNav';
+import MarketingFooter from '@/components/MarketingFooter';
 
 const plans = [
   {
@@ -99,18 +100,7 @@ function CheckIcon() {
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <Link href="/">
-          <OCSLogo variant="full" color="dark" height={32} />
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">Sign in</Link>
-          <Link href="/register" className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            Get started free
-          </Link>
-        </div>
-      </nav>
+      <MarketingNav />
 
       <div className="max-w-7xl mx-auto px-6 py-16">
         {/* Hero */}
@@ -173,8 +163,15 @@ export default function PricingPage() {
             All paid plans include a 14-day free trial. No credit card required for Free plan.{' '}
             <Link href="/login" className="text-blue-600 hover:underline">Sign in</Link> to manage your subscription.
           </p>
+          <p className="text-gray-500 text-sm mt-3">
+            Need to self-host?{' '}
+            <Link href="/open-source" className="text-blue-600 hover:underline">OpenCap Stack is MIT licensed</Link>
+            {' '}— run it on your own infrastructure for free.
+          </p>
         </div>
       </div>
+
+      <MarketingFooter />
     </div>
   );
 }
