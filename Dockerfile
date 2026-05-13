@@ -8,6 +8,10 @@ RUN npm install --no-fund --no-audit
 
 COPY client/ ./
 
+# Cache bust — increment to force clean Next.js rebuild
+ARG CACHEBUST=2
+RUN echo "Cache bust: $CACHEBUST"
+
 # Build Next.js — NEXT_PUBLIC vars must be set at build time
 ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=G-KYCXJ4D8M8
 ARG NEXT_PUBLIC_SITE_URL=https://opencapstack.com
