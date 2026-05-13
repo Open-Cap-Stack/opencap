@@ -11,6 +11,7 @@
 const path = require('path');
 const fs = require('fs').promises;
 const zerodbService = require('./zerodbService');
+const databaseAdapter = require('./databaseAdapter');
 
 // Maximum file size (100MB by default)
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -149,21 +150,19 @@ class FileStorageService {
         content_type: contentType
       };
 
-      // Use ZeroDB files API: store file content as base64 in file_metadata
-      const response = await zerodbService.client.post(
-        `/api/v1/projects/${zerodbService.projectId}/database/files`,
-        {
-          file_key: fileKey,
-          file_name: fileName,
-          content_type: contentType,
-          size_bytes: fileBuffer.length,
-          file_content: fileBuffer.toString('base64'),
-          file_metadata: fullMetadata
-        },
-        { timeout: 60000 }
-      );
+      // Store file as a ZeroDB database record (base64 content + metadata)
+      // ZeroDB database/files endpoint is metadata-only; use database records for binary storage
+      const fileRecord = await databaseAdapter.create('file_storage', {
+        file_key: fileKey,
+        file_name: fileName,
+        content_type: contentType,
+        size_bytes: fileBuffer.length,
+        file_content_base64: fileBuffer.toString('base64'),
+        ...fullMetadata,
+        stored_at: new Date().toISOString()
+      });
 
-      const fileId = response.data?.file_id || response.data?.id || response.data?.data?.file_id || fileKey;
+      const fileId = fileRecord?.id || fileRecord?._id || fileRecord?.row_id || fileKey;
       return {
         id: fileId,
         fileKey: fileKey,
@@ -236,39 +235,40 @@ class FileStorageService {
     const axios = require('axios');
 
     try {
-      // Step 1: Get presigned download URL from ZeroDB
-      const urlResponse = await zerodbService.client.get(
-        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}/download`
-      );
+      // Retrieve file record from ZeroDB database storage
+      const record = await databaseAdapter.findById('file_storage', fileId);
+      if (!record) {
+        throw new Error('File not found');
+      }
 
-      const { download_url, file_name, content_type, size_bytes, expires_at } = urlResponse.data;
+      const file_name = record.file_name || record.fileName;
+      const content_type = record.content_type || record.contentType || 'application/octet-stream';
+      const size_bytes = record.size_bytes || record.size || 0;
 
-      // If caller just wants the URL, return it
       if (returnUrl) {
+        // No presigned URLs available; return a data URI for small files
+        const b64 = record.file_content_base64;
         return {
-          url: download_url,
+          url: b64 ? `data:${content_type};base64,${b64}` : null,
           fileName: file_name,
           contentType: content_type,
-          size: size_bytes,
-          expiresAt: expires_at
+          size: size_bytes
         };
       }
 
-      // Step 2: Fetch actual file content from presigned URL
-      const fileResponse = await axios.get(download_url, {
-        responseType: stream ? 'stream' : 'arraybuffer',
-        timeout: 60000
-      });
+      const b64 = record.file_content_base64;
+      const data = b64 ? Buffer.from(b64, 'base64') : Buffer.alloc(0);
 
       const result = {
-        data: stream ? null : fileResponse.data,
-        contentType: content_type || fileResponse.headers['content-type'],
-        size: size_bytes || parseInt(fileResponse.headers['content-length'] || '0', 10),
+        data: stream ? null : data,
+        contentType: content_type,
+        size: size_bytes,
         fileName: file_name
       };
 
       if (stream) {
-        result.stream = fileResponse.data;
+        const { Readable } = require('stream');
+        result.stream = Readable.from(data);
       }
 
       if (includeMetadata) {
@@ -277,20 +277,7 @@ class FileStorageService {
 
       return result;
     } catch (error) {
-      if (error.response) {
-        const status = error.response.status;
-        const detail = error.response.data?.detail || error.response.data?.message;
-        if (status === 404 || (detail && detail.includes('not found'))) {
-          throw new Error('File not found');
-        }
-        if (status === 401) {
-          throw new Error('Authentication required');
-        }
-        if (status === 503) {
-          throw new Error('Service temporarily unavailable');
-        }
-        throw new Error(`Failed to download file: ${detail || error.message}`);
-      }
+      if (error.message === 'File not found') throw error;
       throw new Error(`Failed to download file: ${error.message}`);
     }
   }
