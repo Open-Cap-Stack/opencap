@@ -140,17 +140,6 @@ class FileStorageService {
       // Create form data for file upload
       // Use /database/storage/upload endpoint (not /database/files which is metadata-only)
       // See: https://github.com/AINative-Studio/core/issues/1077
-      const FormData = require('form-data');
-      const form = new FormData();
-      form.append('file', fileBuffer, {
-        filename: fileName,
-        contentType: contentType
-      });
-
-      // Add file key for storage path
-      form.append('key', fileKey);
-
-      // Add metadata
       const fullMetadata = {
         ...metadata,
         companyId,
@@ -159,22 +148,27 @@ class FileStorageService {
         original_name: fileName,
         content_type: contentType
       };
-      form.append('metadata', JSON.stringify(fullMetadata));
 
+      // Use ZeroDB files API: store file content as base64 in file_metadata
       const response = await zerodbService.client.post(
-        `/v1/public/zerodb/${zerodbService.projectId}/database/storage/upload`,
-        form,
+        `/api/v1/projects/${zerodbService.projectId}/database/files`,
         {
-          headers: form.getHeaders ? form.getHeaders() : { 'Content-Type': 'multipart/form-data' },
-          timeout: 60000 // 60 second timeout for uploads
-        }
+          file_key: fileKey,
+          file_name: fileName,
+          content_type: contentType,
+          size_bytes: fileBuffer.length,
+          file_content: fileBuffer.toString('base64'),
+          file_metadata: fullMetadata
+        },
+        { timeout: 60000 }
       );
 
+      const fileId = response.data?.file_id || response.data?.id || response.data?.data?.file_id || fileKey;
       return {
-        id: response.data.file_id,
-        fileKey: response.data.file_key,
+        id: fileId,
+        fileKey: fileKey,
         fileName: fileName,
-        size: response.data.size_bytes || fileBuffer.length,
+        size: fileBuffer.length,
         contentType: contentType,
         metadata: fullMetadata,
         createdAt: new Date().toISOString()
