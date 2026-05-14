@@ -169,7 +169,7 @@ exports.createDocument = async (req, res) => {
             data: { documentId: savedDocument.id || savedDocument._id }
         });
 
-        res.status(201).json(savedDocument);
+        res.status(201).json({ success: true, data: savedDocument });
     } catch (error) {
         errorResponse(res, 400, error.message, error);
     }
@@ -288,14 +288,17 @@ exports.getDocuments = async (req, res) => {
         documents = documents.slice(skip, skip + parseInt(limit));
 
         res.status(200).json({
-            documents,
-            pagination: {
-                total,
-                page: parseInt(page),
-                limit: parseInt(limit),
-                totalPages: Math.ceil(total / parseInt(limit))
-            },
-            searchPerformed: !!search
+            success: true,
+            data: {
+                documents,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                },
+                searchPerformed: !!search
+            }
         });
     } catch (error) {
         console.error('Error getting documents:', error.message);
