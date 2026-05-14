@@ -1,0 +1,315 @@
+{
+  "config": {
+    "configFile": "/Users/aideveloper/opencapstack/config/playwright.config.js",
+    "rootDir": "/Users/aideveloper/opencapstack/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aideveloper/opencapstack/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aideveloper/opencapstack/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/aideveloper/opencapstack/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aideveloper/opencapstack/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/aideveloper/opencapstack/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aideveloper/opencapstack/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/aideveloper/opencapstack/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "/Users/aideveloper/opencapstack/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/aideveloper/opencapstack/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "/Users/aideveloper/opencapstack/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "test-results/results.xml"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.1",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "auth.spec.js",
+      "file": "auth.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "403 Unverified Account — verify-email redirect",
+          "file": "auth.spec.js",
+          "line": 436,
+          "column": 6,
+          "specs": [
+            {
+              "title": "api.js 403 \"Account is not active\" on protected route redirects to /login?error=verify-email",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 14070,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:5173/login?redirect=%2F\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:5173/login?redirect=%2F\"\n============================================================\n    at /Users/aideveloper/opencapstack/e2e/auth.spec.js:523:16",
+                        "location": {
+                          "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                          "column": 16,
+                          "line": 523
+                        },
+                        "snippet": "  521 |\n  522 |     // api.js interceptor fires: pathname is '/' so redirect to /login?error=verify-email\n> 523 |     await page.waitForURL(\n      |                ^\n  524 |       (url) => url.pathname === '/login' && url.searchParams.get('error') === 'verify-email',\n  525 |       { timeout: 10000 }\n  526 |     );"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                            "column": 16,
+                            "line": 523
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:5173/login?redirect=%2F\"\n============================================================\n\n  521 |\n  522 |     // api.js interceptor fires: pathname is '/' so redirect to /login?error=verify-email\n> 523 |     await page.waitForURL(\n      |                ^\n  524 |       (url) => url.pathname === '/login' && url.searchParams.get('error') === 'verify-email',\n  525 |       { timeout: 10000 }\n  526 |     );\n    at /Users/aideveloper/opencapstack/e2e/auth.spec.js:523:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-05-09T19:33:02.815Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                        "column": 16,
+                        "line": 523
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d5ed79a6b333c2ba7209-6e60d72b8aa674712b25",
+              "file": "auth.spec.js",
+              "line": 500,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Token Storage — localStorage contract",
+          "file": "auth.spec.js",
+          "line": 554,
+          "column": 6,
+          "specs": [
+            {
+              "title": "api.js 401 interceptor clears token and redirects to /login",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 2185,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m\"expired-token\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m\"expired-token\"\u001b[39m\n    at /Users/aideveloper/opencapstack/e2e/auth.spec.js:632:25",
+                        "location": {
+                          "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                          "column": 25,
+                          "line": 632
+                        },
+                        "snippet": "  630 |\n  631 |     const storedToken = await page.evaluate(() => localStorage.getItem('token'));\n> 632 |     expect(storedToken).toBeNull();\n      |                         ^\n  633 |   });\n  634 | });\n  635 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                            "column": 25,
+                            "line": 632
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31m\"expired-token\"\u001b[39m\n\n  630 |\n  631 |     const storedToken = await page.evaluate(() => localStorage.getItem('token'));\n> 632 |     expect(storedToken).toBeNull();\n      |                         ^\n  633 |   });\n  634 | });\n  635 |\n    at /Users/aideveloper/opencapstack/e2e/auth.spec.js:632:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-05-09T19:33:02.710Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/aideveloper/opencapstack/test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/aideveloper/opencapstack/e2e/auth.spec.js",
+                        "column": 25,
+                        "line": 632
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d5ed79a6b333c2ba7209-91a132c97da4103f3de6",
+              "file": "auth.spec.js",
+              "line": 601,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-05-09T19:32:50.456Z",
+    "duration": 27347.126,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

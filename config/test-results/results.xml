@@ -1,0 +1,82 @@
+<testsuites id="" name="" tests="2" failures="2" skipped="0" errors="0" time="27.347126">
+<testsuite name="auth.spec.js" timestamp="2026-05-09T19:32:58.476Z" hostname="chromium" tests="2" failures="2" skipped="0" time="16.255" errors="0">
+<testcase name="403 Unverified Account — verify-email redirect › api.js 403 &quot;Account is not active&quot; on protected route redirects to /login?error=verify-email" classname="auth.spec.js" time="14.07">
+<failure message="auth.spec.js:500:3 api.js 403 &quot;Account is not active&quot; on protected route redirects to /login?error=verify-email" type="FAILURE">
+<![CDATA[  [chromium] › auth.spec.js:500:3 › 403 Unverified Account — verify-email redirect › api.js 403 "Account is not active" on protected route redirects to /login?error=verify-email 
+
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:5173/login?redirect=%2F"
+    ============================================================
+
+      521 |
+      522 |     // api.js interceptor fires: pathname is '/' so redirect to /login?error=verify-email
+    > 523 |     await page.waitForURL(
+          |                ^
+      524 |       (url) => url.pathname === '/login' && url.searchParams.get('error') === 'verify-email',
+      525 |       { timeout: 10000 }
+      526 |     );
+        at /Users/aideveloper/opencapstack/e2e/auth.spec.js:523:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/video.webm]]
+
+[[ATTACHMENT|../../test-results/auth-403-Unverified-Accoun-5eadb-to-login-error-verify-email-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Token Storage — localStorage contract › api.js 401 interceptor clears token and redirects to /login" classname="auth.spec.js" time="2.185">
+<failure message="auth.spec.js:601:3 api.js 401 interceptor clears token and redirects to /login" type="FAILURE">
+<![CDATA[  [chromium] › auth.spec.js:601:3 › Token Storage — localStorage contract › api.js 401 interceptor clears token and redirects to /login 
+
+    Error: expect(received).toBeNull()
+
+    Received: "expired-token"
+
+      630 |
+      631 |     const storedToken = await page.evaluate(() => localStorage.getItem('token'));
+    > 632 |     expect(storedToken).toBeNull();
+          |                         ^
+      633 |   });
+      634 | });
+      635 |
+        at /Users/aideveloper/opencapstack/e2e/auth.spec.js:632:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/video.webm]]
+
+[[ATTACHMENT|../../test-results/auth-Token-Storage-—-local-a8507-oken-and-redirects-to-login-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

@@ -56,7 +56,7 @@ Ensure your `.env` file contains:
 ```bash
 # AINATIVE / ZERODB CREDENTIALS
 AINATIVE_USERNAME="admin@ainative.studio"
-AINATIVE_PASSWORD="Admin2025!Secure"
+AINATIVE_PASSWORD="H%dJcjSwLZIe1%9u"
 AINATIVE_API_URL="https://api.ainative.studio/"
 AINATIVE_API_TOKEN="kLPiP0bzgKJ0CnNYVt1wq3qxbs2QgDeF2XwyUnxBEOM"
 
@@ -92,7 +92,7 @@ curl -X POST "https://api.ainative.studio/v1/public/auth/register" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@ainative.studio",
-    "password": "Admin2025!Secure",
+    "password": "H%dJcjSwLZIe1%9u",
     "name": "OpenCapStack Admin"
   }'
 ```
@@ -104,7 +104,7 @@ curl -X POST "https://api.ainative.studio/v1/public/auth/login-json" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@ainative.studio",
-    "password": "Admin2025!Secure"
+    "password": "H%dJcjSwLZIe1%9u"
   }'
 ```
 
