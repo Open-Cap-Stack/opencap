@@ -96,6 +96,16 @@ exports.getCompanySAFEs = async (req, res) => {
       }
     });
   } catch (error) {
+    // ZeroDB may return 422 if the table filter is rejected (e.g., schema mismatch);
+    // treat as empty list so the frontend page loads gracefully
+    const status = error?.response?.status;
+    if (status === 422 || status === 429) {
+      return res.json({
+        success: true,
+        data: [],
+        pagination: { page: 1, limit: 20, total: 0, pages: 0 }
+      });
+    }
     res.status(500).json({
       success: false,
       error: error.message
