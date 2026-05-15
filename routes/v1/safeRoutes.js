@@ -12,6 +12,13 @@ router.use(authenticateToken);
 
 // SAFE CRUD operations
 router.post('/', safeController.createSAFE);
+// Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
+router.get('/', (req, res, next) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.json({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
+  req.params.companyId = companyId;
+  return safeController.getCompanySAFEs(req, res, next);
+});
 router.get('/company/:companyId', safeController.getCompanySAFEs);
 router.get('/company/:companyId/summary', safeController.getCompanySummary);
 router.get('/:safeId', safeController.getSAFE);
