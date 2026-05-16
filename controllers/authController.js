@@ -129,8 +129,8 @@ const registerUser = async (req, res) => {
       password: hashedPassword,
       role,
       companyId,
-      // Require email verification only when SMTP is configured
-      status: (isDevelopment || !process.env.EMAIL_HOST) ? 'active' : 'pending'
+      // Auto-activate users — email verification is optional (sent in background)
+      status: 'active'
     };
 
     // Only add verification token when SMTP is configured and can send the email
@@ -144,47 +144,40 @@ const registerUser = async (req, res) => {
     // Create user using ZeroDB pattern
     const user = await User.create(userData);
 
-    // Send verification email in background if not in development
-    if (!isDevelopment) {
-      sendVerificationEmailToUser(user).catch(err =>
-        console.error('Failed to send verification email:', err.message)
-      );
-    }
+    // Send verification email in background (non-blocking — user is already active)
+    sendVerificationEmailToUser(user).catch(err =>
+      console.error('Failed to send verification email:', err.message)
+    );
 
-    // Generate auth token for immediate login in development
-    let token;
-    if (isDevelopment) {
-      if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET environment variable is required');
-      }
+    // Generate auth token for immediate login
+    const token = jwt.sign(
+      {
+        userId: user.userId || user._id,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions || [],
+        companyId: user.companyId || null
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
 
-      token = jwt.sign(
-        {
-          userId: user.userId || user._id,
-          email: user.email,
-          role: user.role,
-          permissions: user.permissions || [],
-          companyId: user.companyId || null
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-    }
-
-    // Return success response
-    const response = {
+    // Return success response with token for immediate login
+    return res.status(201).json({
       success: true,
-      message: isDevelopment
-        ? 'Registration successful. You are now logged in.'
-        : 'Registration successful. Please check your email to verify your account.',
-      userId: user._id
-    };
-
-    if (isDevelopment) {
-      response.token = token;
-    }
-
-    return res.status(201).json(response);
+      message: 'Registration successful.',
+      userId: user.userId || user._id,
+      token,
+      ainativeToken: token,
+      user: {
+        userId: user.userId || user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        companyId: user.companyId || null
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error.message);
     return res.status(500).json({
@@ -994,8 +987,8 @@ const verifyEmail = async (req, res) => {
 const sendVerificationEmailToUser = async (user) => {
   // Generate verification token
   const verificationToken = jwt.sign(
-    { userId: user.userId || user._id }, 
-    process.env.JWT_VERIFICATION_SECRET, 
+    { userId: user.userId || user._id },
+    process.env.JWT_VERIFICATION_SECRET || process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
   
