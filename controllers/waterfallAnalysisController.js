@@ -97,8 +97,9 @@ exports.runAnalysis = async (req, res) => {
       shareClassId: sc.shareClassId || sc.name || `class-${i}`,
       name: sc.name || sc.shareClassName || `Class ${i + 1}`,
       shareClassName: sc.shareClassName || sc.name || `Class ${i + 1}`,
+      // Standard VC preferred is 1x non-participating; 'common' only when preference is 0
       preferenceType: sc.preferenceType || (
-        (sc.preferenceAmount > 0 || sc.liquidationPreference > 0) ? 'preferred' : 'common'
+        (sc.preferenceAmount > 0 || sc.liquidationPreference > 0) ? 'non_participating' : 'common'
       ),
       originalInvestment: sc.originalInvestment || sc.preferenceAmount || sc.liquidationPreference || 0,
       liquidationMultiple: sc.liquidationMultiple || 1,

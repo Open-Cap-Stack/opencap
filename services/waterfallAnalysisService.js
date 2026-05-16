@@ -176,7 +176,8 @@ class WaterfallAnalysisService {
     // If no conversion happened, distribute remaining to common only
     if (convertedShares === 0 && proceedsForCommon > 0) {
       for (const sc of commonClasses) {
-        const shareRatio = commonTotalShares > 0 ? sc.totalShares / commonTotalShares : 0;
+        // Fall back to equal split when no share counts provided
+        const shareRatio = commonTotalShares > 0 ? sc.totalShares / commonTotalShares : (1 / commonClasses.length);
         const proceeds = shareRatio * proceedsForCommon;
 
         shareClassResults.push({
