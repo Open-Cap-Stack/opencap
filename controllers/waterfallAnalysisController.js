@@ -91,8 +91,29 @@ exports.runAnalysis = async (req, res) => {
       return res.status(404).json({ message: 'Waterfall analysis not found' });
     }
 
+    // Normalize share classes — UI sends { name, shareClassName, preferenceAmount }
+    // but the service expects shareClassId, originalInvestment, and preferenceType
+    const normalizedShareClasses = (analysis.shareClasses || []).map((sc, i) => ({
+      shareClassId: sc.shareClassId || sc.name || `class-${i}`,
+      name: sc.name || sc.shareClassName || `Class ${i + 1}`,
+      shareClassName: sc.shareClassName || sc.name || `Class ${i + 1}`,
+      preferenceType: sc.preferenceType || (
+        (sc.preferenceAmount > 0 || sc.liquidationPreference > 0) ? 'preferred' : 'common'
+      ),
+      originalInvestment: sc.originalInvestment || sc.preferenceAmount || sc.liquidationPreference || 0,
+      liquidationMultiple: sc.liquidationMultiple || 1,
+      seniorityRank: sc.seniorityRank || (i + 1),
+      totalShares: sc.totalShares || sc.shares || 0,
+      pricePerShare: sc.pricePerShare || 0,
+      participatingPreferred: sc.participatingPreferred || false,
+      participationCap: sc.participationCap || 0,
+    }));
+
     // Run the waterfall calculation
-    const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+    const result = WaterfallAnalysisService.calculateWaterfall({
+      ...analysis,
+      shareClasses: normalizedShareClasses,
+    });
 
     // Update the analysis with results
     const updateData = {
