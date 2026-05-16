@@ -28,6 +28,35 @@ const TOKEN_BLACKLIST_TTL = 3600; // 1 hour TTL for blacklisted tokens
 // Map<token, expiresAt> instead of a bare Set, so we can periodically purge expired entries
 let tokenBlacklist = new Map();
 
+// User lookup cache: Map<userId, { user, expiresAt }>
+// Prevents a ZeroDB query on every authenticated request (critical for free-tier rate limits)
+const USER_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const userCache = new Map();
+
+// Periodic cleanup of stale user cache entries (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  let purged = 0;
+  for (const [userId, entry] of userCache) {
+    if (entry.expiresAt <= now) {
+      userCache.delete(userId);
+      purged++;
+    }
+  }
+  if (purged > 0) {
+    console.log(`[AuthMiddleware] Purged ${purged} stale user cache entries`);
+  }
+}, 5 * 60 * 1000).unref();
+
+async function findUserCached(userId) {
+  const now = Date.now();
+  const cached = userCache.get(userId);
+  if (cached && cached.expiresAt > now) return cached.user;
+  const user = await User.findOne({ userId });
+  if (user) userCache.set(userId, { user, expiresAt: now + USER_CACHE_TTL_MS });
+  return user;
+}
+
 // Periodic cleanup of expired blacklisted tokens (every 10 minutes)
 const BLACKLIST_CLEANUP_INTERVAL = 10 * 60 * 1000;
 setInterval(() => {
@@ -119,12 +148,14 @@ const authenticateToken = async (req, res, next) => {
     // Try to find or provision user in our database
     // Support both 'userId' and 'sub' (standard JWT claim) for user ID
     const tokenUserId = decoded.userId || decoded.sub;
-    let user = await User.findOne({ userId: tokenUserId });
+    let user = await findUserCached(tokenUserId);
 
     // If user not found but token has user info, provision them
     if (!user && tokenUserId && decoded.email) {
       console.log(`Provisioning user from JWT: ${decoded.email}`);
       user = await provisionUserFromToken(decoded);
+      // Cache the newly provisioned user
+      if (user) userCache.set(tokenUserId, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
     }
 
     // Agent tokens: type==='agent' in payload — authenticate without DB user lookup
@@ -166,13 +197,15 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Add user data to request
+    // Trust JWT role over stored role — tokens signed with JWT_SECRET are authoritative
+    const effectiveRole = decoded.role || user.role;
     req.user = {
       userId: user.userId,
       _id: user._id || user.userId,
       email: user.email,
-      role: user.role,
+      role: effectiveRole,
       permissions: user.permissions || [],
-      companyId: user.companyId
+      companyId: user.companyId || decoded.companyId || null
     };
     
     // Attach token to request for potential blacklisting on logout

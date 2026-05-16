@@ -11,6 +11,27 @@ const crypto = require('crypto');
 const CONV_TABLE = 'conversations';
 const MSG_TABLE = 'messages';
 
+let tablesEnsured = false;
+
+async function ensureTables() {
+  if (tablesEnsured) return;
+  try {
+    await zerodbService.createTable(CONV_TABLE, {
+      id: 'string', name: 'string', participants: 'json',
+      participantNames: 'json', createdBy: 'string',
+      createdAt: 'string', updatedAt: 'string',
+    });
+  } catch { /* table already exists */ }
+  try {
+    await zerodbService.createTable(MSG_TABLE, {
+      id: 'string', conversationId: 'string', senderId: 'string',
+      senderName: 'string', text: 'string', read: 'boolean',
+      createdAt: 'string',
+    });
+  } catch { /* table already exists */ }
+  tablesEnsured = true;
+}
+
 function generateUUID() {
   return crypto.randomUUID();
 }
@@ -20,7 +41,8 @@ function unwrap(result) {
   if (!Array.isArray(rawData)) return [];
   return rawData.map((item) => {
     if (item.row_data) {
-      return { ...item.row_data, id: item.row_id || item.row_data.id, row_id: item.row_id };
+      // Prefer the application-level id stored in row_data over the ZeroDB row_id
+      return { ...item.row_data, id: item.row_data.id || item.row_id, row_id: item.row_id };
     }
     return item;
   });
@@ -32,6 +54,7 @@ function unwrap(result) {
  */
 exports.getConversations = async (req, res) => {
   try {
+    await ensureTables();
     const userId = req.user?.userId;
 
     // Fetch all conversations where this user is a participant
@@ -110,6 +133,7 @@ exports.getConversations = async (req, res) => {
  */
 exports.sendMessage = async (req, res) => {
   try {
+    await ensureTables();
     const { conversationId, to, text } = req.body;
     const userId = req.user?.userId;
     const now = new Date().toISOString();

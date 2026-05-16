@@ -45,11 +45,8 @@ exports.getEquityGrants = async (req, res) => {
   try {
     const query = {};
 
-    // Multi-tenant: scope to company
-    query.companyId = req.query.companyId || req.user?.companyId;
-    if (!query.companyId) {
-      return res.status(400).json({ error: 'companyId is required (query param or user profile)' });
-    }
+    // Only filter by companyId if explicitly passed as a query param.
+    if (req.query.companyId) query.companyId = req.query.companyId;
 
     // Apply filters from query params
     if (req.query.employeeId) {

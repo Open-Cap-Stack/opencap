@@ -37,8 +37,6 @@ exports.getTasks = async (req, res) => {
   try {
     // Build filter object from query parameters
     const filter = {};
-    const companyId = req.query.companyId || req.user?.companyId;
-
     if (req.query.status) {
       filter.status = req.query.status;
     }
@@ -51,8 +49,8 @@ exports.getTasks = async (req, res) => {
       filter.assigneeId = req.query.assigneeId;
     }
 
-    if (companyId) {
-      filter.companyId = companyId;
+    if (req.query.companyId) {
+      filter.companyId = req.query.companyId;
     }
 
     const tasks = await Task.find(filter);

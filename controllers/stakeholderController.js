@@ -87,11 +87,9 @@ exports.getAllStakeholders = async (req, res) => {
     // Build filter from query params
     const filter = {};
 
-    // Multi-tenant: scope to user's company, or allow explicit companyId query
-    filter.companyId = req.query.companyId || req.user?.companyId;
-    if (!filter.companyId) {
-      return res.status(400).json({ error: 'companyId is required (query param or user profile)' });
-    }
+    // Only filter by companyId if explicitly passed as a query param.
+    // Do not block by req.user.companyId — rows may lack this field.
+    if (req.query.companyId) filter.companyId = req.query.companyId;
 
     if (req.query.projectId) {
       filter.projectId = req.query.projectId;

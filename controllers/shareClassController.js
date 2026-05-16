@@ -16,13 +16,10 @@ const createShareClass = async (req, res) => {
     return errorResponse(res, 400, 'Name is required');
   }
 
-  const companyId = req.body.companyId || req.user?.companyId;
-  if (!companyId) {
-    return errorResponse(res, 400, 'companyId is required');
-  }
+  const companyId = req.body.companyId || req.user?.companyId || null;
 
   try {
-    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio, companyId });
+    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio, ...(companyId ? { companyId } : {}) });
     res.status(201).json({ shareClass });
   } catch (error) {
     errorResponse(res, 500, 'Error creating share class', error);
@@ -32,8 +29,10 @@ const createShareClass = async (req, res) => {
 const getAllShareClasses = async (req, res) => {
   try {
     const query = {};
-    const companyId = req.query.companyId || req.user?.companyId;
-    if (companyId) query.companyId = companyId;
+    // Only filter by companyId if explicitly passed as a query param by the client.
+    // Do NOT auto-filter by req.user.companyId — most rows were stored without companyId
+    // and user tokens often have null companyId, causing empty results.
+    if (req.query.companyId) query.companyId = req.query.companyId;
     const shareClasses = await databaseAdapter.find(MODEL_NAME, query);
     res.status(200).json({ shareClasses });
   } catch (error) {
