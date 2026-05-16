@@ -115,7 +115,7 @@ class DilutionCalculationService {
 
         // Update existing share class percentages
         proFormaShareClasses.forEach(sc => {
-            if (sc.shareClassId.startsWith('series-new')) {
+            if (sc.shareClassId && sc.shareClassId.startsWith('series-new')) {
                 return; // Already calculated above
             }
             sc.ownershipPercentage = (sc.shares / totalShares) * 100;
