@@ -142,7 +142,11 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const results = await this._findInZeroDB(tableName, { _id: id }, { limit: 1, ...options });
+      // Try row_id first (ZeroDB native ID), then fall back to _id field in row_data
+      let results = await this._findInZeroDB(tableName, { row_id: id }, { limit: 1, ...options });
+      if (!results || results.length === 0) {
+        results = await this._findInZeroDB(tableName, { _id: id }, { limit: 1, ...options });
+      }
       this._recordMetric(Date.now() - startTime, true);
       return results && results.length > 0 ? results[0] : null;
     } catch (error) {
@@ -189,9 +193,14 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const result = await this._updateInZeroDB(tableName, { _id: id }, update);
+      await this._updateInZeroDB(tableName, { row_id: id }, update);
+      // Fetch and return the updated document (options.new is implicit)
+      let results = await this._findInZeroDB(tableName, { row_id: id }, { limit: 1 });
+      if (!results || results.length === 0) {
+        results = await this._findInZeroDB(tableName, { _id: id }, { limit: 1 });
+      }
       this._recordMetric(Date.now() - startTime, true);
-      return result;
+      return results && results.length > 0 ? results[0] : null;
     } catch (error) {
       this._recordMetric(0, false);
       console.error(`ZeroDB findByIdAndUpdate error for ${modelName}:`, error);
@@ -233,9 +242,17 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const result = await this._deleteInZeroDB(tableName, { _id: id });
+      // Fetch the document before deleting so we can return it
+      let docs = await this._findInZeroDB(tableName, { row_id: id }, { limit: 1 });
+      if (!docs || docs.length === 0) {
+        docs = await this._findInZeroDB(tableName, { _id: id }, { limit: 1 });
+      }
+      const doc = docs && docs.length > 0 ? docs[0] : null;
+      if (doc) {
+        await this._deleteInZeroDB(tableName, { row_id: doc.row_id || id });
+      }
       this._recordMetric(Date.now() - startTime, true);
-      return result;
+      return doc;
     } catch (error) {
       this._recordMetric(0, false);
       console.error(`ZeroDB findByIdAndDelete error for ${modelName}:`, error);
