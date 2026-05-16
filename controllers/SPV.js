@@ -32,11 +32,18 @@ const isValidId = (id) => {
  */
 exports.createSPV = async (req, res) => {
   try {
-    const { SPVID, Name, Purpose, CreationDate, Status, ParentCompanyID, ComplianceStatus } = req.body;
+    // Accept both PascalCase (legacy) and camelCase (frontend) field names
+    const Name = req.body.Name || req.body.name;
+    const Purpose = req.body.Purpose || req.body.purpose || req.body.description || req.body.type || 'General';
+    const ParentCompanyID = req.body.ParentCompanyID || req.body.parentCompanyId || req.user?.companyId || 'default';
+    const SPVID = req.body.SPVID || req.body.spvId;
+    const CreationDate = req.body.CreationDate || req.body.formationDate || req.body.creationDate;
+    const Status = req.body.Status || req.body.status;
+    const ComplianceStatus = req.body.ComplianceStatus || req.body.complianceStatus;
 
     // Validate required fields
-    if (!Name || !Purpose || !ParentCompanyID) {
-      return res.status(400).json({ message: 'Missing required fields: Name, Purpose, and ParentCompanyID are required' });
+    if (!Name) {
+      return res.status(400).json({ message: 'Missing required field: Name is required' });
     }
 
     // Normalize status to lowercase for ZeroDB model
