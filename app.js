@@ -256,6 +256,7 @@ const routes = {
   pluginRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginRoutes')), // Issue #506: Plugin tools
   boardMeetingRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardMeetingRoutes')), // Board meeting management
   messageRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageRoutes')), // Messaging / conversations
+  accountantRoutes: safeRequire(path.join(__dirname, 'routes/v1/accountantRoutes')), // AI 409A accountant review workflow
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -427,6 +428,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/board-meetings';
     } else if (key === 'messageRoutes') {
       path = '/api/v1/messages';
+    } else if (key === 'accountantRoutes') {
+      path = '/api/v1/accountant';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

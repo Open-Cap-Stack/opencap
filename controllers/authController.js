@@ -96,8 +96,17 @@ const registerUser = async (req, res) => {
       });
     }
 
+    // Accountant self-registration requires a valid invite code
+    const { accountantInviteCode } = req.body;
+    if (role === 'accountant') {
+      const expectedCode = process.env.ACCOUNTANT_INVITE_CODE;
+      if (!expectedCode || accountantInviteCode !== expectedCode) {
+        return res.status(403).json({ message: 'Invalid accountant invite code' });
+      }
+    }
+
     // Validate role matches User model schema
-    const allowedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
+    const allowedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant'];
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({
         message: `Role must be one of: ${allowedRoles.join(', ')}`

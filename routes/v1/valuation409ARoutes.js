@@ -25,6 +25,14 @@ router.get('/', valuation409AController.getAllValuations);
 // Get valuation analytics
 router.get('/analytics', valuation409AController.getValuationAnalytics);
 
+// ── AI-powered 409A workflow (must be before /:valuationId to avoid conflicts) ─
+router.post('/:valuationId/submit-inputs', valuation409AController.submitInputs);
+router.post('/:valuationId/payment-session', valuation409AController.createPaymentSession);
+router.post('/:valuationId/mark-paid', valuation409AController.markPaid);
+router.post('/:valuationId/run-ai', valuation409AController.runAI);
+router.get('/:valuationId/ai-status', valuation409AController.getAIStatus);
+router.get('/:valuationId/report', valuation409AController.getAIReport);
+
 /**
  * @swagger
  * /api/v1/valuations/latest:

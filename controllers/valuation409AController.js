@@ -511,6 +511,218 @@ exports.processExpiredValuations = async (req, res) => {
 };
 
 // ============================================================================
+// AI-POWERED 409A WORKFLOW ENDPOINTS
+// ============================================================================
+
+// Submit financial inputs + business context, transition to data_collection
+exports.submitInputs = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+    const { financialInputs, businessContext } = req.body;
+
+    if (!financialInputs || !businessContext) {
+      return res.status(400).json({ success: false, error: 'financialInputs and businessContext are required' });
+    }
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    const fk = valuation.valuationId ? { valuationId: valuation.valuationId } : { row_id: valuation.row_id };
+    const now = new Date().toISOString();
+
+    await Valuation409A.updateOne(fk, {
+      $set: {
+        financialInputs,
+        businessContext,
+        status: 'data_collection',
+        aiStatus: 'not_started',
+        updatedAt: now
+      }
+    });
+
+    const updated = await Valuation409A.findOne(fk);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Create Stripe checkout session for 409A payment ($999 flat fee)
+exports.createPaymentSession = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+    const { successUrl, cancelUrl } = req.body;
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    if (!['data_collection', 'requested'].includes(valuation.status)) {
+      return res.status(400).json({ success: false, error: 'Valuation is not in a payable state' });
+    }
+    if (valuation.paymentStatus === 'paid') {
+      return res.status(400).json({ success: false, error: 'This valuation has already been paid for' });
+    }
+
+    const stripeService = require('../services/stripeService');
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ success: false, error: 'Payment processing not configured' });
+    }
+
+    const stripe = stripeService.getStripe();
+    const resolvedId = valuation.valuationId || valuation.row_id;
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: '409A Valuation Report',
+            description: 'AI-powered 409A fair market value analysis with accountant review and sign-off'
+          },
+          unit_amount: 99900 // $999.00
+        },
+        quantity: 1
+      }],
+      mode: 'payment',
+      success_url: successUrl || `${process.env.FRONTEND_URL}/valuations/${resolvedId}?payment=success`,
+      cancel_url: cancelUrl || `${process.env.FRONTEND_URL}/valuations/${resolvedId}?payment=cancelled`,
+      metadata: { valuationId: resolvedId, companyId: valuation.companyId }
+    });
+
+    // Store the session ID on the valuation for webhook reconciliation
+    const fk = valuation.valuationId ? { valuationId: valuation.valuationId } : { row_id: valuation.row_id };
+    await Valuation409A.updateOne(fk, {
+      $set: { stripeSessionId: session.id, updatedAt: new Date().toISOString() }
+    });
+
+    res.json({ success: true, sessionId: session.id, url: session.url });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Mark valuation as paid (called by Stripe webhook or manually by admin)
+exports.markPaid = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+    const { stripeSessionId } = req.body;
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    const fk = valuation.valuationId ? { valuationId: valuation.valuationId } : { row_id: valuation.row_id };
+    await Valuation409A.updateOne(fk, {
+      $set: {
+        paymentStatus: 'paid',
+        paidAt: new Date().toISOString(),
+        stripeSessionId: stripeSessionId || valuation.stripeSessionId,
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+    res.json({ success: true, message: 'Payment recorded' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Trigger AI valuation run (requires payment)
+exports.runAI = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    if (valuation.paymentStatus !== 'paid' && req.user?.role !== 'admin') {
+      return res.status(402).json({ success: false, error: 'Payment required before running AI valuation' });
+    }
+    if (!valuation.financialInputs || !valuation.businessContext?.industry) {
+      return res.status(400).json({ success: false, error: 'Financial inputs and business context must be submitted first' });
+    }
+    if (['ai_processing', 'accountant_review', 'accountant_approved', 'released'].includes(valuation.aiStatus)) {
+      return res.status(400).json({ success: false, error: `AI is already in ${valuation.aiStatus} state` });
+    }
+
+    const fk = valuation.valuationId ? { valuationId: valuation.valuationId } : { row_id: valuation.row_id };
+    await Valuation409A.updateOne(fk, {
+      $set: { aiStatus: 'researching', status: 'ai_processing', updatedAt: new Date().toISOString() }
+    });
+
+    // Run agent asynchronously — don't await
+    const resolvedId = valuation.valuationId || valuation.row_id;
+    const { runValuationAgent } = require('../services/valuation409AAgentService');
+    runValuationAgent(resolvedId).catch(err => {
+      console.error(`[409A] Background agent failed for ${resolvedId}:`, err.message);
+    });
+
+    res.json({ success: true, message: 'AI valuation started. Poll /ai-status for progress.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Poll AI status
+exports.getAIStatus = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    res.json({
+      success: true,
+      data: {
+        aiStatus: valuation.aiStatus || 'not_started',
+        status: valuation.status,
+        aiStartedAt: valuation.aiStartedAt,
+        aiCompletedAt: valuation.aiCompletedAt,
+        aiErrorMessage: valuation.aiErrorMessage || null,
+        fairMarketValue: valuation.fairMarketValue || null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get full AI report content
+exports.getAIReport = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) valuation = await Valuation409A.findOne({ row_id: valuationId });
+    if (!valuation) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    if (!valuation.aiReport) {
+      return res.status(404).json({ success: false, error: 'AI report not yet generated' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        report: valuation.aiReport,
+        comparables: valuation.aiSelectedComparables || [],
+        reconciliation: valuation.aiReconciliation || null,
+        fairMarketValue: valuation.fairMarketValue,
+        accountantSignedAt: valuation.accountantSignedAt || null,
+        accountantSignatureRecord: valuation.accountantSignatureRecord || null,
+        status: valuation.status,
+        releasedToCompanyAt: valuation.releasedToCompanyAt || null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================================
 // AUDIT TRAIL ENDPOINTS (Issue #63)
 // ============================================================================
 
