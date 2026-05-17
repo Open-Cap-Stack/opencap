@@ -88,7 +88,8 @@ exports.getCompanySAFEs = async (req, res) => {
     const { companyId } = req.params;
     const { status, page = 1, limit = 20 } = req.query;
 
-    const query = { companyId };
+    // 'default' is the admin/demo companyId — return all SAFEs in that case
+    const query = companyId && companyId !== 'default' ? { companyId } : {};
     if (status) query.status = status;
 
     const pageNum = parseInt(page);

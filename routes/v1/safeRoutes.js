@@ -27,7 +27,10 @@ router.get('/', (req, res, next) => {
   if (!companyId) {
     return SAFE.find({}, { sort: { createdAt: -1 }, limit: 100 })
       .then(safes => res.json({ success: true, data: (safes || []).map(normalizeSafeType), pagination: { page: 1, limit: 100, total: (safes || []).length, pages: 1 } }))
-      .catch(err => res.json({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } }));
+      .catch(err => {
+        console.error('[safeRoutes] find error:', err.message);
+        res.json({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
+      });
   }
   req.params.companyId = companyId;
   return safeController.getCompanySAFEs(req, res, next);
