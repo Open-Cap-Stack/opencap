@@ -9,6 +9,7 @@ const AccountantQueue = require('../models/AccountantQueue');
 const Valuation409A = require('../models/Valuation409A');
 const User = require('../models/User');
 const emailService = require('../services/valuation409AEmailService');
+const stripeService = require('../services/stripeService');
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,91 @@ exports.getStats = async (req, res) => {
         inReview: byStatus.in_review || 0,
         completed: byStatus.completed || 0,
         byStatus
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ─── Stripe Connect Payout Onboarding ────────────────────────────────────────
+
+exports.createConnectOnboardingLink = async (req, res) => {
+  try {
+    const { userId, email, role } = req.user;
+    if (role !== 'accountant' && role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Accountant role required' });
+    }
+
+    if (!stripeService.isConfigured()) {
+      return res.status(503).json({ success: false, error: 'Stripe not configured' });
+    }
+
+    const stripe = stripeService.getStripe();
+    const frontendUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
+
+    // Find or create Stripe Connect Express account for this accountant
+    let user = await User.findOne({ userId });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    let stripeAccountId = user.stripeConnectAccountId;
+
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email,
+        capabilities: { transfers: { requested: true } },
+        metadata: { userId },
+      });
+      stripeAccountId = account.id;
+      const fk = user.userId ? { userId: user.userId } : { row_id: user.row_id };
+      await User.updateOne(fk, { $set: { stripeConnectAccountId: stripeAccountId, updatedAt: new Date().toISOString() } });
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${frontendUrl}/accountant?connect=refresh`,
+      return_url: `${frontendUrl}/accountant?connect=success`,
+      type: 'account_onboarding',
+    });
+
+    res.json({ success: true, url: accountLink.url });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getConnectStatus = async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    if (role !== 'accountant' && role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Accountant role required' });
+    }
+
+    const user = await User.findOne({ userId });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const stripeAccountId = user.stripeConnectAccountId;
+
+    if (!stripeAccountId) {
+      return res.json({ success: true, data: { connected: false, chargesEnabled: false, payoutsEnabled: false } });
+    }
+
+    if (!stripeService.isConfigured()) {
+      return res.json({ success: true, data: { connected: true, chargesEnabled: false, payoutsEnabled: false, stripeAccountId } });
+    }
+
+    const stripe = stripeService.getStripe();
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+
+    res.json({
+      success: true,
+      data: {
+        connected: true,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        stripeAccountId,
+        detailsSubmitted: account.details_submitted,
       }
     });
   } catch (error) {

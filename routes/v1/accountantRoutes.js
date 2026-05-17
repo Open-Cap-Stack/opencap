@@ -26,6 +26,10 @@ router.post('/valuations/:valuationId/release', accountantController.releaseToCo
 // Dashboard stats
 router.get('/stats', accountantController.getStats);
 
+// Stripe Connect payout onboarding
+router.post('/connect/onboard', accountantController.createConnectOnboardingLink);
+router.get('/connect/status', accountantController.getConnectStatus);
+
 // Admin: accountant management
 router.get('/accountants', accountantController.listAccountants);
 
