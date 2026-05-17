@@ -10,16 +10,27 @@ const { errorResponse } = require('../middleware/errorResponse');
 const MODEL_NAME = 'ShareClass';
 
 const createShareClass = async (req, res) => {
-  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio } = req.body;
+  // Accept `type` as an alias for `classType` (frontend sends `type`)
+  const body = { ...req.body };
+  if (body.type && !body.classType) body.classType = body.type;
+
+  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, pricePerShare, liquidationPreference, votingRights, antiDilutionRights, conversionRatio } = body;
 
   if (!name) {
     return errorResponse(res, 400, 'Name is required');
   }
 
-  const companyId = req.body.companyId || req.user?.companyId || null;
+  const companyId = body.companyId || req.user?.companyId || null;
 
   try {
-    const shareClass = await databaseAdapter.create(MODEL_NAME, { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, liquidationPreference, votingRights, antiDilutionRights, conversionRatio, ...(companyId ? { companyId } : {}) });
+    const shareClass = await databaseAdapter.create(MODEL_NAME, {
+      name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares,
+      authorizedShares, conversionRate, classType, parValue, pricePerShare,
+      liquidationPreference, votingRights, antiDilutionRights, conversionRatio,
+      // Also store `type` for frontend compatibility
+      type: classType || body.type,
+      ...(companyId ? { companyId } : {})
+    });
     res.status(201).json({ shareClass });
   } catch (error) {
     errorResponse(res, 500, 'Error creating share class', error);
@@ -57,11 +68,16 @@ const getShareClassById = async (req, res) => {
 
 const updateShareClassById = async (req, res) => {
   try {
+    // Normalize type/classType alias
+    const updateBody = { ...req.body };
+    if (updateBody.type && !updateBody.classType) updateBody.classType = updateBody.type;
+    if (updateBody.classType) updateBody.type = updateBody.classType;
+
     // Find by shareClassId first to get the internal _id
     const results = await databaseAdapter.find(MODEL_NAME, { shareClassId: req.params.id });
     const existing = results && results.length > 0 ? results[0] : null;
     const lookupId = existing ? existing._id : req.params.id;
-    const updatedShareClass = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, lookupId, req.body, { new: true });
+    const updatedShareClass = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, lookupId, updateBody, { new: true });
     if (!updatedShareClass) {
       return errorResponse(res, 404, 'Share class not found');
     }

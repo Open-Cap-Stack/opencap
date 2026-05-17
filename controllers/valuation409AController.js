@@ -18,15 +18,16 @@ exports.createValuationRequest = async (req, res) => {
       metadata
     } = req.body;
 
+    const userId = req.user?._id || req.user?.userId;
     const valuation = await Valuation409A.create({
       companyId,
-      requestedBy: req.user._id,
+      requestedBy: userId,
       reason,
       reasonDetails,
       notes,
       tags,
       metadata,
-      createdBy: req.user._id
+      createdBy: userId
     });
 
     res.status(201).json({
@@ -130,7 +131,7 @@ exports.updateValuation = async (req, res) => {
     delete updates.status;
     delete updates.statusHistory;
 
-    updates.updatedBy = req.user._id;
+    updates.updatedBy = req.user?._id || req.user?.userId;
     await Valuation409A.updateOne({ valuationId }, { $set: updates });
     const updated = await Valuation409A.findOne({ valuationId });
 
@@ -143,6 +144,24 @@ exports.updateValuation = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+// Delete a valuation (hard delete)
+exports.deleteValuation = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+    // Try by valuationId field first, then by _id / row_id
+    let deleted = await Valuation409A.findOneAndDelete({ valuationId });
+    if (!deleted) {
+      deleted = await Valuation409A.findByIdAndDelete(valuationId);
+    }
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Valuation not found' });
+    }
+    res.json({ success: true, message: 'Valuation deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -582,15 +601,36 @@ exports.exportAuditData = async (req, res) => {
 // Get all valuations (for list view)
 exports.getAllValuations = async (req, res) => {
   try {
-    // Return empty array - table may not exist yet
+    const { page = 1, limit = 20, status } = req.query;
+    const query = {};
+    // Only filter by companyId when explicitly provided; do NOT auto-filter by
+    // req.user.companyId because many rows were stored without a companyId.
+    if (req.query.companyId) query.companyId = req.query.companyId;
+    if (status) query.status = status;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    let valuations = [];
+    try {
+      valuations = await Valuation409A.find(query, {
+        sort: { createdAt: -1 },
+        skip: (pageNum - 1) * limitNum,
+        limit: limitNum
+      });
+    } catch (dbErr) {
+      // Table may not exist yet — return empty gracefully
+      console.warn('getAllValuations: DB error (table may not exist):', dbErr.message);
+    }
+
     res.json({
       success: true,
-      data: [],
+      data: valuations || [],
       pagination: {
-        page: 1,
-        limit: 10,
-        total: 0,
-        pages: 0
+        page: pageNum,
+        limit: limitNum,
+        total: (valuations || []).length,
+        pages: Math.ceil((valuations || []).length / limitNum) || 0
       }
     });
   } catch (error) {

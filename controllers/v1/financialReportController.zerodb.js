@@ -12,8 +12,9 @@ const zerodbService = require('../../services/zerodbService');
  * @param {string} id - The ID to validate
  * @returns {boolean} - Whether the ID is valid
  */
+// Accept MongoDB ObjectIds AND ZeroDB UUIDs / any non-empty string ID
 const isValidObjectId = (id) => {
-  return /^[0-9a-fA-F]{24}$/.test(id);
+  return typeof id === 'string' && id.trim().length > 0;
 };
 
 /**
@@ -49,22 +50,30 @@ const createFinancialReport = async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const { companyId, reportingPeriod, reportType } = req.body;
+    // Accept aliases: type→reportType, period→reportingPeriod, name→reportName
+    const body = { ...req.body };
+    if (body.type && !body.reportType) body.reportType = body.type;
+    if (body.period && !body.reportingPeriod) body.reportingPeriod = body.period;
+    if (body.name && !body.reportName) body.reportName = body.name;
+    // companyId from user if not provided
+    if (!body.companyId && req.user?.companyId) body.companyId = req.user.companyId;
 
-    // Validate required fields
-    if (!companyId || !reportingPeriod || !reportType) {
+    const { companyId, reportingPeriod, reportType } = body;
+
+    // Validate required fields — only reportType is truly required for frontend usage
+    if (!reportType && !body.type) {
       return res.status(400).json({
-        error: 'Required fields missing: companyId, reportingPeriod, and reportType are required'
+        error: 'Required fields missing: reportType (or type) is required'
       });
     }
 
-    // Calculate totals and prepare report data
+    // Calculate totals and prepare report data (use merged body with aliases)
     const reportData = calculateTotals({
-      ...req.body,
-      userId: req.user.userId,
+      ...body,
+      userId: req.user?.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      reportDate: req.body.reportDate || new Date().toISOString()
+      reportDate: body.reportDate || new Date().toISOString()
     });
 
     const result = await zerodbService.insertRow('financial_reports', reportData);
@@ -99,39 +108,24 @@ const getAllFinancialReports = async (req, res) => {
       page = 1
     } = req.query;
 
-    // Build filter
+    // Build filter — ZeroDB only supports equality filters
     const filter = {};
+    // Only filter by companyId when explicitly provided (not auto from user token)
+    if (companyId) filter.companyId = companyId;
+    if (reportType) filter.reportType = reportType;
+    // Note: date range ($gte/$lte) not supported by ZeroDB — JS post-filter below
 
-    if (companyId) {
-      filter.companyId = companyId;
-    }
-
-    if (reportType) {
-      filter.reportType = reportType;
-    }
-
-    if (startDate || endDate) {
-      filter.reportDate = {};
-      if (startDate) {
-        filter.reportDate.$gte = new Date(startDate).toISOString();
-      }
-      if (endDate) {
-        filter.reportDate.$lte = new Date(endDate).toISOString();
-      }
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
+    const skip = (parseInt(page) - 1) * limitNum;
 
     let financialReports = [];
     try {
       financialReports = await zerodbService.queryTable('financial_reports', {
         filter,
-        skip,
-        limit: parseInt(limit),
+        limit: limitNum + skip + 200, // fetch extra for JS post-filtering
         sort: { reportDate: -1 }
       });
     } catch (dbError) {
-      // Table may not exist yet - return empty data
       if (dbError.message?.includes('not found') || dbError.response?.data?.detail?.includes('not found')) {
         console.warn('financial_reports table not found, returning empty data');
         return res.status(200).json([]);
@@ -139,7 +133,22 @@ const getAllFinancialReports = async (req, res) => {
       throw dbError;
     }
 
-    return res.status(200).json(financialReports);
+    // Unwrap ZeroDB response format
+    const rawRows = financialReports?.data || financialReports?.rows || financialReports || [];
+    let reports = Array.isArray(rawRows) ? rawRows.map(r => r.row_data ? { ...r.row_data, row_id: r.row_id } : r) : [];
+
+    // JS post-filter for date range (ZeroDB doesn't support $gte/$lte)
+    if (startDate) {
+      const start = new Date(startDate);
+      reports = reports.filter(r => r.reportDate && new Date(r.reportDate) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      reports = reports.filter(r => r.reportDate && new Date(r.reportDate) <= end);
+    }
+
+    const paginated = reports.slice(skip, skip + limitNum);
+    return res.status(200).json(paginated);
   } catch (error) {
     console.error('Error fetching financial reports:', error);
     return res.status(500).json({ error: 'Failed to retrieve financial reports' });
@@ -158,15 +167,20 @@ const getFinancialReportById = async (req, res) => {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
 
-    const reports = await zerodbService.queryTable('financial_reports', {
-      filter: { _id: id }
-    });
+    // Try row_id first, then _id for compatibility
+    let reports = await zerodbService.queryTable('financial_reports', { filter: { row_id: id } });
+    let rawRows = reports?.data || reports?.rows || reports || [];
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      reports = await zerodbService.queryTable('financial_reports', { filter: { _id: id } });
+      rawRows = reports?.data || reports?.rows || reports || [];
+    }
+    const existing = Array.isArray(rawRows) ? rawRows[0] : null;
 
-    if (!reports || reports.length === 0) {
+    if (!existing) {
       return res.status(404).json({ error: 'Financial report not found' });
     }
 
-    const report = reports[0];
+    const report = existing.row_data ? { ...existing.row_data, row_id: existing.row_id } : existing;
     if (report.companyId && req.user?.companyId && report.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: report belongs to another company' });
     }
@@ -195,34 +209,36 @@ const updateFinancialReport = async (req, res) => {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
 
-    // Check if report exists
-    const existingReports = await zerodbService.queryTable('financial_reports', {
-      filter: { _id: id }
-    });
+    // Check if report exists — try row_id first, then _id for compatibility
+    let existingReports = await zerodbService.queryTable('financial_reports', { filter: { row_id: id } });
+    let rawRows = existingReports?.data || existingReports?.rows || existingReports || [];
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      existingReports = await zerodbService.queryTable('financial_reports', { filter: { _id: id } });
+      rawRows = existingReports?.data || existingReports?.rows || existingReports || [];
+    }
+    const existing = Array.isArray(rawRows) ? rawRows[0] : null;
 
-    if (!existingReports || existingReports.length === 0) {
+    if (!existing) {
       return res.status(404).json({ error: 'Financial report not found' });
     }
 
-    if (existingReports[0].companyId && req.user?.companyId && existingReports[0].companyId !== req.user.companyId) {
+    const existingData = existing.row_data || existing;
+    if (existingData.companyId && req.user?.companyId && existingData.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: report belongs to another company' });
     }
 
     // Calculate totals and prepare update data
     const updateData = calculateTotals({
       ...req.body,
-      lastModifiedBy: req.user.userId,
+      lastModifiedBy: req.user?.userId,
       updatedAt: new Date().toISOString()
     });
 
-    await zerodbService.updateRows('financial_reports', { filter: { _id: id }, update: updateData });
+    // Use row_id for ZeroDB update if available
+    const rowId = existing.row_id || id;
+    await zerodbService.updateRows('financial_reports', { filter: { row_id: rowId }, update: updateData });
 
-    // Fetch updated report
-    const updatedReports = await zerodbService.queryTable('financial_reports', {
-      filter: { _id: id }
-    });
-
-    return res.status(200).json(updatedReports[0]);
+    return res.status(200).json({ ...existingData, ...updateData, id, row_id: rowId });
   } catch (error) {
     console.error('Error updating financial report:', error);
 
@@ -246,25 +262,28 @@ const deleteFinancialReport = async (req, res) => {
       return res.status(400).json({ error: 'Invalid financial report ID format' });
     }
 
-    // Check if report exists
-    const existingReports = await zerodbService.queryTable('financial_reports', {
-      filter: { _id: id }
-    });
+    // Check if report exists — try row_id first, then _id
+    let existingReports = await zerodbService.queryTable('financial_reports', { filter: { row_id: id } });
+    let rawRows = existingReports?.data || existingReports?.rows || existingReports || [];
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      existingReports = await zerodbService.queryTable('financial_reports', { filter: { _id: id } });
+      rawRows = existingReports?.data || existingReports?.rows || existingReports || [];
+    }
+    const existing = Array.isArray(rawRows) ? rawRows[0] : null;
 
-    if (!existingReports || existingReports.length === 0) {
+    if (!existing) {
       return res.status(404).json({ error: 'Financial report not found' });
     }
 
-    if (existingReports[0].companyId && req.user?.companyId && existingReports[0].companyId !== req.user.companyId) {
+    const existingData = existing.row_data || existing;
+    if (existingData.companyId && req.user?.companyId && existingData.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: report belongs to another company' });
     }
 
-    await zerodbService.deleteRows('financial_reports', { _id: id });
+    const rowId = existing.row_id || id;
+    await zerodbService.deleteRows('financial_reports', { filter: { row_id: rowId } });
 
-    return res.status(200).json({
-      message: 'Financial report deleted successfully',
-      id
-    });
+    return res.status(200).json({ message: 'Financial report deleted successfully', id });
   } catch (error) {
     console.error('Error deleting financial report:', error);
     return res.status(500).json({ error: 'Failed to delete financial report' });

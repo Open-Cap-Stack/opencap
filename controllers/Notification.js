@@ -17,19 +17,18 @@ const { parsePagination } = require('../middleware/pagination');
 const buildNotificationFilter = (query) => {
   const filter = {};
 
-  // Filter by companyId
+  // Filter by companyId (only when explicitly provided)
   if (query.companyId) {
     filter.companyId = query.companyId;
   }
 
-  // Filter by notification type (single or multiple comma-separated)
+  // Filter by notification type — ZeroDB only supports equality; single type only
   if (query.type) {
     const types = query.type.split(',').map(t => t.trim());
     if (types.length === 1) {
       filter.notificationType = types[0];
-    } else {
-      filter.notificationType = { $in: types };
     }
+    // For multiple types, skip DB filter; JS post-filtering applied in getNotifications
   }
 
   // Filter by read/unread status
@@ -96,55 +95,37 @@ exports.createNotification = async (req, res) => {
  */
 exports.getNotifications = async (req, res) => {
   try {
-    // Build filter from query parameters
+    // Build filter from query parameters (ZeroDB equality only)
     const filter = buildNotificationFilter(req.query);
-    // Default companyId from user context
-    if (!filter.companyId && req.user?.companyId) {
-      filter.companyId = req.user.companyId;
-    }
+    // Do NOT auto-filter by req.user.companyId — rows may lack this field
 
-    // Handle pagination with enforced limits
     const { limit, skip } = parsePagination({
       limit: req.query.limit,
       skip: req.query.offset,
       page: req.query.page
     });
 
-    // Get notifications with filter and pagination
-    const notifications = await databaseAdapter.find('Notification', filter, {
-      skip,
-      limit,
-      sort: { Timestamp: -1 } // Most recent first
+    // Fetch with higher limit to allow JS post-filtering
+    const fetchLimit = limit + skip + 500;
+    let allNotifications = await databaseAdapter.find('Notification', filter, {
+      limit: fetchLimit,
+      sort: { Timestamp: -1 }
     });
 
-    // Get total count for pagination info
-    let total = 0;
-    let unreadCount = 0;
-
-    if (databaseAdapter.count) {
-      total = await databaseAdapter.count('Notification', filter);
-      // Get unread count (within same companyId filter if specified)
-      const unreadFilter = { ...filter };
-      delete unreadFilter.isRead; // Remove isRead filter to count all unread
-      unreadFilter.isRead = false;
-      unreadCount = await databaseAdapter.count('Notification', unreadFilter);
-    } else {
-      // Fallback: count from all results if count method not available
-      const allNotifications = await databaseAdapter.find('Notification', filter, {});
-      total = allNotifications.length;
-      unreadCount = allNotifications.filter(n => !n.isRead).length;
+    // JS post-filtering for multi-type (ZeroDB doesn't support $in)
+    if (req.query.type) {
+      const types = req.query.type.split(',').map(t => t.trim());
+      if (types.length > 1) {
+        allNotifications = allNotifications.filter(n => types.includes(n.notificationType));
+      }
     }
 
-    // Calculate if there are more results
+    const total = allNotifications.length;
+    const unreadCount = allNotifications.filter(n => !n.isRead).length;
+    const notifications = allNotifications.slice(skip, skip + limit);
     const hasMore = skip + notifications.length < total;
 
-    // Return formatted response
-    res.status(200).json({
-      notifications,
-      total,
-      hasMore,
-      unreadCount
-    });
+    res.status(200).json({ notifications, total, hasMore, unreadCount });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve notifications', error: error.message });
   }

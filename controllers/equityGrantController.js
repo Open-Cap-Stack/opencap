@@ -23,9 +23,8 @@ exports.createEquityGrant = async (req, res) => {
       status: req.body.status || 'pending'
     };
 
-    if (!grantData.companyId) {
-      return res.status(400).json({ error: 'companyId is required' });
-    }
+    // companyId is preferred but not required — allow creation without it
+    // so the frontend can work without companyId in JWT
 
     if (grantData.numberOfShares !== undefined && grantData.numberOfShares <= 0) {
       return res.status(400).json({ error: 'numberOfShares must be a positive number' });

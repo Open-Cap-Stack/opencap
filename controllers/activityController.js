@@ -19,31 +19,23 @@ const databaseAdapter = require('../services/databaseAdapter');
 const buildActivityFilter = (query) => {
   const filter = {};
 
-  // Filter by companyId
+  // Filter by companyId (only when explicitly provided)
   if (query.companyId) {
     filter.companyId = query.companyId;
   }
 
-  // Filter by activity type (single or multiple comma-separated)
+  // Filter by activity type — ZeroDB only supports equality; use single type only
   if (query.type) {
     const types = query.type.split(',').map(t => t.trim());
+    // ZeroDB does not support $in; only filter by single type
     if (types.length === 1) {
       filter.activityType = types[0];
-    } else {
-      filter.activityType = { $in: types };
     }
+    // For multiple types, skip filter (JS post-filtering will handle it)
   }
 
-  // Filter by date range
-  if (query.startDate || query.endDate) {
-    filter.timestamp = {};
-    if (query.startDate) {
-      filter.timestamp.$gte = new Date(query.startDate);
-    }
-    if (query.endDate) {
-      filter.timestamp.$lte = new Date(query.endDate);
-    }
-  }
+  // Note: date range filters ($gte/$lte) are not supported by ZeroDB's basic equality filter.
+  // We store startDate/endDate in the query for JS-side post-filtering.
 
   return filter;
 };
@@ -79,17 +71,13 @@ exports.createActivity = async (req, res) => {
  */
 exports.getActivities = async (req, res) => {
   try {
-    // Build filter from query parameters
+    // Build filter from query parameters (ZeroDB equality only)
     const filter = buildActivityFilter(req.query);
-    // Default companyId from user context if not in query
-    if (!filter.companyId && req.user?.companyId) {
-      filter.companyId = req.user.companyId;
-    }
+    // Do NOT auto-filter by req.user.companyId — rows may lack this field
 
-    // Handle pagination - support both offset-based and page-based
+    // Handle pagination
     const limit = Math.max(parseInt(req.query.limit) || 100, 1);
     let skip;
-
     if (req.query.offset !== undefined) {
       skip = Math.max(parseInt(req.query.offset) || 0, 0);
     } else {
@@ -97,32 +85,34 @@ exports.getActivities = async (req, res) => {
       skip = (page - 1) * limit;
     }
 
-    // Get activities with filter and pagination
-    const activities = await databaseAdapter.find('Activity', filter, {
-      skip,
-      limit,
-      sort: { timestamp: -1 } // Most recent first
+    // Fetch with higher limit to allow JS post-filtering
+    const fetchLimit = limit + skip + 500;
+    let activities = await databaseAdapter.find('Activity', filter, {
+      limit: fetchLimit,
+      sort: { timestamp: -1 }
     });
 
-    // Get total count for pagination info
-    let total = 0;
-    if (databaseAdapter.count) {
-      total = await databaseAdapter.count('Activity', filter);
-    } else {
-      // Fallback: count from all results if count method not available
-      const allActivities = await databaseAdapter.find('Activity', filter, {});
-      total = allActivities.length;
+    // JS post-filtering for multi-type and date ranges (ZeroDB doesn't support $in/$gte/$lte)
+    if (req.query.type) {
+      const types = req.query.type.split(',').map(t => t.trim());
+      if (types.length > 1) {
+        activities = activities.filter(a => types.includes(a.activityType));
+      }
+    }
+    if (req.query.startDate) {
+      const start = new Date(req.query.startDate);
+      activities = activities.filter(a => a.timestamp && new Date(a.timestamp) >= start);
+    }
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      activities = activities.filter(a => a.timestamp && new Date(a.timestamp) <= end);
     }
 
-    // Calculate if there are more results
-    const hasMore = skip + activities.length < total;
+    const total = activities.length;
+    const paged = activities.slice(skip, skip + limit);
+    const hasMore = skip + paged.length < total;
 
-    // Return formatted response
-    res.status(200).json({
-      activities,
-      total,
-      hasMore
-    });
+    res.status(200).json({ activities: paged, total, hasMore });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching activities' });
   }

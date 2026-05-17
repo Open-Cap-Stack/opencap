@@ -260,6 +260,7 @@ router.get('/:valuationId', valuation409AController.getValuation);
  *         description: Cannot update valuation in current status
  */
 router.put('/:valuationId', valuation409AController.updateValuation);
+router.delete('/:valuationId', valuation409AController.deleteValuation);
 
 /**
  * @swagger

@@ -197,10 +197,11 @@ exports.getDocuments = async (req, res) => {
         // Build simple filter object (ZeroDB only supports basic equality)
         let filter = {};
 
-        // Multi-tenant: scope to company
-        const effectiveCompanyId = companyId || req.user?.companyId;
-        if (effectiveCompanyId) {
-            filter.companyId = effectiveCompanyId;
+        // Only filter by companyId when explicitly passed as a query param.
+        // Do NOT auto-filter by req.user.companyId — rows may lack this field and
+        // users often have null companyId, which would return 0 results.
+        if (companyId) {
+            filter.companyId = companyId;
         }
 
         // Add category filter
@@ -235,10 +236,12 @@ exports.getDocuments = async (req, res) => {
             }
         }
 
-        // CRITICAL: Apply user-level access control filtering
-        // Users should only see documents they have access to
+        // Apply user-level access control filtering for non-admin users.
+        // Documents without an accessLevel are treated as accessible (no-restriction default).
         if (req.user?.role !== 'admin') {
             documents = documents.filter(doc => {
+                // No accessLevel set — treat as accessible
+                if (!doc.accessLevel) return true;
                 // Public documents are visible to everyone
                 if (doc.accessLevel === 'public') return true;
                 // Document owner has access
@@ -247,7 +250,7 @@ exports.getDocuments = async (req, res) => {
                 if (doc.sharedWith && doc.sharedWith.includes(req.user?.userId)) return true;
                 // Company-level documents are accessible to users in same company
                 if (doc.accessLevel === 'company' && doc.companyId === req.user?.companyId) return true;
-                // Default: no access
+                // Private: only owner has access (already checked above)
                 return false;
             });
         }

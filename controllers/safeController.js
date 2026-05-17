@@ -44,6 +44,7 @@ exports.createSAFE = async (req, res) => {
       metadata
     } = req.body;
 
+    const userId = req.user?._id || req.user?.userId;
     const safe = await SAFE.create({
       companyId,
       investorId,
@@ -60,11 +61,11 @@ exports.createSAFE = async (req, res) => {
       notes,
       tags,
       metadata,
-      createdBy: req.user._id,
+      createdBy: userId,
       statusHistory: [{
         status: 'draft',
         changedAt: new Date(),
-        changedBy: req.user._id,
+        changedBy: userId,
         reason: 'SAFE created'
       }]
     });
@@ -181,7 +182,7 @@ exports.updateSAFE = async (req, res) => {
     delete updates.status;
     delete updates.statusHistory;
 
-    updates.updatedBy = req.user._id;
+    updates.updatedBy = req.user?._id || req.user?.userId;
 
     await SAFE.updateOne({ safeId }, { $set: updates });
     const updatedSafe = await SAFE.findOne({ safeId });
@@ -373,6 +374,24 @@ exports.markFunded = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+// Delete a SAFE (hard delete)
+exports.deleteSAFE = async (req, res) => {
+  try {
+    const { safeId } = req.params;
+
+    const safe = await SAFE.findOne({ safeId });
+    if (!safe) {
+      return res.status(404).json({ success: false, error: 'SAFE not found' });
+    }
+
+    await SAFE.findOneAndDelete({ safeId });
+
+    res.json({ success: true, message: 'SAFE deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
