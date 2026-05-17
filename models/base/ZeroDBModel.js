@@ -518,6 +518,12 @@ class ZeroDBModel {
      * @returns {Object|null} Deleted document
      */
     async findByIdAndDelete(id) {
+        // Try row_id first (ZeroDB native), then fall back to _id field in row_data
+        const byRowId = await this.findOne({ row_id: id });
+        if (byRowId) {
+            await zerodbService.deleteRows(this.tableName, { filter: { row_id: id } });
+            return byRowId;
+        }
         return this.findOneAndDelete({ _id: id });
     }
 
@@ -531,7 +537,7 @@ class ZeroDBModel {
 
         const result = await zerodbService.queryTable(this.tableName, {
             filter: query,
-            limit: 0
+            limit: 1  // ZeroDB requires limit >= 1; use total from response for actual count
         });
 
         return result.total || result.count || 0;
