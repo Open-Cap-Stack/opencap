@@ -671,17 +671,52 @@ exports.getAllValuations = async (req, res) => {
 // Get valuation analytics
 exports.getValuationAnalytics = async (req, res) => {
   try {
-    // Return empty analytics - table may not exist yet
+    let valuations = [];
+    try {
+      valuations = await Valuation409A.find({}, { sort: { createdAt: -1 } });
+    } catch (dbErr) {
+      console.warn('getValuationAnalytics: DB error:', dbErr.message);
+    }
+
+    const byStatus = {};
+    for (const v of valuations) {
+      byStatus[v.status] = (byStatus[v.status] || 0) + 1;
+    }
+
+    const totalValuations = valuations.length;
+    const pendingValuations = (byStatus.requested || 0) + (byStatus.in_progress || 0);
+    const completedValuations = (byStatus.completed || 0) + (byStatus.approved || 0);
+
+    const valuationsByStatus = Object.entries(byStatus).map(([status, count]) => ({ status, count }));
+
+    // Group by month (last 12 months)
+    const monthCounts = {};
+    for (const v of valuations) {
+      if (v.createdAt) {
+        const d = new Date(v.createdAt);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthCounts[key] = (monthCounts[key] || 0) + 1;
+      }
+    }
+    const valuationsByMonth = Object.entries(monthCounts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month, count }));
+
     res.json({
       success: true,
       data: {
-        totalValuations: 0,
-        pendingValuations: 0,
-        completedValuations: 0,
+        totalValuations,
+        pendingValuations,
+        completedValuations,
         averageProcessingTime: 0,
-        valuationsByStatus: [],
-        valuationsByMonth: [],
-        recentActivity: []
+        valuationsByStatus,
+        valuationsByMonth,
+        recentActivity: valuations.slice(0, 5).map(v => ({
+          valuationId: v.valuationId || v.row_id,
+          status: v.status,
+          fairMarketValue: v.fairMarketValue,
+          createdAt: v.createdAt
+        }))
       }
     });
   } catch (error) {
@@ -697,15 +732,18 @@ exports.getLatestValuation = async (req, res) => {
   try {
     const { companyId } = req.query;
 
-    if (!companyId) {
-      return res.status(400).json({
-        success: false,
-        error: 'companyId query parameter is required'
-      });
+    // Try approved/current first
+    let valuation = null;
+    if (companyId && companyId !== 'default') {
+      valuation = await Valuation409A.findCurrentValuation(companyId);
     }
 
-    // Find the most recent approved valuation that hasn't expired
-    const valuation = await Valuation409A.findCurrentValuation(companyId);
+    // Fall back: return the most recent valuation regardless of status
+    if (!valuation) {
+      const query = companyId && companyId !== 'default' ? { companyId } : {};
+      const all = await Valuation409A.find(query, { sort: { createdAt: -1 }, limit: 1 });
+      valuation = all[0] || null;
+    }
 
     res.json({
       success: true,
