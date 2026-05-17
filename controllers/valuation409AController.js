@@ -9,26 +9,40 @@ const Valuation409A = require('../models/Valuation409A');
 // Create a new valuation request
 exports.createValuationRequest = async (req, res) => {
   try {
-    const {
-      companyId,
-      reason,
-      reasonDetails,
-      notes,
-      tags,
-      metadata
-    } = req.body;
-
     const userId = req.user?._id || req.user?.userId;
-    const valuation = await Valuation409A.create({
+
+    // Accept both the model's native fields and the frontend's simplified fields.
+    // Frontend sends: { name, valuationDate, fairMarketValue, provider }
+    // Model requires: companyId, requestedBy, reason (enum), status
+    const body = req.body;
+
+    const companyId = body.companyId || req.user?.companyId || 'default';
+    const reason = body.reason || 'other';
+    const fairMarketValue = body.fairMarketValue !== undefined ? Number(body.fairMarketValue) : undefined;
+    const effectiveDate = body.valuationDate || body.effectiveDate;
+
+    const valuationData = {
       companyId,
       requestedBy: userId,
       reason,
-      reasonDetails,
-      notes,
-      tags,
-      metadata,
-      createdBy: userId
-    });
+      reasonDetails: body.reasonDetails || body.name || '',
+      notes: body.notes || '',
+      tags: body.tags,
+      metadata: body.metadata,
+      createdBy: userId,
+    };
+
+    if (fairMarketValue !== undefined && !isNaN(fairMarketValue)) {
+      valuationData.fairMarketValue = fairMarketValue;
+    }
+    if (effectiveDate) {
+      valuationData.effectiveDate = effectiveDate;
+    }
+    if (body.provider) {
+      valuationData.valuationFirm = { name: body.provider };
+    }
+
+    const valuation = await Valuation409A.create(valuationData);
 
     res.status(201).json({
       success: true,
