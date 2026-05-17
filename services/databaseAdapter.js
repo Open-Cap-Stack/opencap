@@ -488,7 +488,7 @@ class DatabaseAdapter {
       'Form3921': 'form3921',
       'InviteManagement': 'invite_management',
       'SPVAssetModel': 'spv_asset_models',
-      'FundraisingRound': 'securities'
+      'FundraisingRound': 'fundraising_rounds'
     };
 
     // Check for direct mapping first

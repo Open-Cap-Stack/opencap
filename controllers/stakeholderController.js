@@ -35,6 +35,13 @@ function normalizeForDisplay(stakeholder) {
   if (obj.type) obj.type = capitalize(obj.type);
   if (obj.role) obj.role = toTitleCase(obj.role);
   if (obj.status) obj.status = capitalize(obj.status);
+  // Cap-table page compatibility: expose share count under legacy field names used by
+  // the frontend (sharesHeld, shares, sharesOwned) alongside the canonical names.
+  const issuedShares = obj.totalGrantedShares || 0;
+  obj.sharesHeld = issuedShares;
+  obj.sharesOwned = issuedShares;
+  obj.shares = issuedShares;
+  obj.issuedShares = issuedShares;
   return obj;
 }
 

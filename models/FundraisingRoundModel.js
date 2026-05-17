@@ -129,7 +129,7 @@ const fundraisingRoundSchema = {
     closingDate: { type: 'date' }
 };
 
-const baseModel = createModel('securities', fundraisingRoundSchema);
+const baseModel = createModel('fundraising_rounds', fundraisingRoundSchema);
 
 /**
  * Check if a round type is a priced round requiring valuation

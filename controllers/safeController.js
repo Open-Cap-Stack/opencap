@@ -7,6 +7,22 @@ const SignatureRequest = require('../models/SignatureRequest');
 const SAFEConversion = require('../models/SAFEConversion');
 const SAFEConversionService = require('../services/safeConversionService');
 
+/**
+ * Normalize safeType to use hyphen-format regardless of how it was stored in DB.
+ * Handles legacy underscore variants (e.g. "post_money" -> "post-money").
+ */
+function normalizeSafeType(safe) {
+  if (!safe || !safe.safeType) return safe;
+  const typeMap = {
+    post_money: 'post-money',
+    pre_money: 'pre-money'
+  };
+  return {
+    ...safe,
+    safeType: typeMap[safe.safeType] || safe.safeType
+  };
+}
+
 // Create a new SAFE
 exports.createSAFE = async (req, res) => {
   try {
@@ -87,7 +103,7 @@ exports.getCompanySAFEs = async (req, res) => {
 
     res.json({
       success: true,
-      data: safes,
+      data: safes.map(normalizeSafeType),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -129,7 +145,7 @@ exports.getSAFE = async (req, res) => {
 
     res.json({
       success: true,
-      data: safe
+      data: normalizeSafeType(safe)
     });
   } catch (error) {
     res.status(500).json({
