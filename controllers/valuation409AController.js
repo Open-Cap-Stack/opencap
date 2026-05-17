@@ -691,6 +691,41 @@ exports.getAIStatus = async (req, res) => {
   }
 };
 
+// Download PDF report
+exports.downloadPDF = async (req, res) => {
+  try {
+    const { valuationId } = req.params;
+
+    let val = await Valuation409A.findOne({ valuationId });
+    if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
+    if (!val) return res.status(404).json({ success: false, error: 'Valuation not found' });
+
+    if (!val.aiReport) {
+      return res.status(404).json({ success: false, error: 'Report not yet generated' });
+    }
+
+    // Only released reports are publicly downloadable; accountant+ can download anytime
+    const allowedRoles = ['admin', 'accountant'];
+    if (val.status !== 'released' && !allowedRoles.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, error: 'Report not yet released' });
+    }
+
+    const { generatePDF } = require('../services/valuation409APdfService');
+    const tmpPath = await generatePDF(val.valuationId || val.row_id);
+
+    const fs = require('fs');
+    const filename = `409A-${val.companyId || 'report'}-${(val.valuationId || val.row_id).slice(0, 8)}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    const stream = fs.createReadStream(tmpPath);
+    stream.pipe(res);
+    stream.on('end', () => { try { fs.unlinkSync(tmpPath); } catch {} });
+    stream.on('error', (err) => res.status(500).json({ success: false, error: err.message }));
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Get full AI report content
 exports.getAIReport = async (req, res) => {
   try {

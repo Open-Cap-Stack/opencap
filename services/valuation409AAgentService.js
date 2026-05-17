@@ -9,6 +9,8 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const Valuation409A = require('../models/Valuation409A');
 const AccountantQueue = require('../models/AccountantQueue');
+const emailService = require('./valuation409AEmailService');
+const User = require('../models/User');
 
 const AINATIVE_BASE = 'https://api.ainative.studio';
 const AINATIVE_API_KEY = process.env.AINATIVE_API_KEY;
@@ -386,6 +388,22 @@ async function runValuationAgent(valuationId) {
       queuedAt: now,
       createdBy: 'ai_agent'
     });
+
+    // Notify all accountants by email (best-effort)
+    try {
+      const accountants = await User.find({ role: 'accountant' });
+      const accountantEmails = accountants.map(a => a.email).filter(Boolean);
+      if (accountantEmails.length > 0) {
+        await emailService.sendAccountantQueueNotification({
+          accountantEmails,
+          companyId: valuation.companyId,
+          valuationId: valuation.valuationId || valuationId,
+          fmv: reconciled.finalFmvPerShare,
+        });
+      }
+    } catch (emailErr) {
+      console.warn('[409A Agent] Accountant email failed:', emailErr.message);
+    }
 
     console.log(`[409A Agent] Completed. FMV: $${reconciled.finalFmvPerShare} | Queued for accountant review`);
     return { success: true, fmvPerShare: reconciled.finalFmvPerShare, queueId };

@@ -32,6 +32,7 @@ router.post('/:valuationId/mark-paid', valuation409AController.markPaid);
 router.post('/:valuationId/run-ai', valuation409AController.runAI);
 router.get('/:valuationId/ai-status', valuation409AController.getAIStatus);
 router.get('/:valuationId/report', valuation409AController.getAIReport);
+router.get('/:valuationId/pdf', valuation409AController.downloadPDF);
 
 /**
  * @swagger

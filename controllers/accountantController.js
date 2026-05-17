@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const AccountantQueue = require('../models/AccountantQueue');
 const Valuation409A = require('../models/Valuation409A');
 const User = require('../models/User');
+const emailService = require('../services/valuation409AEmailService');
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
@@ -283,6 +284,22 @@ exports.releaseToCompany = async (req, res) => {
     await Valuation409A.updateOne(fk, {
       $set: { status: 'released', releasedToCompanyAt: now, releasedBy: req.user.userId, updatedAt: now }
     });
+
+    // Email the requesting user (best-effort)
+    try {
+      const requester = await User.findOne({ userId: val.requestedBy });
+      if (requester?.email) {
+        await emailService.sendReportReleased({
+          to: requester.email,
+          companyId: val.companyId,
+          valuationId: val.valuationId || valuationId,
+          fmv: val.fairMarketValue,
+          signedBy: val.accountantSignatureRecord?.signerEmail,
+        });
+      }
+    } catch (emailErr) {
+      console.warn('[Release] Email notification failed:', emailErr.message);
+    }
 
     res.json({ success: true, message: 'Valuation released to company dashboard' });
   } catch (error) {

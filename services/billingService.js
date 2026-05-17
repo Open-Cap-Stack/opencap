@@ -1204,6 +1204,62 @@ class BillingService {
     const companyId = session.metadata?.companyId;
     if (!companyId) return;
 
+    // ── 409A one-time payment ────────────────────────────────────────────────
+    const valuationId = session.metadata?.valuationId;
+    if (valuationId && session.mode === 'payment') {
+      try {
+        const Valuation409A = require('../models/Valuation409A');
+        let val = await Valuation409A.findOne({ valuationId });
+        if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
+        if (val) {
+          const fk = val.valuationId ? { valuationId: val.valuationId } : { row_id: val.row_id };
+          const now = new Date().toISOString();
+
+          // Mark paid
+          await Valuation409A.updateOne(fk, {
+            $set: {
+              paymentStatus: 'paid',
+              paidAt: now,
+              stripeSessionId: session.id,
+              status: 'ai_processing',
+              aiStatus: 'researching',
+              updatedAt: now
+            }
+          });
+
+          const resolvedId = val.valuationId || valuationId;
+
+          // Send payment confirmation email to the requesting user's email
+          // (best-effort — don't throw if email fails)
+          try {
+            const User = require('../models/User');
+            const user = await User.findOne({ userId: val.requestedBy });
+            if (user?.email) {
+              const emailSvc = require('./valuation409AEmailService');
+              await emailSvc.sendPaymentConfirmed({
+                to: user.email,
+                companyId: val.companyId,
+                valuationId: resolvedId,
+              });
+            }
+          } catch (emailErr) {
+            console.warn('[409A webhook] Email send failed:', emailErr.message);
+          }
+
+          // Fire AI agent asynchronously
+          const { runValuationAgent } = require('./valuation409AAgentService');
+          runValuationAgent(resolvedId).catch(err =>
+            console.error(`[409A webhook] Agent failed for ${resolvedId}:`, err.message)
+          );
+
+          console.log(`[Webhook] 409A payment confirmed, AI started for ${resolvedId}`);
+          return; // done — skip subscription sync
+        }
+      } catch (err) {
+        console.error('[Webhook] 409A payment handling error:', err.message);
+      }
+    }
+    // ── Subscription checkout (existing path) ────────────────────────────────
     if (session.subscription) {
       const stripeSub = await stripeService.getSubscription(session.subscription);
       await this._syncSubscriptionFromStripe(companyId, stripeSub);
