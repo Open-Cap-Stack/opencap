@@ -22,17 +22,9 @@ router.use(authenticateToken);
 router.post('/', safeController.createSAFE);
 // Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
 router.get('/', (req, res, next) => {
-  const companyId = req.user?.companyId;
-  // If no companyId on token, fetch all SAFEs (companyId-less demo mode)
-  if (!companyId) {
-    return SAFE.find({}, { sort: { createdAt: -1 }, limit: 100 })
-      .then(safes => res.json({ success: true, data: (safes || []).map(normalizeSafeType), pagination: { page: 1, limit: 100, total: (safes || []).length, pages: 1 } }))
-      .catch(err => {
-        console.error('[safeRoutes] find error:', err.message);
-        res.json({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
-      });
-  }
-  req.params.companyId = companyId;
+  // Always delegate to getCompanySAFEs — it handles null/default companyId by returning all
+  const companyId = req.user?.companyId || 'default';
+  req.params = { ...req.params, companyId };
   return safeController.getCompanySAFEs(req, res, next);
 });
 router.get('/company/:companyId', safeController.getCompanySAFEs);
