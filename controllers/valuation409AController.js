@@ -125,7 +125,14 @@ exports.updateValuation = async (req, res) => {
     const { valuationId } = req.params;
     const updates = req.body;
 
-    const valuation = await Valuation409A.findOne({ valuationId });
+    // Try to find by valuationId field first, then by row_id / _id
+    let valuation = await Valuation409A.findOne({ valuationId });
+    if (!valuation) {
+      valuation = await Valuation409A.findOne({ row_id: valuationId });
+    }
+    if (!valuation) {
+      valuation = await Valuation409A.findOne({ _id: valuationId });
+    }
     if (!valuation) {
       return res.status(404).json({
         success: false,
@@ -133,21 +140,27 @@ exports.updateValuation = async (req, res) => {
       });
     }
 
-    // Only allow updates in early statuses
-    if (!['requested', 'in_progress'].includes(valuation.status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Can only update valuations in requested or in_progress status'
-      });
-    }
+    // Use the actual stored valuationId for subsequent lookups
+    const resolvedId = valuation.valuationId || valuationId;
 
-    // Prevent status changes through this endpoint
-    delete updates.status;
+    // Map frontend field aliases
+    if (updates.name && !updates.reasonDetails) updates.reasonDetails = updates.name;
+    if (updates.fairMarketValue !== undefined) updates.fairMarketValue = Number(updates.fairMarketValue);
+
+    // Allow status updates from frontend
+    const allowedStatuses = ['requested', 'in_progress', 'completed', 'approved', 'rejected'];
+    if (updates.status && !allowedStatuses.includes(updates.status)) {
+      delete updates.status;
+    }
     delete updates.statusHistory;
 
     updates.updatedBy = req.user?._id || req.user?.userId;
-    await Valuation409A.updateOne({ valuationId }, { $set: updates });
-    const updated = await Valuation409A.findOne({ valuationId });
+    updates.updatedAt = new Date().toISOString();
+
+    // Update by the filter that actually found the record
+    const filterKey = valuation.valuationId ? { valuationId: resolvedId } : { row_id: valuation.row_id };
+    await Valuation409A.updateOne(filterKey, { $set: updates });
+    const updated = await Valuation409A.findOne(filterKey);
 
     res.json({
       success: true,
