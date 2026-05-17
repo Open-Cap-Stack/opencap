@@ -251,9 +251,14 @@ class ZeroDBService {
       // Convert boolean values to strings for ZeroDB JSON field comparisons
       const normalizedFilter = this._normalizeFilterForZeroDB(filter);
 
+      // ZeroDB requires limit >= 1; skip must be omitted or >= 0 (send only when > 0)
+      const safeLimit = Math.max(1, parseInt(limit) || 100);
+      const body = { filter: normalizedFilter, limit: safeLimit, sort, projection };
+      if (skip > 0) body.skip = skip;
+
       const response = await this.client.post(
         `/api/v1/projects/${this.projectId}/database/tables/${tableName}/query`,
-        { filter: normalizedFilter, skip, limit, sort, projection }
+        body
       );
       return response.data;
     } catch (error) {
