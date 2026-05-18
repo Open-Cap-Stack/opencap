@@ -162,6 +162,9 @@ async function generatePDF(valuationId) {
     if (recon.weightedEquityValue) {
       addKVRow(doc, 'Weighted Equity Value', fmt$(recon.weightedEquityValue));
     }
+    if (val.aiDCFResult?.dlom != null) {
+      addKVRow(doc, 'DLOM (DCF)', fmtPct(val.aiDCFResult.dlom * 100));
+    }
 
     // ── COMPANY OVERVIEW ──────────────────────────────────────────────────────
     doc.addPage({ margin: 0 });
@@ -260,6 +263,27 @@ async function generatePDF(valuationId) {
       if (opm.fmvPerShare != null) addKVRow(doc, 'FMV Per Share (pre-DLOM)', `$${Number(opm.fmvPerShare).toFixed(4)}`);
       if (opm.adjustedFmvPerShare != null) addKVRow(doc, 'FMV Per Share (post-DLOM)', `$${Number(opm.adjustedFmvPerShare).toFixed(4)}`);
     }
+
+    // ── DLOM ANALYSIS ─────────────────────────────────────────────────────────
+    doc.addPage({ margin: 0 });
+    addPageHeader(doc, 'DLOM Analysis');
+    addSectionHeader(doc, 'Discount for Lack of Marketability (DLOM)');
+    addBodyText(doc, report.dlomNarrative || 'DLOM analysis is incorporated within the DCF and OPM methodologies above. The discount reflects the illiquidity of minority interests in private company common stock.');
+
+    doc.moveDown(0.3);
+    addSectionHeader(doc, 'DLOM Summary');
+
+    const dcfDlom = val.aiDCFResult?.dlom;
+    const opmDlom = val.aiOPMResult?.dlom;
+
+    if (dcfDlom != null) addKVRow(doc, 'DCF DLOM Applied', fmtPct(dcfDlom * 100));
+    if (opmDlom != null) addKVRow(doc, 'OPM DLOM Applied', fmtPct(opmDlom * 100));
+    if (dcfDlom != null && opmDlom != null) {
+      addKVRow(doc, 'Blended DLOM (average)', fmtPct(((dcfDlom + opmDlom) / 2) * 100));
+    }
+    addKVRow(doc, 'Methodology', 'Restricted Stock Studies / QMDM');
+    doc.moveDown(0.3);
+    addBodyText(doc, 'Common stock holders in private companies lack the ability to freely transfer shares, register for public sale, or force a liquidity event. This illiquidity discount is a required adjustment under IRC \u00a71.409A-1(b)(5) and is supported by empirical studies of restricted stock transactions.');
 
     // ── RISK FACTORS ──────────────────────────────────────────────────────────
     if (report.riskFactors) {

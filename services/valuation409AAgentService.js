@@ -302,6 +302,7 @@ Write the following sections. Return as JSON with these exact keys:
   "comparableAnalysis": "2 paragraphs: analysis of the comparable companies selected, revenue multiples observed, and how they inform the valuation",
   "dcfAnalysis": "2 paragraphs: DCF assumptions (discount rate, growth projections, terminal value) and results",
   "opmAnalysis": "2 paragraphs: OPM or PWERM methodology, key inputs (volatility, time to liquidity, scenarios), and results",
+  "dlomNarrative": "A 2-3 paragraph professional narrative explaining the DLOM (Discount for Lack of Marketability) applied in this valuation. Cover: (1) what DLOM is and why it applies to private company common stock under IRC §409A, (2) the specific DLOM percentage applied (reference the actual % from the financial inputs), (3) the justification method used (Restricted Stock Studies, QMDM, or Put Option method) and why it is appropriate given the company stage and characteristics.",
   "riskFactors": "1 paragraph: key risk factors that affect this valuation",
   "conclusionNarrative": "${reconciled.conclusionNarrative}"
 }`
