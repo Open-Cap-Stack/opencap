@@ -54,14 +54,15 @@ export const safeTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/safes', input);
-      const id = created.safeId ?? created.row_id ?? created._id;
+      const id = created?.data?.safeId ?? created?.safeId ?? created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/safes/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `SAFE created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `SAFE created and confirmed:\nsafeId: ${record.safeId ?? id}\nstatus: ${record.status ?? 'unknown'}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -70,7 +71,7 @@ export const safeTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `SAFE created (could not confirm persisted state — verify with get_safe):\n${JSON.stringify(created, null, 2)}`,
+              text: `SAFE created (note: could not confirm persisted state — verify with get_safe):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };
@@ -121,11 +122,12 @@ export const safeTools: ToolDefinition[] = [
       // Always re-fetch to return confirmed persisted state
       try {
         const { data: confirmed } = await client.get(`/api/v1/safes/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `SAFE updated (confirmed):\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `SAFE updated and confirmed:\nsafeId: ${record.safeId ?? id}\nstatus: ${record.status ?? 'unknown'}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -134,7 +136,7 @@ export const safeTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `SAFE updated but could not confirm persisted state — verify with get_safe. ID: ${id}`,
+              text: `SAFE updated (note: could not confirm persisted state — verify with get_safe):\nID: ${id}`,
             },
           ],
         };
