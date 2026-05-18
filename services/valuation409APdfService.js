@@ -276,6 +276,32 @@ async function generatePDF(valuationId) {
       addKVRow(doc, 'DCF Equity Value', fmt$(recon.dcfEquityValue));
     }
 
+    // DCF Projections Table from aiDCFResult
+    const dcf = val.aiDCFResult;
+    if (dcf && dcf.projections && dcf.projections.length > 0) {
+      doc.moveDown(0.3);
+      addSectionHeader(doc, 'Financial Projections');
+      addTable(
+        doc,
+        ['Year', 'Revenue', 'EBITDA', 'Free Cash Flow', 'Growth Rate'],
+        dcf.projections.map(p => [
+          p.year || '—',
+          fmt$(p.revenue),
+          fmt$(p.ebitda),
+          fmt$(p.freeCashFlow),
+          p.growthRate != null ? fmtPct(Number(p.growthRate) * 100) : '—'
+        ])
+      );
+
+      doc.moveDown(0.3);
+      addSectionHeader(doc, 'DCF Key Assumptions');
+      if (dcf.discountRate != null) addKVRow(doc, 'Discount Rate (WACC)', fmtPct(Number(dcf.discountRate) * 100));
+      if (dcf.terminalValue != null) addKVRow(doc, 'Terminal Value', fmt$(dcf.terminalValue));
+      if (dcf.enterpriseValue != null) addKVRow(doc, 'Enterprise Value', fmt$(dcf.enterpriseValue));
+      if (dcf.dlom != null) addKVRow(doc, 'DLOM Applied', fmtPct(Number(dcf.dlom) * 100));
+      if (dcf.equityValue != null) addKVRow(doc, 'DCF Equity Value (post-DLOM)', fmt$(dcf.equityValue));
+    }
+
     // ── OPM / PWERM ───────────────────────────────────────────────────────────
     doc.addPage({ margin: 0 });
     addPageHeader(doc, 'OPM / PWERM Analysis');
