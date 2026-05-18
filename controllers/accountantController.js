@@ -483,3 +483,39 @@ exports.getTransferHistory = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ─── Admin: Manual Queue Assignment ─────────────────────────────────────────
+
+exports.adminAssignQueueItem = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { queueId } = req.params;
+    const { accountantUserId } = req.body;
+
+    if (!accountantUserId) {
+      return res.status(400).json({ success: false, error: 'accountantUserId required' });
+    }
+
+    const item = await AccountantQueue.findOne({ queueId });
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Queue item not found' });
+    }
+
+    const now = new Date().toISOString();
+    await AccountantQueue.updateOne({ queueId }, {
+      $set: {
+        assignedAccountantId: accountantUserId,
+        assignedAt: now,
+        status: 'assigned',
+        updatedAt: now
+      }
+    });
+
+    res.json({ success: true, message: 'Queue item assigned' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

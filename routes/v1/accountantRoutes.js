@@ -35,5 +35,6 @@ router.get('/transfers', accountantController.getTransferHistory);
 
 // Admin: accountant management
 router.get('/accountants', accountantController.listAccountants);
+router.patch('/queue/:queueId/assign', accountantController.adminAssignQueueItem);
 
 module.exports = router;
