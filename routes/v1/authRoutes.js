@@ -52,6 +52,9 @@ router.get('/me', authenticateToken, (req, res) => {
   });
 });
 
+// Change password (authenticated)
+router.put('/change-password', authenticateToken, authController.changePassword);
+
 // Email verification
 router.post('/verify/send', authenticateToken, authController.sendVerificationEmail);
 router.get('/verify/:token', authController.verifyEmail);

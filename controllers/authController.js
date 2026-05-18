@@ -1208,6 +1208,65 @@ const ainativeLogin = async (req, res) => {
   }
 };
 
+/**
+ * Change password for authenticated user
+ * PUT /api/v1/auth/change-password
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate required fields
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'currentPassword and newPassword are required' });
+    }
+
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
+    }
+
+    // Find user
+    let user = await User.findOne({ userId });
+    if (!user && isValidObjectId(userId)) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash and save the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.findOneAndUpdate(
+      { userId: user.userId || user._id },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    return res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error.message);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Export all controller functions
 module.exports = {
   registerUser,
@@ -1225,7 +1284,8 @@ module.exports = {
   resendVerification,
   exchangeAINativeToken,
   ainativeLogin,
-  adminToken
+  adminToken,
+  changePassword
 };
 
 /**
