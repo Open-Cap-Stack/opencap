@@ -41,6 +41,7 @@ export const stakeholderTools: ToolDefinition[] = [
         .enum(['founder', 'investor', 'employee', 'advisor', 'other'])
         .describe('Stakeholder role'),
       companyId: z.string().describe('Company ID to add the stakeholder to'),
+      title: z.string().optional().describe("Job title or role title, e.g. 'Director of Developer Relations', 'Lead Advisor'"),
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/stakeholders', input);
@@ -79,6 +80,7 @@ export const stakeholderTools: ToolDefinition[] = [
         .enum(['founder', 'investor', 'employee', 'advisor', 'other'])
         .optional()
         .describe('Stakeholder role'),
+      title: z.string().optional().describe("Job title or role title, e.g. 'Director of Developer Relations', 'Lead Advisor'"),
     }),
     handler: async (input, client) => {
       const { id, ...body } = input;
