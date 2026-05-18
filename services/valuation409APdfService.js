@@ -230,7 +230,21 @@ async function generatePDF(valuationId, capTableData = {}) {
     doc.pipe(stream);
 
     // ── COVER PAGE ────────────────────────────────────────────────────────────
-    doc.rect(0, 0, doc.page.width, doc.page.height).fill(BLUE);
+    // Use AI-generated cover image if available, otherwise solid blue background
+    const coverImgB64 = report.coverImageBuffer;
+    if (coverImgB64) {
+      try {
+        const imgBuf = Buffer.from(coverImgB64, 'base64');
+        doc.image(imgBuf, 0, 0, { width: doc.page.width, height: doc.page.height });
+        // Dark overlay for readability
+        doc.rect(0, 0, doc.page.width, doc.page.height).fillOpacity(0.55).fill('#0f172a');
+        doc.fillOpacity(1);
+      } catch (_) {
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill(BLUE);
+      }
+    } else {
+      doc.rect(0, 0, doc.page.width, doc.page.height).fill(BLUE);
+    }
     doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(28)
        .text('409A VALUATION REPORT', 60, 140, { width: doc.page.width - 120, align: 'center' });
     doc.moveDown(0.5);

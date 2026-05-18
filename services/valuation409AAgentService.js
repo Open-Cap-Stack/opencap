@@ -13,9 +13,17 @@ const emailService = require('./valuation409AEmailService');
 const User = require('../models/User');
 
 const AINATIVE_BASE = 'https://api.ainative.studio';
-const AINATIVE_API_KEY = process.env.AINATIVE_API_KEY;
-// Use claude-sonnet for financial analysis — most reliable for structured output
-const AI_MODEL = 'claude-sonnet-4.5';
+const AINATIVE_API_KEY = process.env.AINATIVE_API_KEY || process.env.ZERODB_API_KEY;
+
+// Per-step model selection:
+// - deepseek-r1: reasoning model for quantitative financial steps (DCF, OPM, comparables)
+// - mistral-large: fast, high-quality narrative prose for report writing and reconciliation
+// - minimax-image-01: image generation for PDF cover page
+const MODELS = {
+  quantitative: 'deepseek-r1',    // comparables research, DCF, OPM/PWERM
+  narrative:    'mistral-large',  // reconciliation conclusion, full report draft
+  image:        'minimax-image-01' // cover page image
+};
 
 const SYSTEM_PROMPT = `You are a qualified 409A valuation analyst. You produce IRC Section 409A compliant fair market value analyses for private company common stock. Your analysis must be:
 - Methodologically sound (OPM, PWERM, DCF, market comps)
@@ -24,42 +32,114 @@ const SYSTEM_PROMPT = `You are a qualified 409A valuation analyst. You produce I
 - Written in professional financial report language
 Always return valid JSON when asked for structured output.`;
 
+// Fallback chain: if primary model is overloaded (529/503/402), try the next one
+const FALLBACK_CHAIN = {
+  [MODELS.quantitative]: ['deepseek-v3', 'qwen3-235b-cerebras', 'mistral-large', 'deepseek-v3.2'],
+  [MODELS.narrative]:    ['deepseek-v3', 'qwen3-235b-cerebras', 'mistral-large', 'deepseek-v3.2'],
+};
+
 async function ainativeChat(messages, options = {}) {
-  const response = await axios.post(
-    `${AINATIVE_BASE}/v1/messages`,
+  const primaryModel = options.model || MODELS.quantitative;
+  const modelsToTry = [primaryModel, ...(FALLBACK_CHAIN[primaryModel] || [])];
+
+  let lastErr;
+  for (const model of modelsToTry) {
+    try {
+      if (model !== primaryModel) {
+        console.log(`  [409A Agent] Falling back to ${model} (${primaryModel} overloaded)`);
+      }
+      const response = await axios.post(
+        `${AINATIVE_BASE}/v1/messages`,
+        {
+          model,
+          system: SYSTEM_PROMPT,
+          messages,
+          max_tokens: options.maxTokens || 4096,
+          temperature: 0,
+          ...options.extra
+        },
+        {
+          headers: {
+            'x-api-key': AINATIVE_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          timeout: 180000
+        }
+      );
+      const content = response.data?.content;
+      if (!content || !content[0]) throw new Error('Empty response from AINative API');
+      return content[0].text;
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 529 || status === 503 || status === 429 || status === 402) {
+        lastErr = err;
+        continue; // try next model
+      }
+      throw err; // non-recoverable error
+    }
+  }
+  throw lastErr;
+}
+
+async function generateCoverImage(company, industry) {
+  // Try AINative image generation endpoints
+  const prompt = `Professional financial report cover image for a 409A valuation. Abstract dark navy blue background with subtle geometric data visualization elements, gold accent lines, and elegant typography space. Corporate, sophisticated, trustworthy. No text in the image.`;
+  const endpoints = [
     {
-      model: AI_MODEL,
-      system: SYSTEM_PROMPT,
-      messages,
-      max_tokens: options.maxTokens || 4096,
-      temperature: 0, // deterministic for financial analysis
-      ...options.extra
+      url: `${AINATIVE_BASE}/v1/images/generations`,
+      body: { model: MODELS.image, prompt, n: 1, size: '1024x576', response_format: 'b64_json' }
     },
     {
-      headers: {
-        'x-api-key': AINATIVE_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      timeout: 120000
+      url: `${AINATIVE_BASE}/api/v1/images/generations`,
+      body: { model: MODELS.image, prompt, n: 1, size: '1024x576', response_format: 'b64_json' }
+    },
+  ];
+  for (const { url, body } of endpoints) {
+    try {
+      const response = await axios.post(url, body, {
+        headers: { 'x-api-key': AINATIVE_API_KEY, 'Content-Type': 'application/json' },
+        timeout: 60000
+      });
+      const b64 = response.data?.data?.[0]?.b64_json;
+      if (b64) return Buffer.from(b64, 'base64');
+    } catch (err) {
+      // try next endpoint
     }
-  );
-  const content = response.data?.content;
-  if (!content || !content[0]) throw new Error('Empty response from AINative API');
-  return content[0].text;
+  }
+  console.warn('[409A Agent] Cover image generation unavailable (non-fatal) — using solid background');
+  return null;
 }
 
 async function ainativeChatJSON(messages, options = {}) {
   const text = await ainativeChat(messages, options);
-  // Strip markdown code fences if present
-  const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  // Strip markdown code fences, thinking blocks, and leading prose
+  let clean = text
+    .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')  // remove chain-of-thought blocks
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
+
+  // Try full parse first
   try {
     return JSON.parse(clean);
-  } catch {
-    // Try to extract JSON object from text
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error('AI response was not valid JSON: ' + clean.slice(0, 200));
+  } catch { /* fall through */ }
+
+  // Extract the outermost JSON object
+  const objMatch = clean.match(/\{[\s\S]*\}/);
+  if (objMatch) {
+    try { return JSON.parse(objMatch[0]); } catch { /* fall through */ }
   }
+
+  // Last resort: find the last complete JSON object by trimming trailing garbage
+  const lastBrace = clean.lastIndexOf('}');
+  if (lastBrace > 0) {
+    const firstBrace = clean.indexOf('{');
+    if (firstBrace >= 0) {
+      try { return JSON.parse(clean.slice(firstBrace, lastBrace + 1)); } catch { /* fall through */ }
+    }
+  }
+
+  throw new Error('AI response was not valid JSON: ' + clean.slice(0, 300));
 }
 
 async function updateAIStatus(valuationId, status, extra = {}) {
@@ -115,7 +195,7 @@ Return a JSON object with this exact structure:
 Include 4-6 comparable companies. Use your knowledge of public/private company valuations in this space.`
     }
   ];
-  return ainativeChatJSON(messages);
+  return ainativeChatJSON(messages, { model: MODELS.quantitative });
 }
 
 // ─── Step 2: DCF Analysis ──────────────────────────────────────────────────────
@@ -160,7 +240,7 @@ Return a JSON object:
 }`
     }
   ];
-  return ainativeChatJSON(messages);
+  return ainativeChatJSON(messages, { model: MODELS.quantitative });
 }
 
 // ─── Step 3: OPM / PWERM Analysis ─────────────────────────────────────────────
@@ -202,7 +282,7 @@ Return JSON:
 }`
     }
   ];
-  return ainativeChatJSON(messages, { maxTokens: 2048 });
+  return ainativeChatJSON(messages, { model: MODELS.quantitative, maxTokens: 2048 });
 }
 
 // ─── Step 4: Reconcile Methods & Compute Final FMV ────────────────────────────
@@ -253,7 +333,7 @@ Return JSON: { "conclusionNarrative": "string" }`
     }
   ];
 
-  const conclusion = await ainativeChatJSON(messages, { maxTokens: 512 });
+  const conclusion = await ainativeChatJSON(messages, { model: MODELS.narrative, maxTokens: 512 });
 
   return {
     weights,
@@ -309,7 +389,7 @@ Write the following sections. Return as JSON with these exact keys:
 }`
     }
   ];
-  return ainativeChatJSON(messages, { maxTokens: 4096 });
+  return ainativeChatJSON(messages, { model: MODELS.narrative, maxTokens: 4096 });
 }
 
 // ─── Main Agent Runner ─────────────────────────────────────────────────────────
@@ -355,8 +435,12 @@ async function runValuationAgent(valuationId) {
     inputs.capTableSnapshot = capTableSnapshot;
     const reconciled = await reconcileMethods(dcfResult, opmResult, comparablesResult, inputs);
 
-    // Step 5: Draft report
-    console.log(`[409A Agent] Step 5: Drafting report`);
+    // Step 5a: Generate cover image (non-blocking)
+    console.log(`[409A Agent] Step 5a: Generating cover image`);
+    const coverImageBuffer = await generateCoverImage(businessContext.companyName || valuation.companyId, businessContext.industry || 'Technology');
+
+    // Step 5b: Draft report
+    console.log(`[409A Agent] Step 5b: Drafting report`);
     const reportSections = await draftReport(inputs, comparablesResult, dcfResult, opmResult, reconciled);
 
     // Save all results back to the valuation record
@@ -368,7 +452,8 @@ async function runValuationAgent(valuationId) {
       aiSelectedComparables: comparablesResult.comparables || [],
       aiReport: {
         ...reportSections,
-        generatedAt: now
+        generatedAt: now,
+        coverImageBuffer: coverImageBuffer ? coverImageBuffer.toString('base64') : null
       },
       aiReconciliation: reconciled,
       aiDCFResult: dcfResult,
@@ -423,4 +508,4 @@ async function runValuationAgent(valuationId) {
   }
 }
 
-module.exports = { runValuationAgent };
+module.exports = { runValuationAgent, generateCoverImage, MODELS };
