@@ -113,7 +113,7 @@ describe('409A PDF Generation (Issue #566)', () => {
       await finished;
 
       // Verify the PDF service was called
-      expect(generatePDF).toHaveBeenCalledWith('val_test_123');
+      expect(generatePDF).toHaveBeenCalledWith('val_test_123', expect.any(Object));
 
       // Verify response headers were set
       expect(setHeaderFn).toHaveBeenCalledWith('Content-Type', 'application/pdf');
@@ -211,7 +211,7 @@ describe('409A PDF Generation (Issue #566)', () => {
       await finished;
 
       // Should NOT have returned 403 — the PDF service should have been called
-      expect(generatePDF).toHaveBeenCalledWith('val_test_123');
+      expect(generatePDF).toHaveBeenCalledWith('val_test_123', expect.any(Object));
     });
   });
 
@@ -263,7 +263,7 @@ describe('409A PDF Generation (Issue #566)', () => {
 
       await finished;
 
-      expect(generatePDF).toHaveBeenCalledWith('val_buffer_test');
+      expect(generatePDF).toHaveBeenCalledWith('val_buffer_test', expect.any(Object));
     });
   });
 });
