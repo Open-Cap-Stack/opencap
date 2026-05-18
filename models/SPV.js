@@ -12,15 +12,32 @@ const { v4: uuidv4 } = require('uuid');
 const VALID_STATUSES = ['active', 'draft', 'pending', 'closed', 'liquidated'];
 const VALID_COMPLIANCE_STATUSES = ['Compliant', 'NonCompliant', 'PendingReview'];
 
+// Enum constants for new fields
+const VALID_COMPANY_STAGES = ['pre-seed', 'seed', 'series-a', 'series-b', 'post-revenue', 'other'];
+const VALID_INCORPORATION_TYPES = ['c-corp', 'llc', 's-corp', 'other'];
+const VALID_MONTHS_OF_RUNWAY = ['less-than-12', '12-or-more'];
+const VALID_TRANSACTION_TYPES = ['primary', 'secondary'];
+const VALID_INSTRUMENTS = ['safe', 'convertible-note', 'preferred-equity', 'common-equity', 'other'];
+const VALID_VALUATIONS = ['capped', 'uncapped'];
+const VALID_ADVISER_TYPES = ['platform-advisor', 'self-advised'];
+
 // Validation functions
 const validators = {
     isValidStatus: (status) => VALID_STATUSES.includes(status),
     isValidComplianceStatus: (status) => VALID_COMPLIANCE_STATUSES.includes(status),
-    isValidDate: (date) => date instanceof Date && !isNaN(date)
+    isValidDate: (date) => date instanceof Date && !isNaN(date),
+    isValidCompanyStage: (stage) => VALID_COMPANY_STAGES.includes(stage),
+    isValidIncorporationType: (type) => VALID_INCORPORATION_TYPES.includes(type),
+    isValidMonthsOfRunway: (val) => VALID_MONTHS_OF_RUNWAY.includes(val),
+    isValidTransactionType: (type) => VALID_TRANSACTION_TYPES.includes(type),
+    isValidInstrument: (inst) => VALID_INSTRUMENTS.includes(inst),
+    isValidValuation: (val) => VALID_VALUATIONS.includes(val),
+    isValidAdviserType: (type) => VALID_ADVISER_TYPES.includes(type)
 };
 
 // Schema definition for documentation and validation
 const spvSchema = {
+    // --- Original fields (required) ---
     SPVID: { type: 'string', required: true, unique: true },
     Name: { type: 'string', required: true },
     Purpose: { type: 'string', required: true },
@@ -36,6 +53,65 @@ const spvSchema = {
         required: true,
         enum: VALID_COMPLIANCE_STATUSES
     },
+
+    // --- Basic Info additions (all optional) ---
+    companyId: { type: 'string' },
+    companyLegalName: { type: 'string' },
+    companyStage: { type: 'string', enum: VALID_COMPANY_STAGES },
+    countryOfIncorporation: { type: 'string', default: 'United States' },
+    incorporationType: { type: 'string', enum: VALID_INCORPORATION_TYPES },
+    founderEmails: { type: 'array' },
+    monthsOfRunway: { type: 'string', enum: VALID_MONTHS_OF_RUNWAY },
+    proRataRights: { type: 'boolean' },
+    targetClosingDate: { type: 'date' },
+    lpMinimumInvestment: { type: 'number' },
+
+    // --- Terms ---
+    transactionType: { type: 'string', enum: VALID_TRANSACTION_TYPES },
+    instrument: { type: 'string', enum: VALID_INSTRUMENTS },
+    includesTokenWarrant: { type: 'boolean' },
+    valuation: { type: 'string', enum: VALID_VALUATIONS },
+    valuationCap: { type: 'number' },
+    discount: { type: 'number' },
+    round: { type: 'string' },
+    roundSize: { type: 'number' },
+    allocation: { type: 'number' },
+    otherTerms: { type: 'string' },
+    termDocuments: { type: 'array' },
+
+    // --- Adviser & ERA ---
+    adviserType: { type: 'string', enum: VALID_ADVISER_TYPES },
+    masterPartnershipEntity: { type: 'string' },
+    fundLead: { type: 'string' },
+
+    // --- Data room & memo ---
+    memo: { type: 'string' },
+    pitchDeckUrl: { type: 'string' },
+    coInvestors: { type: 'array' },  // [{name: string, amount: number}]
+    pastFinancing: { type: 'boolean' },
+    risks: { type: 'array' },
+    disclosures: { type: 'object' },  // boolean fields: investedPreviously, downRound, advisoryShares, officerOrEmployee, relativeWorking, otherConflicts, noConflicts
+
+    // --- Carry & GP ---
+    carryPercentage: { type: 'number', default: 0 },
+    carryRecipientEntity: { type: 'string' },
+    gpCommitmentAmount: { type: 'number' },
+    gpCommitmentFromFund: { type: 'boolean' },
+    investingOnDifferentTerms: { type: 'boolean' },
+    dealPartners: { type: 'array' },  // [{userId: string, carryPercentage: number}]
+
+    // --- Additional services ---
+    has3c7ParallelFunds: { type: 'boolean' },
+    hasFinancialStatements: { type: 'boolean' },
+
+    // --- Metrics ---
+    totalRaised: { type: 'number', default: 0 },
+    lpCount: { type: 'number', default: 0 },
+
+    // --- Wizard state ---
+    wizardStep: { type: 'number', default: 0 },
+    wizardCompletedSteps: { type: 'array' },
+
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
 };
@@ -51,6 +127,13 @@ const SPV = {
     validators,
     VALID_STATUSES,
     VALID_COMPLIANCE_STATUSES,
+    VALID_COMPANY_STAGES,
+    VALID_INCORPORATION_TYPES,
+    VALID_MONTHS_OF_RUNWAY,
+    VALID_TRANSACTION_TYPES,
+    VALID_INSTRUMENTS,
+    VALID_VALUATIONS,
+    VALID_ADVISER_TYPES,
 
     /**
      * Create a new SPV with defaults and validation

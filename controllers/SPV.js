@@ -18,6 +18,69 @@ const isValidId = (id) => {
 };
 
 /**
+ * Whitelist of fields that can be set on create or update (beyond the original fields).
+ * All new fields added in issue #579 for expanded SPV data model.
+ */
+const EXTENDED_FIELDS = [
+  // Basic Info additions
+  'companyId', 'companyLegalName', 'companyStage', 'countryOfIncorporation',
+  'incorporationType', 'founderEmails', 'monthsOfRunway', 'proRataRights',
+  'targetClosingDate', 'lpMinimumInvestment',
+  // Terms
+  'transactionType', 'instrument', 'includesTokenWarrant', 'valuation',
+  'valuationCap', 'discount', 'round', 'roundSize', 'allocation',
+  'otherTerms', 'termDocuments',
+  // Adviser & ERA
+  'adviserType', 'masterPartnershipEntity', 'fundLead',
+  // Data room & memo
+  'memo', 'pitchDeckUrl', 'coInvestors', 'pastFinancing', 'risks', 'disclosures',
+  // Carry & GP
+  'carryPercentage', 'carryRecipientEntity', 'gpCommitmentAmount',
+  'gpCommitmentFromFund', 'investingOnDifferentTerms', 'dealPartners',
+  // Additional services
+  'has3c7ParallelFunds', 'hasFinancialStatements',
+  // Metrics
+  'totalRaised', 'lpCount',
+  // Wizard state
+  'wizardStep', 'wizardCompletedSteps'
+];
+
+/**
+ * Enum validation map for extended fields that have constrained values.
+ */
+const ENUM_VALIDATORS = {
+  companyStage: { values: SPV.VALID_COMPANY_STAGES, label: 'company stage' },
+  incorporationType: { values: SPV.VALID_INCORPORATION_TYPES, label: 'incorporation type' },
+  monthsOfRunway: { values: SPV.VALID_MONTHS_OF_RUNWAY, label: 'months of runway' },
+  transactionType: { values: SPV.VALID_TRANSACTION_TYPES, label: 'transaction type' },
+  instrument: { values: SPV.VALID_INSTRUMENTS, label: 'instrument' },
+  valuation: { values: SPV.VALID_VALUATIONS, label: 'valuation' },
+  adviserType: { values: SPV.VALID_ADVISER_TYPES, label: 'adviser type' }
+};
+
+/**
+ * Pick whitelisted extended fields from a request body and validate enums.
+ * Returns { data, error } where error is a string if validation failed.
+ */
+function pickExtendedFields(body) {
+  const data = {};
+  for (const field of EXTENDED_FIELDS) {
+    if (body[field] !== undefined) {
+      // Validate enum fields
+      const enumDef = ENUM_VALIDATORS[field];
+      if (enumDef && !enumDef.values.includes(body[field])) {
+        return {
+          data: null,
+          error: `Invalid ${enumDef.label}. Must be one of: ${enumDef.values.join(', ')}`
+        };
+      }
+      data[field] = body[field];
+    }
+  }
+  return { data, error: null };
+}
+
+/**
  * Create a new SPV
  * @route POST /api/spvs
  * @param {Object} req.body - SPV data
@@ -70,6 +133,12 @@ exports.createSPV = async (req, res) => {
       }
     }
 
+    // Pick and validate extended fields from request body
+    const { data: extendedData, error: extendedError } = pickExtendedFields(req.body);
+    if (extendedError) {
+      return res.status(400).json({ message: extendedError });
+    }
+
     // Use SPV.create() - the model will auto-generate SPVID if not provided
     const savedSPV = await SPV.create({
       SPVID,
@@ -79,6 +148,7 @@ exports.createSPV = async (req, res) => {
       Status: normalizedStatus,
       ParentCompanyID,
       ComplianceStatus: ComplianceStatus || 'PendingReview',
+      ...extendedData
     });
 
     res.status(201).json(savedSPV);
@@ -186,16 +256,23 @@ exports.updateSPV = async (req, res) => {
       });
     }
 
+    // Pick and validate extended fields from request body
+    const { data: extendedData, error: extendedError } = pickExtendedFields(req.body);
+    if (extendedError) {
+      return res.status(400).json({ message: extendedError });
+    }
+
     const updateData = {
       ...(Name && { Name }),
       ...(Purpose && { Purpose }),
       ...(normalizedStatus && { Status: normalizedStatus }),
       ...(ComplianceStatus && { ComplianceStatus }),
+      ...extendedData,
       updatedAt: new Date().toISOString()
     };
 
-    // If no fields to update
-    if (Object.keys(updateData).length <= 1) { // Only updatedAt
+    // If no fields to update (only updatedAt present)
+    if (Object.keys(updateData).length <= 1) {
       return res.status(400).json({ message: 'No valid fields provided for update' });
     }
 
