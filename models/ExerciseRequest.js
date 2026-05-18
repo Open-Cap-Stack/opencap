@@ -403,6 +403,56 @@ const ExerciseRequest = {
     );
   },
 
+  /**
+   * Get exercise summary by equity grant ID
+   * Aggregates total exercised shares and pending shares for a grant
+   * @param {string} equityGrantId - Equity grant ID
+   * @returns {Object} Exercise summary
+   */
+  async getExerciseSummaryByGrant(equityGrantId) {
+    const requests = await baseModel.find.call(baseModel, { equityGrantId });
+
+    const completedRequests = requests.filter(r => r.status === 'completed');
+    const pendingRequests = requests.filter(r =>
+      ['pending', 'approved', 'processed'].includes(r.status)
+    );
+
+    const totalExercisedShares = completedRequests.reduce(
+      (sum, r) => sum + (r.exerciseDetails?.sharesRequested || 0), 0
+    );
+    const totalPendingShares = pendingRequests.reduce(
+      (sum, r) => sum + (r.exerciseDetails?.sharesRequested || 0), 0
+    );
+
+    return {
+      equityGrantId,
+      totalExercisedShares,
+      totalPendingShares,
+      completedCount: completedRequests.length,
+      pendingCount: pendingRequests.length,
+      totalCount: requests.length
+    };
+  },
+
+  /**
+   * Get ISO exercises for a specific tax year
+   * @param {string} companyId - Company ID
+   * @param {number} taxYear - Tax year
+   * @returns {Array} Completed ISO exercises in that tax year
+   */
+  async getISOExercisesForTaxYear(companyId, taxYear) {
+    const requests = await baseModel.find.call(baseModel, {
+      companyId,
+      optionType: 'ISO',
+      status: 'completed'
+    });
+
+    return requests.filter(r => {
+      const completedDate = r.completedAt ? new Date(r.completedAt) : null;
+      return completedDate && completedDate.getFullYear() === taxYear;
+    });
+  },
+
   // Expose base model methods
   find: baseModel.find.bind(baseModel),
   findOne: baseModel.findOne.bind(baseModel),

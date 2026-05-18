@@ -46,8 +46,8 @@ class AdvancedAnalyticsService {
     }
 
     const [shareClasses, stakeholders] = await Promise.all([
-      ShareClass.find({ companyId }).lean(),
-      Stakeholder.find({ companyId }).lean()
+      ShareClass.find({ companyId }),
+      Stakeholder.find({ companyId })
     ]);
 
     const totalAuthorizedShares = shareClasses.reduce(
@@ -91,7 +91,7 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const shareClasses = await ShareClass.find({ companyId }).lean();
+    const shareClasses = await ShareClass.find({ companyId });
 
     const totalPreMoney = newInvestment.preMoneyValuation;
     const postMoneyValuation = totalPreMoney + newInvestment.amount;
@@ -130,7 +130,7 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const shareClasses = await ShareClass.find({ companyId }).lean();
+    const shareClasses = await ShareClass.find({ companyId });
     let currentOwnership = 100;
     const roundResults = [];
 
@@ -172,10 +172,10 @@ class AdvancedAnalyticsService {
       throw new Error('Time range is required');
     }
 
-    const reports = await FinancialReport.find({
-      companyId,
-      reportDate: { $gte: timeRange.start, $lte: timeRange.end }
-    }).sort({ reportDate: 1 }).lean();
+    const reports = await FinancialReport.find(
+      { companyId, reportDate: { $gte: timeRange.start, $lte: timeRange.end } },
+      { sort: { reportDate: 1 } }
+    );
 
     if (reports.length < 2) {
       return {
@@ -225,8 +225,10 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const reports = await FinancialReport.find({ companyId })
-      .sort({ reportDate: 1 }).lean();
+    const reports = await FinancialReport.find(
+      { companyId },
+      { sort: { reportDate: 1 } }
+    );
 
     if (reports.length < 2) {
       throw new Error('Insufficient data for forecasting');
@@ -271,7 +273,7 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const stakeholders = await Stakeholder.find({ companyId }).lean();
+    const stakeholders = await Stakeholder.find({ companyId });
 
     // Calculate role distribution
     const roleDistribution = {};
@@ -484,8 +486,10 @@ class AdvancedAnalyticsService {
       throw new Error('Company not found');
     }
 
-    const reports = await FinancialReport.find({ companyId })
-      .sort({ reportDate: 1 }).lean();
+    const reports = await FinancialReport.find(
+      { companyId },
+      { sort: { reportDate: 1 } }
+    );
 
     // Generate performance embedding
     const performanceProfile = reports.length > 0
@@ -528,8 +532,10 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const reports = await FinancialReport.find({ companyId })
-      .sort({ reportDate: 1 }).lean();
+    const reports = await FinancialReport.find(
+      { companyId },
+      { sort: { reportDate: 1 } }
+    );
 
     // Calculate year-over-year growth even with limited data
     const yearOverYearGrowth = this.calculateYoYGrowth(reports, metric);
@@ -704,7 +710,7 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const stakeholders = await Stakeholder.find({ companyId }).lean();
+    const stakeholders = await Stakeholder.find({ companyId });
 
     // Group by year
     const cohorts = {};
@@ -748,21 +754,35 @@ class AdvancedAnalyticsService {
       throw new Error('Company ID is required');
     }
 
-    const aggregation = await FinancialReport.aggregate([
-      { $match: { companyId } },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$reportDate' },
-            quarter: { $ceil: { $divide: [{ $month: '$reportDate' }, 3] } }
-          },
-          avgRevenue: { $avg: '$totalRevenue' },
-          avgNetIncome: { $avg: '$netIncome' },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.quarter': 1 } }
-    ]);
+    const reports = await FinancialReport.find(
+      { companyId },
+      { sort: { reportDate: 1 } }
+    );
+
+    // Group by year-quarter in application code (replaces MongoDB aggregate)
+    const groups = {};
+    reports.forEach(report => {
+      const date = new Date(report.reportDate);
+      const year = date.getFullYear();
+      const quarter = Math.ceil((date.getMonth() + 1) / 3);
+      const key = `${year}-Q${quarter}`;
+
+      if (!groups[key]) {
+        groups[key] = { _id: { year, quarter }, revenues: [], netIncomes: [], count: 0 };
+      }
+      groups[key].revenues.push(report.totalRevenue || 0);
+      groups[key].netIncomes.push(report.netIncome || 0);
+      groups[key].count++;
+    });
+
+    const aggregation = Object.values(groups)
+      .map(g => ({
+        _id: g._id,
+        avgRevenue: g.revenues.reduce((a, b) => a + b, 0) / g.count,
+        avgNetIncome: g.netIncomes.reduce((a, b) => a + b, 0) / g.count,
+        count: g.count
+      }))
+      .sort((a, b) => a._id.year - b._id.year || a._id.quarter - b._id.quarter);
 
     return {
       cohorts: aggregation.reduce((acc, item) => {
@@ -790,12 +810,15 @@ class AdvancedAnalyticsService {
     for (const metric of metrics) {
       switch (metric) {
         case 'revenue':
-          const revenueData = await FinancialReport.find({
-            companyId,
-            ...(timeRange && {
-              reportDate: { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) }
-            })
-          }).sort({ reportDate: 1 }).lean();
+          const revenueData = await FinancialReport.find(
+            {
+              companyId,
+              ...(timeRange && {
+                reportDate: { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) }
+              })
+            },
+            { sort: { reportDate: 1 } }
+          );
 
           report.revenue = {
             data: revenueData,

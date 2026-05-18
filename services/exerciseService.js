@@ -70,8 +70,8 @@ class ExerciseService {
       currentFMV
     });
 
-    // Create the exercise request
-    const exerciseRequest = new ExerciseRequest({
+    // Create the exercise request via model's create method
+    return await ExerciseRequest.create({
       companyId,
       stakeholderId,
       equityGrantId,
@@ -91,8 +91,6 @@ class ExerciseService {
       requestedAt: new Date(),
       notes
     });
-
-    return await exerciseRequest.save();
   }
 
   /**
@@ -146,12 +144,15 @@ class ExerciseService {
       throw new Error('Can only approve pending requests');
     }
 
-    exerciseRequest.status = 'approved';
-    exerciseRequest.approvedBy = approvedBy;
-    exerciseRequest.approvedAt = new Date();
-    exerciseRequest.approvalNotes = notes;
-
-    return await exerciseRequest.save();
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      {
+        status: 'approved',
+        approvedBy,
+        approvedAt: new Date().toISOString(),
+        approvalNotes: notes
+      }
+    );
   }
 
   /**
@@ -176,12 +177,15 @@ class ExerciseService {
       throw new Error('Can only reject pending requests');
     }
 
-    exerciseRequest.status = 'rejected';
-    exerciseRequest.rejectedBy = rejectedBy;
-    exerciseRequest.rejectedAt = new Date();
-    exerciseRequest.rejectionReason = reason;
-
-    return await exerciseRequest.save();
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      {
+        status: 'rejected',
+        rejectedBy,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason
+      }
+    );
   }
 
   /**
@@ -239,8 +243,8 @@ class ExerciseService {
         )
       : 0;
 
-    // Update tax withholding data
-    exerciseRequest.taxWithholding = {
+    // Build tax withholding data
+    const taxWithholding = {
       calculated: true,
       totalWithholding: taxResult.summary.totalWithholding,
       federalWithholding: taxResult.summary.federalWithholding,
@@ -253,11 +257,15 @@ class ExerciseService {
       withholdingMethod: exerciseRequest.paymentMethod === 'cashless' ? 'sell_to_cover' : 'cash'
     };
 
-    exerciseRequest.status = 'processed';
-    exerciseRequest.processedBy = processedBy;
-    exerciseRequest.processedAt = new Date();
-
-    return await exerciseRequest.save();
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      {
+        taxWithholding,
+        status: 'processed',
+        processedBy,
+        processedAt: new Date().toISOString()
+      }
+    );
   }
 
   /**
@@ -284,17 +292,19 @@ class ExerciseService {
       certificateInfo.certificateNumber
     );
 
-    exerciseRequest.certificateData = certificateData;
-    exerciseRequest.status = 'completed';
-    exerciseRequest.completedBy = completedBy;
-    exerciseRequest.completedAt = new Date();
+    const updateData = {
+      certificateData,
+      status: 'completed',
+      completedBy,
+      completedAt: new Date().toISOString()
+    };
 
     // Mark payment as received if applicable
     if (certificateInfo.paymentReceived !== false) {
-      exerciseRequest.payment = {
+      updateData.payment = {
         paymentReceived: true,
         paymentAmount: exerciseRequest.exerciseDetails.totalExerciseCost,
-        paymentDate: new Date(),
+        paymentDate: new Date().toISOString(),
         paymentMethod: exerciseRequest.paymentMethod
       };
     }
@@ -302,11 +312,13 @@ class ExerciseService {
     // Generate Form 3921 for ISO exercises (required by IRS)
     if (exerciseRequest.optionType === 'ISO' && certificateInfo.generateForm3921 !== false) {
       try {
-        const form3921 = await this.generateForm3921(exerciseRequest, completedBy, certificateInfo);
+        // Use the merged data for form generation (since we have completedAt now)
+        const mergedRequest = { ...exerciseRequest, ...updateData };
+        const form3921 = await this.generateForm3921(mergedRequest, completedBy, certificateInfo);
         if (form3921) {
-          exerciseRequest.form3921Id = form3921._id;
-          exerciseRequest.form3921Generated = true;
-          exerciseRequest.form3921GeneratedAt = new Date();
+          updateData.form3921Id = form3921._id;
+          updateData.form3921Generated = true;
+          updateData.form3921GeneratedAt = new Date().toISOString();
         }
       } catch (error) {
         // Log error but don't fail the completion
@@ -314,7 +326,10 @@ class ExerciseService {
       }
     }
 
-    return await exerciseRequest.save();
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      updateData
+    );
   }
 
   /**
@@ -371,8 +386,7 @@ class ExerciseService {
     };
 
     try {
-      const form3921 = new Form3921(form3921Data);
-      return await form3921.save();
+      return await Form3921.create(form3921Data);
     } catch (error) {
       console.error('Error creating Form 3921:', error);
       throw error;
@@ -417,12 +431,15 @@ class ExerciseService {
       throw new Error('Cannot cancel processed or completed requests');
     }
 
-    exerciseRequest.status = 'cancelled';
-    exerciseRequest.cancelledBy = cancelledBy;
-    exerciseRequest.cancelledAt = new Date();
-    exerciseRequest.cancellationReason = reason;
-
-    return await exerciseRequest.save();
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      {
+        status: 'cancelled',
+        cancelledBy,
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: reason
+      }
+    );
   }
 
   /**
@@ -431,13 +448,7 @@ class ExerciseService {
    * @returns {Promise<Object|null>} Exercise request or null
    */
   static async getExerciseRequestById(requestId) {
-    return await ExerciseRequest.findById(requestId)
-      .populate('companyId', 'name')
-      .populate('stakeholderId', 'name email')
-      .populate('requestedBy', 'email')
-      .populate('approvedBy', 'email')
-      .populate('processedBy', 'email')
-      .populate('completedBy', 'email');
+    return await ExerciseRequest.findById(requestId);
   }
 
   /**
@@ -446,8 +457,10 @@ class ExerciseService {
    * @returns {Promise<Array>} Exercise requests
    */
   static async getExerciseRequestsByStakeholder(stakeholderId) {
-    return await ExerciseRequest.find({ stakeholderId })
-      .sort({ requestedAt: -1 });
+    return await ExerciseRequest.find(
+      { stakeholderId },
+      { sort: { requestedAt: -1 } }
+    );
   }
 
   /**
@@ -461,8 +474,20 @@ class ExerciseService {
     if (status) {
       query.status = status;
     }
-    return await ExerciseRequest.find(query)
-      .sort({ requestedAt: -1 });
+    return await ExerciseRequest.find(query, { sort: { requestedAt: -1 } });
+  }
+
+  /**
+   * Update an exercise request by ID
+   * @param {string} requestId - Exercise request ID
+   * @param {Object} updateData - Fields to update
+   * @returns {Promise<Object>} Updated exercise request
+   */
+  static async updateExerciseRequest(requestId, updateData) {
+    return await ExerciseRequest.findOneAndUpdate(
+      { _id: requestId },
+      updateData
+    );
   }
 
   /**
