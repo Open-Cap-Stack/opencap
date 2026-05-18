@@ -179,8 +179,14 @@ exports.updateSAFE = async (req, res) => {
       });
     }
 
-    // Prevent status changes through this endpoint
-    delete updates.status;
+    // Prevent status changes through this endpoint — return an explicit error
+    // instead of silently dropping the field (fixes #554)
+    if (updates.status !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status cannot be changed via PUT. Use PATCH /api/v1/safes/:id/status for status transitions.'
+      });
+    }
     delete updates.statusHistory;
 
     updates.updatedBy = req.user?._id || req.user?.userId;
@@ -191,6 +197,74 @@ exports.updateSAFE = async (req, res) => {
     res.json({
       success: true,
       data: updatedSafe
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Update SAFE status via validated transition (fixes #554, #561)
+exports.updateStatus = async (req, res) => {
+  try {
+    const { safeId } = req.params;
+    const { status, reason } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'status is required'
+      });
+    }
+
+    // Look up by safeId first, then fall back to row_id
+    let safe = await SAFE.findOne({ safeId });
+    if (!safe) {
+      safe = await SAFE.findById(safeId);
+    }
+    if (!safe) {
+      return res.status(404).json({
+        success: false,
+        error: 'SAFE not found'
+      });
+    }
+
+    const currentSafeId = safe.safeId || safeId;
+
+    // Valid transitions map — mirrors the one in models/SAFE.js
+    const validTransitions = {
+      draft: ['sent', 'cancelled'],
+      sent: ['fully_signed', 'cancelled', 'expired'],
+      fully_signed: ['funded', 'cancelled'],
+      funded: ['converted', 'cancelled'],
+      converted: [],
+      cancelled: [],
+      expired: []
+    };
+
+    if (!SAFE.canTransitionTo(safe.status, status)) {
+      const allowed = validTransitions[safe.status] || [];
+      return res.status(400).json({
+        success: false,
+        error: `Cannot transition from '${safe.status}' to '${status}'. Allowed transitions: ${
+          allowed.length ? allowed.join(', ') : 'none (terminal state)'
+        }`
+      });
+    }
+
+    const userId = req.user?._id || req.user?.userId;
+    const updatedSafe = await SAFE.transitionTo(
+      currentSafeId,
+      status,
+      userId,
+      reason || `Status changed to ${status}`
+    );
+
+    res.json({
+      success: true,
+      data: normalizeSafeType(updatedSafe)
     });
   } catch (error) {
     res.status(400).json({

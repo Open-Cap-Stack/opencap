@@ -31,6 +31,7 @@ router.get('/company/:companyId', safeController.getCompanySAFEs);
 router.get('/company/:companyId/summary', safeController.getCompanySummary);
 router.get('/:safeId', safeController.getSAFE);
 router.put('/:safeId', safeController.updateSAFE);
+router.patch('/:safeId/status', safeController.updateStatus);
 router.delete('/:safeId', safeController.deleteSAFE);
 
 // SAFE workflow
