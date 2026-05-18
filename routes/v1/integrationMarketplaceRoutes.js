@@ -6,9 +6,18 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const integrationMarketplaceController = require('../../controllers/integrationMarketplaceController');
+const integrationConnectController = require('../../controllers/integrationConnectController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
+
+// --- User integration connections (#582) ---
+// GET /api/v1/integrations/connected
+router.get('/connected', integrationConnectController.getConnectedIntegrations);
+// POST /api/v1/integrations/connect
+router.post('/connect', integrationConnectController.connectIntegration);
+// POST /api/v1/integrations/disconnect
+router.post('/disconnect', integrationConnectController.disconnectIntegration);
 
 // Get all marketplace listings
 // GET /api/v1/integrations/marketplace

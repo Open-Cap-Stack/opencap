@@ -489,10 +489,7 @@ app.get('/api/v1/billing/current', (req, res, next) => {
   req.url = '/current-plan';
   next('route');
 });
-// integrations — alias /integrations/connected → integration-modules list
-app.get('/api/v1/integrations/connected', _stub);
-app.post('/api/v1/integrations/connect', _stubObj);
-app.post('/api/v1/integrations/disconnect', _stubObj);
+// integrations connect/disconnect — now served by integrationMarketplaceRoutes (#582)
 // fundraising-analytics — alias → /api/v1/fundraising
 const fundraisingAnalyticsRouteModule = safeRequire(path.join(__dirname, 'routes/v1/fundraisingAnalyticsRoutes'));
 if (fundraisingAnalyticsRouteModule) app.use('/api/v1/fundraising-analytics', fundraisingAnalyticsRouteModule);

@@ -52,6 +52,7 @@ const userSchema = {
     lastLogin: { type: 'date', default: null },
     passwordResetToken: { type: 'string', default: null },
     passwordResetExpires: { type: 'date', default: null },
+    connectedIntegrations: { type: 'array', default: [] },
     deletedAt: { type: 'date', default: null },
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
