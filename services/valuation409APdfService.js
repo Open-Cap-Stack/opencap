@@ -202,7 +202,7 @@ function addAppraiserQualificationsPage(doc, { sig }) {
 }
 
 // ─── Main Generator ───────────────────────────────────────────────────────────
-async function generatePDF(valuationId) {
+async function generatePDF(valuationId, capTableData = {}) {
   // Fetch valuation
   let val = await Valuation409A.findOne({ valuationId });
   if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
@@ -303,6 +303,32 @@ async function generatePDF(valuationId) {
     if (fin.employeeCount)        addKVRow(doc, 'Employees',                fin.employeeCount);
     if (fin.lastFundraisingAmount) addKVRow(doc, 'Last Fundraise',          fmt$(fin.lastFundraisingAmount));
     if (fin.lastFundraisingPreMoney) addKVRow(doc, 'Last Pre-Money Val.',   fmt$(fin.lastFundraisingPreMoney));
+
+    // ── CAPITAL STRUCTURE ─────────────────────────────────────────────────────
+    doc.addPage({ margin: 0 });
+    addPageHeader(doc, 'Capital Structure');
+    addSectionHeader(doc, 'Capital Structure');
+
+    const { shareClasses = [], totalGrantedOptions = 0 } = capTableData;
+    if (shareClasses.length > 0) {
+      const rows = shareClasses.map(sc => [
+        sc.name || sc.className || '—',
+        sc.authorizedShares != null ? Number(sc.authorizedShares).toLocaleString() : '—',
+        sc.issuedShares != null ? Number(sc.issuedShares).toLocaleString() : '—',
+        sc.liquidationPreference != null ? fmt$(sc.liquidationPreference) : '—',
+        sc.participationRights || '—'
+      ]);
+      if (totalGrantedOptions > 0) {
+        rows.push(['Stock Options (granted)', '—', Number(totalGrantedOptions).toLocaleString(), '—', '—']);
+      }
+      // Fully diluted total
+      const totalOutstanding = shareClasses.reduce((s, sc) => s + (Number(sc.issuedShares) || 0), 0) + totalGrantedOptions;
+      rows.push(['FULLY DILUTED TOTAL', '—', Number(totalOutstanding).toLocaleString(), '—', '—']);
+
+      addTable(doc, ['Share Class', 'Authorized', 'Outstanding', 'Liq. Preference', 'Participating'], rows);
+    } else {
+      addBodyText(doc, 'Capital structure data not available for this valuation.');
+    }
 
     // ── METHODOLOGY ───────────────────────────────────────────────────────────
     doc.addPage({ margin: 0 });

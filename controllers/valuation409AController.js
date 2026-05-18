@@ -710,8 +710,23 @@ exports.downloadPDF = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Report not yet released' });
     }
 
+    const ShareClass = require('../models/ShareClass');
+    const EquityGrant = require('../models/EquityGrant');
+
+    let shareClasses = [];
+    let totalGrantedOptions = 0;
+    try {
+      shareClasses = await ShareClass.find({ companyId: val.companyId }) || [];
+      const grants = await EquityGrant.find({ companyId: val.companyId }) || [];
+      totalGrantedOptions = grants.reduce((sum, g) => sum + (Number(g.numberOfShares) || 0), 0);
+    } catch (capErr) {
+      // cap table data is best-effort
+    }
+
+    const capTableData = { shareClasses, totalGrantedOptions };
+
     const { generatePDF } = require('../services/valuation409APdfService');
-    const tmpPath = await generatePDF(val.valuationId || val.row_id);
+    const tmpPath = await generatePDF(val.valuationId || val.row_id, capTableData);
 
     const fs = require('fs');
     const filename = `409A-${val.companyId || 'report'}-${(val.valuationId || val.row_id).slice(0, 8)}.pdf`;
