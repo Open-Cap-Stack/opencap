@@ -71,7 +71,7 @@ claude mcp add opencap npx @opencapstack/mcp-server
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OPENCAP_API_KEY` | Yes | — | Your OpenCap JWT token. Get one at `https://api.opencapstack.com/api/v1/auth/login` |
-| `OPENCAP_BASE_URL` | No | `https://api.opencapstack.com` | Base URL for the OpenCap API |
+| `OPENCAP_BASE_URL` | No | `https://api.opencapstack.com` | Base URL for the OpenCap API. **Must NOT include `/api/v1`** (the tools add this automatically). Correct: `https://api.opencapstack.com`. Wrong: `https://api.opencapstack.com/api/v1`. If the suffix is present it will be stripped automatically with a warning. |
 | `TRANSPORT` | No | `stdio` | Transport mode: `stdio` or `sse` |
 | `PORT` | No | `3001` | Port for the SSE HTTP server (only used when `TRANSPORT=sse`) |
 
@@ -112,7 +112,7 @@ claude mcp add opencap npx @opencapstack/mcp-server
 
 ## Self-hosted usage
 
-If you run your own OpenCap Stack instance, set `OPENCAP_BASE_URL` to your instance's API base URL:
+If you run your own OpenCap Stack instance, set `OPENCAP_BASE_URL` to your instance's root URL (without the `/api/v1` path -- the MCP tools add this automatically):
 
 ```json
 {
@@ -122,6 +122,8 @@ If you run your own OpenCap Stack instance, set `OPENCAP_BASE_URL` to your insta
   }
 }
 ```
+
+> **Common mistake:** Do not set `OPENCAP_BASE_URL` to `https://opencap.yourcompany.internal/api/v1`. The `/api/v1` prefix is appended by each tool automatically. If you include it, all requests will use a doubled path like `/api/v1/api/v1/...`. The server will strip a trailing `/api/v1` and log a warning, but it is best to set the correct value upfront.
 
 ### SSE transport (web clients)
 
