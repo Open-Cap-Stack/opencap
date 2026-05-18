@@ -224,6 +224,43 @@ async function generatePDF(valuationId) {
       addKVRow(doc, 'OPM Equity Value', fmt$(recon.opmEquityValue));
     }
 
+    const opm = val.aiOPMResult;
+    if (opm) {
+      doc.moveDown(0.3);
+
+      if (opm.scenarios && opm.scenarios.length > 0) {
+        // PWERM path — scenario table
+        addSectionHeader(doc, 'PWERM Scenario Analysis');
+        addTable(
+          doc,
+          ['Scenario', 'Probability', 'Exit Value', 'Common Share Value'],
+          [
+            ...opm.scenarios.map(s => [
+              s.name || '—',
+              fmtPct(s.probability != null ? s.probability * 100 : null),
+              fmt$(s.exitValue),
+              s.commonShareValue != null ? `$${Number(s.commonShareValue).toFixed(4)}` : '—'
+            ]),
+            // Weighted total row
+            ['Weighted Total', '100%', fmt$(opm.weightedEquityValue), opm.fmvPerShare != null ? `$${Number(opm.fmvPerShare).toFixed(4)}` : '—']
+          ]
+        );
+      } else {
+        // OPM path — key inputs
+        addSectionHeader(doc, 'OPM Key Inputs');
+        if (opm.enterpriseValue != null) addKVRow(doc, 'Enterprise Value', fmt$(opm.enterpriseValue));
+        if (opm.volatility != null) addKVRow(doc, 'Volatility', fmtPct(opm.volatility * 100));
+        if (opm.riskFreeRate != null) addKVRow(doc, 'Risk-Free Rate', fmtPct(opm.riskFreeRate * 100));
+        if (opm.timeToExit != null) addKVRow(doc, 'Time to Exit (years)', opm.timeToExit);
+      }
+
+      // Common outputs
+      doc.moveDown(0.2);
+      if (opm.dlom != null) addKVRow(doc, 'DLOM Applied', fmtPct(opm.dlom * 100));
+      if (opm.fmvPerShare != null) addKVRow(doc, 'FMV Per Share (pre-DLOM)', `$${Number(opm.fmvPerShare).toFixed(4)}`);
+      if (opm.adjustedFmvPerShare != null) addKVRow(doc, 'FMV Per Share (post-DLOM)', `$${Number(opm.adjustedFmvPerShare).toFixed(4)}`);
+    }
+
     // ── RISK FACTORS ──────────────────────────────────────────────────────────
     if (report.riskFactors) {
       doc.addPage({ margin: 0 });
