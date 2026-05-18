@@ -126,10 +126,17 @@ router.get('/:id', (req, res, next) => {
 }, SPVController.getSPVById);
 
 /**
- * @route PUT /api/spvs/:id
- * @desc Update an SPV by ID
+ * @route PUT/PATCH /api/spvs/:id
+ * @desc Update an SPV by ID (both PUT and PATCH supported for partial updates)
  * @access Private
  */
+router.patch('/:id', (req, res, next) => {
+  if (!req.params.id || req.params.id.trim() === '') {
+    return res.status(404).json({ message: 'SPV ID is required' });
+  }
+  next();
+}, SPVController.updateSPV);
+
 router.put('/:id', (req, res, next) => {
   // Check for empty ID parameter and handle it directly
   if (!req.params.id || req.params.id.trim() === '') {
