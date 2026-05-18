@@ -141,6 +141,66 @@ function addCoverLetterPage(doc, { company, effDate, fmv, sig }) {
   doc.fillColor(DARK);
 }
 
+// ─── Limiting Conditions Page ─────────────────────────────────────────────────
+function addLimitingConditionsPage(doc, { company, effDate }) {
+  doc.addPage({ margin: 0 });
+  addPageHeader(doc, 'Limiting Conditions & Assumptions');
+  addSectionHeader(doc, 'Statement of Limiting Conditions and Assumptions');
+
+  const conditions = [
+    ['Independence', `OpenCap Stack and its affiliated accountants have no present or contemplated future interest in ${company} and have no personal interest or bias with respect to the parties involved.`],
+    ['Information Reliance', `This valuation is based upon information provided by the management of ${company} and from sources believed to be reliable. We have not independently audited or verified such information.`],
+    ['Prospective Financial Information', 'Forward-looking statements and projections involve inherent uncertainty. Actual results may differ materially from those projected. We make no representation or warranty as to the achievability of any projections.'],
+    ['No Legal or Investment Advice', 'This report does not constitute legal, tax, accounting, or investment advice and should not be relied upon as such. Users should consult appropriate professional advisors.'],
+    ['Subsequent Events', `We have no obligation to update this report for events or circumstances occurring after the effective date of ${effDate}.`],
+    ['IRC Section 409A Purpose Only', 'This valuation was prepared solely for purposes of compliance with IRC Section 409A and Treasury Regulation §1.409A-1(b)(5). It is not suitable for use in financial reporting (ASC 718), mergers and acquisitions, financing transactions, or any other purpose without our prior written consent.'],
+    ['Confidentiality', `This report is confidential and is intended solely for the Board of Directors of ${company} and its legal counsel in connection with equity compensation planning. Unauthorized distribution is prohibited.`],
+  ];
+
+  conditions.forEach(([title, text]) => {
+    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(DARK).text(title, 40, doc.y);
+    doc.moveDown(0.1);
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+       .text(text, 40, doc.y, { width: doc.page.width - 80 });
+    doc.moveDown(0.2);
+  });
+  doc.fillColor(DARK);
+}
+
+// ─── Appraiser Qualifications Page ───────────────────────────────────────────
+function addAppraiserQualificationsPage(doc, { sig }) {
+  doc.addPage({ margin: 0 });
+  addPageHeader(doc, 'Appraiser Qualifications');
+  addSectionHeader(doc, 'Appraiser Qualifications & Independence');
+
+  doc.font('Helvetica-BoldOblique').fontSize(10).fillColor(BLUE)
+     .text('This valuation was prepared in accordance with the requirements of Treasury Regulation §1.409A-1(b)(5)(iv) by a qualified independent appraiser with significant knowledge, experience, education, and training in performing similar valuations.', 40, doc.y, { width: doc.page.width - 80 });
+  doc.fillColor(DARK);
+  doc.moveDown(1);
+
+  addSectionHeader(doc, 'OpenCap Stack AI Valuation Engine');
+  addKVRow(doc, 'Methodology', 'Hybrid DCF / OPM / PWERM / Market Comparables — consistent with AICPA Accounting and Valuation Guide for equity-based compensation');
+  addKVRow(doc, 'Compliance', 'Treasury Regulation §1.409A-1(b)(5) and IRS Notice 2005-1');
+  addKVRow(doc, 'Independence', 'OpenCap Stack has no equity interest in the company and receives a fixed engagement fee unrelated to the valuation conclusion');
+  addKVRow(doc, 'Data Sources', 'Public market comparables databases, SEC filings, industry research, and company-provided financial information');
+
+  doc.moveDown(0.8);
+  addSectionHeader(doc, 'Reviewing Accountant');
+
+  if (sig) {
+    addKVRow(doc, 'Reviewer', sig.signerEmail);
+    addKVRow(doc, 'Date of Review', fmtDate(sig.signedAt));
+    addKVRow(doc, 'Signature ID', sig.signatureId);
+    addKVRow(doc, 'Credentials', 'CPA');
+    addKVRow(doc, 'Independence', 'Reviewer has no financial interest in the company beyond the engagement fee');
+  } else {
+    doc.font('Helvetica-BoldOblique').fontSize(10).fillColor(GRAY)
+       .text('Pending accountant review and attestation.', 40, doc.y);
+    doc.fillColor(DARK);
+  }
+}
+
 // ─── Main Generator ───────────────────────────────────────────────────────────
 async function generatePDF(valuationId) {
   // Fetch valuation
@@ -392,6 +452,12 @@ async function generatePDF(valuationId) {
        .text(`Fair Market Value: $${fmv.toFixed(4)} per Common Share`, 50, cboxY + 12, { width: doc.page.width - 100 });
     doc.fillColor(GRAY).font('Helvetica').fontSize(9)
        .text(`Effective ${effDate} · Methodology: Hybrid DCF / OPM / Market Comps`, 50, cboxY + 32, { width: doc.page.width - 100 });
+
+    // ── LIMITING CONDITIONS ────────────────────────────────────────────────────
+    addLimitingConditionsPage(doc, { company, effDate });
+
+    // ── APPRAISER QUALIFICATIONS ───────────────────────────────────────────────
+    addAppraiserQualificationsPage(doc, { sig });
 
     // ── ACCOUNTANT SIGN-OFF ───────────────────────────────────────────────────
     doc.addPage({ margin: 0 });
