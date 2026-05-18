@@ -92,6 +92,13 @@ router.get('/:id/performance', SPVNestedController.getSPVPerformance);
 router.get('/:id/reports/:type', SPVNestedController.getSPVReport);
 
 /**
+ * @route PUT /api/spvs/:id/status
+ * @desc Transition SPV status with lifecycle guards (Issue #580)
+ * @access Private
+ */
+router.put('/:id/status', SPVController.transitionStatus);
+
+/**
  * @route POST /api/spvs/:id/close
  * @desc Close an SPV
  * @access Private

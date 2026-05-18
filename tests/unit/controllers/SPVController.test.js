@@ -13,8 +13,27 @@ jest.mock('../../../models/SPV', () => ({
   findByIdAndUpdate: jest.fn(),
   findOneAndDelete: jest.fn(),
   findByIdAndDelete: jest.fn(),
-  VALID_STATUSES: ['active', 'draft', 'pending', 'closed', 'liquidated'],
-  VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview']
+  VALID_STATUSES: ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'],
+  VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview'],
+  VALID_COMPANY_STAGES: ['pre-seed', 'seed', 'series-a', 'series-b', 'post-revenue', 'other'],
+  VALID_INCORPORATION_TYPES: ['c-corp', 'llc', 's-corp', 'other'],
+  VALID_MONTHS_OF_RUNWAY: ['less-than-12', '12-or-more'],
+  VALID_TRANSACTION_TYPES: ['primary', 'secondary'],
+  VALID_INSTRUMENTS: ['safe', 'convertible-note', 'preferred-equity', 'common-equity', 'other'],
+  VALID_VALUATIONS: ['capped', 'uncapped'],
+  VALID_ADVISER_TYPES: ['platform-advisor', 'self-advised'],
+  LEGACY_STATUS_MAP: { active: 'raising', inactive: 'draft', dissolved: 'canceled', pending: 'in_review', closed: 'wired', liquidated: 'canceled' },
+  TRANSITION_RULES: { draft: ['in_review', 'canceled'], in_review: ['raising', 'draft', 'canceled'], raising: ['closing', 'canceled'], closing: ['wired', 'canceled'], wired: ['canceled'], canceled: [] },
+  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'dataRoom', 'carry'],
+  normalizeStatus: jest.fn((status) => {
+    if (!status) return 'draft';
+    const lower = status.toLowerCase();
+    const valid = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
+    if (valid.includes(lower)) return lower;
+    const map = { active: 'raising', inactive: 'draft', dissolved: 'canceled', pending: 'in_review', closed: 'wired', liquidated: 'canceled' };
+    return map[lower] || lower;
+  }),
+  validateTransition: jest.fn()
 }));
 
 const httpMocks = require('node-mocks-http');
@@ -31,12 +50,12 @@ describe('SPV Controller', () => {
   });
 
   describe('createSPV', () => {
-    const validSPVData = { SPVID: 'SPV001', Name: 'Test SPV', Purpose: 'Investment vehicle', CreationDate: '2024-01-15', Status: 'Active', ParentCompanyID: 'COMPANY001', ComplianceStatus: 'Compliant' };
+    const validSPVData = { SPVID: 'SPV001', Name: 'Test SPV', Purpose: 'Investment vehicle', CreationDate: '2024-01-15', Status: 'draft', ParentCompanyID: 'COMPANY001', ComplianceStatus: 'Compliant' };
 
     it('should create an SPV successfully', async () => {
       req.body = validSPVData;
       SPV.findOne.mockResolvedValue(null);
-      const mockSaved = { _id: 'spv123', ...validSPVData, Status: 'active' };
+      const mockSaved = { _id: 'spv123', ...validSPVData, Status: 'draft' };
       SPV.create.mockResolvedValue(mockSaved);
       await spvController.createSPV(req, res);
       expect(res.statusCode).toBe(201);
@@ -44,7 +63,7 @@ describe('SPV Controller', () => {
     });
 
     it('should return 400 when required fields are missing', async () => {
-      req.body = { SPVID: 'SPV001', Name: 'Test SPV' };
+      req.body = { SPVID: 'SPV001' }; // Missing Name
       await spvController.createSPV(req, res);
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
@@ -60,6 +79,7 @@ describe('SPV Controller', () => {
 
     it('should return 400 for invalid compliance status', async () => {
       req.body = { ...validSPVData, ComplianceStatus: 'Invalid' };
+      SPV.findOne.mockResolvedValue(null);
       await spvController.createSPV(req, res);
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res._getData()).message).toContain('Invalid compliance status');
@@ -131,8 +151,8 @@ describe('SPV Controller', () => {
   describe('updateSPV', () => {
     it('should update SPV successfully', async () => {
       req.params = { id: 'SPV001' };
-      req.body = { Name: 'Updated SPV Name', Status: 'Pending' };
-      const mockUpdated = { _id: 'spv123', SPVID: 'SPV001', Name: 'Updated SPV Name', Status: 'pending' };
+      req.body = { Name: 'Updated SPV Name', Status: 'in_review' };
+      const mockUpdated = { _id: 'spv123', SPVID: 'SPV001', Name: 'Updated SPV Name', Status: 'in_review' };
       SPV.findOneAndUpdate.mockResolvedValue(mockUpdated);
       await spvController.updateSPV(req, res);
       expect(res.statusCode).toBe(200);
@@ -182,8 +202,8 @@ describe('SPV Controller', () => {
 
   describe('getSPVsByStatus', () => {
     it('should return SPVs by status', async () => {
-      req.params = { status: 'Active' };
-      const mockSPVs = [{ _id: 'spv1', Status: 'active' }];
+      req.params = { status: 'draft' };
+      const mockSPVs = [{ _id: 'spv1', Status: 'draft' }];
       SPV.find.mockResolvedValue(mockSPVs);
       await spvController.getSPVsByStatus(req, res);
       expect(res.statusCode).toBe(200);
@@ -197,7 +217,7 @@ describe('SPV Controller', () => {
     });
 
     it('should return 404 when no SPVs found with status', async () => {
-      req.params = { status: 'Closed' };
+      req.params = { status: 'wired' };
       SPV.find.mockResolvedValue([]);
       await spvController.getSPVsByStatus(req, res);
       expect(res.statusCode).toBe(404);

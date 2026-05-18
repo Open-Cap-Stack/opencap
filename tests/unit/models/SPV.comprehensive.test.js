@@ -6,7 +6,7 @@
 
 // Mock the SPV model to avoid database dependencies
 jest.mock('../../../models/SPV', () => {
-  const validStatuses = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+  const validStatuses = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
   const validComplianceStatuses = ['Compliant', 'NonCompliant', 'PendingReview'];
 
   function MockSPV(data = {}) {
@@ -68,7 +68,7 @@ jest.mock('../../../models/SPV', () => {
 describe('SPV Model', () => {
   let SPV;
 
-  const validStatuses = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+  const validStatuses = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
   const validComplianceStatuses = ['Compliant', 'NonCompliant', 'PendingReview'];
 
   beforeAll(() => {
@@ -87,7 +87,7 @@ describe('SPV Model', () => {
           Name: 'Tech Investment SPV I',
           Purpose: 'Investment in early-stage technology companies',
           CreationDate: new Date('2024-01-15'),
-          Status: 'active',
+          Status: 'draft',
           ParentCompanyID: 'company-456',
           ComplianceStatus: 'Compliant'
         };
@@ -272,7 +272,7 @@ describe('SPV Model', () => {
           Name: 'Test SPV',
           Purpose: 'Test purpose',
           CreationDate: new Date(),
-          Status: 'active',
+          Status: 'raising',
           ParentCompanyID: 'company-123',
           ComplianceStatus: complianceStatus
         });
@@ -288,7 +288,7 @@ describe('SPV Model', () => {
           Name: 'Test SPV',
           Purpose: 'Test purpose',
           CreationDate: new Date(),
-          Status: 'active',
+          Status: 'raising',
           ParentCompanyID: 'company-123',
           ComplianceStatus: 'InvalidStatus'
         });
@@ -304,7 +304,7 @@ describe('SPV Model', () => {
           Name: 'Test SPV',
           Purpose: 'Test purpose',
           CreationDate: new Date(),
-          Status: 'active',
+          Status: 'raising',
           ParentCompanyID: 'company-123',
           ComplianceStatus: 'compliant'
         });
@@ -332,61 +332,61 @@ describe('SPV Model', () => {
       expect(spv.ComplianceStatus).toBe('PendingReview');
     });
 
-    it('should handle pending SPV', () => {
+    it('should handle in_review SPV', () => {
       const spv = new SPV({
-        SPVID: 'spv-pending-001',
-        Name: 'Pending Approval SPV',
+        SPVID: 'spv-review-001',
+        Name: 'Under Review SPV',
         Purpose: 'Awaiting regulatory approval',
         CreationDate: new Date(),
-        Status: 'pending',
+        Status: 'in_review',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'PendingReview'
       });
 
-      expect(spv.Status).toBe('pending');
+      expect(spv.Status).toBe('in_review');
     });
 
-    it('should handle active SPV', () => {
+    it('should handle raising SPV', () => {
       const spv = new SPV({
-        SPVID: 'spv-active-001',
-        Name: 'Active Investment SPV',
-        Purpose: 'Currently investing in portfolio companies',
+        SPVID: 'spv-raising-001',
+        Name: 'Raising Investment SPV',
+        Purpose: 'Currently raising capital',
         CreationDate: new Date('2023-01-01'),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
 
-      expect(spv.Status).toBe('active');
+      expect(spv.Status).toBe('raising');
       expect(spv.ComplianceStatus).toBe('Compliant');
     });
 
-    it('should handle closed SPV', () => {
+    it('should handle closing SPV', () => {
       const spv = new SPV({
-        SPVID: 'spv-closed-001',
-        Name: 'Closed Investment SPV',
-        Purpose: 'Investment period complete',
+        SPVID: 'spv-closing-001',
+        Name: 'Closing Investment SPV',
+        Purpose: 'Investment period closing',
         CreationDate: new Date('2020-01-01'),
-        Status: 'closed',
+        Status: 'closing',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
 
-      expect(spv.Status).toBe('closed');
+      expect(spv.Status).toBe('closing');
     });
 
-    it('should handle liquidated SPV', () => {
+    it('should handle wired SPV', () => {
       const spv = new SPV({
-        SPVID: 'spv-liquidated-001',
-        Name: 'Liquidated SPV',
-        Purpose: 'Fully distributed to investors',
+        SPVID: 'spv-wired-001',
+        Name: 'Wired SPV',
+        Purpose: 'Funds fully wired',
         CreationDate: new Date('2018-01-01'),
-        Status: 'liquidated',
+        Status: 'wired',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
 
-      expect(spv.Status).toBe('liquidated');
+      expect(spv.Status).toBe('wired');
     });
   });
 
@@ -405,7 +405,7 @@ describe('SPV Model', () => {
           Name: 'Test SPV',
           Purpose: 'Test purpose',
           CreationDate: new Date(),
-          Status: 'active',
+          Status: 'raising',
           ParentCompanyID: 'company-123',
           ComplianceStatus: 'Compliant'
         });
@@ -421,7 +421,7 @@ describe('SPV Model', () => {
         Name: longName,
         Purpose: 'Long-term investment vehicle',
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
@@ -440,7 +440,7 @@ describe('SPV Model', () => {
         Name: 'AI Investment SPV',
         Purpose: detailedPurpose,
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
@@ -461,7 +461,7 @@ describe('SPV Model', () => {
           Name: 'Date Test SPV',
           Purpose: 'Test purpose',
           CreationDate: date,
-          Status: 'active',
+          Status: 'raising',
           ParentCompanyID: 'company-123',
           ComplianceStatus: 'Compliant'
         });
@@ -478,7 +478,7 @@ describe('SPV Model', () => {
         Name: 'Test SPV',
         Purpose: 'Test purpose',
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
@@ -504,14 +504,14 @@ describe('SPV Model', () => {
 
     it('should call find correctly', async () => {
       const mockSPVs = [
-        { SPVID: 'spv-1', Name: 'SPV 1', Status: 'active' },
-        { SPVID: 'spv-2', Name: 'SPV 2', Status: 'active' }
+        { SPVID: 'spv-1', Name: 'SPV 1', Status: 'raising' },
+        { SPVID: 'spv-2', Name: 'SPV 2', Status: 'raising' }
       ];
       SPV.find.mockResolvedValue(mockSPVs);
 
-      const result = await SPV.find({ Status: 'active' });
+      const result = await SPV.find({ Status: 'raising' });
 
-      expect(SPV.find).toHaveBeenCalledWith({ Status: 'active' });
+      expect(SPV.find).toHaveBeenCalledWith({ Status: 'raising' });
       expect(result).toEqual(mockSPVs);
     });
 
@@ -531,9 +531,9 @@ describe('SPV Model', () => {
     it('should call countDocuments correctly', async () => {
       SPV.countDocuments.mockResolvedValue(5);
 
-      const count = await SPV.countDocuments({ Status: 'active' });
+      const count = await SPV.countDocuments({ Status: 'raising' });
 
-      expect(SPV.countDocuments).toHaveBeenCalledWith({ Status: 'active' });
+      expect(SPV.countDocuments).toHaveBeenCalledWith({ Status: 'raising' });
       expect(count).toBe(5);
     });
 
@@ -563,7 +563,7 @@ describe('SPV Model', () => {
         Name: 'Save Test SPV',
         Purpose: 'Testing save operation',
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
@@ -581,7 +581,7 @@ describe('SPV Model', () => {
         Name: 'Duplicate SPV',
         Purpose: 'Test purpose',
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       });
@@ -598,7 +598,7 @@ describe('SPV Model', () => {
         Name: 'Object Test SPV',
         Purpose: 'Testing toObject',
         CreationDate: new Date(),
-        Status: 'active',
+        Status: 'raising',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'Compliant'
       };
@@ -614,10 +614,11 @@ describe('SPV Model', () => {
     it('should handle complete SPV lifecycle', () => {
       const spvLifecycle = [
         { Status: 'draft', ComplianceStatus: 'PendingReview' },
-        { Status: 'pending', ComplianceStatus: 'PendingReview' },
-        { Status: 'active', ComplianceStatus: 'Compliant' },
-        { Status: 'closed', ComplianceStatus: 'Compliant' },
-        { Status: 'liquidated', ComplianceStatus: 'Compliant' }
+        { Status: 'in_review', ComplianceStatus: 'PendingReview' },
+        { Status: 'raising', ComplianceStatus: 'Compliant' },
+        { Status: 'closing', ComplianceStatus: 'Compliant' },
+        { Status: 'wired', ComplianceStatus: 'Compliant' },
+        { Status: 'canceled', ComplianceStatus: 'Compliant' }
       ];
 
       spvLifecycle.forEach(({ Status, ComplianceStatus }) => {
@@ -639,8 +640,8 @@ describe('SPV Model', () => {
     it('should handle multiple SPVs per company', async () => {
       const companyId = 'company-456';
       const spvs = [
-        { SPVID: 'spv-tech-1', Name: 'Tech Fund I', Status: 'active' },
-        { SPVID: 'spv-tech-2', Name: 'Tech Fund II', Status: 'pending' },
+        { SPVID: 'spv-tech-1', Name: 'Tech Fund I', Status: 'raising' },
+        { SPVID: 'spv-tech-2', Name: 'Tech Fund II', Status: 'in_review' },
         { SPVID: 'spv-real-estate', Name: 'Real Estate Fund', Status: 'draft' }
       ];
 
@@ -660,7 +661,7 @@ describe('SPV Model', () => {
         Name: 'Non-Compliant SPV',
         Purpose: 'Requires compliance review',
         CreationDate: new Date(),
-        Status: 'pending',
+        Status: 'in_review',
         ParentCompanyID: 'company-123',
         ComplianceStatus: 'NonCompliant'
       });

@@ -109,8 +109,8 @@ exports.createSPV = async (req, res) => {
       return res.status(400).json({ message: 'Missing required field: Name is required' });
     }
 
-    // Normalize status to lowercase for ZeroDB model
-    const normalizedStatus = Status ? Status.toLowerCase() : 'active';
+    // Normalize status — map legacy values to new lifecycle states
+    const normalizedStatus = SPV.normalizeStatus(Status || 'draft');
 
     // Validate enum values using model's valid statuses
     if (!SPV.VALID_STATUSES.includes(normalizedStatus)) {
@@ -148,6 +148,11 @@ exports.createSPV = async (req, res) => {
       Status: normalizedStatus,
       ParentCompanyID,
       ComplianceStatus: ComplianceStatus || 'PendingReview',
+      statusHistory: [{
+        status: normalizedStatus,
+        changedAt: new Date().toISOString(),
+        changedBy: req.user?.id || req.user?.userId || 'system'
+      }],
       ...extendedData
     });
 
@@ -242,8 +247,8 @@ exports.updateSPV = async (req, res) => {
       return res.status(400).json({ message: 'SPVID cannot be modified' });
     }
 
-    // Normalize and validate status
-    const normalizedStatus = Status ? Status.toLowerCase() : null;
+    // Normalize and validate status (map legacy values to new lifecycle states)
+    const normalizedStatus = Status ? SPV.normalizeStatus(Status) : null;
     if (normalizedStatus && !SPV.VALID_STATUSES.includes(normalizedStatus)) {
       return res.status(400).json({
         message: `Invalid status. Status must be one of: ${SPV.VALID_STATUSES.join(', ')}`
@@ -427,6 +432,103 @@ exports.deleteSPV = async (req, res) => {
     res.status(200).json({ message: 'SPV deleted successfully', deletedSPV });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete SPV', error: error.message });
+  }
+};
+
+/**
+ * Transition SPV status with lifecycle guards
+ * @route PUT /api/v1/spv/:id/status
+ * @param {string} req.params.id - SPV ID or row_id
+ * @param {Object} req.body - { status: 'in_review' }
+ * @returns {Object} JSON response with updated SPV or error message
+ */
+exports.transitionStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status: targetStatus } = req.body;
+
+    if (!targetStatus) {
+      return res.status(400).json({ message: 'Missing required field: status' });
+    }
+
+    // Look up the SPV
+    let spv = await SPV.findOne({ SPVID: id });
+    if (!spv && isValidId(id)) {
+      spv = await SPV.findById(id);
+    }
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    const currentStatus = spv.Status;
+
+    // Validate the transition is allowed
+    const transition = SPV.validateTransition(currentStatus, targetStatus);
+    if (!transition.valid) {
+      return res.status(400).json({ message: transition.reason });
+    }
+
+    // Guard: draft -> in_review requires wizard steps
+    if (currentStatus === 'draft' && targetStatus === 'in_review') {
+      const completedSteps = spv.wizardCompletedSteps || [];
+      const missing = SPV.REQUIRED_STEPS_FOR_REVIEW.filter(
+        step => !completedSteps.includes(step)
+      );
+      if (missing.length > 0) {
+        return res.status(400).json({
+          message: 'Cannot transition to in_review: missing required wizard steps',
+          missingSteps: missing
+        });
+      }
+    }
+
+    // Guard: in_review -> raising requires admin role
+    if (currentStatus === 'in_review' && targetStatus === 'raising') {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({
+          message: 'Only admin users can transition an SPV from in_review to raising'
+        });
+      }
+    }
+
+    // Build status history entry
+    const historyEntry = {
+      status: targetStatus,
+      changedAt: new Date().toISOString(),
+      changedBy: req.user?.id || req.user?.userId || 'unknown'
+    };
+
+    const statusHistory = Array.isArray(spv.statusHistory) ? [...spv.statusHistory, historyEntry] : [historyEntry];
+
+    const updateData = {
+      Status: targetStatus,
+      statusHistory,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Perform the update
+    let updatedSPV;
+    if (spv.SPVID) {
+      updatedSPV = await SPV.findOneAndUpdate(
+        { SPVID: spv.SPVID },
+        { $set: updateData },
+        { new: true }
+      );
+    } else {
+      updatedSPV = await SPV.findByIdAndUpdate(
+        spv.id || spv._id || spv.row_id,
+        { $set: updateData },
+        { new: true }
+      );
+    }
+
+    if (!updatedSPV) {
+      return res.status(500).json({ message: 'Failed to update SPV status' });
+    }
+
+    res.status(200).json(updatedSPV);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to transition SPV status', error: error.message });
   }
 };
 

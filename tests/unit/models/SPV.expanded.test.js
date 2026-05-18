@@ -28,7 +28,7 @@ describe('SPV Model - Expanded Fields (Issue #579)', () => {
                 SPVID: 'spv_abc',
                 Name: 'Test SPV',
                 Purpose: 'Investment vehicle',
-                Status: 'active',
+                Status: 'draft',
                 ComplianceStatus: 'Compliant',
                 ParentCompanyID: 'company_1',
                 ...overrides
@@ -39,7 +39,7 @@ describe('SPV Model - Expanded Fields (Issue #579)', () => {
     const minimalData = () => ({
         Name: 'Alpha SPV',
         Purpose: 'Series A investment',
-        Status: 'active',
+        Status: 'draft',
         ComplianceStatus: 'Compliant',
         ParentCompanyID: 'company_1'
     });

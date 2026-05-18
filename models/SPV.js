@@ -8,8 +8,31 @@
 const { createModel } = require('./base/ZeroDBModel');
 const { v4: uuidv4 } = require('uuid');
 
-// Valid status values
-const VALID_STATUSES = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+// Valid status values (lifecycle states for issue #580)
+const VALID_STATUSES = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
+
+// Map legacy status values to new lifecycle states
+const LEGACY_STATUS_MAP = {
+  active: 'raising',
+  inactive: 'draft',
+  dissolved: 'canceled',
+  pending: 'in_review',
+  closed: 'wired',
+  liquidated: 'canceled'
+};
+
+// Transition rules: key = current status, value = array of allowed next statuses
+const TRANSITION_RULES = {
+  draft: ['in_review', 'canceled'],
+  in_review: ['raising', 'draft', 'canceled'],
+  raising: ['closing', 'canceled'],
+  closing: ['wired', 'canceled'],
+  wired: ['canceled'],
+  canceled: []
+};
+
+// Steps required for draft -> in_review transition
+const REQUIRED_STEPS_FOR_REVIEW = ['terms', 'adviser', 'dataRoom', 'carry'];
 const VALID_COMPLIANCE_STATUSES = ['Compliant', 'NonCompliant', 'PendingReview'];
 
 // Enum constants for new fields
@@ -112,6 +135,9 @@ const spvSchema = {
     wizardStep: { type: 'number', default: 0 },
     wizardCompletedSteps: { type: 'array' },
 
+    // --- Status lifecycle (issue #580) ---
+    statusHistory: { type: 'array' }, // [{status, changedAt, changedBy}]
+
     createdAt: { type: 'date' },
     updatedAt: { type: 'date' }
 };
@@ -126,6 +152,9 @@ const SPV = {
     schema: spvSchema,
     validators,
     VALID_STATUSES,
+    LEGACY_STATUS_MAP,
+    TRANSITION_RULES,
+    REQUIRED_STEPS_FOR_REVIEW,
     VALID_COMPLIANCE_STATUSES,
     VALID_COMPANY_STAGES,
     VALID_INCORPORATION_TYPES,
@@ -134,6 +163,41 @@ const SPV = {
     VALID_INSTRUMENTS,
     VALID_VALUATIONS,
     VALID_ADVISER_TYPES,
+
+    /**
+     * Normalize a legacy status value to the new lifecycle status.
+     * Returns the status unchanged if it is already a valid lifecycle status.
+     * @param {string} status - Status value (possibly legacy)
+     * @returns {string} Normalized status
+     */
+    normalizeStatus(status) {
+        if (!status) return 'draft';
+        const lower = status.toLowerCase();
+        if (VALID_STATUSES.includes(lower)) return lower;
+        if (LEGACY_STATUS_MAP[lower]) return LEGACY_STATUS_MAP[lower];
+        return lower;
+    },
+
+    /**
+     * Validate whether a status transition is allowed.
+     * @param {string} fromStatus - Current status
+     * @param {string} toStatus - Desired status
+     * @returns {{ valid: boolean, reason?: string }}
+     */
+    validateTransition(fromStatus, toStatus) {
+        if (!VALID_STATUSES.includes(toStatus)) {
+            return { valid: false, reason: `Invalid target status '${toStatus}'. Must be one of: ${VALID_STATUSES.join(', ')}` };
+        }
+        // "any -> canceled" is always allowed
+        if (toStatus === 'canceled') {
+            return { valid: true };
+        }
+        const allowed = TRANSITION_RULES[fromStatus];
+        if (!allowed || !allowed.includes(toStatus)) {
+            return { valid: false, reason: `Transition from '${fromStatus}' to '${toStatus}' is not allowed` };
+        }
+        return { valid: true };
+    },
 
     /**
      * Create a new SPV with defaults and validation

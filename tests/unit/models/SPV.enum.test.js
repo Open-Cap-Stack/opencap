@@ -55,10 +55,10 @@ describe('SPV Model Status Enum Validation', () => {
     });
   });
 
-  describe('Status Enum Values', () => {
-    const expectedStatuses = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+  describe('Status Enum Values (Issue #580 lifecycle)', () => {
+    const expectedStatuses = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
 
-    it('should have status enum with all required values', () => {
+    it('should have status enum with all lifecycle values', () => {
       const enumValues = SPV.schema.Status.enum;
       expect(enumValues).toBeDefined();
       expect(Array.isArray(enumValues)).toBe(true);
@@ -68,7 +68,7 @@ describe('SPV Model Status Enum Validation', () => {
       });
     });
 
-    it('should use lowercase values for all statuses', () => {
+    it('should use lowercase/snake_case values for all statuses', () => {
       const enumValues = SPV.schema.Status.enum;
       enumValues.forEach(status => {
         expect(status).toBe(status.toLowerCase());
@@ -79,34 +79,27 @@ describe('SPV Model Status Enum Validation', () => {
       expect(SPV.schema.Status.enum).toContain('draft');
     });
 
-    it('should include liquidated status for liquidated SPVs', () => {
-      expect(SPV.schema.Status.enum).toContain('liquidated');
+    it('should include in_review status for SPVs under review', () => {
+      expect(SPV.schema.Status.enum).toContain('in_review');
     });
 
-    it('should have lowercase active instead of Active', () => {
-      expect(SPV.schema.Status.enum).toContain('active');
-      expect(SPV.schema.Status.enum).not.toContain('Active');
+    it('should include raising status for actively fundraising SPVs', () => {
+      expect(SPV.schema.Status.enum).toContain('raising');
     });
 
-    it('should have lowercase pending instead of Pending', () => {
-      expect(SPV.schema.Status.enum).toContain('pending');
-      expect(SPV.schema.Status.enum).not.toContain('Pending');
+    it('should include canceled status for terminated SPVs', () => {
+      expect(SPV.schema.Status.enum).toContain('canceled');
     });
 
-    it('should have lowercase closed instead of Closed', () => {
-      expect(SPV.schema.Status.enum).toContain('closed');
-      expect(SPV.schema.Status.enum).not.toContain('Closed');
-    });
-
-    it('should have exactly 5 status values', () => {
-      expect(SPV.schema.Status.enum.length).toBe(5);
+    it('should have exactly 6 status values', () => {
+      expect(SPV.schema.Status.enum.length).toBe(6);
     });
   });
 
   describe('Constants', () => {
     it('should export VALID_STATUSES', () => {
       expect(SPV.VALID_STATUSES).toBeDefined();
-      expect(SPV.VALID_STATUSES).toEqual(['active', 'draft', 'pending', 'closed', 'liquidated']);
+      expect(SPV.VALID_STATUSES).toEqual(['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled']);
     });
 
     it('should export VALID_COMPLIANCE_STATUSES', () => {
@@ -121,20 +114,22 @@ describe('SPV Model Status Enum Validation', () => {
     });
 
     it('should validate valid status values', () => {
-      expect(SPV.validators.isValidStatus('active')).toBe(true);
       expect(SPV.validators.isValidStatus('draft')).toBe(true);
-      expect(SPV.validators.isValidStatus('pending')).toBe(true);
-      expect(SPV.validators.isValidStatus('closed')).toBe(true);
-      expect(SPV.validators.isValidStatus('liquidated')).toBe(true);
+      expect(SPV.validators.isValidStatus('in_review')).toBe(true);
+      expect(SPV.validators.isValidStatus('raising')).toBe(true);
+      expect(SPV.validators.isValidStatus('closing')).toBe(true);
+      expect(SPV.validators.isValidStatus('wired')).toBe(true);
+      expect(SPV.validators.isValidStatus('canceled')).toBe(true);
     });
 
-    it('should reject uppercase Active status', () => {
-      expect(SPV.validators.isValidStatus('Active')).toBe(false);
+    it('should reject uppercase status values', () => {
+      expect(SPV.validators.isValidStatus('Draft')).toBe(false);
     });
 
-    it('should reject invalid status values', () => {
-      expect(SPV.validators.isValidStatus('archived')).toBe(false);
-      expect(SPV.validators.isValidStatus('invalid')).toBe(false);
+    it('should reject legacy status values (they must be normalized first)', () => {
+      expect(SPV.validators.isValidStatus('active')).toBe(false);
+      expect(SPV.validators.isValidStatus('pending')).toBe(false);
+      expect(SPV.validators.isValidStatus('closed')).toBe(false);
     });
 
     it('should validate valid compliance statuses', () => {
@@ -210,7 +205,7 @@ describe('SPV Model Status Enum Validation', () => {
 
     it('should have getValidStatuses method', () => {
       expect(typeof SPV.getValidStatuses).toBe('function');
-      expect(SPV.getValidStatuses()).toEqual(['active', 'draft', 'pending', 'closed', 'liquidated']);
+      expect(SPV.getValidStatuses()).toEqual(['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled']);
     });
 
     it('should have getValidComplianceStatuses method', () => {

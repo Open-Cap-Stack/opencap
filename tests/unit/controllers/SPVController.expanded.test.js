@@ -16,7 +16,7 @@ jest.mock('../../../models/SPV', () => ({
   findByIdAndUpdate: jest.fn(),
   findOneAndDelete: jest.fn(),
   findByIdAndDelete: jest.fn(),
-  VALID_STATUSES: ['active', 'draft', 'pending', 'closed', 'liquidated'],
+  VALID_STATUSES: ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'],
   VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview'],
   VALID_COMPANY_STAGES: ['pre-seed', 'seed', 'series-a', 'series-b', 'post-revenue', 'other'],
   VALID_INCORPORATION_TYPES: ['c-corp', 'llc', 's-corp', 'other'],
@@ -24,7 +24,19 @@ jest.mock('../../../models/SPV', () => ({
   VALID_TRANSACTION_TYPES: ['primary', 'secondary'],
   VALID_INSTRUMENTS: ['safe', 'convertible-note', 'preferred-equity', 'common-equity', 'other'],
   VALID_VALUATIONS: ['capped', 'uncapped'],
-  VALID_ADVISER_TYPES: ['platform-advisor', 'self-advised']
+  VALID_ADVISER_TYPES: ['platform-advisor', 'self-advised'],
+  LEGACY_STATUS_MAP: { active: 'raising', inactive: 'draft', dissolved: 'canceled', pending: 'in_review', closed: 'wired', liquidated: 'canceled' },
+  TRANSITION_RULES: { draft: ['in_review', 'canceled'], in_review: ['raising', 'draft', 'canceled'], raising: ['closing', 'canceled'], closing: ['wired', 'canceled'], wired: ['canceled'], canceled: [] },
+  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'dataRoom', 'carry'],
+  normalizeStatus: jest.fn((status) => {
+    if (!status) return 'draft';
+    const lower = status.toLowerCase();
+    const valid = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
+    if (valid.includes(lower)) return lower;
+    const map = { active: 'raising', inactive: 'draft', dissolved: 'canceled', pending: 'in_review', closed: 'wired', liquidated: 'canceled' };
+    return map[lower] || lower;
+  }),
+  validateTransition: jest.fn()
 }));
 
 const httpMocks = require('node-mocks-http');
@@ -39,7 +51,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
     Name: 'Test SPV',
     Purpose: 'Investment vehicle',
     CreationDate: '2024-01-15',
-    Status: 'Active',
+    Status: 'draft',
     ParentCompanyID: 'COMPANY001',
     ComplianceStatus: 'Compliant'
   };
@@ -70,7 +82,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
 
       req.body = { ...baseData, ...extFields };
       SPV.findOne.mockResolvedValue(null);
-      const mockSaved = { _id: 'spv123', ...baseData, Status: 'active', ...extFields };
+      const mockSaved = { _id: 'spv123', ...baseData, Status: 'draft', ...extFields };
       SPV.create.mockResolvedValue(mockSaved);
 
       await spvController.createSPV(req, res);
@@ -104,7 +116,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
 
       req.body = { ...baseData, ...termsFields };
       SPV.findOne.mockResolvedValue(null);
-      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'active', ...termsFields });
+      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'draft', ...termsFields });
 
       await spvController.createSPV(req, res);
 
@@ -146,7 +158,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
 
       req.body = { ...baseData, ...extFields };
       SPV.findOne.mockResolvedValue(null);
-      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'active', ...extFields });
+      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'draft', ...extFields });
 
       await spvController.createSPV(req, res);
 
@@ -243,7 +255,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
     it('should ignore non-whitelisted fields', async () => {
       req.body = { ...baseData, hackerField: 'malicious', __proto__: 'bad' };
       SPV.findOne.mockResolvedValue(null);
-      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'active' });
+      SPV.create.mockResolvedValue({ _id: 'spv123', ...baseData, Status: 'draft' });
 
       await spvController.createSPV(req, res);
 
@@ -354,12 +366,12 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
       req.params = { id: 'SPV001' };
       req.body = {
         Name: 'Renamed SPV',
-        Status: 'Closed',
+        Status: 'closing',
         totalRaised: 500000,
         lpCount: 12
       };
 
-      const mockUpdated = { _id: 'spv123', SPVID: 'SPV001', Name: 'Renamed SPV', Status: 'closed', totalRaised: 500000, lpCount: 12 };
+      const mockUpdated = { _id: 'spv123', SPVID: 'SPV001', Name: 'Renamed SPV', Status: 'closing', totalRaised: 500000, lpCount: 12 };
       SPV.findOneAndUpdate.mockResolvedValue(mockUpdated);
 
       await spvController.updateSPV(req, res);
@@ -370,7 +382,7 @@ describe('SPV Controller - Expanded Fields (Issue #579)', () => {
         {
           $set: expect.objectContaining({
             Name: 'Renamed SPV',
-            Status: 'closed',
+            Status: 'closing',
             totalRaised: 500000,
             lpCount: 12
           })

@@ -25,7 +25,7 @@ describe('SPV Model', () => {
                 SPVID: 'spv_abc',
                 Name: 'Test SPV',
                 Purpose: 'Investment vehicle',
-                Status: 'active',
+                Status: 'draft',
                 ComplianceStatus: 'Compliant',
                 ParentCompanyID: 'company_1',
                 ...overrides
@@ -90,14 +90,14 @@ describe('SPV Model', () => {
     // VALID_STATUSES enum
     // -------------------------------------------------------------------------
     describe('VALID_STATUSES', () => {
-        const expectedStatuses = ['active', 'draft', 'pending', 'closed', 'liquidated'];
+        const expectedStatuses = ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'];
 
         it('exposes VALID_STATUSES array', () => {
             expect(Array.isArray(SPV.VALID_STATUSES)).toBe(true);
         });
 
-        it('has exactly 5 valid statuses', () => {
-            expect(SPV.VALID_STATUSES).toHaveLength(5);
+        it('has exactly 6 valid statuses', () => {
+            expect(SPV.VALID_STATUSES).toHaveLength(6);
         });
 
         expectedStatuses.forEach(status => {
@@ -207,7 +207,7 @@ describe('SPV Model', () => {
         const minimalData = () => ({
             Name: 'Alpha SPV',
             Purpose: 'Series A investment',
-            Status: 'active',
+            Status: 'draft',
             ComplianceStatus: 'Compliant',
             ParentCompanyID: 'company_1'
         });
@@ -238,12 +238,12 @@ describe('SPV Model', () => {
         });
 
         it('throws when Name is missing', async () => {
-            const data = { Purpose: 'Test', Status: 'active', ComplianceStatus: 'Compliant', ParentCompanyID: 'c1' };
+            const data = { Purpose: 'Test', Status: 'draft', ComplianceStatus: 'Compliant', ParentCompanyID: 'c1' };
             await expect(SPV.create(data)).rejects.toThrow('Name is required');
         });
 
         it('throws when Purpose is missing', async () => {
-            const data = { Name: 'SPV', Status: 'active', ComplianceStatus: 'Compliant', ParentCompanyID: 'c1' };
+            const data = { Name: 'SPV', Status: 'draft', ComplianceStatus: 'Compliant', ParentCompanyID: 'c1' };
             await expect(SPV.create(data)).rejects.toThrow('Purpose is required');
         });
 
@@ -309,9 +309,9 @@ describe('SPV Model', () => {
     describe('findByStatus()', () => {
         it('returns results for valid status', async () => {
             zerodbService.queryTable.mockResolvedValue({
-                data: [{ row_id: 'r1', row_data: { SPVID: 's1', Status: 'active' } }]
+                data: [{ row_id: 'r1', row_data: { SPVID: 's1', Status: 'draft' } }]
             });
-            const results = await SPV.findByStatus('active');
+            const results = await SPV.findByStatus('draft');
             expect(Array.isArray(results)).toBe(true);
         });
 
@@ -368,7 +368,7 @@ describe('SPV Model', () => {
                 data: [{ row_data: { SPVID: 'spv_abc' } }]
             });
             zerodbService.updateRows.mockResolvedValue({ modifiedCount: 1 });
-            const result = await SPV.updateStatus('spv_abc', 'closed');
+            const result = await SPV.updateStatus('spv_abc', 'wired');
             expect(result).toBeDefined();
         });
     });
