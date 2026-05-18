@@ -84,6 +84,63 @@ function fmt$(n) { return n != null ? `$${Number(n).toLocaleString()}` : '—'; 
 function fmtPct(n) { return n != null ? `${Number(n).toFixed(1)}%` : '—'; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'; }
 
+// ─── Cover Letter Page ────────────────────────────────────────────────────────
+function addCoverLetterPage(doc, { company, effDate, fmv, sig }) {
+  doc.addPage({ margin: 0 });
+  addPageHeader(doc, 'Cover Letter');
+
+  const letterDate = fmtDate(new Date());
+  const reviewer = sig ? sig.signerEmail : 'Pending Accountant Review';
+
+  doc.y = 70;
+  doc.font('Helvetica').fontSize(10).fillColor(DARK).text(letterDate, 40, doc.y);
+  doc.moveDown(1);
+  doc.font('Helvetica-Bold').fontSize(10).text('Board of Directors', 40, doc.y);
+  doc.font('Helvetica').fontSize(10).text(company, 40, doc.y + 14);
+  doc.y += 28;
+  doc.moveDown(1);
+
+  doc.font('Helvetica-Bold').fontSize(10)
+     .text(`Re: IRC Section 409A Valuation of Common Stock — ${company} — Effective ${effDate}`, 40, doc.y, { width: doc.page.width - 80 });
+  doc.moveDown(1);
+
+  doc.font('Helvetica').fontSize(10).fillColor(DARK)
+     .text(`Dear Members of the Board,`, 40, doc.y);
+  doc.moveDown(0.8);
+
+  doc.text(
+    `We have prepared this report at the request of ${company} management to provide an independent opinion of the fair market value (FMV) of the common stock of ${company} (the "Company") as of ${effDate} for purposes of compliance with Section 409A of the Internal Revenue Code and Treasury Regulation §1.409A-1(b)(5).`,
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(0.8);
+
+  // Bold FMV inline
+  doc.text('Based on our analysis, it is our opinion that the FMV of a single share of the Company\'s common stock as of ', 40, doc.y, { continued: true, width: doc.page.width - 80 });
+  doc.text(`${effDate} is `, { continued: true });
+  doc.font('Helvetica-Bold').text(`$${Number(fmv).toFixed(4)}`, { continued: true });
+  doc.font('Helvetica').text('.');
+  doc.moveDown(0.8);
+
+  doc.text(
+    'This report contains our analysis supporting this conclusion, including an assessment of the Company\'s business, financial condition, and prospects, as well as an evaluation using the Hybrid Discounted Cash Flow, Option Pricing Model, and Market Comparable methodologies.',
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(0.8);
+
+  doc.text(
+    'This report is intended solely for use by the Board of Directors in connection with the grant of stock options and other equity awards under IRC Section 409A. It should not be used for any other purpose.',
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(1.5);
+
+  doc.text('Respectfully submitted,', 40, doc.y);
+  doc.moveDown(0.4);
+  doc.font('Helvetica-Bold').text('OpenCap Stack AI Valuation Platform', 40, doc.y);
+  doc.moveDown(0.3);
+  doc.font('Helvetica').fillColor(GRAY).text(reviewer, 40, doc.y);
+  doc.fillColor(DARK);
+}
+
 // ─── Main Generator ───────────────────────────────────────────────────────────
 async function generatePDF(valuationId) {
   // Fetch valuation
@@ -141,6 +198,9 @@ async function generatePDF(valuationId) {
          .text(`Reviewed and approved by: ${sig.signerEmail}`, { align: 'center' });
     }
     doc.fillColor(DARK); // reset
+
+    // ── COVER LETTER ──────────────────────────────────────────────────────────
+    addCoverLetterPage(doc, { company, effDate, fmv, sig });
 
     // ── EXECUTIVE SUMMARY ─────────────────────────────────────────────────────
     doc.addPage({ margin: 0 });
