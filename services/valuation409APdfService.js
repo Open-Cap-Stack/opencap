@@ -84,6 +84,63 @@ function fmt$(n) { return n != null ? `$${Number(n).toLocaleString()}` : '—'; 
 function fmtPct(n) { return n != null ? `${Number(n).toFixed(1)}%` : '—'; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'; }
 
+// ─── Cover Letter Page ────────────────────────────────────────────────────────
+function addCoverLetterPage(doc, { company, effDate, fmv, sig }) {
+  doc.addPage({ margin: 0 });
+  addPageHeader(doc, 'Cover Letter');
+
+  const letterDate = fmtDate(new Date());
+  const reviewer = sig ? sig.signerEmail : 'Pending Accountant Review';
+
+  doc.y = 70;
+  doc.font('Helvetica').fontSize(10).fillColor(DARK).text(letterDate, 40, doc.y);
+  doc.moveDown(1);
+  doc.font('Helvetica-Bold').fontSize(10).text('Board of Directors', 40, doc.y);
+  doc.font('Helvetica').fontSize(10).text(company, 40, doc.y + 14);
+  doc.y += 28;
+  doc.moveDown(1);
+
+  doc.font('Helvetica-Bold').fontSize(10)
+     .text(`Re: IRC Section 409A Valuation of Common Stock — ${company} — Effective ${effDate}`, 40, doc.y, { width: doc.page.width - 80 });
+  doc.moveDown(1);
+
+  doc.font('Helvetica').fontSize(10).fillColor(DARK)
+     .text(`Dear Members of the Board,`, 40, doc.y);
+  doc.moveDown(0.8);
+
+  doc.text(
+    `We have prepared this report at the request of ${company} management to provide an independent opinion of the fair market value (FMV) of the common stock of ${company} (the "Company") as of ${effDate} for purposes of compliance with Section 409A of the Internal Revenue Code and Treasury Regulation §1.409A-1(b)(5).`,
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(0.8);
+
+  // Bold FMV inline
+  doc.text('Based on our analysis, it is our opinion that the FMV of a single share of the Company\'s common stock as of ', 40, doc.y, { continued: true, width: doc.page.width - 80 });
+  doc.text(`${effDate} is `, { continued: true });
+  doc.font('Helvetica-Bold').text(`$${Number(fmv).toFixed(4)}`, { continued: true });
+  doc.font('Helvetica').text('.');
+  doc.moveDown(0.8);
+
+  doc.text(
+    'This report contains our analysis supporting this conclusion, including an assessment of the Company\'s business, financial condition, and prospects, as well as an evaluation using the Hybrid Discounted Cash Flow, Option Pricing Model, and Market Comparable methodologies.',
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(0.8);
+
+  doc.text(
+    'This report is intended solely for use by the Board of Directors in connection with the grant of stock options and other equity awards under IRC Section 409A. It should not be used for any other purpose.',
+    40, doc.y, { width: doc.page.width - 80, align: 'justify' }
+  );
+  doc.moveDown(1.5);
+
+  doc.text('Respectfully submitted,', 40, doc.y);
+  doc.moveDown(0.4);
+  doc.font('Helvetica-Bold').text('OpenCap Stack AI Valuation Platform', 40, doc.y);
+  doc.moveDown(0.3);
+  doc.font('Helvetica').fillColor(GRAY).text(reviewer, 40, doc.y);
+  doc.fillColor(DARK);
+}
+
 // ─── Main Generator ───────────────────────────────────────────────────────────
 async function generatePDF(valuationId) {
   // Fetch valuation
@@ -141,6 +198,9 @@ async function generatePDF(valuationId) {
          .text(`Reviewed and approved by: ${sig.signerEmail}`, { align: 'center' });
     }
     doc.fillColor(DARK); // reset
+
+    // ── COVER LETTER ──────────────────────────────────────────────────────────
+    addCoverLetterPage(doc, { company, effDate, fmv, sig });
 
     // ── EXECUTIVE SUMMARY ─────────────────────────────────────────────────────
     doc.addPage({ margin: 0 });
@@ -260,6 +320,27 @@ async function generatePDF(valuationId) {
       if (opm.fmvPerShare != null) addKVRow(doc, 'FMV Per Share (pre-DLOM)', `$${Number(opm.fmvPerShare).toFixed(4)}`);
       if (opm.adjustedFmvPerShare != null) addKVRow(doc, 'FMV Per Share (post-DLOM)', `$${Number(opm.adjustedFmvPerShare).toFixed(4)}`);
     }
+
+    // ── DLOM ANALYSIS ─────────────────────────────────────────────────────────
+    doc.addPage({ margin: 0 });
+    addPageHeader(doc, 'DLOM Analysis');
+    addSectionHeader(doc, 'Discount for Lack of Marketability (DLOM)');
+    addBodyText(doc, report.dlomNarrative || 'DLOM analysis is incorporated within the DCF and OPM methodologies above. The discount reflects the illiquidity of minority interests in private company common stock.');
+
+    doc.moveDown(0.3);
+    addSectionHeader(doc, 'DLOM Summary');
+
+    const dcfDlom = val.aiDCFResult?.dlom;
+    const opmDlom = val.aiOPMResult?.dlom;
+
+    if (dcfDlom != null) addKVRow(doc, 'DCF DLOM Applied', fmtPct(dcfDlom * 100));
+    if (opmDlom != null) addKVRow(doc, 'OPM DLOM Applied', fmtPct(opmDlom * 100));
+    if (dcfDlom != null && opmDlom != null) {
+      addKVRow(doc, 'Blended DLOM (average)', fmtPct(((dcfDlom + opmDlom) / 2) * 100));
+    }
+    addKVRow(doc, 'Methodology', 'Restricted Stock Studies / QMDM');
+    doc.moveDown(0.3);
+    addBodyText(doc, 'Common stock holders in private companies lack the ability to freely transfer shares, register for public sale, or force a liquidity event. This illiquidity discount is a required adjustment under IRC \u00a71.409A-1(b)(5) and is supported by empirical studies of restricted stock transactions.');
 
     // ── RISK FACTORS ──────────────────────────────────────────────────────────
     if (report.riskFactors) {
