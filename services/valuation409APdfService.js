@@ -346,9 +346,33 @@ async function generatePDF(valuationId, capTableData = {}) {
       doc.moveDown(0.3);
       addTable(
         doc,
-        ['Company', 'Public?', 'Rev Multiple', 'Industry'],
-        comps.map(c => [c.companyName, c.isPublic ? 'Yes' : 'No', `${c.revenueMultiple}x`, c.industry])
+        ['Company', 'Ticker', 'Public?', 'Industry', 'Rev Mult', 'EBITDA Mult', 'Growth'],
+        comps.map(c => [
+          c.companyName,
+          c.ticker || '—',
+          c.isPublic ? 'Yes' : 'No',
+          c.industry || '—',
+          c.revenueMultiple != null ? `${c.revenueMultiple}x` : '—',
+          c.ebitdaMultiple != null ? `${c.ebitdaMultiple}x` : '—',
+          c.revenueGrowthRate != null ? fmtPct(Number(c.revenueGrowthRate) * 100) : '—'
+        ])
       );
+
+      // Selection rationale
+      const withRationale = comps.filter(c => c.selectionRationale);
+      if (withRationale.length > 0) {
+        doc.moveDown(0.3);
+        addSectionHeader(doc, 'Selection Rationale');
+        withRationale.forEach(c => {
+          const y = doc.y;
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(DARK)
+             .text(`${c.companyName}: `, 40, y, { continued: true, width: doc.page.width - 80 });
+          doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+             .text(c.selectionRationale, { width: doc.page.width - 80 });
+          doc.moveDown(0.2);
+        });
+        doc.fillColor(DARK);
+      }
     }
 
     // ── DCF ANALYSIS ──────────────────────────────────────────────────────────

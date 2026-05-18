@@ -104,7 +104,8 @@ Return a JSON object with this exact structure:
       "rationale": "why this company is comparable (2-3 sentences)",
       "revenueMultiple": number,
       "ebitdaMultiple": number or null,
-      "revenueGrowthRate": number or null
+      "revenueGrowthRate": number or null,
+      "selectionRationale": "one sentence explaining why this company is comparable to the subject"
     }
   ],
   "selectedMultiple": number,
