@@ -25,6 +25,7 @@ import { financialReportTools } from './tools/financialReports.js';
 import { equityGrantTools } from './tools/equityGrants.js';
 import { metaTools } from './tools/meta.js';
 import { type ToolDefinition } from './types.js';
+import { formatMcpError } from './errors.js';
 
 const ALL_TOOLS: ToolDefinition[] = [
   ...metaTools,
@@ -44,7 +45,7 @@ export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '1.6.0',
+      version: '1.8.0',
     },
     {
       capabilities: {
@@ -80,9 +81,8 @@ export function createServer(client: AxiosInstance): Server {
       const result = await tool.handler(parsed, client);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       return {
-        content: [{ type: 'text', text: `Tool error: ${message}` }],
+        content: [{ type: 'text', text: `Tool error: ${formatMcpError(error)}` }],
         isError: true,
       };
     }

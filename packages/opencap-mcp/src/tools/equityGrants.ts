@@ -7,7 +7,7 @@ export const equityGrantTools: ToolDefinition[] = [
     name: 'list_equity_grants',
     description:
       'List all equity grants (options, RSAs, RSUs, etc.) for a company. ' +
-      'Use the `grantId` field from results for follow-up operations, not the `_id` field.',
+      'The ID field to use in follow-up get/update calls is `grantId`, not `_id`.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
       limit: coerceInt('Max results to return').optional().default(50),
@@ -71,14 +71,15 @@ export const equityGrantTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/equity-grants', input);
-      const id = created.grantId ?? created.row_id ?? created._id;
+      const id = created?.data?.grantId ?? created?.grantId ?? created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/equity-grants/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Equity grant created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Equity grant created and confirmed:\ngrantId: ${record.grantId ?? id}\nstatus: ${record.status ?? 'unknown'}\ncompanyId: ${record.companyId ?? input.companyId}\nemployeeId: ${record.employeeId ?? input.employeeId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -87,7 +88,7 @@ export const equityGrantTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Equity grant created (could not confirm persisted state — verify with get_equity_grant):\n${JSON.stringify(created, null, 2)}`,
+              text: `Equity grant created (note: could not confirm persisted state — verify with get_equity_grant):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };
@@ -109,17 +110,15 @@ export const equityGrantTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { id, ...body } = input;
-      const { data: updated } = await client.patch(
-        `/api/v1/equity-grants/${id}/status`,
-        body
-      );
+      await client.patch(`/api/v1/equity-grants/${id}/status`, body);
       try {
         const { data: confirmed } = await client.get(`/api/v1/equity-grants/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Equity grant updated:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Equity grant updated and confirmed:\ngrantId: ${record.grantId ?? id}\nstatus: ${record.status ?? input.status}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -128,7 +127,7 @@ export const equityGrantTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Equity grant updated (could not confirm persisted state — verify with get_equity_grant):\n${JSON.stringify(updated, null, 2)}`,
+              text: `Equity grant updated (note: could not confirm persisted state — verify with get_equity_grant):\nID: ${id}`,
             },
           ],
         };

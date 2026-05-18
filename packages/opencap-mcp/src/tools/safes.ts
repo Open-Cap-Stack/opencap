@@ -6,7 +6,8 @@ export const safeTools: ToolDefinition[] = [
   {
     name: 'list_safes',
     description:
-      'List all SAFE (Simple Agreement for Future Equity) instruments in the cap table.',
+      'List all SAFE (Simple Agreement for Future Equity) instruments in the cap table. ' +
+      'The ID field to use in follow-up get/update calls is `safeId` (e.g. `safe_xxx`), not `_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       investorId: z.string().optional().describe('Filter by investor stakeholder ID'),
@@ -53,14 +54,15 @@ export const safeTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/safes', input);
-      const id = created.safeId ?? created.row_id ?? created._id;
+      const id = created?.data?.safeId ?? created?.safeId ?? created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/safes/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `SAFE created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `SAFE created and confirmed:\nsafeId: ${record.safeId ?? id}\nstatus: ${record.status ?? 'unknown'}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -69,7 +71,7 @@ export const safeTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `SAFE created (could not confirm persisted state — verify with get_safe):\n${JSON.stringify(created, null, 2)}`,
+              text: `SAFE created (note: could not confirm persisted state — verify with get_safe):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };
@@ -79,13 +81,20 @@ export const safeTools: ToolDefinition[] = [
   {
     name: 'update_safe',
     description:
-      'Update an existing SAFE instrument (e.g. record conversion). Use the `safeId` field (e.g. `safe_xxx`) from `list_safes`, not the `_id` field.',
+      'Update an existing SAFE instrument (e.g. change status, record conversion). ' +
+      'Use the `safeId` field (e.g. `safe_xxx`) from `list_safes`, not the `_id` field. ' +
+      'When `status` is provided, uses the dedicated status-transition endpoint (PATCH /safes/:id/status). ' +
+      'Non-status fields use the generic PUT endpoint.',
     inputSchema: z.object({
       id: z.string().describe('SAFE ID — use the `safeId` field from list_safes, not `_id`'),
       status: z
-        .enum(['open', 'converted', 'cancelled'])
+        .enum(['draft', 'sent', 'fully_signed', 'funded', 'converted', 'cancelled', 'expired'])
         .optional()
-        .describe('Current status of the SAFE'),
+        .describe('New status for the SAFE (uses dedicated status-transition endpoint)'),
+      reason: z
+        .string()
+        .optional()
+        .describe('Reason for the status change (used only when status is provided)'),
       conversionDate: z
         .string()
         .optional()
@@ -97,15 +106,28 @@ export const safeTools: ToolDefinition[] = [
       convertedShares: coerceInt('Number of shares issued upon conversion').optional(),
     }),
     handler: async (input, client) => {
-      const { id, ...body } = input;
-      const { data: updated } = await client.put(`/api/v1/safes/${id}`, body);
+      const { id, status, reason, ...rest } = input;
+
+      // If status is provided, use the dedicated status-transition endpoint
+      if (status) {
+        await client.patch(`/api/v1/safes/${id}/status`, { status, reason });
+      }
+
+      // If there are non-status fields to update, use the generic PUT endpoint
+      const hasNonStatusFields = Object.keys(rest).length > 0;
+      if (hasNonStatusFields) {
+        await client.put(`/api/v1/safes/${id}`, rest);
+      }
+
+      // Always re-fetch to return confirmed persisted state
       try {
         const { data: confirmed } = await client.get(`/api/v1/safes/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `SAFE updated:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `SAFE updated and confirmed:\nsafeId: ${record.safeId ?? id}\nstatus: ${record.status ?? 'unknown'}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -114,7 +136,7 @@ export const safeTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `SAFE updated (could not confirm persisted state — verify with get_safe):\n${JSON.stringify(updated, null, 2)}`,
+              text: `SAFE updated (note: could not confirm persisted state — verify with get_safe):\nID: ${id}`,
             },
           ],
         };
