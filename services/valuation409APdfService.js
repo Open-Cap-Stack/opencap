@@ -272,10 +272,12 @@ async function generatePDF(valuationId) {
          .text('Pending accountant review and sign-off.', 40, doc.y);
     }
 
-    // ── PAGE NUMBERS ──────────────────────────────────────────────────────────
+    // ── PAGE NUMBERS & CONFIDENTIAL FOOTER ─────────────────────────────────
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
+      doc.fillColor(GRAY).font('Helvetica').fontSize(7)
+         .text('CONFIDENTIAL \u2014 IRC Section 409A Valuation Report', 40, doc.page.height - 42, { width: doc.page.width - 80, align: 'center' });
       doc.fillColor(GRAY).font('Helvetica').fontSize(8)
          .text(`Page ${i + 1} of ${totalPages}`, 40, doc.page.height - 30, { width: doc.page.width - 80, align: 'center' });
     }
