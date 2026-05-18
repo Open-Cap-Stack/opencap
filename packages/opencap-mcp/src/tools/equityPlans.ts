@@ -6,7 +6,8 @@ export const equityPlanTools: ToolDefinition[] = [
   {
     name: 'list_equity_plans',
     description:
-      'List all equity plans (stock option plans, RSU plans, etc.) in the company.',
+      'List all equity plans (stock option plans, RSU plans, etc.) in the company. ' +
+      'The ID field to use in follow-up get calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       limit: coerceInt('Max results to return').optional().default(50),

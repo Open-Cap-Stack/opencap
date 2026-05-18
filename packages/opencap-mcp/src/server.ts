@@ -25,6 +25,7 @@ import { financialReportTools } from './tools/financialReports.js';
 import { equityGrantTools } from './tools/equityGrants.js';
 import { metaTools } from './tools/meta.js';
 import { type ToolDefinition } from './types.js';
+import { formatMcpError } from './errors.js';
 
 const ALL_TOOLS: ToolDefinition[] = [
   ...metaTools,
@@ -44,7 +45,7 @@ export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '1.6.0',
+      version: '1.7.0',
     },
     {
       capabilities: {

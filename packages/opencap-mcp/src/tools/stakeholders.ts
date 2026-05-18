@@ -6,7 +6,8 @@ export const stakeholderTools: ToolDefinition[] = [
   {
     name: 'list_stakeholders',
     description:
-      'List all stakeholders in the cap table. Returns name, email, role, and ownership details.',
+      'List all stakeholders in the cap table. Returns name, email, role, and ownership details. ' +
+      'The ID field to use in follow-up get/update calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       limit: coerceInt('Max results to return').optional().default(50),

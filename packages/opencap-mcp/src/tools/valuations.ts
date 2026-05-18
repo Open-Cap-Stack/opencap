@@ -19,7 +19,9 @@ export const valuationTools: ToolDefinition[] = [
   },
   {
     name: 'get_valuation_history',
-    description: 'Get the historical valuation timeline for the company.',
+    description:
+      'Get the historical valuation timeline for the company. ' +
+      'The ID field to use in follow-up calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
       limit: coerceInt('Max results to return').optional().default(20),

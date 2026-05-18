@@ -6,7 +6,8 @@ export const shareClassTools: ToolDefinition[] = [
   {
     name: 'list_share_classes',
     description:
-      'List all share classes defined in the cap table (e.g. Common, Series A Preferred).',
+      'List all share classes defined in the cap table (e.g. Common, Series A Preferred). ' +
+      'The ID field to use in follow-up get calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       limit: coerceInt('Max results to return').optional().default(50),

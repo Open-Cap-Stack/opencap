@@ -7,7 +7,7 @@ export const equityGrantTools: ToolDefinition[] = [
     name: 'list_equity_grants',
     description:
       'List all equity grants (options, RSAs, RSUs, etc.) for a company. ' +
-      'Use the `grantId` field from results for follow-up operations, not the `_id` field.',
+      'The ID field to use in follow-up get/update calls is `grantId`, not `_id`.',
     inputSchema: z.object({
       companyId: z.string().describe('Company ID'),
       limit: coerceInt('Max results to return').optional().default(50),

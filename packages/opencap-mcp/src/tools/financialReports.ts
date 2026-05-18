@@ -6,7 +6,8 @@ export const financialReportTools: ToolDefinition[] = [
   {
     name: 'list_financial_reports',
     description:
-      'List all financial reports (equity summaries, cap table snapshots, tax reports, etc.).',
+      'List all financial reports (equity summaries, cap table snapshots, tax reports, etc.). ' +
+      'The ID field to use in follow-up get calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       reportType: z

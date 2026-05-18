@@ -6,7 +6,8 @@ export const documentTools: ToolDefinition[] = [
   {
     name: 'list_documents',
     description:
-      'List documents stored in OpenCap (shareholder agreements, option grants, board consents, etc.).',
+      'List documents stored in OpenCap (shareholder agreements, option grants, board consents, etc.). ' +
+      'The ID field to use in follow-up get calls is `row_id`.',
     inputSchema: z.object({
       companyId: z.string().optional().describe('Filter by company ID'),
       documentType: z
@@ -36,9 +37,11 @@ export const documentTools: ToolDefinition[] = [
   },
   {
     name: 'get_document',
-    description: 'Get metadata and details for a specific document by ID.',
+    description:
+      'Get metadata and details for a specific document by ID. ' +
+      'Use the `row_id` field from `list_documents`, not the `_id` field.',
     inputSchema: z.object({
-      id: z.string().describe('Document ID'),
+      id: z.string().describe('Document ID — use the `row_id` field from list_documents, not `_id`'),
     }),
     handler: async (input, client) => {
       const { data } = await client.get(`/api/v1/documents/${input.id}`);
