@@ -45,14 +45,15 @@ export const stakeholderTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/stakeholders', input);
-      const id = created.row_id ?? created._id;
+      const id = created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/stakeholders/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Stakeholder created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Stakeholder created and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? input.name}\nrole: ${record.role ?? input.role}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -61,7 +62,7 @@ export const stakeholderTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Stakeholder created (could not confirm persisted state — verify with get_stakeholder):\n${JSON.stringify(created, null, 2)}`,
+              text: `Stakeholder created (note: could not confirm persisted state — verify with get_stakeholder):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };
@@ -83,14 +84,15 @@ export const stakeholderTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { id, ...body } = input;
-      const { data: updated } = await client.put(`/api/v1/stakeholders/${id}`, body);
+      await client.put(`/api/v1/stakeholders/${id}`, body);
       try {
         const { data: confirmed } = await client.get(`/api/v1/stakeholders/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Stakeholder updated:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Stakeholder updated and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? 'unknown'}\nrole: ${record.role ?? 'unknown'}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -99,7 +101,7 @@ export const stakeholderTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Stakeholder updated (could not confirm persisted state — verify with get_stakeholder):\n${JSON.stringify(updated, null, 2)}`,
+              text: `Stakeholder updated (note: could not confirm persisted state — verify with get_stakeholder):\nID: ${id}`,
             },
           ],
         };

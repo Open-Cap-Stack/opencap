@@ -7,6 +7,7 @@ jest.mock('axios', () => {
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     interceptors: {
       response: { use: jest.fn() },
     },
@@ -79,9 +80,46 @@ describe('ALL_TOOLS registry', () => {
     expect(toolNames).toContain('create_financial_report');
   });
 
+  it('contains all meta tools', () => {
+    expect(toolNames).toContain('whoami');
+    expect(toolNames).toContain('list_workflows');
+    expect(toolNames).toContain('cap_table_summary');
+  });
+
+  it('contains all equity grant tools', () => {
+    expect(toolNames).toContain('list_equity_grants');
+    expect(toolNames).toContain('get_equity_grant');
+    expect(toolNames).toContain('create_equity_grant');
+    expect(toolNames).toContain('update_equity_grant');
+    expect(toolNames).toContain('get_vesting_schedule');
+  });
+
   it('has no duplicate tool names', () => {
     const unique = new Set(toolNames);
     expect(unique.size).toBe(toolNames.length);
+  });
+});
+
+describe('list_workflows tool', () => {
+  it('returns workflow recipes with description and steps', async () => {
+    const tool = ALL_TOOLS.find((t) => t.name === 'list_workflows')!;
+    const result = await tool.handler({}, {} as any);
+    const text = result.content[0].type === 'text' ? result.content[0].text : '';
+    const workflows = JSON.parse(text);
+
+    expect(workflows.add_advisor_with_equity).toBeDefined();
+    expect(workflows.add_advisor_with_equity.description).toBeTruthy();
+    expect(workflows.add_advisor_with_equity.steps).toHaveLength(3);
+    expect(workflows.add_advisor_with_equity.steps[0].tool).toBe('create_stakeholder');
+    expect(workflows.add_advisor_with_equity.steps[0].notes).toBeTruthy();
+
+    expect(workflows.record_safe_round).toBeDefined();
+    expect(workflows.record_safe_round.description).toBeTruthy();
+    expect(workflows.record_safe_round.steps).toHaveLength(2);
+
+    expect(workflows.request_409a_valuation).toBeDefined();
+    expect(workflows.request_409a_valuation.description).toBeTruthy();
+    expect(workflows.request_409a_valuation.steps).toHaveLength(2);
   });
 });
 

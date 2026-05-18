@@ -286,6 +286,40 @@ exports.releaseToCompany = async (req, res) => {
       $set: { status: 'released', releasedToCompanyAt: now, releasedBy: req.user.userId, updatedAt: now }
     });
 
+    // Fire Stripe transfer to accountant (best-effort — do not block release)
+    const queueItem = await AccountantQueue.findOne({ valuationId: val.valuationId || valuationId });
+    try {
+      if (queueItem?.assignedAccountantId && stripeService.isConfigured()) {
+        const accountant = await User.findOne({ userId: queueItem.assignedAccountantId });
+        if (accountant?.stripeConnectAccountId) {
+          const stripe = stripeService.getStripe();
+          const transfer = await stripe.transfers.create({
+            amount: 24975,
+            currency: 'usd',
+            destination: accountant.stripeConnectAccountId,
+            description: `409A review fee — valuation ${val.valuationId || valuationId}`,
+            metadata: { valuationId: val.valuationId || valuationId, accountantUserId: queueItem.assignedAccountantId },
+          });
+          // Log the transfer
+          const TransferLog = require('../models/TransferLog');
+          await TransferLog.create({
+            transferId: uuidv4(),
+            valuationId: val.valuationId || valuationId,
+            queueId: queueItem.queueId,
+            accountantUserId: queueItem.assignedAccountantId,
+            stripeTransferId: transfer.id,
+            amount: 24975,
+            currency: 'usd',
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (transferErr) {
+      console.warn('[Release] Stripe transfer failed:', transferErr.message);
+    }
+
     // Email the requesting user (best-effort)
     try {
       const requester = await User.findOne({ userId: val.requestedBy });
@@ -431,6 +465,20 @@ exports.listAccountants = async (req, res) => {
     }
     const accountants = await User.find({ role: 'accountant' });
     res.json({ success: true, data: accountants });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ─── Transfer History ────────────────────────────────────────────────────────
+
+exports.getTransferHistory = async (req, res) => {
+  try {
+    const TransferLog = require('../models/TransferLog');
+    const { userId, role } = req.user;
+    const filter = role === 'admin' ? {} : { accountantUserId: userId };
+    const logs = await TransferLog.find(filter, { sort: { createdAt: -1 } });
+    res.json({ success: true, data: logs });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

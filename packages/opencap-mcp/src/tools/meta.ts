@@ -23,87 +23,76 @@ export const metaTools: ToolDefinition[] = [
   {
     name: 'list_workflows',
     description:
-      'Get step-by-step workflow guides for common cap table operations. ' +
-      'Call this when you are unsure what tools to use or in what order.',
+      'Returns step-by-step workflow recipes for common cap table operations. ' +
+      'Call this first when starting a new task.',
     inputSchema: z.object({}),
     handler: async () => {
       const workflows = {
-        add_advisor_with_equity: [
-          {
-            step: 1,
-            tool: 'create_stakeholder',
-            required: ['name', 'email', 'role: advisor', 'companyId'],
-          },
-          {
-            step: 2,
-            tool: 'create_equity_plan',
-            note: 'Skip if plan exists — use list_equity_plans first',
-            required: ['name', 'planType: NSO', 'sharesReserved', 'companyId'],
-          },
-          {
-            step: 3,
-            tool: 'create_equity_grant',
-            required: [
-              'companyId',
-              'employeeId: <stakeholder row_id>',
-              'equityPlanId: <plan row_id>',
-              'grantType: NSO',
-              'numberOfShares',
-              'grantDate',
-            ],
-          },
-        ],
-        record_safe_investment: [
-          {
-            step: 1,
-            tool: 'create_stakeholder',
-            note: 'Skip if investor exists — use list_stakeholders first',
-            required: ['name', 'email', 'role: investor', 'companyId'],
-          },
-          {
-            step: 2,
-            tool: 'create_safe',
-            required: [
-              'investmentAmount',
-              'safeType',
-              'investorId: <stakeholder row_id>',
-              'companyId',
-              'investmentDate',
-            ],
-          },
-        ],
-        set_up_share_classes: [
-          {
-            step: 1,
-            tool: 'create_share_class',
-            note: 'Common stock first',
-            required: ['name: Common', 'classType: common', 'authorizedShares', 'companyId'],
-          },
-          {
-            step: 2,
-            tool: 'create_share_class',
-            note: 'Preferred if needed',
-            required: [
-              'name: Series A Preferred',
-              'classType: preferred',
-              'authorizedShares',
-              'companyId',
-            ],
-          },
-        ],
-        record_409a_valuation: [
-          {
-            step: 1,
-            tool: 'create_valuation_request',
-            required: ['companyId', 'valuationType: 409A', 'valuationDate', 'commonStockFMV'],
-          },
-          {
-            step: 2,
-            tool: 'create_financial_report',
-            note: 'Optional',
-            required: ['companyId', 'reportType: 409A_report'],
-          },
-        ],
+        add_advisor_with_equity: {
+          description: 'Add an advisor and issue them an equity grant',
+          steps: [
+            {
+              step: 1,
+              tool: 'create_stakeholder',
+              notes: 'role: advisor. Save the returned row_id.',
+            },
+            {
+              step: 2,
+              tool: 'list_equity_plans',
+              notes: 'Find an existing equity plan, or use create_equity_plan. Save the row_id.',
+            },
+            {
+              step: 3,
+              tool: 'create_equity_grant',
+              notes: 'Use employeeId from step 1, equityPlanId from step 2.',
+            },
+          ],
+        },
+        record_safe_round: {
+          description: 'Record a SAFE investment from an investor',
+          steps: [
+            {
+              step: 1,
+              tool: 'create_stakeholder',
+              notes: 'role: investor. Save the returned row_id.',
+            },
+            {
+              step: 2,
+              tool: 'create_safe',
+              notes: 'Use stakeholderId from step 1.',
+            },
+          ],
+        },
+        request_409a_valuation: {
+          description: 'Request a 409A valuation',
+          steps: [
+            {
+              step: 1,
+              tool: 'create_valuation_request',
+              notes: 'Provide companyId and reason.',
+            },
+            {
+              step: 2,
+              tool: 'get_latest_valuation',
+              notes: 'Check status after AI processing completes.',
+            },
+          ],
+        },
+        set_up_share_classes: {
+          description: 'Define share classes for the company (common, preferred, etc.)',
+          steps: [
+            {
+              step: 1,
+              tool: 'create_share_class',
+              notes: 'Common stock first. classType: common, provide authorizedShares.',
+            },
+            {
+              step: 2,
+              tool: 'create_share_class',
+              notes: 'Preferred if needed. classType: preferred, provide authorizedShares.',
+            },
+          ],
+        },
       };
       return {
         content: [{ type: 'text', text: JSON.stringify(workflows, null, 2) }],

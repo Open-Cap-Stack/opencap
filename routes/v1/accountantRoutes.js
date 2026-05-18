@@ -30,6 +30,9 @@ router.get('/stats', accountantController.getStats);
 router.post('/connect/onboard', accountantController.createConnectOnboardingLink);
 router.get('/connect/status', accountantController.getConnectStatus);
 
+// Transfer history
+router.get('/transfers', accountantController.getTransferHistory);
+
 // Admin: accountant management
 router.get('/accountants', accountantController.listAccountants);
 

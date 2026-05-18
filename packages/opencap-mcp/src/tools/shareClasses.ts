@@ -55,14 +55,15 @@ export const shareClassTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/share-classes', input);
-      const id = created.row_id ?? created._id;
+      const id = created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/share-classes/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Share class created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Share class created and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? input.name}\nclassType: ${record.classType ?? input.classType}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -71,7 +72,7 @@ export const shareClassTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Share class created (could not confirm persisted state — verify with get_share_class):\n${JSON.stringify(created, null, 2)}`,
+              text: `Share class created (note: could not confirm persisted state — verify with get_share_class):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };

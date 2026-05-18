@@ -56,14 +56,15 @@ export const equityPlanTools: ToolDefinition[] = [
     }),
     handler: async (input, client) => {
       const { data: created } = await client.post('/api/v1/equity-plans', input);
-      const id = created.row_id ?? created._id;
+      const id = created?.data?.row_id ?? created?.row_id ?? created?._id;
       try {
         const { data: confirmed } = await client.get(`/api/v1/equity-plans/${id}`);
+        const record = confirmed?.data ?? confirmed;
         return {
           content: [
             {
               type: 'text',
-              text: `Equity plan created:\n${JSON.stringify(confirmed, null, 2)}\n\nID for follow-up operations: ${id}`,
+              text: `Equity plan created and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? input.name}\nplanType: ${record.planType ?? input.planType}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };
@@ -72,7 +73,7 @@ export const equityPlanTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Equity plan created (could not confirm persisted state — verify with get_equity_plan):\n${JSON.stringify(created, null, 2)}`,
+              text: `Equity plan created (note: could not confirm persisted state — verify with get_equity_plan):\n${JSON.stringify(created?.data ?? created, null, 2)}`,
             },
           ],
         };

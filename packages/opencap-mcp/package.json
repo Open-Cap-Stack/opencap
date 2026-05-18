@@ -1,6 +1,6 @@
 {
   "name": "@opencapstack/mcp-server",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "MCP server for OpenCap Stack — manage your cap table via Claude, Cursor, and any MCP-compatible client",
   "type": "module",
   "bin": {

@@ -69,6 +69,10 @@ const billingController = require('./controllers/billingController');
 const webhookRateLimiter = createRouteRateLimit('webhook', 100, 60 * 1000); // 100 requests per minute
 app.post('/api/v1/billing/webhook', webhookRateLimiter, express.raw({ type: 'application/json' }), billingController.handleStripeWebhook);
 
+// Issue #567: Stripe Connect webhook for accountant payouts (raw body required)
+const stripeConnectWebhookController = require('./controllers/stripeConnectWebhookController');
+app.post('/api/v1/webhooks/stripe-connect', webhookRateLimiter, express.raw({ type: 'application/json' }), stripeConnectWebhookController.handleStripeConnectWebhook);
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -266,7 +270,7 @@ const routes = {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/mcp'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/mcp', '/webhooks'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }

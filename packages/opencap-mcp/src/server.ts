@@ -45,7 +45,7 @@ export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '1.7.0',
+      version: '1.8.0',
     },
     {
       capabilities: {
@@ -81,9 +81,8 @@ export function createServer(client: AxiosInstance): Server {
       const result = await tool.handler(parsed, client);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       return {
-        content: [{ type: 'text', text: `Tool error: ${message}` }],
+        content: [{ type: 'text', text: `Tool error: ${formatMcpError(error)}` }],
         isError: true,
       };
     }
