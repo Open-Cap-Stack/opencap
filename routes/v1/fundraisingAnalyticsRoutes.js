@@ -15,6 +15,22 @@ const { authenticate } = require('../../middleware/authMiddleware');
 router.use(authenticate);
 
 /**
+ * @route   GET /api/v1/fundraising-analytics
+ * @desc    Get aggregated fundraising overview using companyId from auth token
+ * @access  Private
+ * Note: Alias for frontend that calls GET /fundraising-analytics without companyId param
+ */
+router.get('/', (req, res, next) => {
+  // Derive companyId from authenticated user
+  const companyId = req.user?.companyId || req.query.companyId;
+  if (!companyId) {
+    return res.status(400).json({ error: 'Company ID is required (pass as query param or via auth token)' });
+  }
+  req.params.companyId = companyId;
+  return fundraisingAnalyticsController.getOverview(req, res, next);
+});
+
+/**
  * @route   GET /api/v1/fundraising/analytics/:companyId
  * @desc    Get aggregated fundraising overview
  * @access  Private
