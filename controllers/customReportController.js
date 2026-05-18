@@ -142,10 +142,13 @@ class CustomReportController {
         query.companyId = user.companyId;
       }
 
-      const reports = await CustomReport.find(query)
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 });
+      // ZeroDB find() returns a plain array, not a MongoDB cursor.
+      // Pass pagination options as the second argument instead of chaining.
+      const reports = await CustomReport.find(query, {
+        skip,
+        limit,
+        sort: { createdAt: -1 }
+      });
 
       const totalCount = await CustomReport.countDocuments(query);
       const totalPages = Math.ceil(totalCount / limit);

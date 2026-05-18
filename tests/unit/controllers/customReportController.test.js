@@ -163,7 +163,7 @@ describe('CustomReportController Tests', () => {
   describe('listCustomReports', () => {
     it('should list reports for regular user', async () => {
       const mockReports = [{ reportId: 'report-001' }, { reportId: 'report-002' }];
-      CustomReport.find.mockReturnValue({ skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue(mockReports) });
+      CustomReport.find.mockResolvedValue(mockReports);
       CustomReport.countDocuments.mockResolvedValue(2);
 
       await customReportController.listCustomReports(req, res, next);
@@ -173,7 +173,7 @@ describe('CustomReportController Tests', () => {
 
     it('should list all reports for admin', async () => {
       req.user.role = 'admin';
-      CustomReport.find.mockReturnValue({ skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]) });
+      CustomReport.find.mockResolvedValue([]);
       CustomReport.countDocuments.mockResolvedValue(0);
 
       await customReportController.listCustomReports(req, res, next);
@@ -183,7 +183,7 @@ describe('CustomReportController Tests', () => {
     it('should handle pagination correctly', async () => {
       req.query.page = '2';
       req.query.limit = '5';
-      CustomReport.find.mockReturnValue({ skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]) });
+      CustomReport.find.mockResolvedValue([]);
       CustomReport.countDocuments.mockResolvedValue(15);
 
       await customReportController.listCustomReports(req, res, next);
