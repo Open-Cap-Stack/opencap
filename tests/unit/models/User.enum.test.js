@@ -46,8 +46,8 @@ describe('User Model Role Enum Validation', () => {
       });
     });
 
-    it('should have exactly 6 role values', () => {
-      expect(User.schema.role.enum.length).toBe(6);
+    it('should have exactly 7 role values', () => {
+      expect(User.schema.role.enum.length).toBe(7);
     });
   });
 
