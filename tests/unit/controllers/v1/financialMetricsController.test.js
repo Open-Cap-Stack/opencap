@@ -567,30 +567,19 @@ describe('Financial Metrics Controller', () => {
   describe('getFinancialDashboard', () => {
     const validCompanyId = '507f1f77bcf86cd799439011';
     const mockReport = {
-      revenue: 500000,
-      grossProfit: 300000,
-      operatingIncome: 150000,
-      netIncome: 100000,
-      currentAssets: 200000,
-      currentLiabilities: 100000,
-      totalLiabilities: 250000,
-      totalEquity: 400000,
-      totalAssets: 650000,
-      inventory: 50000,
-      costOfGoodsSold: 200000,
-      interestExpense: 10000,
-      periodEnd: new Date(),
-      period: 'Q1 2024'
+      revenue: { sales: 300000, services: 150000, other: 50000 },
+      expenses: { salaries: 100000, marketing: 50000, operations: 80000, other: 20000 },
+      totalRevenue: 500000,
+      totalExpenses: 250000,
+      netIncome: 250000,
+      reportDate: new Date(),
+      reportingPeriod: 'Q1 2024'
     };
 
     it('should return financial dashboard metrics', async () => {
       req.params.companyId = validCompanyId;
 
-      FinancialReport.findOne.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue(mockReport)
-        })
-      });
+      FinancialReport.find.mockResolvedValue([mockReport]);
 
       await financialMetricsController.getFinancialDashboard(req, res);
 
@@ -611,11 +600,7 @@ describe('Financial Metrics Controller', () => {
     it('should return 404 when no financial data found', async () => {
       req.params.companyId = validCompanyId;
 
-      FinancialReport.findOne.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue(null)
-        })
-      });
+      FinancialReport.find.mockResolvedValue([]);
 
       await financialMetricsController.getFinancialDashboard(req, res);
 
@@ -631,11 +616,7 @@ describe('Financial Metrics Controller', () => {
     it('should handle database errors', async () => {
       req.params.companyId = validCompanyId;
 
-      FinancialReport.findOne.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          lean: jest.fn().mockRejectedValue(new Error('Database error'))
-        })
-      });
+      FinancialReport.find.mockRejectedValue(new Error('Database error'));
 
       await financialMetricsController.getFinancialDashboard(req, res);
 

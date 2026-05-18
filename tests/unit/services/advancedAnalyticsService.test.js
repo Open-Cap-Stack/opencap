@@ -48,19 +48,15 @@ describe('Advanced Analytics Service', () => {
       it('should return cap table summary for a company', async () => {
         const companyId = 'COMP001';
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 5000000, ownershipPercentage: 50 },
-            { shareClassId: 'SC002', name: 'Preferred A', authorizedShares: 3000000, dilutedShares: 2000000, ownershipPercentage: 30 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 5000000, ownershipPercentage: 50 },
+          { shareClassId: 'SC002', name: 'Preferred A', authorizedShares: 3000000, dilutedShares: 2000000, ownershipPercentage: 30 }
+        ]);
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Founder 1', role: 'Founder', equityHoldings: 25 },
-            { stakeholderId: 'SH002', name: 'Investor 1', role: 'Investor', equityHoldings: 15 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Founder 1', role: 'Founder', equityHoldings: 25 },
+          { stakeholderId: 'SH002', name: 'Investor 1', role: 'Investor', equityHoldings: 15 }
+        ]);
 
         const result = await advancedAnalyticsService.getCapTableSummary(companyId);
 
@@ -75,16 +71,12 @@ describe('Advanced Analytics Service', () => {
       it('should calculate ownership distribution correctly', async () => {
         const companyId = 'COMP002';
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 },
-            { shareClassId: 'SC002', name: 'Options', authorizedShares: 2000000, dilutedShares: 2000000, ownershipPercentage: 20 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 },
+          { shareClassId: 'SC002', name: 'Options', authorizedShares: 2000000, dilutedShares: 2000000, ownershipPercentage: 20 }
+        ]);
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([]);
 
         const result = await advancedAnalyticsService.getCapTableSummary(companyId);
 
@@ -101,13 +93,9 @@ describe('Advanced Analytics Service', () => {
       it('should return empty summary when no share classes exist', async () => {
         const companyId = 'COMP003';
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([]);
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([]);
 
         const result = await advancedAnalyticsService.getCapTableSummary(companyId);
 
@@ -126,11 +114,9 @@ describe('Advanced Analytics Service', () => {
           shareClassName: 'Series A'
         };
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 10000000, ownershipPercentage: 100 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 10000000, ownershipPercentage: 100 }
+        ]);
 
         const result = await advancedAnalyticsService.getDilutionAnalysis(companyId, newInvestment);
 
@@ -148,11 +134,9 @@ describe('Advanced Analytics Service', () => {
           { amount: 2000000, preMoneyValuation: 15000000, shareClassName: 'Series A' }
         ];
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 5000000, dilutedShares: 5000000, ownershipPercentage: 100 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 5000000, dilutedShares: 5000000, ownershipPercentage: 100 }
+        ]);
 
         const result = await advancedAnalyticsService.getMultiRoundDilution(companyId, rounds);
 
@@ -170,16 +154,12 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP001';
         const timeRange = { start: new Date('2023-01-01'), end: new Date('2024-01-01') };
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000, totalExpenses: 80000, netIncome: 20000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 120000, totalExpenses: 85000, netIncome: 35000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 150000, totalExpenses: 90000, netIncome: 60000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 180000, totalExpenses: 100000, netIncome: 80000, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000, totalExpenses: 80000, netIncome: 20000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 120000, totalExpenses: 85000, netIncome: 35000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 150000, totalExpenses: 90000, netIncome: 60000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 180000, totalExpenses: 100000, netIncome: 80000, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getInvestmentTrends(companyId, timeRange);
 
@@ -193,16 +173,12 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP002';
         const timeRange = { start: new Date('2023-01-01'), end: new Date('2024-01-01') };
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 200000, totalExpenses: 100000, netIncome: 100000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 180000, totalExpenses: 100000, netIncome: 80000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 150000, totalExpenses: 100000, netIncome: 50000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 120000, totalExpenses: 100000, netIncome: 20000, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 200000, totalExpenses: 100000, netIncome: 100000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 180000, totalExpenses: 100000, netIncome: 80000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 150000, totalExpenses: 100000, netIncome: 50000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 120000, totalExpenses: 100000, netIncome: 20000, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getInvestmentTrends(companyId, timeRange);
 
@@ -214,16 +190,12 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP003';
         const timeRange = { start: new Date('2023-01-01'), end: new Date('2024-01-01') };
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 120000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 110000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 130000, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 120000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 110000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 130000, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getInvestmentTrends(companyId, timeRange);
 
@@ -237,16 +209,12 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP001';
         const periods = 4;
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 120000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 144000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 172800, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 120000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 144000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 172800, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.forecastRevenue(companyId, periods);
 
@@ -263,15 +231,13 @@ describe('Advanced Analytics Service', () => {
       it('should provide stakeholder distribution analysis', async () => {
         const companyId = 'COMP001';
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Founder 1', role: 'Founder', equityHoldings: 40 },
-            { stakeholderId: 'SH002', name: 'Founder 2', role: 'Founder', equityHoldings: 30 },
-            { stakeholderId: 'SH003', name: 'Investor 1', role: 'Investor', equityHoldings: 15 },
-            { stakeholderId: 'SH004', name: 'Employee 1', role: 'Employee', equityHoldings: 5 },
-            { stakeholderId: 'SH005', name: 'Advisor 1', role: 'Advisor', equityHoldings: 2 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Founder 1', role: 'Founder', equityHoldings: 40 },
+          { stakeholderId: 'SH002', name: 'Founder 2', role: 'Founder', equityHoldings: 30 },
+          { stakeholderId: 'SH003', name: 'Investor 1', role: 'Investor', equityHoldings: 15 },
+          { stakeholderId: 'SH004', name: 'Employee 1', role: 'Employee', equityHoldings: 5 },
+          { stakeholderId: 'SH005', name: 'Advisor 1', role: 'Advisor', equityHoldings: 2 }
+        ]);
 
         const result = await advancedAnalyticsService.getStakeholderInsights(companyId);
 
@@ -285,12 +251,10 @@ describe('Advanced Analytics Service', () => {
       it('should calculate concentration metrics', async () => {
         const companyId = 'COMP002';
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Major Holder', role: 'Founder', equityHoldings: 80 },
-            { stakeholderId: 'SH002', name: 'Minor Holder', role: 'Investor', equityHoldings: 20 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Major Holder', role: 'Founder', equityHoldings: 80 },
+          { stakeholderId: 'SH002', name: 'Minor Holder', role: 'Investor', equityHoldings: 20 }
+        ]);
 
         const result = await advancedAnalyticsService.getStakeholderInsights(companyId);
 
@@ -302,11 +266,9 @@ describe('Advanced Analytics Service', () => {
       it('should identify stakeholder risks', async () => {
         const companyId = 'COMP003';
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Single Founder', role: 'Founder', equityHoldings: 95 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Single Founder', role: 'Founder', equityHoldings: 95 }
+        ]);
 
         const result = await advancedAnalyticsService.getStakeholderInsights(companyId);
 
@@ -449,14 +411,10 @@ describe('Advanced Analytics Service', () => {
           CompanyType: 'startup'
         });
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000 },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 120000 }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000 },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 120000 }
+        ]);
 
         zerodbService.searchVectors.mockResolvedValue({
           vectors: [
@@ -483,20 +441,16 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP001';
         const metric = 'revenue';
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2022', totalRevenue: 90000, reportDate: new Date('2022-03-31') },
-              { reportingPeriod: 'Q2-2022', totalRevenue: 100000, reportDate: new Date('2022-06-30') },
-              { reportingPeriod: 'Q3-2022', totalRevenue: 85000, reportDate: new Date('2022-09-30') },
-              { reportingPeriod: 'Q4-2022', totalRevenue: 120000, reportDate: new Date('2022-12-31') },
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 115000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 95000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 140000, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2022', totalRevenue: 90000, reportDate: new Date('2022-03-31') },
+          { reportingPeriod: 'Q2-2022', totalRevenue: 100000, reportDate: new Date('2022-06-30') },
+          { reportingPeriod: 'Q3-2022', totalRevenue: 85000, reportDate: new Date('2022-09-30') },
+          { reportingPeriod: 'Q4-2022', totalRevenue: 120000, reportDate: new Date('2022-12-31') },
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 115000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 95000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 140000, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getTimeSeriesAnalysis(companyId, metric);
 
@@ -510,20 +464,16 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP002';
         const metric = 'revenue';
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2022', totalRevenue: 100000, reportDate: new Date('2022-03-31') },
-              { reportingPeriod: 'Q2-2022', totalRevenue: 110000, reportDate: new Date('2022-06-30') },
-              { reportingPeriod: 'Q3-2022', totalRevenue: 105000, reportDate: new Date('2022-09-30') },
-              { reportingPeriod: 'Q4-2022', totalRevenue: 150000, reportDate: new Date('2022-12-31') },
-              { reportingPeriod: 'Q1-2023', totalRevenue: 115000, reportDate: new Date('2023-03-31') },
-              { reportingPeriod: 'Q2-2023', totalRevenue: 125000, reportDate: new Date('2023-06-30') },
-              { reportingPeriod: 'Q3-2023', totalRevenue: 120000, reportDate: new Date('2023-09-30') },
-              { reportingPeriod: 'Q4-2023', totalRevenue: 170000, reportDate: new Date('2023-12-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2022', totalRevenue: 100000, reportDate: new Date('2022-03-31') },
+          { reportingPeriod: 'Q2-2022', totalRevenue: 110000, reportDate: new Date('2022-06-30') },
+          { reportingPeriod: 'Q3-2022', totalRevenue: 105000, reportDate: new Date('2022-09-30') },
+          { reportingPeriod: 'Q4-2022', totalRevenue: 150000, reportDate: new Date('2022-12-31') },
+          { reportingPeriod: 'Q1-2023', totalRevenue: 115000, reportDate: new Date('2023-03-31') },
+          { reportingPeriod: 'Q2-2023', totalRevenue: 125000, reportDate: new Date('2023-06-30') },
+          { reportingPeriod: 'Q3-2023', totalRevenue: 120000, reportDate: new Date('2023-09-30') },
+          { reportingPeriod: 'Q4-2023', totalRevenue: 170000, reportDate: new Date('2023-12-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getTimeSeriesAnalysis(companyId, metric);
 
@@ -535,14 +485,10 @@ describe('Advanced Analytics Service', () => {
         const companyId = 'COMP003';
         const metric = 'revenue';
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2022', totalRevenue: 100000, reportDate: new Date('2022-03-31') },
-              { reportingPeriod: 'Q1-2023', totalRevenue: 130000, reportDate: new Date('2023-03-31') }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2022', totalRevenue: 100000, reportDate: new Date('2022-03-31') },
+          { reportingPeriod: 'Q1-2023', totalRevenue: 130000, reportDate: new Date('2023-03-31') }
+        ]);
 
         const result = await advancedAnalyticsService.getTimeSeriesAnalysis(companyId, metric);
 
@@ -557,14 +503,12 @@ describe('Advanced Analytics Service', () => {
       it('should group stakeholders into cohorts by join date', async () => {
         const companyId = 'COMP001';
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Early Bird 1', role: 'Founder', createdAt: new Date('2020-01-15'), equityHoldings: 30 },
-            { stakeholderId: 'SH002', name: 'Early Bird 2', role: 'Founder', createdAt: new Date('2020-02-15'), equityHoldings: 25 },
-            { stakeholderId: 'SH003', name: 'Series A Investor', role: 'Investor', createdAt: new Date('2021-06-15'), equityHoldings: 15 },
-            { stakeholderId: 'SH004', name: 'Late Employee', role: 'Employee', createdAt: new Date('2023-01-15'), equityHoldings: 2 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Early Bird 1', role: 'Founder', createdAt: new Date('2020-01-15'), equityHoldings: 30 },
+          { stakeholderId: 'SH002', name: 'Early Bird 2', role: 'Founder', createdAt: new Date('2020-02-15'), equityHoldings: 25 },
+          { stakeholderId: 'SH003', name: 'Series A Investor', role: 'Investor', createdAt: new Date('2021-06-15'), equityHoldings: 15 },
+          { stakeholderId: 'SH004', name: 'Late Employee', role: 'Employee', createdAt: new Date('2023-01-15'), equityHoldings: 2 }
+        ]);
 
         const result = await advancedAnalyticsService.getStakeholderCohorts(companyId);
 
@@ -578,13 +522,11 @@ describe('Advanced Analytics Service', () => {
       it('should analyze cohort retention', async () => {
         const companyId = 'COMP002';
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Active Founder', role: 'Founder', createdAt: new Date('2020-01-15'), status: 'active', equityHoldings: 30 },
-            { stakeholderId: 'SH002', name: 'Former Employee', role: 'Employee', createdAt: new Date('2020-06-15'), status: 'inactive', equityHoldings: 0 },
-            { stakeholderId: 'SH003', name: 'Active Investor', role: 'Investor', createdAt: new Date('2021-01-15'), status: 'active', equityHoldings: 15 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Active Founder', role: 'Founder', createdAt: new Date('2020-01-15'), status: 'active', equityHoldings: 30 },
+          { stakeholderId: 'SH002', name: 'Former Employee', role: 'Employee', createdAt: new Date('2020-06-15'), status: 'inactive', equityHoldings: 0 },
+          { stakeholderId: 'SH003', name: 'Active Investor', role: 'Investor', createdAt: new Date('2021-01-15'), status: 'active', equityHoldings: 15 }
+        ]);
 
         const result = await advancedAnalyticsService.getStakeholderCohorts(companyId);
 
@@ -598,10 +540,10 @@ describe('Advanced Analytics Service', () => {
       it('should analyze investment cohorts', async () => {
         const companyId = 'COMP001';
 
-        FinancialReport.aggregate = jest.fn().mockResolvedValue([
-          { _id: { year: 2022, quarter: 1 }, avgRevenue: 100000, avgNetIncome: 20000, count: 1 },
-          { _id: { year: 2022, quarter: 2 }, avgRevenue: 120000, avgNetIncome: 30000, count: 1 },
-          { _id: { year: 2023, quarter: 1 }, avgRevenue: 150000, avgNetIncome: 45000, count: 1 }
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportDate: new Date('2022-03-31'), totalRevenue: 100000, netIncome: 20000 },
+          { reportDate: new Date('2022-06-30'), totalRevenue: 120000, netIncome: 30000 },
+          { reportDate: new Date('2023-03-31'), totalRevenue: 150000, netIncome: 45000 }
         ]);
 
         const result = await advancedAnalyticsService.getInvestmentCohorts(companyId);
@@ -623,25 +565,17 @@ describe('Advanced Analytics Service', () => {
           format: 'detailed'
         };
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 }
+        ]);
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { stakeholderId: 'SH001', name: 'Founder', role: 'Founder', equityHoldings: 50 }
-          ])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([
+          { stakeholderId: 'SH001', name: 'Founder', role: 'Founder', equityHoldings: 50 }
+        ]);
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000 }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000 }
+        ]);
 
         const result = await advancedAnalyticsService.generateCustomReport(companyId, reportConfig);
 
@@ -662,13 +596,9 @@ describe('Advanced Analytics Service', () => {
           exportFormat: 'json'
         };
 
-        FinancialReport.find = jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([
-              { reportingPeriod: 'Q1-2023', totalRevenue: 100000 }
-            ])
-          })
-        });
+        FinancialReport.find = jest.fn().mockResolvedValue([
+          { reportingPeriod: 'Q1-2023', totalRevenue: 100000 }
+        ]);
 
         const result = await advancedAnalyticsService.generateCustomReport(companyId, reportConfig);
 
@@ -683,15 +613,11 @@ describe('Advanced Analytics Service', () => {
       it('should cache frequently accessed analytics', async () => {
         const companyId = 'COMP001';
 
-        ShareClass.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([
-            { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 }
-          ])
-        });
+        ShareClass.find = jest.fn().mockResolvedValue([
+          { shareClassId: 'SC001', name: 'Common', authorizedShares: 10000000, dilutedShares: 8000000, ownershipPercentage: 80 }
+        ]);
 
-        Stakeholder.find = jest.fn().mockReturnValue({
-          lean: jest.fn().mockResolvedValue([])
-        });
+        Stakeholder.find = jest.fn().mockResolvedValue([]);
 
         await advancedAnalyticsService.getCapTableSummary(companyId, { useCache: true });
         const result = await advancedAnalyticsService.getCapTableSummary(companyId, { useCache: true });
@@ -776,13 +702,9 @@ describe('Advanced Analytics Service', () => {
     it('should handle missing data gracefully', async () => {
       const companyId = 'COMP001';
 
-      ShareClass.find = jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([])
-      });
+      ShareClass.find = jest.fn().mockResolvedValue([]);
 
-      Stakeholder.find = jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([])
-      });
+      Stakeholder.find = jest.fn().mockResolvedValue([]);
 
       const result = await advancedAnalyticsService.getCapTableSummary(companyId);
 

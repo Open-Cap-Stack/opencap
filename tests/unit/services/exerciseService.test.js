@@ -1,26 +1,28 @@
 /**
  * Exercise Service Tests
  * Feature: Issue #79 - Build Exercise Management System
+ *
+ * Updated for ZeroDB-compatible patterns (no Mongoose constructor/save)
  */
 
 // Mock dependencies first
 jest.mock('../../../models/ExerciseRequest', () => {
-  const mockConstructor = jest.fn().mockImplementation(() => ({
-    save: jest.fn()
-  }));
-  mockConstructor.findById = jest.fn();
-  mockConstructor.find = jest.fn();
-  mockConstructor.getExerciseSummaryByGrant = jest.fn();
-  mockConstructor.getISOExercisesForTaxYear = jest.fn();
-  mockConstructor.findByEquityGrant = jest.fn();
-  return mockConstructor;
+  const mock = {
+    create: jest.fn(),
+    findById: jest.fn(),
+    find: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+    getExerciseSummaryByGrant: jest.fn(),
+    getISOExercisesForTaxYear: jest.fn(),
+    findByEquityGrant: jest.fn(),
+  };
+  return mock;
 });
 jest.mock('../../../services/taxWithholdingService');
 jest.mock('../../../models/Form3921', () => {
-  const mockConstructor = jest.fn().mockImplementation(() => ({
-    save: jest.fn()
-  }));
-  return mockConstructor;
+  return {
+    create: jest.fn(),
+  };
 });
 
 const ExerciseRequest = require('../../../models/ExerciseRequest');
@@ -65,14 +67,13 @@ describe('ExerciseService', () => {
         exerciseRequestId: 'exr_mock-uuid'
       };
 
-      ExerciseRequest.mockImplementation(() => ({
-        save: jest.fn().mockResolvedValue(mockSavedRequest)
-      }));
+      ExerciseRequest.create.mockResolvedValue(mockSavedRequest);
 
       const result = await ExerciseService.createExerciseRequest(validRequestData);
 
       expect(result).toBeDefined();
       expect(result.status).toBe('pending');
+      expect(ExerciseRequest.create).toHaveBeenCalled();
     });
 
     it('should calculate exercise details automatically', async () => {
@@ -87,9 +88,7 @@ describe('ExerciseService', () => {
         }
       };
 
-      ExerciseRequest.mockImplementation(() => ({
-        save: jest.fn().mockResolvedValue(mockSavedRequest)
-      }));
+      ExerciseRequest.create.mockResolvedValue(mockSavedRequest);
 
       const result = await ExerciseService.createExerciseRequest(validRequestData);
 
@@ -115,16 +114,16 @@ describe('ExerciseService', () => {
     it('should change status from pending to approved', async () => {
       const mockRequest = {
         _id: 'request-id-123',
-        status: 'pending',
-        save: jest.fn().mockResolvedValue({
-          _id: 'request-id-123',
-          status: 'approved',
-          approvedBy: 'admin-001',
-          approvedAt: new Date()
-        })
+        status: 'pending'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        _id: 'request-id-123',
+        status: 'approved',
+        approvedBy: 'admin-001',
+        approvedAt: new Date().toISOString()
+      });
 
       const result = await ExerciseService.approveExerciseRequest('request-id-123', 'admin-001');
 
@@ -133,7 +132,7 @@ describe('ExerciseService', () => {
     });
 
     it('should throw error if request not found', async () => {
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(null);
+      ExerciseRequest.findById.mockResolvedValue(null);
 
       await expect(ExerciseService.approveExerciseRequest('non-existent', 'admin-001'))
         .rejects.toThrow('Exercise request not found');
@@ -145,7 +144,7 @@ describe('ExerciseService', () => {
         status: 'processed'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       await expect(ExerciseService.approveExerciseRequest('request-id-123', 'admin-001'))
         .rejects.toThrow('Can only approve pending requests');
@@ -156,16 +155,16 @@ describe('ExerciseService', () => {
     it('should change status from pending to rejected', async () => {
       const mockRequest = {
         _id: 'request-id-123',
-        status: 'pending',
-        save: jest.fn().mockResolvedValue({
-          _id: 'request-id-123',
-          status: 'rejected',
-          rejectedBy: 'admin-001',
-          rejectionReason: 'Insufficient vested shares'
-        })
+        status: 'pending'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        _id: 'request-id-123',
+        status: 'rejected',
+        rejectedBy: 'admin-001',
+        rejectionReason: 'Insufficient vested shares'
+      });
 
       const result = await ExerciseService.rejectExerciseRequest(
         'request-id-123',
@@ -183,7 +182,7 @@ describe('ExerciseService', () => {
         status: 'pending'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       await expect(ExerciseService.rejectExerciseRequest('request-id-123', 'admin-001', ''))
         .rejects.toThrow('Rejection reason is required');
@@ -207,16 +206,10 @@ describe('ExerciseService', () => {
           additionalWithholding: 0,
           isSubjectToAMT: false
         },
-        save: jest.fn().mockImplementation(function() {
-          return Promise.resolve({
-            ...this,
-            status: 'processed',
-            processedAt: new Date()
-          });
-        })
+        paymentMethod: 'cash'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       TaxWithholdingService.calculateNSOExerciseWithholding = jest.fn().mockReturnValue({
         income: { ordinaryIncome: 9000 },
@@ -227,6 +220,12 @@ describe('ExerciseService', () => {
           socialSecurityWithholding: 558,
           medicareWithholding: 130.5
         }
+      });
+
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        ...mockRequest,
+        status: 'processed',
+        processedAt: new Date().toISOString()
       });
 
       const result = await ExerciseService.processExerciseRequest('request-id-123', 'admin-001');
@@ -251,24 +250,26 @@ describe('ExerciseService', () => {
           additionalWithholding: 0,
           isSubjectToAMT: true
         },
-        save: jest.fn().mockImplementation(function() {
-          return Promise.resolve({
-            ...this,
-            status: 'processed',
-            processedAt: new Date()
-          });
-        })
+        paymentMethod: 'cash'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       TaxWithholdingService.calculateISOExerciseWithholding = jest.fn().mockReturnValue({
         income: { amtIncome: 9000 },
         summary: {
-          totalWithholding: 2340, // AMT only
+          totalWithholding: 2340,
           federalWithholding: 0,
-          stateWithholding: 0
+          stateWithholding: 0,
+          socialSecurityWithholding: 0,
+          medicareWithholding: 0
         }
+      });
+
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        ...mockRequest,
+        status: 'processed',
+        processedAt: new Date().toISOString()
       });
 
       const result = await ExerciseService.processExerciseRequest('request-id-123', 'admin-001');
@@ -283,7 +284,7 @@ describe('ExerciseService', () => {
         status: 'pending'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       await expect(ExerciseService.processExerciseRequest('request-id-123', 'admin-001'))
         .rejects.toThrow('Can only process approved requests');
@@ -300,21 +301,20 @@ describe('ExerciseService', () => {
         exerciseDetails: {
           sharesRequested: 1000
         },
-        save: jest.fn().mockImplementation(function() {
-          return Promise.resolve({
-            ...this,
-            status: 'completed',
-            completedAt: new Date(),
-            certificateData: {
-              certificateNumber: 'CERT-001',
-              sharesIssued: 1000,
-              issueDate: new Date()
-            }
-          });
-        })
+        paymentMethod: 'cash'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        ...mockRequest,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        certificateData: {
+          certificateNumber: 'CERT-001',
+          sharesIssued: 1000,
+          issueDate: expect.any(Date)
+        }
+      });
 
       const result = await ExerciseService.completeExerciseRequest('request-id-123', 'admin-001', {
         certificateNumber: 'CERT-001'
@@ -331,7 +331,7 @@ describe('ExerciseService', () => {
         status: 'approved'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       await expect(ExerciseService.completeExerciseRequest('request-id-123', 'admin-001', {}))
         .rejects.toThrow('Can only complete processed requests');
@@ -342,19 +342,17 @@ describe('ExerciseService', () => {
     it('should cancel pending request', async () => {
       const mockRequest = {
         _id: 'request-id-123',
-        status: 'pending',
-        save: jest.fn().mockImplementation(function() {
-          return Promise.resolve({
-            ...this,
-            status: 'cancelled',
-            cancelledAt: new Date(),
-            cancelledBy: 'user-001',
-            cancellationReason: 'User requested cancellation'
-          });
-        })
+        status: 'pending'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue({
+        ...mockRequest,
+        status: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+        cancelledBy: 'user-001',
+        cancellationReason: 'User requested cancellation'
+      });
 
       const result = await ExerciseService.cancelExerciseRequest(
         'request-id-123',
@@ -371,7 +369,7 @@ describe('ExerciseService', () => {
         status: 'processed'
       };
 
-      ExerciseRequest.findById = jest.fn().mockResolvedValue(mockRequest);
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       await expect(ExerciseService.cancelExerciseRequest('request-id-123', 'user-001', 'reason'))
         .rejects.toThrow('Cannot cancel processed or completed requests');
@@ -386,16 +384,7 @@ describe('ExerciseService', () => {
         status: 'pending'
       };
 
-      // Create a chainable mock for populate calls
-      const mockPopulate = jest.fn().mockReturnThis();
-      mockPopulate.mockImplementation(() => ({
-        populate: mockPopulate,
-        then: (resolve) => resolve(mockRequest)
-      }));
-
-      ExerciseRequest.findById = jest.fn().mockReturnValue({
-        populate: mockPopulate
-      });
+      ExerciseRequest.findById.mockResolvedValue(mockRequest);
 
       const result = await ExerciseService.getExerciseRequestById('request-id-123');
 
@@ -403,16 +392,7 @@ describe('ExerciseService', () => {
     });
 
     it('should return null if not found', async () => {
-      // Create a chainable mock for populate calls
-      const mockPopulate = jest.fn().mockReturnThis();
-      mockPopulate.mockImplementation(() => ({
-        populate: mockPopulate,
-        then: (resolve) => resolve(null)
-      }));
-
-      ExerciseRequest.findById = jest.fn().mockReturnValue({
-        populate: mockPopulate
-      });
+      ExerciseRequest.findById.mockResolvedValue(null);
 
       const result = await ExerciseService.getExerciseRequestById('non-existent');
 
@@ -427,14 +407,15 @@ describe('ExerciseService', () => {
         { _id: 'request-2', status: 'completed' }
       ];
 
-      ExerciseRequest.find = jest.fn().mockReturnValue({
-        sort: jest.fn().mockResolvedValue(mockRequests)
-      });
+      ExerciseRequest.find.mockResolvedValue(mockRequests);
 
       const result = await ExerciseService.getExerciseRequestsByStakeholder('stakeholder-456');
 
       expect(result).toHaveLength(2);
-      expect(ExerciseRequest.find).toHaveBeenCalledWith({ stakeholderId: 'stakeholder-456' });
+      expect(ExerciseRequest.find).toHaveBeenCalledWith(
+        { stakeholderId: 'stakeholder-456' },
+        { sort: { requestedAt: -1 } }
+      );
     });
   });
 
@@ -445,14 +426,15 @@ describe('ExerciseService', () => {
         { _id: 'request-2', status: 'approved' }
       ];
 
-      ExerciseRequest.find = jest.fn().mockReturnValue({
-        sort: jest.fn().mockResolvedValue(mockRequests)
-      });
+      ExerciseRequest.find.mockResolvedValue(mockRequests);
 
       const result = await ExerciseService.getExerciseRequestsByCompany('company-123');
 
       expect(result).toHaveLength(2);
-      expect(ExerciseRequest.find).toHaveBeenCalledWith({ companyId: 'company-123' });
+      expect(ExerciseRequest.find).toHaveBeenCalledWith(
+        { companyId: 'company-123' },
+        { sort: { requestedAt: -1 } }
+      );
     });
 
     it('should filter by status if provided', async () => {
@@ -460,16 +442,14 @@ describe('ExerciseService', () => {
         { _id: 'request-1', status: 'pending' }
       ];
 
-      ExerciseRequest.find = jest.fn().mockReturnValue({
-        sort: jest.fn().mockResolvedValue(mockRequests)
-      });
+      ExerciseRequest.find.mockResolvedValue(mockRequests);
 
       const result = await ExerciseService.getExerciseRequestsByCompany('company-123', 'pending');
 
-      expect(ExerciseRequest.find).toHaveBeenCalledWith({
-        companyId: 'company-123',
-        status: 'pending'
-      });
+      expect(ExerciseRequest.find).toHaveBeenCalledWith(
+        { companyId: 'company-123', status: 'pending' },
+        { sort: { requestedAt: -1 } }
+      );
     });
   });
 
@@ -680,9 +660,7 @@ describe('ExerciseService', () => {
         }
       };
 
-      ExerciseRequest.mockImplementation(() => ({
-        save: jest.fn().mockResolvedValue(mockSavedRequest)
-      }));
+      ExerciseRequest.create.mockResolvedValue(mockSavedRequest);
 
       const requestData = {
         companyId: 'company-123',
@@ -725,9 +703,7 @@ describe('ExerciseService', () => {
         taxYear: 2024
       };
 
-      Form3921.mockImplementation(() => ({
-        save: jest.fn().mockResolvedValue(mockForm3921)
-      }));
+      Form3921.create.mockResolvedValue(mockForm3921);
 
       const result = await ExerciseService.generateForm3921(
         exerciseRequest,
@@ -787,6 +763,29 @@ describe('ExerciseService', () => {
       await ExerciseService.getExercisesByGrant('grant-123', 'completed');
 
       expect(ExerciseRequest.findByEquityGrant).toHaveBeenCalledWith('grant-123', 'completed');
+    });
+  });
+
+  describe('updateExerciseRequest', () => {
+    it('should update exercise request by ID', async () => {
+      const mockUpdated = {
+        _id: 'request-id-123',
+        form3921Generated: true,
+        form3921Id: 'form-123'
+      };
+
+      ExerciseRequest.findOneAndUpdate.mockResolvedValue(mockUpdated);
+
+      const result = await ExerciseService.updateExerciseRequest('request-id-123', {
+        form3921Generated: true,
+        form3921Id: 'form-123'
+      });
+
+      expect(result.form3921Generated).toBe(true);
+      expect(ExerciseRequest.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: 'request-id-123' },
+        { form3921Generated: true, form3921Id: 'form-123' }
+      );
     });
   });
 });
