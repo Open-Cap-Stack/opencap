@@ -15,11 +15,52 @@ const bcrypt = require('bcrypt');
 const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
 const { sanitizeUser, sanitizeUsers } = require('../utils/sanitizeUser');
+const { getPlanById } = require('../config/stripe');
 
 const SALT_ROUNDS = 10;
 
 /** Maximum number of users that can be bulk-deleted in a single request */
 const BULK_DELETE_MAX = 10;
+
+/**
+ * Check whether a company has hit its user seat limit.
+ * Only the free plan has a seat cap (5 users).
+ * Starter and Professional are usage-based with no seat limit.
+ *
+ * @param {string} companyId
+ * @param {string} planId - e.g. 'free', 'starter', 'professional', 'enterprise'
+ * @returns {{ allowed: boolean, limit: number, current: number }}
+ */
+async function checkUserSeatLimit(companyId, planId) {
+  const plan = getPlanById(planId || 'free');
+  const limit = plan?.limits?.users ?? 5; // default to free tier limit if unknown
+
+  if (limit === -1) return { allowed: true, limit: -1, current: 0 }; // usage-based, no cap
+
+  const current = await User.countDocuments({ companyId });
+  return { allowed: current < limit, limit, current };
+}
+
+/**
+ * Resolve a company's active plan ID.
+ * Falls back to 'free' if no subscription record is found.
+ *
+ * @param {string} companyId
+ * @returns {string} planId
+ */
+async function getCompanyPlanId(companyId) {
+  if (!companyId) return 'free';
+  try {
+    const databaseAdapter = require('../services/databaseAdapter');
+    const sub = await databaseAdapter.findOne('Subscription', {
+      companyId,
+      status: { $in: ['active', 'trialing'] }
+    });
+    return sub?.planId || 'free';
+  } catch {
+    return 'free';
+  }
+}
 
 /**
  * Create a new user
@@ -34,6 +75,21 @@ const createUser = async (req, res) => {
   }
 
   try {
+    // Enforce user seat limit for free plan
+    const companyId = req.body.companyId || req.user?.companyId;
+    if (companyId) {
+      const planId = await getCompanyPlanId(companyId);
+      const seatCheck = await checkUserSeatLimit(companyId, planId);
+      if (!seatCheck.allowed) {
+        return res.status(403).json({
+          error: `User limit reached. Your ${planId} plan allows up to ${seatCheck.limit} team members (currently ${seatCheck.current}). Upgrade to add more.`,
+          code: 'USER_SEAT_LIMIT_REACHED',
+          limit: seatCheck.limit,
+          current: seatCheck.current
+        });
+      }
+    }
+
     // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {

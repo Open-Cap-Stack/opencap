@@ -153,7 +153,9 @@ exports.createSPV = async (req, res) => {
         changedAt: new Date().toISOString(),
         changedBy: req.user?.id || req.user?.userId || 'system'
       }],
-      ...extendedData
+      ...extendedData,
+      // Platform fee: OpenCap Stack takes 5% carry on every SPV — fixed, not overridable
+      platformCarryPercentage: 5
     });
 
     res.status(201).json(savedSPV);

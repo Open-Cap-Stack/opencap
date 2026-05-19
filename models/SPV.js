@@ -123,6 +123,11 @@ const spvSchema = {
     investingOnDifferentTerms: { type: 'boolean' },
     dealPartners: { type: 'array' },  // [{userId: string, carryPercentage: number}]
 
+    // --- Platform fee ---
+    // OpenCap Stack takes 5% carried interest on every SPV as a platform fee.
+    // This is fixed and non-negotiable; stored for auditability and waterfall calculations.
+    platformCarryPercentage: { type: 'number', default: 5 },
+
     // --- Additional services ---
     has3c7ParallelFunds: { type: 'boolean' },
     hasFinancialStatements: { type: 'boolean' },

@@ -5,12 +5,53 @@
  */
 
 const databaseAdapter = require('../services/databaseAdapter');
+const User = require('../models/User');
+const { getPlanById } = require('../config/stripe');
 
 const MODEL_NAME = 'Invite';
 
+async function getCompanyPlanId(companyId) {
+  if (!companyId) return 'free';
+  try {
+    const sub = await databaseAdapter.findOne('Subscription', {
+      companyId,
+      status: { $in: ['active', 'trialing'] }
+    });
+    return sub?.planId || 'free';
+  } catch {
+    return 'free';
+  }
+}
+
 exports.createInvite = async (req, res) => {
   try {
-    req.body.companyId = req.user?.companyId || req.body.companyId;
+    const companyId = req.user?.companyId || req.body.companyId;
+    req.body.companyId = companyId;
+
+    // Enforce user seat limit: count existing users + pending invites against the plan cap
+    if (companyId) {
+      const planId = await getCompanyPlanId(companyId);
+      const plan = getPlanById(planId || 'free');
+      const limit = plan?.limits?.users ?? 5;
+
+      if (limit !== -1) {
+        const [userCount, pendingInviteCount] = await Promise.all([
+          User.countDocuments({ companyId }),
+          databaseAdapter.count(MODEL_NAME, { companyId, status: { $in: ['pending', 'sent'] } })
+        ]);
+        const total = userCount + pendingInviteCount;
+        if (total >= limit) {
+          return res.status(403).json({
+            message: `User limit reached. Your ${planId} plan allows up to ${limit} team members (${userCount} active, ${pendingInviteCount} pending). Upgrade to invite more.`,
+            code: 'USER_SEAT_LIMIT_REACHED',
+            limit,
+            current: userCount,
+            pending: pendingInviteCount
+          });
+        }
+      }
+    }
+
     const savedInvite = await databaseAdapter.create(MODEL_NAME, req.body);
     res.status(201).json(savedInvite);
   } catch (error) {

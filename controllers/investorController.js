@@ -9,6 +9,23 @@
 
 const databaseAdapter = require('../services/databaseAdapter');
 const { errorResponse } = require('../middleware/errorResponse');
+const { getPlanById } = require('../config/stripe');
+
+// Investor types surfaced in SPV co-investor signals (VC funds & angel syndicates only)
+const SPV_SIGNAL_TYPES = ['venture_capital', 'angel', 'Venture Capital', 'Angel'];
+
+async function getCompanyPlanId(companyId) {
+  if (!companyId) return 'free';
+  try {
+    const sub = await databaseAdapter.findOne('Subscription', {
+      companyId,
+      status: { $in: ['active', 'trialing'] }
+    });
+    return sub?.planId || 'free';
+  } catch {
+    return 'free';
+  }
+}
 
 /**
  * Create a new investor
@@ -153,23 +170,43 @@ exports.deleteInvestor = async (req, res) => {
 };
 
 /**
- * Search investors by name (typeahead)
+ * Search investors by name — returns only VC funds & angel syndicates.
+ * Used by the SPV wizard co-investor typeahead to add deal signals.
+ * Requires starter plan or above (investor database is a paid feature).
+ *
  * GET /api/v1/investor/search?q=<query>&limit=<n>
  */
 exports.searchInvestors = async (req, res) => {
   try {
+    // Gate: investor database is not available on the free plan
+    const companyId = req.user?.companyId;
+    const planId = await getCompanyPlanId(companyId);
+    const plan = getPlanById(planId);
+    if (!plan?.limits?.investorDatabaseAccess) {
+      return res.status(403).json({
+        error: 'Investor database access requires a paid plan. Upgrade to Starter or above.',
+        code: 'PLAN_FEATURE_RESTRICTED',
+        requiredPlan: 'starter'
+      });
+    }
+
     const q = (req.query.q || '').toLowerCase().trim();
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
 
+    // Only return VC funds and angel syndicates — used for SPV deal signals
     const all = await databaseAdapter.find('Investor', {}, {});
     const investors = Array.isArray(all) ? all : (all.investors ?? []);
 
+    const signalInvestors = investors.filter((inv) =>
+      SPV_SIGNAL_TYPES.includes(inv.investorType)
+    );
+
     const filtered = q
-      ? investors.filter((inv) =>
+      ? signalInvestors.filter((inv) =>
           inv.name?.toLowerCase().includes(q) ||
           inv.email?.toLowerCase().includes(q)
         )
-      : investors;
+      : signalInvestors;
 
     res.status(200).json({ investors: filtered.slice(0, limit) });
   } catch (error) {
@@ -178,11 +215,22 @@ exports.searchInvestors = async (req, res) => {
 };
 
 /**
- * Bulk create investors (for programmatic seeding)
+ * Bulk create investors — platform admin seeding endpoint.
+ * Used to populate the master VC/angel fund database that paid users search.
+ * Restricted to admin role only (internal platform operation).
+ *
  * POST /api/v1/investor/bulk
  */
 exports.bulkCreateInvestors = async (req, res) => {
   try {
+    // Admin-only: this endpoint seeds the platform investor master database
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Investor bulk seeding is restricted to platform administrators.',
+        code: 'ADMIN_REQUIRED'
+      });
+    }
+
     const { investors } = req.body;
     if (!Array.isArray(investors) || investors.length === 0) {
       return errorResponse(res, 400, 'investors array is required');
@@ -197,7 +245,7 @@ exports.bulkCreateInvestors = async (req, res) => {
           investorId: inv.investorId || `inv_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           name: inv.name,
           investorType: inv.investorType || 'venture_capital',
-          companyId: inv.companyId || 'platform',
+          companyId: inv.companyId || 'platform', // 'platform' = global master database entry
           email: inv.email,
           ...inv,
         });
