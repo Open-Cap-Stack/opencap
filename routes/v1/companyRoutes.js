@@ -10,14 +10,15 @@ const companyController = require('../../controllers/Company');
 const settingsController = require('../../controllers/settingsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole, hasPermission } = require('../../middleware/rbacMiddleware');
+const { allowCompanySetup } = require('../../middleware/companySetupMiddleware');
 
 const router = express.Router();
 
 // POST /api/companies - Create a new company
-// Requires: write:companies permission
+// Allows first-time setup for users without a company; otherwise requires write:companies
 router.post('/',
   authenticateToken,
-  hasPermission('write:companies'),
+  allowCompanySetup('write:companies'),
   companyController.createCompany
 );
 

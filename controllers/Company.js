@@ -118,6 +118,21 @@ exports.createCompany = async (req, res) => {
     const company = savedCompany?.row_data
       ? { ...savedCompany.row_data, _id: savedCompany.row_id || savedCompany.row_data._id, row_id: savedCompany.row_id }
       : savedCompany;
+
+    // If the user has no companyId yet (onboarding), link them to the new company
+    if (req.user && !req.user.companyId) {
+      const newCompanyId = company.companyId || companyId;
+      try {
+        await zerodbService.updateRows('users', {
+          filter: { _id: req.user.userId },
+          update: { companyId: newCompanyId, updatedAt: new Date().toISOString() }
+        });
+      } catch (userUpdateError) {
+        // Non-blocking: company was created successfully, log but don't fail
+        console.error('Failed to update user companyId after company creation:', userUpdateError.message);
+      }
+    }
+
     res.status(201).json(company);
   } catch (error) {
     console.error('Error creating company:', error.message);

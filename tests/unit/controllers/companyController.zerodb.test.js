@@ -927,6 +927,80 @@ describe('Company Controller - ZeroDB Migration', () => {
     });
   });
 
+  describe('createCompany - user companyId update on onboarding', () => {
+    const onboardingData = {
+      CompanyName: 'My New Startup',
+      CompanyType: 'startup'
+    };
+
+    it('should update req.user companyId after creating a company when user has no companyId', async () => {
+      mockReq.body = { ...onboardingData };
+      mockReq.user = { userId: 'user-1', role: 'user', companyId: null };
+
+      const createdCompany = {
+        row_id: 'zerodb-new-id',
+        row_data: {
+          companyId: expect.any(String),
+          CompanyName: 'My New Startup',
+          CompanyType: 'startup'
+        }
+      };
+
+      zerodbService.queryTable.mockResolvedValue([]); // no duplicate
+      zerodbService.insertRow.mockResolvedValue({ data: [createdCompany] });
+      zerodbService.updateRows.mockResolvedValue({ modifiedCount: 1 });
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      // Verify that the user's record was updated with the new companyId
+      expect(zerodbService.updateRows).toHaveBeenCalledWith(
+        'users',
+        expect.objectContaining({
+          filter: { _id: 'user-1' },
+          update: expect.objectContaining({
+            companyId: expect.any(String)
+          })
+        })
+      );
+    });
+
+    it('should NOT update user companyId if user already has one', async () => {
+      mockReq.body = { ...onboardingData };
+      mockReq.user = { userId: 'user-1', role: 'admin', companyId: 'existing-company' };
+
+      zerodbService.queryTable.mockResolvedValue([]); // no duplicate
+      zerodbService.insertRow.mockResolvedValue({
+        rows: [{ _id: 'zerodb-new-id', companyId: 'company-123', CompanyName: 'My New Startup', CompanyType: 'startup' }]
+      });
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      // Should NOT have called updateRows for users table
+      expect(zerodbService.updateRows).not.toHaveBeenCalledWith(
+        'users',
+        expect.anything()
+      );
+    });
+
+    it('should still return 201 even if user update fails (non-blocking)', async () => {
+      mockReq.body = { ...onboardingData };
+      mockReq.user = { userId: 'user-1', role: 'user', companyId: null };
+
+      zerodbService.queryTable.mockResolvedValue([]); // no duplicate
+      zerodbService.insertRow.mockResolvedValue({
+        rows: [{ _id: 'zerodb-new-id', companyId: 'company-123', CompanyName: 'My New Startup', CompanyType: 'startup' }]
+      });
+      zerodbService.updateRows.mockRejectedValue(new Error('User update failed'));
+
+      await companyController.createCompany(mockReq, mockRes);
+
+      // Company creation should still succeed
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+    });
+  });
+
   describe('ZeroDB Service Integration', () => {
     it('should use correct table name for all operations', async () => {
       // Test create
