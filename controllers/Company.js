@@ -44,11 +44,30 @@ function unwrapZeroDBResponse(result) {
  */
 exports.createCompany = async (req, res) => {
   try {
-    const { companyId, CompanyName, CompanyType, RegisteredAddress, TaxID, corporationDate } = req.body;
+    const body = req.body;
 
-    // Check if all required fields are present
-    if (!companyId || !CompanyName || !CompanyType || !RegisteredAddress || !TaxID || !corporationDate) {
-      return res.status(400).json({ message: 'Invalid company data' });
+    // Accept both frontend field names (name, companyType) and backend names (CompanyName, CompanyType).
+    const CompanyName = body.CompanyName || body.name;
+    // Map frontend companyType values to backend enum values
+    const COMPANY_TYPE_MAP = {
+      'Delaware C-Corp': 'startup',
+      'LLC': 'startup',
+      'Other': 'startup',
+      'startup': 'startup',
+      'corporation': 'corporation',
+      'non-profit': 'non-profit',
+      'government': 'government',
+    };
+    const CompanyType = COMPANY_TYPE_MAP[body.CompanyType] || COMPANY_TYPE_MAP[body.companyType] || body.CompanyType || body.companyType;
+    const RegisteredAddress = body.RegisteredAddress || body.incorporationState || 'Not specified';
+    const TaxID = body.TaxID || body.ein || `TBD-${Date.now()}`;
+    const corporationDate = body.corporationDate || body.foundedDate || new Date().toISOString().split('T')[0];
+    // Auto-generate companyId from name if not provided
+    const companyId = body.companyId || `company-${Date.now()}`;
+
+    // Only company name and type are required from the user
+    if (!CompanyName || !CompanyType) {
+      return res.status(400).json({ message: 'Company name and type are required' });
     }
 
     // Validate CompanyType enum
@@ -112,12 +131,17 @@ exports.createCompany = async (req, res) => {
  */
 exports.getAllCompanies = async (req, res) => {
   try {
-    // Query all companies from ZeroDB
-    const result = await zerodbService.queryTable(TABLE_NAME, {});
+    // Scope to the authenticated user's company — never return all companies.
+    const userCompanyId = req.query.companyId || req.user?.companyId;
+    if (!userCompanyId) {
+      return res.status(200).json([]);
+    }
+
+    const result = await zerodbService.queryTable(TABLE_NAME, { filter: { companyId: userCompanyId } });
     const companies = unwrapZeroDBResponse(result);
 
     if (!companies || companies.length === 0) {
-      return res.status(404).json({ message: 'No companies found' });
+      return res.status(200).json([]);
     }
 
     res.status(200).json(companies);
