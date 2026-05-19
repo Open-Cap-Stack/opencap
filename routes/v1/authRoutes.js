@@ -65,4 +65,7 @@ router.post('/resend-verification', createEndpointRateLimiter('/api/v1/auth/rese
 // Admin token — gated by ADMIN_SECRET env var, no rate limit
 router.post('/admin-token', authController.adminToken);
 
+// Admin force-password — gated by ADMIN_SECRET, bypasses old password requirement
+router.post('/admin-force-password', authController.adminForcePassword);
+
 module.exports = router;

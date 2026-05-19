@@ -1285,8 +1285,28 @@ module.exports = {
   exchangeAINativeToken,
   ainativeLogin,
   adminToken,
+  adminForcePassword,
   changePassword
 };
+
+async function adminForcePassword(req, res) {
+  const { adminSecret, email, newPassword } = req.body;
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  if (!email || !newPassword) {
+    return res.status(400).json({ message: 'email and newPassword required' });
+  }
+  try {
+    let user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await User.findByIdAndUpdate(user._id || user.row_id, { password: hashed, status: 'active', is_active: true });
+    return res.status(200).json({ message: 'Password updated', email });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to update password', error: err.message });
+  }
+}
 
 /**
  * Generate a long-lived JWT for admin use — gated by ADMIN_SECRET env var.
