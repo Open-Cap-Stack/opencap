@@ -43,7 +43,8 @@ const getAllShareClasses = async (req, res) => {
     // Scope by companyId: prefer explicit query param, fall back to the
     // authenticated user's companyId so users only see their own data.
     const companyId = req.query.companyId || req.user?.companyId;
-    if (companyId) query.companyId = companyId;
+    if (!companyId) return res.status(200).json({ shareClasses: [] });
+    query.companyId = companyId;
     const shareClasses = await databaseAdapter.find(MODEL_NAME, query);
     res.status(200).json({ shareClasses });
   } catch (error) {

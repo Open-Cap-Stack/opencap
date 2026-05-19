@@ -96,8 +96,10 @@ exports.getAllStakeholders = async (req, res) => {
 
     // Scope by companyId: prefer explicit query param, fall back to the
     // authenticated user's companyId so users only see their own data.
+    // If no companyId is resolvable, return empty — never leak cross-company data.
     const companyId = req.query.companyId || req.user?.companyId;
-    if (companyId) filter.companyId = companyId;
+    if (!companyId) return res.status(200).json([]);
+    filter.companyId = companyId;
 
     if (req.query.projectId) {
       filter.projectId = req.query.projectId;

@@ -172,8 +172,10 @@ exports.createSPV = async (req, res) => {
 exports.getSPVs = async (req, res) => {
   try {
     // Scope to the authenticated user's company; fall back to explicit query param.
+    // If no companyId is resolvable, return empty — never leak cross-company data.
     const parentCompanyId = req.user?.companyId || req.query.companyId;
-    const filter = parentCompanyId ? { ParentCompanyID: parentCompanyId } : {};
+    if (!parentCompanyId) return res.status(200).json({ message: 'No SPVs found', spvs: [] });
+    const filter = { ParentCompanyID: parentCompanyId };
     const spvs = await SPV.find(filter);
     if (spvs.length === 0) {
       return res.status(200).json({ message: 'No SPVs found', spvs: [] });

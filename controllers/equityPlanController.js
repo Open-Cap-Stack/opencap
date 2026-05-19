@@ -18,7 +18,8 @@ exports.getEquityPlans = async (req, res) => {
     try {
         const query = {};
         const companyId = req.query.companyId || req.user?.companyId;
-        if (companyId) query.companyId = companyId;
+        if (!companyId) return res.status(200).json([]);
+        query.companyId = companyId;
         const plans = await databaseAdapter.find('EquityPlan', query);
         res.status(200).json(plans);
     } catch (error) {
