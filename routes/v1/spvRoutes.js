@@ -99,6 +99,16 @@ router.get('/:id/reports/:type', SPVNestedController.getSPVReport);
 router.put('/:id/status', SPVController.transitionStatus);
 
 /**
+ * @route POST /api/spvs/:id/submit
+ * @desc Submit SPV for review (transitions draft → in_review)
+ * @access Private
+ */
+router.post('/:id/submit', (req, res, next) => {
+  req.body = { ...req.body, status: 'in_review' };
+  next();
+}, SPVController.transitionStatus);
+
+/**
  * @route POST /api/spvs/:id/close
  * @desc Close an SPV
  * @access Private

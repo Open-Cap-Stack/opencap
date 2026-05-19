@@ -94,9 +94,10 @@ exports.getAllStakeholders = async (req, res) => {
     // Build filter from query params
     const filter = {};
 
-    // Only filter by companyId if explicitly passed as a query param.
-    // Do not block by req.user.companyId — rows may lack this field.
-    if (req.query.companyId) filter.companyId = req.query.companyId;
+    // Scope by companyId: prefer explicit query param, fall back to the
+    // authenticated user's companyId so users only see their own data.
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) filter.companyId = companyId;
 
     if (req.query.projectId) {
       filter.projectId = req.query.projectId;

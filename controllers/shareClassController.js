@@ -40,10 +40,10 @@ const createShareClass = async (req, res) => {
 const getAllShareClasses = async (req, res) => {
   try {
     const query = {};
-    // Only filter by companyId if explicitly passed as a query param by the client.
-    // Do NOT auto-filter by req.user.companyId — most rows were stored without companyId
-    // and user tokens often have null companyId, causing empty results.
-    if (req.query.companyId) query.companyId = req.query.companyId;
+    // Scope by companyId: prefer explicit query param, fall back to the
+    // authenticated user's companyId so users only see their own data.
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
     const shareClasses = await databaseAdapter.find(MODEL_NAME, query);
     res.status(200).json({ shareClasses });
   } catch (error) {
