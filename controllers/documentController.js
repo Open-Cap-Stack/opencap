@@ -197,12 +197,13 @@ exports.getDocuments = async (req, res) => {
         // Build simple filter object (ZeroDB only supports basic equality)
         let filter = {};
 
-        // Only filter by companyId when explicitly passed as a query param.
-        // Do NOT auto-filter by req.user.companyId — rows may lack this field and
-        // users often have null companyId, which would return 0 results.
-        if (companyId) {
-            filter.companyId = companyId;
+        // Scope by companyId — prefer explicit query param, fall back to user's companyId.
+        // If neither is present, return empty to prevent cross-company data leakage.
+        const resolvedCompanyId = companyId || req.user?.companyId;
+        if (!resolvedCompanyId) {
+            return res.status(200).json({ data: { documents: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } } });
         }
+        filter.companyId = resolvedCompanyId;
 
         // Add category filter
         if (category) {
