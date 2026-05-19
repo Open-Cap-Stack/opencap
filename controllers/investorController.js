@@ -151,3 +151,64 @@ exports.deleteInvestor = async (req, res) => {
     errorResponse(res, 500, 'Error deleting investor', error);
   }
 };
+
+/**
+ * Search investors by name (typeahead)
+ * GET /api/v1/investor/search?q=<query>&limit=<n>
+ */
+exports.searchInvestors = async (req, res) => {
+  try {
+    const q = (req.query.q || '').toLowerCase().trim();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+
+    const all = await databaseAdapter.find('Investor', {}, {});
+    const investors = Array.isArray(all) ? all : (all.investors ?? []);
+
+    const filtered = q
+      ? investors.filter((inv) =>
+          inv.name?.toLowerCase().includes(q) ||
+          inv.email?.toLowerCase().includes(q)
+        )
+      : investors;
+
+    res.status(200).json({ investors: filtered.slice(0, limit) });
+  } catch (error) {
+    errorResponse(res, 500, 'Error searching investors', error);
+  }
+};
+
+/**
+ * Bulk create investors (for programmatic seeding)
+ * POST /api/v1/investor/bulk
+ */
+exports.bulkCreateInvestors = async (req, res) => {
+  try {
+    const { investors } = req.body;
+    if (!Array.isArray(investors) || investors.length === 0) {
+      return errorResponse(res, 400, 'investors array is required');
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const inv of investors) {
+      try {
+        const created = await databaseAdapter.create('Investor', {
+          investorId: inv.investorId || `inv_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          name: inv.name,
+          investorType: inv.investorType || 'venture_capital',
+          companyId: inv.companyId || 'platform',
+          email: inv.email,
+          ...inv,
+        });
+        results.push(created);
+      } catch (err) {
+        errors.push({ name: inv.name, error: err.message });
+      }
+    }
+
+    res.status(201).json({ created: results.length, errors });
+  } catch (error) {
+    errorResponse(res, 500, 'Error bulk creating investors', error);
+  }
+};

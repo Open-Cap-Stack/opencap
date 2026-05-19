@@ -461,6 +461,9 @@ if (employeeRouteModule) app.use('/api/v1/employees', employeeRouteModule);
 // spv — frontend calls /spv but backend registered at /spvs; alias /spv → /spvs
 const spvRouteModule = safeRequire(path.join(__dirname, 'routes/v1/spvRoutes'));
 if (spvRouteModule) app.use('/api/v1/spv', spvRouteModule);
+// investors (plural) — alias for investor route (singular registered by generic mapper)
+const investorRouteModuleAlias = safeRequire(path.join(__dirname, 'routes/v1/investorRoutes'));
+if (investorRouteModuleAlias) app.use('/api/v1/investors', investorRouteModuleAlias);
 // Scenarios — no persistent backend yet; return empty list so the frontend uses localStorage
 app.get('/api/v1/scenarios', (req, res) => res.json([]));
 app.post('/api/v1/scenarios', (req, res) => res.status(201).json({ ...req.body, id: req.body.id || Date.now().toString() }));

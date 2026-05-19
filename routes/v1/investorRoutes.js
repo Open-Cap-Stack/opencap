@@ -7,6 +7,12 @@ const investorController = require('../../controllers/investorController');
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
+// Search (must be before /:id)
+router.get('/search', investorController.searchInvestors);
+
+// Bulk create for programmatic seeding
+router.post('/bulk', investorController.bulkCreateInvestors);
+
 // Investor routes
 router.get('/', investorController.getAllInvestors);
 router.get('/:id', investorController.getInvestorById);
