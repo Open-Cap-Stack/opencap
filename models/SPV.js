@@ -32,7 +32,7 @@ const TRANSITION_RULES = {
 };
 
 // Steps required for draft -> in_review transition
-const REQUIRED_STEPS_FOR_REVIEW = ['terms', 'adviserEra', 'dataRoom', 'carry'];
+const REQUIRED_STEPS_FOR_REVIEW = ['terms', 'adviser', 'memo', 'carry'];
 const VALID_COMPLIANCE_STATUSES = ['Compliant', 'NonCompliant', 'PendingReview'];
 
 // Enum constants for new fields

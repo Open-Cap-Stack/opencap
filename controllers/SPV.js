@@ -489,11 +489,45 @@ exports.transitionStatus = async (req, res) => {
       }
     }
 
-    // Guard: in_review -> raising requires admin role
+    // Guard: in_review -> raising requires admin or founder role
     if (currentStatus === 'in_review' && targetStatus === 'raising') {
+      const role = req.user?.role;
+      if (!role || (role !== 'admin' && role !== 'founder')) {
+        return res.status(403).json({
+          message: 'Only admin or founder users can transition an SPV from in_review to raising'
+        });
+      }
+    }
+
+    // Guard: raising -> closing requires fund lead or admin
+    if (currentStatus === 'raising' && targetStatus === 'closing') {
+      const role = req.user?.role;
+      const userId = req.user?.id || req.user?.userId;
+      const isFundLead = spv.fundLead && userId && spv.fundLead === userId;
+      if (!role || (role !== 'admin' && !isFundLead)) {
+        return res.status(403).json({
+          message: 'Only admin or the fund lead can transition an SPV from raising to closing'
+        });
+      }
+    }
+
+    // Guard: closing -> wired requires admin only
+    if (currentStatus === 'closing' && targetStatus === 'wired') {
       if (!req.user || req.user.role !== 'admin') {
         return res.status(403).json({
-          message: 'Only admin users can transition an SPV from in_review to raising'
+          message: 'Only admin users can transition an SPV from closing to wired'
+        });
+      }
+    }
+
+    // Guard: any -> canceled requires fund lead or admin
+    if (targetStatus === 'canceled') {
+      const role = req.user?.role;
+      const userId = req.user?.id || req.user?.userId;
+      const isFundLead = spv.fundLead && userId && spv.fundLead === userId;
+      if (!role || (role !== 'admin' && role !== 'founder' && !isFundLead)) {
+        return res.status(403).json({
+          message: 'Only admin, founder, or the fund lead can cancel an SPV'
         });
       }
     }

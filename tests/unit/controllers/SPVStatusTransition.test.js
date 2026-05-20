@@ -30,7 +30,7 @@ jest.mock('../../../models/SPV', () => ({
     wired: ['canceled'],
     canceled: []
   },
-  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'dataRoom', 'carry'],
+  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'memo', 'carry'],
   VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview'],
   VALID_COMPANY_STAGES: ['pre-seed', 'seed', 'series-a', 'series-b', 'post-revenue', 'other'],
   VALID_INCORPORATION_TYPES: ['c-corp', 'llc', 's-corp', 'other'],
@@ -99,7 +99,7 @@ describe('SPV Status Transition (Issue #580)', () => {
     it('should transition draft -> in_review when wizard steps are complete', async () => {
       const spv = mockSPV({
         Status: 'draft',
-        wizardCompletedSteps: ['terms', 'adviser', 'dataRoom', 'carry']
+        wizardCompletedSteps: ['terms', 'adviser', 'memo', 'carry']
       });
       req.params = { id: spv.SPVID };
       req.body = { status: 'in_review' };
@@ -113,10 +113,11 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(data.Status).toBe('in_review');
     });
 
-    it('should transition draft -> canceled (always allowed)', async () => {
+    it('should transition draft -> canceled for admin', async () => {
       const spv = mockSPV({ Status: 'draft' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'canceled' };
+      req.user = { id: 'admin-1', role: 'admin' };
 
       SPV.findOne.mockResolvedValue(spv);
       SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'canceled' });
@@ -150,10 +151,24 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(res.statusCode).toBe(200);
     });
 
-    it('should transition raising -> closing', async () => {
+    it('should transition in_review -> raising for founder user', async () => {
+      const spv = mockSPV({ Status: 'in_review' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'raising' };
+      req.user = { id: 'founder-1', role: 'founder' };
+
+      SPV.findOne.mockResolvedValue(spv);
+      SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'raising' });
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should transition raising -> closing for admin', async () => {
       const spv = mockSPV({ Status: 'raising' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'closing' };
+      req.user = { id: 'admin-1', role: 'admin' };
 
       SPV.findOne.mockResolvedValue(spv);
       SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'closing' });
@@ -162,10 +177,24 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(res.statusCode).toBe(200);
     });
 
-    it('should transition closing -> wired', async () => {
+    it('should transition raising -> closing for fund lead', async () => {
+      const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'closing' };
+      req.user = { id: 'lead-user-1', role: 'user' };
+
+      SPV.findOne.mockResolvedValue(spv);
+      SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'closing' });
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should transition closing -> wired for admin', async () => {
       const spv = mockSPV({ Status: 'closing' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'wired' };
+      req.user = { id: 'admin-1', role: 'admin' };
 
       SPV.findOne.mockResolvedValue(spv);
       SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'wired' });
@@ -174,11 +203,28 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(res.statusCode).toBe(200);
     });
 
-    it('should allow any status -> canceled', async () => {
+    it('should allow any status -> canceled for admin', async () => {
       for (const fromStatus of ['draft', 'in_review', 'raising', 'closing', 'wired']) {
         const spv = mockSPV({ Status: fromStatus });
         req.params = { id: spv.SPVID };
         req.body = { status: 'canceled' };
+        req.user = { id: 'admin-1', role: 'admin' };
+
+        SPV.findOne.mockResolvedValue(spv);
+        SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'canceled' });
+
+        const localRes = httpMocks.createResponse();
+        await spvController.transitionStatus(req, localRes);
+        expect(localRes.statusCode).toBe(200);
+      }
+    });
+
+    it('should allow any status -> canceled for fund lead', async () => {
+      for (const fromStatus of ['draft', 'in_review', 'raising', 'closing', 'wired']) {
+        const spv = mockSPV({ Status: fromStatus, fundLead: 'lead-user-1' });
+        req.params = { id: spv.SPVID };
+        req.body = { status: 'canceled' };
+        req.user = { id: 'lead-user-1', role: 'user' };
 
         SPV.findOne.mockResolvedValue(spv);
         SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'canceled' });
@@ -261,7 +307,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
       expect(data.message).toContain('missing required wizard steps');
-      expect(data.missingSteps).toEqual(['terms', 'adviser', 'dataRoom', 'carry']);
+      expect(data.missingSteps).toEqual(['terms', 'adviser', 'memo', 'carry']);
     });
 
     it('should return 400 with only the specific missing steps', async () => {
@@ -274,7 +320,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       await spvController.transitionStatus(req, res);
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.missingSteps).toEqual(['adviser', 'dataRoom']);
+      expect(data.missingSteps).toEqual(['adviser', 'memo']);
     });
 
     it('should return 400 when wizardCompletedSteps is undefined', async () => {
@@ -288,12 +334,12 @@ describe('SPV Status Transition (Issue #580)', () => {
       await spvController.transitionStatus(req, res);
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.missingSteps).toEqual(['terms', 'adviser', 'dataRoom', 'carry']);
+      expect(data.missingSteps).toEqual(['terms', 'adviser', 'memo', 'carry']);
     });
   });
 
-  describe('in_review -> raising without admin role returns 403', () => {
-    it('should return 403 for non-admin user', async () => {
+  describe('in_review -> raising without admin/founder role returns 403', () => {
+    it('should return 403 for non-admin/non-founder user', async () => {
       const spv = mockSPV({ Status: 'in_review' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'raising' };
@@ -305,6 +351,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       expect(res.statusCode).toBe(403);
       const data = JSON.parse(res._getData());
       expect(data.message).toContain('admin');
+      expect(data.message).toContain('founder');
     });
 
     it('should return 403 when user has no role', async () => {
@@ -332,6 +379,103 @@ describe('SPV Status Transition (Issue #580)', () => {
     });
   });
 
+  describe('raising -> closing guard (fund lead or admin)', () => {
+    it('should return 403 for regular user who is not fund lead', async () => {
+      const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'closing' };
+      req.user = { id: 'other-user', role: 'user' };
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toContain('fund lead');
+    });
+
+    it('should return 403 when no user on request', async () => {
+      const spv = mockSPV({ Status: 'raising' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'closing' };
+      req.user = null;
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('closing -> wired guard (admin only)', () => {
+    it('should return 403 for non-admin user', async () => {
+      const spv = mockSPV({ Status: 'closing' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'wired' };
+      req.user = { id: 'user-456', role: 'founder' };
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toContain('admin');
+    });
+
+    it('should return 403 for fund lead (admin only for wired)', async () => {
+      const spv = mockSPV({ Status: 'closing', fundLead: 'lead-user-1' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'wired' };
+      req.user = { id: 'lead-user-1', role: 'user' };
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('any -> canceled guard (fund lead or admin)', () => {
+    it('should return 403 for regular user who is not fund lead', async () => {
+      const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'canceled' };
+      req.user = { id: 'other-user', role: 'user' };
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+      const data = JSON.parse(res._getData());
+      expect(data.message).toContain('fund lead');
+    });
+
+    it('should return 403 when no user on request', async () => {
+      const spv = mockSPV({ Status: 'draft' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'canceled' };
+      req.user = null;
+
+      SPV.findOne.mockResolvedValue(spv);
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should allow founder to cancel', async () => {
+      const spv = mockSPV({ Status: 'raising' });
+      req.params = { id: spv.SPVID };
+      req.body = { status: 'canceled' };
+      req.user = { id: 'founder-1', role: 'founder' };
+
+      SPV.findOne.mockResolvedValue(spv);
+      SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'canceled' });
+
+      await spvController.transitionStatus(req, res);
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
   describe('statusHistory is appended correctly', () => {
     it('should append a new entry to existing statusHistory', async () => {
       const existingHistory = [
@@ -340,7 +484,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({
         Status: 'draft',
         statusHistory: existingHistory,
-        wizardCompletedSteps: ['terms', 'adviser', 'dataRoom', 'carry']
+        wizardCompletedSteps: ['terms', 'adviser', 'memo', 'carry']
       });
       req.params = { id: spv.SPVID };
       req.body = { status: 'in_review' };
@@ -370,7 +514,7 @@ describe('SPV Status Transition (Issue #580)', () => {
     it('should create statusHistory array when it does not exist', async () => {
       const spv = mockSPV({ Status: 'draft' });
       delete spv.statusHistory;
-      spv.wizardCompletedSteps = ['terms', 'adviser', 'dataRoom', 'carry'];
+      spv.wizardCompletedSteps = ['terms', 'adviser', 'memo', 'carry'];
       req.params = { id: spv.SPVID };
       req.body = { status: 'in_review' };
 

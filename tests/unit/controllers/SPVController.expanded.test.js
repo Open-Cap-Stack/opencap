@@ -27,7 +27,7 @@ jest.mock('../../../models/SPV', () => ({
   VALID_ADVISER_TYPES: ['platform-advisor', 'self-advised'],
   LEGACY_STATUS_MAP: { active: 'raising', inactive: 'draft', dissolved: 'canceled', pending: 'in_review', closed: 'wired', liquidated: 'canceled' },
   TRANSITION_RULES: { draft: ['in_review', 'canceled'], in_review: ['raising', 'draft', 'canceled'], raising: ['closing', 'canceled'], closing: ['wired', 'canceled'], wired: ['canceled'], canceled: [] },
-  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'dataRoom', 'carry'],
+  REQUIRED_STEPS_FOR_REVIEW: ['terms', 'adviser', 'memo', 'carry'],
   normalizeStatus: jest.fn((status) => {
     if (!status) return 'draft';
     const lower = status.toLowerCase();
