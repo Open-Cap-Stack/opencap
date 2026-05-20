@@ -102,15 +102,25 @@ describe('SPV Controller', () => {
   });
 
   describe('getSPVs', () => {
-    it('should return all SPVs', async () => {
+    it('should return all SPVs scoped to user companyId', async () => {
+      req.user = { companyId: 'COMPANY001' };
       const mockSPVs = [{ _id: 'spv1', SPVID: 'SPV001' }, { _id: 'spv2', SPVID: 'SPV002' }];
       SPV.find.mockResolvedValue(mockSPVs);
       await spvController.getSPVs(req, res);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData())).toEqual({ spvs: mockSPVs });
+      expect(SPV.find).toHaveBeenCalledWith({ ParentCompanyID: 'COMPANY001' });
+    });
+
+    it('should return empty when user has no companyId', async () => {
+      req.user = {};
+      await spvController.getSPVs(req, res);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res._getData())).toEqual({ message: 'No SPVs found', spvs: [] });
     });
 
     it('should return message when no SPVs found', async () => {
+      req.user = { companyId: 'COMPANY001' };
       SPV.find.mockResolvedValue([]);
       await spvController.getSPVs(req, res);
       expect(res.statusCode).toBe(200);
@@ -118,6 +128,7 @@ describe('SPV Controller', () => {
     });
 
     it('should return 500 on database error', async () => {
+      req.user = { companyId: 'COMPANY001' };
       SPV.find.mockRejectedValue(new Error('Database error'));
       await spvController.getSPVs(req, res);
       expect(res.statusCode).toBe(500);
