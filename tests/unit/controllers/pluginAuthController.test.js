@@ -3,10 +3,12 @@
  *
  * Tests for the OAuth 2.0 authorization server for plugin auth
  * Issue #505: OAuth 2.0 authorization server for plugin auth
+ * Issue #507: Refresh token support for plugin store submission
  *
  * Test Coverage:
  * - Authorization endpoint (redirect, validation, error cases)
  * - Token exchange endpoint (code exchange, validation, error cases)
+ * - Refresh token grant (rotation, expiration, validation)
  * - User info endpoint
  */
 
@@ -31,8 +33,9 @@ describe('Plugin Auth Controller', () => {
     process.env.PLUGIN_CLIENT_SECRET = 'test-client-secret';
     process.env.JWT_SECRET = 'test-jwt-secret-for-plugin-auth';
 
-    // Clear authorization codes between tests
+    // Clear authorization codes and refresh tokens between tests
     pluginAuthController._testing.authorizationCodes.clear();
+    pluginAuthController._testing.refreshTokens.clear();
 
     mockReq = {
       query: {},
@@ -212,7 +215,7 @@ describe('Plugin Auth Controller', () => {
     });
   });
 
-  describe('Given the token endpoint', () => {
+  describe('Given the token endpoint with grant_type=authorization_code', () => {
     let validCode;
 
     beforeEach(() => {
@@ -229,7 +232,7 @@ describe('Plugin Auth Controller', () => {
     });
 
     describe('When exchanging a valid authorization code', () => {
-      it('Then it should return an access token', () => {
+      it('Then it should return an access token and a refresh token', () => {
         mockReq.body = {
           code: validCode,
           client_id: 'test-client-id',
@@ -243,6 +246,7 @@ describe('Plugin Auth Controller', () => {
         expect(mockRes.status).toHaveBeenCalledWith(200);
         const responseBody = mockRes.json.mock.calls[0][0];
         expect(responseBody).toHaveProperty('access_token');
+        expect(responseBody).toHaveProperty('refresh_token');
         expect(responseBody.token_type).toBe('bearer');
         expect(responseBody.expires_in).toBe(3600);
 
@@ -255,6 +259,11 @@ describe('Plugin Auth Controller', () => {
 
         // Code should be consumed (single-use)
         expect(pluginAuthController._testing.authorizationCodes.has(validCode)).toBe(false);
+
+        // Refresh token should be stored
+        expect(pluginAuthController._testing.refreshTokens.has(responseBody.refresh_token)).toBe(true);
+        const rtData = pluginAuthController._testing.refreshTokens.get(responseBody.refresh_token);
+        expect(rtData.userId).toBe('user-123');
       });
     });
 
@@ -392,6 +401,198 @@ describe('Plugin Auth Controller', () => {
 
         expect(mockRes.status).toHaveBeenCalledWith(500);
         expect(mockRes.json).toHaveBeenCalledWith({ error: 'JWT secret not configured' });
+      });
+    });
+  });
+
+  describe('Given the token endpoint with grant_type=refresh_token', () => {
+    let validRefreshToken;
+
+    beforeEach(() => {
+      // Pre-populate a refresh token
+      validRefreshToken = 'rt_' + 'c'.repeat(93);
+      pluginAuthController._testing.refreshTokens.set(validRefreshToken, {
+        userId: 'user-123',
+        email: 'test@example.com',
+        companyId: 'company-456',
+        role: 'admin',
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+      });
+    });
+
+    describe('When refreshing with a valid refresh token', () => {
+      it('Then it should return a new access token and new refresh token', () => {
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: validRefreshToken,
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+        const responseBody = mockRes.json.mock.calls[0][0];
+        expect(responseBody).toHaveProperty('access_token');
+        expect(responseBody).toHaveProperty('refresh_token');
+        expect(responseBody.token_type).toBe('bearer');
+        expect(responseBody.expires_in).toBe(3600);
+
+        // Old refresh token should be invalidated (rotation)
+        expect(pluginAuthController._testing.refreshTokens.has(validRefreshToken)).toBe(false);
+
+        // New refresh token should be stored
+        expect(pluginAuthController._testing.refreshTokens.has(responseBody.refresh_token)).toBe(true);
+
+        // New refresh token should be different from old one
+        expect(responseBody.refresh_token).not.toBe(validRefreshToken);
+
+        // Verify new access token JWT
+        const decoded = jwt.verify(responseBody.access_token, 'test-jwt-secret-for-plugin-auth');
+        expect(decoded.userId).toBe('user-123');
+        expect(decoded.source).toBe('plugin');
+      });
+    });
+
+    describe('When refreshing with an invalid refresh token', () => {
+      it('Then it should return 400', () => {
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: 'invalid-token',
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          error: 'Invalid or expired refresh token'
+        });
+      });
+    });
+
+    describe('When refreshing with an expired refresh token', () => {
+      it('Then it should return 400', () => {
+        const expiredRefreshToken = 'rt_expired_' + 'd'.repeat(85);
+        pluginAuthController._testing.refreshTokens.set(expiredRefreshToken, {
+          userId: 'user-123',
+          email: 'test@example.com',
+          companyId: 'company-456',
+          role: 'admin',
+          expiresAt: Date.now() - 1000 // Already expired
+        });
+
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: expiredRefreshToken,
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          error: 'Refresh token has expired'
+        });
+
+        // Expired token should be cleaned up
+        expect(pluginAuthController._testing.refreshTokens.has(expiredRefreshToken)).toBe(false);
+      });
+    });
+
+    describe('When refreshing without providing a refresh token', () => {
+      it('Then it should return 400', () => {
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          error: 'refresh_token is required'
+        });
+      });
+    });
+
+    describe('When refreshing with invalid client_id', () => {
+      it('Then it should return 400', () => {
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: validRefreshToken,
+          client_id: 'wrong-client',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({ error: 'Invalid client_id' });
+      });
+    });
+
+    describe('When refreshing with invalid client_secret', () => {
+      it('Then it should return 401', () => {
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: validRefreshToken,
+          client_id: 'test-client-id',
+          client_secret: 'wrong-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(401);
+        expect(mockRes.json).toHaveBeenCalledWith({ error: 'Invalid client_secret' });
+      });
+    });
+
+    describe('When JWT_SECRET is missing during refresh', () => {
+      it('Then it should return 500', () => {
+        delete process.env.JWT_SECRET;
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: validRefreshToken,
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(500);
+        expect(mockRes.json).toHaveBeenCalledWith({ error: 'JWT secret not configured' });
+      });
+    });
+
+    describe('When a refresh token is reused after rotation', () => {
+      it('Then the reused token should be rejected', () => {
+        // First use: valid
+        mockReq.body = {
+          grant_type: 'refresh_token',
+          refresh_token: validRefreshToken,
+          client_id: 'test-client-id',
+          client_secret: 'test-client-secret'
+        };
+
+        pluginAuthController.token(mockReq, mockRes);
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+
+        // Second use: should fail (token was rotated)
+        mockRes.status.mockClear();
+        mockRes.json.mockClear();
+        mockRes.status.mockReturnThis();
+        mockRes.json.mockReturnThis();
+
+        pluginAuthController.token(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          error: 'Invalid or expired refresh token'
+        });
       });
     });
   });

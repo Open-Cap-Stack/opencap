@@ -7,7 +7,7 @@ const express = require('express');
 const path = require('path');
 const router = express.Router();
 
-const PUBLIC_DIR = path.join(__dirname, '../client/public');
+const PUBLIC_DIR = path.join(__dirname, '../public');
 
 const sendFile = (filename, contentType) => (req, res) => {
   res.setHeader('Content-Type', contentType);
@@ -29,6 +29,9 @@ router.get('/mcp-server-card.json', sendFile('mcp-server-card.json', 'applicatio
 router.get('/agent-manifest.txt', sendFile('agent-manifest.txt', 'text/plain; charset=utf-8'));
 router.get('/sdks.txt', sendFile('sdks.txt', 'text/plain; charset=utf-8'));
 router.get('/openapi.json', sendFile('openapi.json', 'application/json'));
+
+// Logo for plugin store
+router.get('/logo.png', sendFile('logo.png', 'image/png'));
 
 // .well-known paths
 router.get('/.well-known/security.txt', sendFile('.well-known/security.txt', 'text/plain; charset=utf-8'));

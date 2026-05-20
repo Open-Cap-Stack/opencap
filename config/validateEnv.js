@@ -134,6 +134,30 @@ function validateEnvironment() {
     }
   }
 
+  // Plugin OAuth configuration validation (Issue #507)
+  const pluginVars = ['PLUGIN_CLIENT_ID', 'PLUGIN_CLIENT_SECRET', 'PLUGIN_REDIRECT_URI'];
+  const hasAnyPlugin = pluginVars.some(v => !!process.env[v]);
+  if (hasAnyPlugin) {
+    // If any plugin var is set, all three should be set
+    for (const varName of pluginVars) {
+      if (!process.env[varName]) {
+        const msg = `${varName} is not set (required when other PLUGIN_* vars are configured)`;
+        if (isProd) {
+          errors.push(msg);
+        } else {
+          warnings.push(msg);
+        }
+      }
+    }
+  } else if (isProd) {
+    // In production, plugin vars are required for plugin store integration
+    for (const varName of pluginVars) {
+      if (!process.env[varName]) {
+        errors.push(`${varName} is required in production for plugin store integration`);
+      }
+    }
+  }
+
   // Emit warnings for non-production environments
   if (warnings.length > 0) {
     warnings.forEach(w => console.warn(`WARNING: ${w}`));

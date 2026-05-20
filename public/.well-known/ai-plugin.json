@@ -1,0 +1,21 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "OpenCap Stack",
+  "name_for_model": "opencap",
+  "description_for_human": "Manage your startup cap table: stakeholders, equity, valuations, documents, and financial reports — all through chat.",
+  "description_for_model": "OpenCap Stack is a cap table management platform. Use these tools to read and update stakeholder records, share classes, equity plans, SAFE agreements, fundraising rounds, 409A valuations, vesting schedules, dilution models, waterfall analyses, tax calculations, and financial reports. All operations require an authenticated user session established via OAuth.",
+  "auth": {
+    "type": "oauth",
+    "client_url": "https://api.opencapstack.com/api/v1/auth/plugin/authorize",
+    "scope": "cap_table:read cap_table:write documents:read documents:write reporting:read",
+    "authorization_url": "https://api.opencapstack.com/api/v1/auth/plugin/token",
+    "authorization_content_type": "application/json"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://api.opencapstack.com/.well-known/openapi.yaml"
+  },
+  "logo_url": "https://api.opencapstack.com/logo.png",
+  "contact_email": "support@opencapstack.com",
+  "legal_info_url": "https://opencapstack.com/terms"
+}
