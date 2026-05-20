@@ -11,6 +11,7 @@ const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const SPVController = require('../../controllers/SPV');
 const SPVNestedController = require('../../controllers/SPVNested');
+const SPVInvestorController = require('../../controllers/SPVInvestor');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -64,6 +65,46 @@ router.get('/compliance/:status', SPVController.getSPVsByComplianceStatus);
  * @access Private
  */
 router.get('/parent/:id', SPVController.getSPVsByParentCompany);
+
+/**
+ * SPV LP Investor Endpoints (Issue #590)
+ * These routes must be defined BEFORE the generic /:id route
+ */
+
+/**
+ * @route GET /api/v1/spv/:id/investors
+ * @desc List all LP investors for an SPV (supports ?status= filter)
+ * @access Private
+ */
+router.get('/:id/investors', SPVInvestorController.listInvestors);
+
+/**
+ * @route POST /api/v1/spv/:id/invite
+ * @desc Invite LPs to an SPV by email
+ * @access Private
+ */
+router.post('/:id/invite', SPVInvestorController.inviteInvestors);
+
+/**
+ * @route GET /api/v1/spv/:id/invite-link
+ * @desc Get a shareable invite link for an SPV
+ * @access Private
+ */
+router.get('/:id/invite-link', SPVInvestorController.getInviteLink);
+
+/**
+ * @route PATCH /api/v1/spv/:id/investors/:investorId
+ * @desc Update an LP investor record (status, committedAmount, tags, notes)
+ * @access Private
+ */
+router.patch('/:id/investors/:investorId', SPVInvestorController.updateInvestor);
+
+/**
+ * @route DELETE /api/v1/spv/:id/investors/:investorId
+ * @desc Remove an LP investor from an SPV
+ * @access Private
+ */
+router.delete('/:id/investors/:investorId', SPVInvestorController.deleteInvestor);
 
 /**
  * SPV Nested Endpoints (Issue #123)
