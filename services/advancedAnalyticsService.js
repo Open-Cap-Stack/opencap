@@ -45,10 +45,23 @@ class AdvancedAnalyticsService {
       }
     }
 
-    const [shareClasses, stakeholders] = await Promise.all([
+    const [shareClasses, allStakeholders] = await Promise.all([
       ShareClass.find({ companyId }),
       Stakeholder.find({ companyId })
     ]);
+
+    // Exclude investor-role stakeholders from the ownership chart — they are
+    // platform-wide investor directory entries, not company equity holders.
+    // Also require actual equity position: totalGrantedShares > 0, non-empty
+    // equityGrantIds, or non-zero equityHoldings (legacy field).
+    const stakeholders = allStakeholders.filter(sh => {
+      const role = (sh.role || '').toLowerCase();
+      if (role === 'investor') return false;
+      const hasGrantedShares = (sh.totalGrantedShares || 0) > 0;
+      const hasEquityGrants = Array.isArray(sh.equityGrantIds) && sh.equityGrantIds.length > 0;
+      const hasEquityHoldings = (sh.equityHoldings || 0) > 0;
+      return hasGrantedShares || hasEquityGrants || hasEquityHoldings;
+    });
 
     const totalAuthorizedShares = shareClasses.reduce(
       (sum, sc) => sum + (sc.authorizedShares || 0), 0

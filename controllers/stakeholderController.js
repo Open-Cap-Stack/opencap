@@ -112,7 +112,19 @@ exports.getAllStakeholders = async (req, res) => {
     }
 
     const { limit, skip } = parsePagination(req.query);
-    const stakeholders = await Stakeholder.find(filter, { limit, skip });
+    let stakeholders = await Stakeholder.find(filter, { limit, skip });
+
+    // Support ?excludeRole=investor (or comma-separated list) to let the
+    // frontend hide platform-wide investor directory entries from the cap table.
+    // Filtering is done in JS because ZeroDB's $nin support is unreliable.
+    if (req.query.excludeRole) {
+      const excludedRoles = req.query.excludeRole
+        .toLowerCase()
+        .split(',')
+        .map(r => r.trim().replace(/[\s-]+/g, '_'));
+      stakeholders = stakeholders.filter(sh => !excludedRoles.includes(sh.role));
+    }
+
     res.status(200).json(stakeholders.map(normalizeForDisplay));
   } catch (error) {
     logger.error('Error fetching stakeholders', { error: error.message });

@@ -22,7 +22,7 @@ const userSchema = {
     role: {
         type: 'string',
         required: true,
-        enum: ['admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant']
+        enum: ['super_admin', 'admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant']
     },
     permissions: { type: 'array', default: [] },
     status: {
@@ -60,6 +60,16 @@ const userSchema = {
 
 // Role-based permissions mapping
 const rolePermissions = {
+    super_admin: [
+        'read:users', 'write:users', 'delete:users',
+        'read:companies', 'write:companies', 'delete:companies',
+        'read:reports', 'write:reports', 'delete:reports',
+        'read:spv', 'write:spv', 'delete:spv',
+        'read:assets', 'write:assets', 'delete:assets',
+        'read:compliance', 'write:compliance', 'delete:compliance',
+        'admin:all',
+        'platform:manage_roles', 'platform:manage_tenants', 'platform:view_audit_logs'
+    ],
     admin: [
         'read:users', 'write:users', 'delete:users',
         'read:companies', 'write:companies', 'delete:companies',

@@ -55,7 +55,7 @@ describe('Advanced Analytics Service', () => {
 
         Stakeholder.find = jest.fn().mockResolvedValue([
           { stakeholderId: 'SH001', name: 'Founder 1', role: 'Founder', equityHoldings: 25 },
-          { stakeholderId: 'SH002', name: 'Investor 1', role: 'Investor', equityHoldings: 15 }
+          { stakeholderId: 'SH002', name: 'Employee 1', role: 'Employee', equityHoldings: 15 }
         ]);
 
         const result = await advancedAnalyticsService.getCapTableSummary(companyId);
@@ -65,6 +65,7 @@ describe('Advanced Analytics Service', () => {
         expect(result.totalAuthorizedShares).toBe(13000000);
         expect(result.totalDilutedShares).toBe(7000000);
         expect(result.shareClasses).toHaveLength(2);
+        // Only stakeholders with equity positions and non-investor roles are included
         expect(result.stakeholders).toHaveLength(2);
       });
 

@@ -46,7 +46,7 @@ function verifyCompanyAccess(options = {}) {
         }
 
         // Admin users bypass company scope check
-        if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+        if (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'super_admin') {
             return next();
         }
 

@@ -46,8 +46,12 @@ describe('User Model Role Enum Validation', () => {
       });
     });
 
-    it('should have exactly 7 role values', () => {
-      expect(User.schema.role.enum.length).toBe(7);
+    it('should have exactly 8 role values', () => {
+      expect(User.schema.role.enum.length).toBe(8);
+    });
+
+    it('should include super_admin role for platform-wide administrators', () => {
+      expect(User.schema.role.enum).toContain('super_admin');
     });
   });
 
