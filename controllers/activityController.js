@@ -16,12 +16,14 @@ const databaseAdapter = require('../services/databaseAdapter');
  * @param {Object} query - Request query parameters
  * @returns {Object} MongoDB-style query filter
  */
-const buildActivityFilter = (query) => {
+const buildActivityFilter = (query, user) => {
   const filter = {};
 
-  // Filter by companyId (only when explicitly provided)
-  if (query.companyId) {
-    filter.companyId = query.companyId;
+  // Scope by companyId: prefer explicit query param, fall back to the
+  // authenticated user's companyId so users only see their own data.
+  const companyId = query.companyId || user?.companyId;
+  if (companyId) {
+    filter.companyId = companyId;
   }
 
   // Filter by activity type — ZeroDB only supports equality; use single type only
@@ -72,8 +74,7 @@ exports.createActivity = async (req, res) => {
 exports.getActivities = async (req, res) => {
   try {
     // Build filter from query parameters (ZeroDB equality only)
-    const filter = buildActivityFilter(req.query);
-    // Do NOT auto-filter by req.user.companyId — rows may lack this field
+    const filter = buildActivityFilter(req.query, req.user);
 
     // Handle pagination
     const limit = Math.max(parseInt(req.query.limit) || 100, 1);

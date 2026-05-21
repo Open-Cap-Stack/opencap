@@ -44,8 +44,10 @@ exports.getEquityGrants = async (req, res) => {
   try {
     const query = {};
 
-    // Only filter by companyId if explicitly passed as a query param.
-    if (req.query.companyId) query.companyId = req.query.companyId;
+    // Scope by companyId: prefer explicit query param, fall back to the
+    // authenticated user's companyId so users only see their own data.
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
 
     // Apply filters from query params
     if (req.query.employeeId) {

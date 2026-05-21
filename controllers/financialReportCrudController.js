@@ -35,11 +35,17 @@ const listFinancialReports = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const reports = await FinancialReport.find()
+    // Scope by companyId: prefer explicit query param, fall back to the
+    // authenticated user's companyId so users only see their own data.
+    const companyId = req.query.companyId || req.user?.companyId;
+    const query = {};
+    if (companyId) query.companyId = companyId;
+
+    const reports = await FinancialReport.find(query)
       .skip(skip)
       .limit(limit);
 
-    const totalCount = await FinancialReport.countDocuments();
+    const totalCount = await FinancialReport.countDocuments(query);
     const totalPages = Math.ceil(totalCount / limit);
 
     res.status(200).json({

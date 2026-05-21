@@ -340,12 +340,18 @@ class FinancialReportController {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
       const skip = (page - 1) * limit;
 
-      const reports = await FinancialReport.find()
+      // Scope by companyId: prefer explicit query param, fall back to the
+      // authenticated user's companyId so users only see their own data.
+      const companyId = req.query.companyId || req.user?.companyId;
+      const query = {};
+      if (companyId) query.companyId = companyId;
+
+      const reports = await FinancialReport.find(query)
         .skip(skip)
         .limit(limit)
         .sort({ Timestamp: -1 });
 
-      const totalCount = await FinancialReport.countDocuments();
+      const totalCount = await FinancialReport.countDocuments(query);
       const totalPages = Math.ceil(totalCount / limit);
 
       res.status(200).json({

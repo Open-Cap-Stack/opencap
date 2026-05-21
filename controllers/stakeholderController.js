@@ -80,7 +80,15 @@ exports.createStakeholder = async (req, res) => {
     res.status(201).json(normalizeForDisplay(stakeholder));
   } catch (error) {
     logger.error('Error creating stakeholder', { error: error.message });
-    res.status(500).json({ error: 'Error creating stakeholder' });
+    const isValidation = error.message && (
+      error.message.includes('Invalid') ||
+      error.message.includes('required') ||
+      error.message.includes('must be')
+    );
+    return res.status(isValidation ? 400 : 500).json({
+      message: error.message || 'Error creating stakeholder',
+      error: error.message
+    });
   }
 };
 

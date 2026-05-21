@@ -32,9 +32,10 @@ exports.createFundraisingRound = async (req, res) => {
 exports.getFundraisingRounds = async (req, res) => {
   try {
     const query = {};
-    // Only filter by companyId when explicitly passed as a query param.
-    // Do NOT auto-filter by req.user.companyId — rows may lack this field.
-    if (req.query.companyId) query.companyId = req.query.companyId;
+    // Scope by companyId: prefer explicit query param, fall back to the
+    // authenticated user's companyId so users only see their own data.
+    const companyId = req.query.companyId || req.user?.companyId;
+    if (companyId) query.companyId = companyId;
     const rounds = await databaseAdapter.find('FundraisingRound', query, {});
     res.status(200).json(rounds);
   } catch (error) {

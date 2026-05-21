@@ -14,12 +14,14 @@ const { parsePagination } = require('../middleware/pagination');
  * @param {Object} query - Request query parameters
  * @returns {Object} MongoDB-style query filter
  */
-const buildNotificationFilter = (query) => {
+const buildNotificationFilter = (query, user) => {
   const filter = {};
 
-  // Filter by companyId (only when explicitly provided)
-  if (query.companyId) {
-    filter.companyId = query.companyId;
+  // Scope by companyId: prefer explicit query param, fall back to the
+  // authenticated user's companyId so users only see their own data.
+  const companyId = query.companyId || user?.companyId;
+  if (companyId) {
+    filter.companyId = companyId;
   }
 
   // Filter by notification type — ZeroDB only supports equality; single type only
@@ -96,8 +98,7 @@ exports.createNotification = async (req, res) => {
 exports.getNotifications = async (req, res) => {
   try {
     // Build filter from query parameters (ZeroDB equality only)
-    const filter = buildNotificationFilter(req.query);
-    // Do NOT auto-filter by req.user.companyId — rows may lack this field
+    const filter = buildNotificationFilter(req.query, req.user);
 
     const { limit, skip } = parsePagination({
       limit: req.query.limit,

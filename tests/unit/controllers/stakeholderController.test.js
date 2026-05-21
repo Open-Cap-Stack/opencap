@@ -92,7 +92,10 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.createStakeholder(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
-      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Error creating stakeholder' });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Database connection error',
+        error: 'Database connection error'
+      });
     });
   });
 
