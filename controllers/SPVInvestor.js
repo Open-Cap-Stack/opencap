@@ -7,11 +7,62 @@
  */
 
 const SPVInvestor = require('../models/SPVInvestor');
+const SPV = require('../models/SPV');
+
+/**
+ * Maximum number of emails that can be invited in a single request.
+ */
+const MAX_BATCH_SIZE = 25;
 
 /**
  * Whitelisted fields for PATCH updates on an investor record.
  */
 const UPDATABLE_FIELDS = ['status', 'committedAmount', 'wiredAmount', 'tags', 'notes', 'accreditation', 'name'];
+
+/**
+ * Strip HTML tags from a string to prevent XSS / stored HTML injection.
+ */
+const sanitizeText = (str) => (str || '').replace(/<[^>]*>/g, '').trim();
+
+/**
+ * Remove inviteToken from an investor record before returning to the client.
+ */
+function sanitizeInvestor(inv) {
+  if (!inv) return inv;
+  const { inviteToken, ...safe } = typeof inv === 'object' ? inv : {};
+  return safe;
+}
+
+/**
+ * Verify that the SPV exists and belongs to the requesting user's company.
+ * Returns { spv, error } — if error is truthy the handler should return early.
+ */
+async function verifySPVOwnership(req, res, spvId) {
+  const spv = await SPV.findBySPVID(spvId);
+  if (!spv) {
+    // Also try by row_id
+    const spvById = await SPV.findById(spvId).catch(() => null);
+    if (!spvById) {
+      res.status(404).json({ message: 'SPV not found' });
+      return { spv: null, error: true };
+    }
+    // Check ownership
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      if (spvById.ParentCompanyID !== req.user.companyId) {
+        res.status(403).json({ message: 'Access denied' });
+        return { spv: null, error: true };
+      }
+    }
+    return { spv: spvById, error: false };
+  }
+  if (req.user && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+    if (spv.ParentCompanyID !== req.user.companyId) {
+      res.status(403).json({ message: 'Access denied' });
+      return { spv: null, error: true };
+    }
+  }
+  return { spv, error: false };
+}
 
 /**
  * GET /api/v1/spv/:id/investors
@@ -26,6 +77,9 @@ exports.listInvestors = async (req, res) => {
       return res.status(400).json({ message: 'SPV ID is required' });
     }
 
+    const { error } = await verifySPVOwnership(req, res, spvId);
+    if (error) return;
+
     const filter = {};
     if (req.query.status) {
       if (!SPVInvestor.validators.isValidStatus(req.query.status)) {
@@ -37,7 +91,7 @@ exports.listInvestors = async (req, res) => {
     }
 
     const investors = await SPVInvestor.findBySPV(spvId, filter);
-    res.status(200).json({ investors });
+    res.status(200).json({ investors: investors.map(sanitizeInvestor) });
   } catch (error) {
     res.status(500).json({ message: 'Failed to list investors', error: error.message });
   }
@@ -52,7 +106,7 @@ exports.listInvestors = async (req, res) => {
 exports.inviteInvestors = async (req, res) => {
   try {
     const { id: spvId } = req.params;
-    const { emails, message } = req.body;
+    const { emails, message, notes } = req.body;
 
     if (!spvId || spvId.trim() === '') {
       return res.status(400).json({ message: 'SPV ID is required' });
@@ -61,6 +115,14 @@ exports.inviteInvestors = async (req, res) => {
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return res.status(400).json({ message: 'emails array is required and must not be empty' });
     }
+
+    // Enforce max batch size to prevent timeout on large payloads
+    if (emails.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({ message: `Maximum ${MAX_BATCH_SIZE} invites per request` });
+    }
+
+    const { error } = await verifySPVOwnership(req, res, spvId);
+    if (error) return;
 
     // Validate all emails before creating any records
     const invalidEmails = emails.filter(e => !SPVInvestor.validators.isValidEmail(e));
@@ -71,25 +133,46 @@ exports.inviteInvestors = async (req, res) => {
       });
     }
 
-    const created = [];
+    // Sanitize text fields to prevent stored HTML/XSS
+    const sanitizedMessage = sanitizeText(message);
+    const sanitizedNotes = sanitizeText(notes);
+
+    // Bulk-fetch all existing investors for this SPV in a single query
+    const existingInvestors = await SPVInvestor.findBySPV(spvId);
+    const existingEmails = new Set(
+      (existingInvestors || []).map(inv => inv.email)
+    );
+
     const skipped = [];
+    const newEmails = [];
 
     for (const email of emails) {
-      // Check if this email is already invited to this SPV
-      const existing = await SPVInvestor.findOne({ spvId, email });
-      if (existing) {
+      if (existingEmails.has(email)) {
         skipped.push({ email, reason: 'already invited' });
-        continue;
+      } else {
+        newEmails.push(email);
       }
+    }
 
-      const investor = await SPVInvestor.create({
-        spvId,
-        email,
-        name: email.split('@')[0], // Default name from email prefix
-        status: 'invited',
-        notes: message || ''
-      });
-      created.push(investor);
+    // Create all new investors in parallel
+    const results = await Promise.allSettled(
+      newEmails.map(email =>
+        SPVInvestor.create({
+          spvId,
+          email,
+          name: email.split('@')[0], // Default name from email prefix
+          status: 'invited',
+          notes: sanitizedMessage || sanitizedNotes || ''
+        })
+      )
+    );
+
+    const created = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        created.push(result.value);
+      }
+      // Failed creations are silently skipped; could be logged in production
     }
 
     res.status(201).json({ created, skipped });
@@ -111,6 +194,9 @@ exports.getInviteLink = async (req, res) => {
     if (!spvId || spvId.trim() === '') {
       return res.status(400).json({ message: 'SPV ID is required' });
     }
+
+    const { error } = await verifySPVOwnership(req, res, spvId);
+    if (error) return;
 
     const token = SPVInvestor.generateInviteToken();
     const baseUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
@@ -136,6 +222,9 @@ exports.updateInvestor = async (req, res) => {
     if (!investorId || investorId.trim() === '') {
       return res.status(400).json({ message: 'Investor ID is required' });
     }
+
+    const { error } = await verifySPVOwnership(req, res, spvId);
+    if (error) return;
 
     // Build the update payload from whitelisted fields only
     const updateData = {};
@@ -176,7 +265,7 @@ exports.updateInvestor = async (req, res) => {
       { new: true }
     );
 
-    res.status(200).json(updated);
+    res.status(200).json(sanitizeInvestor(updated));
   } catch (error) {
     res.status(500).json({ message: 'Failed to update investor', error: error.message });
   }
@@ -196,6 +285,9 @@ exports.deleteInvestor = async (req, res) => {
     if (!investorId || investorId.trim() === '') {
       return res.status(400).json({ message: 'Investor ID is required' });
     }
+
+    const { error } = await verifySPVOwnership(req, res, spvId);
+    if (error) return;
 
     const investor = await SPVInvestor.findOne({ _id: investorId, spvId });
     if (!investor) {

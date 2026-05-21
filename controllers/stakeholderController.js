@@ -125,6 +125,19 @@ exports.getAllStakeholders = async (req, res) => {
       stakeholders = stakeholders.filter(sh => !excludedRoles.includes(sh.role));
     }
 
+    // Support ?search= for client-side text search across name, email, and notes.
+    // Done in JS after DB fetch since ZeroDB may not support native text search.
+    const search = req.query.search;
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim().toLowerCase();
+      stakeholders = stakeholders.filter(sh => {
+        const name = (sh.name || '').toLowerCase();
+        const email = (sh.email || '').toLowerCase();
+        const notes = (sh.notes || '').toLowerCase();
+        return name.includes(term) || email.includes(term) || notes.includes(term);
+      });
+    }
+
     res.status(200).json(stakeholders.map(normalizeForDisplay));
   } catch (error) {
     logger.error('Error fetching stakeholders', { error: error.message });

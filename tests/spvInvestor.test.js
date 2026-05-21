@@ -10,6 +10,14 @@
  *   DELETE /api/v1/spv/:id/investors/:investorId
  */
 
+// Mock the SPV model (for ownership checks)
+jest.mock('../models/SPV', () => ({
+  findBySPVID: jest.fn(),
+  findById: jest.fn(),
+  VALID_STATUSES: ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'],
+  VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview']
+}));
+
 // Mock the SPVInvestor model before requiring the controller
 jest.mock('../models/SPVInvestor', () => {
   const VALID_STATUSES = ['invited', 'applied', 'committed', 'wired', 'declined'];
@@ -28,6 +36,7 @@ jest.mock('../models/SPVInvestor', () => {
   };
 });
 
+const SPV = require('../models/SPV');
 const SPVInvestor = require('../models/SPVInvestor');
 const controller = require('../controllers/SPVInvestor');
 
@@ -37,7 +46,7 @@ function mockReqRes(overrides = {}) {
     params: {},
     body: {},
     query: {},
-    user: { _id: 'user_1', userId: 'user_1', companyId: 'comp_1' },
+    user: { _id: 'user_1', userId: 'user_1', companyId: 'comp_1', role: 'admin' },
     ...overrides
   };
   const res = {
@@ -49,16 +58,18 @@ function mockReqRes(overrides = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default: SPV exists and belongs to the user's company
+  SPV.findBySPVID.mockResolvedValue({ SPVID: 'spv_1', ParentCompanyID: 'comp_1' });
 });
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/spv/:id/investors
 // ---------------------------------------------------------------------------
 describe('listInvestors', () => {
-  it('returns investors for a given SPV', async () => {
+  it('returns investors for a given SPV (inviteToken stripped)', async () => {
     const investors = [
-      { _id: 'inv_1', spvId: 'spv_1', email: 'a@b.com', name: 'Alice', status: 'invited' },
-      { _id: 'inv_2', spvId: 'spv_1', email: 'c@d.com', name: 'Bob', status: 'committed' }
+      { _id: 'inv_1', spvId: 'spv_1', email: 'a@b.com', name: 'Alice', status: 'invited', inviteToken: 'secret1' },
+      { _id: 'inv_2', spvId: 'spv_1', email: 'c@d.com', name: 'Bob', status: 'committed', inviteToken: 'secret2' }
     ];
     SPVInvestor.findBySPV.mockResolvedValue(investors);
 
@@ -67,7 +78,12 @@ describe('listInvestors', () => {
 
     expect(SPVInvestor.findBySPV).toHaveBeenCalledWith('spv_1', {});
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ investors });
+    const response = res.json.mock.calls[0][0];
+    expect(response.investors).toHaveLength(2);
+    // Ensure inviteToken is stripped
+    response.investors.forEach(inv => {
+      expect(inv).not.toHaveProperty('inviteToken');
+    });
   });
 
   it('filters by status query param', async () => {
@@ -103,6 +119,28 @@ describe('listInvestors', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
+  it('returns 404 when SPV does not exist', async () => {
+    SPV.findBySPVID.mockResolvedValue(null);
+    SPV.findById.mockResolvedValue(null);
+
+    const { req, res } = mockReqRes({ params: { id: 'spv_nonexistent' } });
+    await controller.listInvestors(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('returns 403 when SPV belongs to another company', async () => {
+    SPV.findBySPVID.mockResolvedValue({ SPVID: 'spv_1', ParentCompanyID: 'other_comp' });
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_1' },
+      user: { _id: 'user_1', userId: 'user_1', companyId: 'comp_1', role: 'user' }
+    });
+    await controller.listInvestors(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
   it('returns 500 on unexpected error', async () => {
     SPVInvestor.findBySPV.mockRejectedValue(new Error('db down'));
 
@@ -117,8 +155,8 @@ describe('listInvestors', () => {
 // POST /api/v1/spv/:id/invite
 // ---------------------------------------------------------------------------
 describe('inviteInvestors', () => {
-  it('creates investor records for each email', async () => {
-    SPVInvestor.findOne.mockResolvedValue(null);
+  it('creates investor records for each email (parallel)', async () => {
+    SPVInvestor.findBySPV.mockResolvedValue([]); // no existing investors
     SPVInvestor.create.mockImplementation(async (data) => ({
       _id: 'inv_new',
       ...data,
@@ -139,10 +177,8 @@ describe('inviteInvestors', () => {
   });
 
   it('skips already-invited emails', async () => {
-    // First email already exists, second does not
-    SPVInvestor.findOne
-      .mockResolvedValueOnce({ _id: 'existing' })
-      .mockResolvedValueOnce(null);
+    // First email already exists in the SPV
+    SPVInvestor.findBySPV.mockResolvedValue([{ email: 'a@b.com' }]);
     SPVInvestor.create.mockResolvedValue({ _id: 'inv_new', email: 'c@d.com' });
 
     const { req, res } = mockReqRes({
@@ -181,6 +217,20 @@ describe('inviteInvestors', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
+  it('returns 400 when batch size exceeds limit', async () => {
+    const emails = Array.from({ length: 26 }, (_, i) => `user${i}@example.com`);
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_1' },
+      body: { emails }
+    });
+    await controller.inviteInvestors(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Maximum 25 invites per request') })
+    );
+  });
+
   it('returns 400 for invalid email addresses', async () => {
     const { req, res } = mockReqRes({
       params: { id: 'spv_1' },
@@ -191,6 +241,21 @@ describe('inviteInvestors', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ invalidEmails: ['not-an-email'] })
+    );
+  });
+
+  it('strips HTML from message field', async () => {
+    SPVInvestor.findBySPV.mockResolvedValue([]);
+    SPVInvestor.create.mockImplementation(async (data) => ({ _id: 'inv_new', ...data }));
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_1' },
+      body: { emails: ['a@b.com'], message: '<script>alert("xss")</script>Hello' }
+    });
+    await controller.inviteInvestors(req, res);
+
+    expect(SPVInvestor.create).toHaveBeenCalledWith(
+      expect.objectContaining({ notes: 'alert("xss")Hello' })
     );
   });
 
@@ -205,7 +270,7 @@ describe('inviteInvestors', () => {
   });
 
   it('returns 500 on unexpected error', async () => {
-    SPVInvestor.findOne.mockRejectedValue(new Error('db down'));
+    SPVInvestor.findBySPV.mockRejectedValue(new Error('db down'));
 
     const { req, res } = mockReqRes({
       params: { id: 'spv_1' },
@@ -244,14 +309,15 @@ describe('getInviteLink', () => {
 // PATCH /api/v1/spv/:id/investors/:investorId
 // ---------------------------------------------------------------------------
 describe('updateInvestor', () => {
-  it('updates investor status and sets committedAt', async () => {
+  it('updates investor status and sets committedAt (inviteToken stripped)', async () => {
     const existing = { _id: 'inv_1', spvId: 'spv_1', status: 'invited' };
     SPVInvestor.findOne.mockResolvedValue(existing);
     SPVInvestor.findOneAndUpdate.mockResolvedValue({
       ...existing,
       status: 'committed',
       committedAmount: 50000,
-      committedAt: expect.any(String)
+      committedAt: expect.any(String),
+      inviteToken: 'secret_tok'
     });
 
     const { req, res } = mockReqRes({
@@ -261,6 +327,8 @@ describe('updateInvestor', () => {
     await controller.updateInvestor(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
+    const response = res.json.mock.calls[0][0];
+    expect(response).not.toHaveProperty('inviteToken');
     expect(SPVInvestor.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'inv_1', spvId: 'spv_1' },
       {

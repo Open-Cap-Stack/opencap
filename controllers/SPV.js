@@ -580,9 +580,9 @@ exports.transitionStatus = async (req, res) => {
  */
 exports.getSPVAnalytics = async (req, res) => {
   try {
-    const { companyId } = req.query;
+    const companyId = req.query.companyId || req.user?.companyId;
 
-    // Build filter
+    // Build filter — scope by companyId when available
     const filter = {};
     if (companyId) {
       filter.ParentCompanyID = companyId;
@@ -593,7 +593,7 @@ exports.getSPVAnalytics = async (req, res) => {
 
     // Calculate analytics
     const totalSPVs = spvs.length;
-    const activeSPVs = spvs.filter(spv => spv.Status === 'Active');
+    const activeSPVs = spvs.filter(spv => spv.Status === 'raising');
 
     // Calculate totals (using placeholder values if fields don't exist)
     const totalAssets = spvs.reduce((sum, spv) => sum + (spv.TotalAssets || 0), 0);
