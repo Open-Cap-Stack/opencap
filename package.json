@@ -34,7 +34,7 @@
     "@langchain/langgraph": "^0.2.22",
     "@types/ws": "^8.18.1",
     "argon2": "^0.40.3",
-    "axios": "^1.13.5",
+    "axios": "^1.16.1",
     "bcrypt": "^5.1.1",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
