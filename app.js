@@ -486,6 +486,9 @@ app.post('/api/v1/exports', (req, res) => res.status(202).json({ status: 'queued
 // document-access (frontend) → document-accesses (backend)
 const documentAccessRouteModule = safeRequire(path.join(__dirname, 'routes/v1/documentAccessRoutes'));
 if (documentAccessRouteModule) app.use('/api/v1/document-access', documentAccessRouteModule);
+
+const apiKeyRouteModule = safeRequire(path.join(__dirname, 'routes/v1/apiKeyRoutes'));
+if (apiKeyRouteModule) app.use('/api/v1/api-keys', apiKeyRouteModule);
 // billing sub-routes — /billing/current and /billing/invoices already exist under /api/v1/billing
 // frontend calls /billing/current but backend has /billing/current-plan
 app.get('/api/v1/billing/current', (req, res, next) => {

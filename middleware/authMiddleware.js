@@ -129,11 +129,23 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ message: 'No token provided' });
     }
     
+    // API key fast-path: tokens starting with 'ocs_' are self-service API keys
+    if (token.startsWith('ocs_')) {
+      const { resolveApiKey } = require('../controllers/apiKeyController');
+      const apiUser = await resolveApiKey(token);
+      if (!apiUser) {
+        return res.status(401).json({ message: 'Invalid API key' });
+      }
+      req.user = apiUser;
+      req.token = token;
+      return next();
+    }
+
     // Check if token is blacklisted
     if (await isTokenBlacklisted(token)) {
       return res.status(401).json({ message: 'Token is invalidated' });
     }
-    
+
     // Verify token with timeout
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET environment variable is required');

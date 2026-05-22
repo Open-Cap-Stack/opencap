@@ -133,6 +133,15 @@ exports.createSPV = async (req, res) => {
       }
     }
 
+    // Coerce numeric fields from string to number
+    const numericFields = ['discount', 'carryPercentage', 'platformCarryPercentage', 'roundSize', 'allocation', 'valuationCap', 'gpCommitmentAmount', 'lpMinimumInvestment', 'totalRaised', 'lpCount'];
+    for (const field of numericFields) {
+      if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== '') {
+        const parsed = parseFloat(req.body[field]);
+        if (!isNaN(parsed)) req.body[field] = parsed;
+      }
+    }
+
     // Pick and validate extended fields from request body
     const { data: extendedData, error: extendedError } = pickExtendedFields(req.body);
     if (extendedError) {
@@ -175,8 +184,22 @@ exports.getSPVs = async (req, res) => {
     // If no companyId is resolvable, return empty — never leak cross-company data.
     const parentCompanyId = req.user?.companyId || req.query.companyId;
     if (!parentCompanyId) return res.status(200).json({ message: 'No SPVs found', spvs: [] });
-    const filter = { ParentCompanyID: parentCompanyId };
-    const spvs = await SPV.find(filter);
+
+    // Fetch SPVs matching either ParentCompanyID or companyId
+    const [byParent, byCompany] = await Promise.all([
+      SPV.find({ ParentCompanyID: parentCompanyId }),
+      SPV.find({ companyId: parentCompanyId })
+    ]);
+
+    // Merge and deduplicate by SPVID
+    const seen = new Set();
+    const spvs = [...byParent, ...byCompany].filter(s => {
+      const id = s.SPVID || s._id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
     if (spvs.length === 0) {
       return res.status(200).json({ message: 'No SPVs found', spvs: [] });
     }
@@ -268,6 +291,15 @@ exports.updateSPV = async (req, res) => {
       });
     }
 
+    // Coerce numeric fields from string to number
+    const numericFields = ['discount', 'carryPercentage', 'platformCarryPercentage', 'roundSize', 'allocation', 'valuationCap', 'gpCommitmentAmount', 'lpMinimumInvestment', 'totalRaised', 'lpCount'];
+    for (const field of numericFields) {
+      if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== '') {
+        const parsed = parseFloat(req.body[field]);
+        if (!isNaN(parsed)) req.body[field] = parsed;
+      }
+    }
+
     // Pick and validate extended fields from request body
     const { data: extendedData, error: extendedError } = pickExtendedFields(req.body);
     if (extendedError) {
@@ -335,7 +367,11 @@ exports.getSPVsByStatus = async (req, res) => {
       });
     }
 
-    const spvs = await SPV.find({ Status: normalizedStatus });
+    const companyId = req.query.companyId || req.user?.companyId;
+    const filter = { Status: normalizedStatus };
+    if (companyId) filter.ParentCompanyID = companyId;
+
+    const spvs = await SPV.find(filter);
 
     if (!spvs || spvs.length === 0) {
       return res.status(404).json({ message: `No SPVs found with status: ${normalizedStatus}` });
@@ -363,7 +399,11 @@ exports.getSPVsByComplianceStatus = async (req, res) => {
       });
     }
 
-    const spvs = await SPV.find({ ComplianceStatus: status });
+    const companyId = req.query.companyId || req.user?.companyId;
+    const filter = { ComplianceStatus: status };
+    if (companyId) filter.ParentCompanyID = companyId;
+
+    const spvs = await SPV.find(filter);
 
     if (!spvs || spvs.length === 0) {
       return res.status(404).json({ message: `No SPVs found with compliance status: ${status}` });

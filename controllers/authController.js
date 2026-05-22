@@ -243,7 +243,7 @@ const loginUser = async (req, res) => {
         companyId: user.companyId || null
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     const refreshToken = jwt.sign(
@@ -493,7 +493,7 @@ const oauthLogin = async (req, res) => {
         companyId: user.companyId || null
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     const refreshToken = jwt.sign(
@@ -570,7 +570,7 @@ const refreshToken = async (req, res) => {
         companyId: user.companyId || null
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     return res.status(200).json({
@@ -650,7 +650,7 @@ const requestPasswordReset = async (req, res) => {
       const resetToken = jwt.sign(
         { userId: user.userId || user._id },
         resetSecret,
-        { expiresIn: '1h' }
+        { expiresIn: '24h' }
       );
 
       // Send reset email
@@ -1113,7 +1113,7 @@ const exchangeAINativeToken = async (req, res) => {
         companyId: localUser.companyId || null
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     const localRefreshToken = jwt.sign(
@@ -1188,7 +1188,7 @@ const ainativeLogin = async (req, res) => {
     const accessToken = jwt.sign(
       { userId, email: localUser.email, role: localUser.role || 'user', permissions: localUser.permissions || [], companyId: localUser.companyId || null },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
     const localRefreshToken = jwt.sign(
       { userId },

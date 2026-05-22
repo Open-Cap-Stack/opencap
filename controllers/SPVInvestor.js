@@ -48,17 +48,31 @@ async function verifySPVOwnership(req, res, spvId) {
     }
     // Check ownership
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
-      if (spvById.ParentCompanyID !== req.user.companyId) {
-        res.status(403).json({ message: 'Access denied' });
-        return { spv: null, error: true };
+      const userCompany = req.user.companyId;
+      const spvCompany = spvById.ParentCompanyID || spvById.companyId;
+      if (!userCompany || (spvCompany !== userCompany)) {
+        // Also allow if user created this SPV (fallback)
+        const userId = req.user.id || req.user.userId;
+        const isCreator = spvById.createdBy && userId && spvById.createdBy === userId;
+        if (!isCreator) {
+          res.status(403).json({ message: 'Access denied' });
+          return { spv: null, error: true };
+        }
       }
     }
     return { spv: spvById, error: false };
   }
   if (req.user && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
-    if (spv.ParentCompanyID !== req.user.companyId) {
-      res.status(403).json({ message: 'Access denied' });
-      return { spv: null, error: true };
+    const userCompany = req.user.companyId;
+    const spvCompany = spv.ParentCompanyID || spv.companyId;
+    if (!userCompany || (spvCompany !== userCompany)) {
+      // Also allow if user created this SPV (fallback)
+      const userId = req.user.id || req.user.userId;
+      const isCreator = spv.createdBy && userId && spv.createdBy === userId;
+      if (!isCreator) {
+        res.status(403).json({ message: 'Access denied' });
+        return { spv: null, error: true };
+      }
     }
   }
   return { spv, error: false };
