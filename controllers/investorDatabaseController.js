@@ -46,8 +46,10 @@ exports.listInvestors = async (req, res) => {
     const sectorFilter = (req.query.sector || '').trim().toLowerCase();
     const stageFilter = (req.query.stage || '').trim().toLowerCase();
 
-    // Only fetch VC import rows — identified by @vc-import.local email domain
-    const queryOptions = { filter: { email: '@vc-import.local' }, limit, skip };
+    // VC investor rows are in the stakeholders table with companyId: ainative-studio
+    // and email domain @vc-import.local. ZeroDB doesn't support suffix matching so
+    // we query by companyId and filter client-side.
+    const queryOptions = { filter: { companyId: 'ainative-studio' }, limit, skip };
 
     const result = await zerodbService.queryTable('stakeholders', queryOptions);
     let rows = Array.isArray(result) ? result : (result.data || []);
@@ -55,7 +57,7 @@ exports.listInvestors = async (req, res) => {
     // Extract row_data from ZeroDB envelope if present
     rows = rows.map((r) => (r.row_data ? { ...r.row_data, _rowId: r.row_id } : r));
 
-    // Ensure only vc-import rows are returned (guard against filter falling back to full scan)
+    // Only return vc-import rows (guards against any future real stakeholders with this companyId)
     rows = rows.filter((r) => (r.email || '').toLowerCase().endsWith('@vc-import.local'));
 
     // Apply text search across name, email, firm, notes
@@ -110,7 +112,7 @@ exports.countInvestors = async (req, res) => {
   if (!checkRole(req, res)) return;
 
   try {
-    const result = await zerodbService.queryTable('stakeholders', { filter: { email: '@vc-import.local' }, limit: 1 });
+    const result = await zerodbService.queryTable('stakeholders', { filter: { companyId: 'ainative-studio' }, limit: 1 });
     const total = result.total ?? (Array.isArray(result) ? result.length : (result.data?.length ?? 0));
     return res.status(200).json({ count: total });
   } catch (error) {
