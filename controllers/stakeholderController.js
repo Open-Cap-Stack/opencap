@@ -122,6 +122,13 @@ exports.getAllStakeholders = async (req, res) => {
     const { limit, skip } = parsePagination(req.query);
     let stakeholders = await Stakeholder.find(filter, { limit, skip });
 
+    // Always exclude VC import rows — these are system-wide investor directory
+    // entries, not company stakeholders. They are served via /investor-database.
+    stakeholders = stakeholders.filter(sh => {
+      const email = (sh.email || '').toLowerCase();
+      return !email.endsWith('@vc-import.local');
+    });
+
     // Support ?excludeRole=investor (or comma-separated list) to let the
     // frontend hide platform-wide investor directory entries from the cap table.
     // Filtering is done in JS because ZeroDB's $nin support is unreliable.
