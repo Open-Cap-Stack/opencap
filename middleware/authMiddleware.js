@@ -285,6 +285,13 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ message: 'Token verification timed out' });
     }
 
+    // ZeroDB / upstream network errors should not log the user out.
+    // Return 503 so the frontend can distinguish a transient backend failure
+    // from a real auth failure (401/403).
+    if (error.isAxiosError || error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+      console.error('Authentication error (upstream unavailable):', error.message);
+      return res.status(503).json({ message: 'Service temporarily unavailable, please retry' });
+    }
     console.error('Authentication error:', error);
     res.status(500).json({ message: 'Authentication error' });
   }
