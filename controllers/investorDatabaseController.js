@@ -1,9 +1,14 @@
 /**
  * Investor Database Controller
  *
- * Serves system-wide VC investor records from the `investors` table.
- * No company scoping — this is a platform-wide directory.
+ * Serves system-wide VC investor records stored in the `stakeholders` table
+ * with email domain @vc-import.local. No company scoping — platform-wide directory.
  * Access is gated to paid roles: admin, founder, accountant.
+ *
+ * Architecture note: VC investor records live in the stakeholders table identified
+ * by their @vc-import.local email. The stakeholderController excludes these rows
+ * so they never appear on a company cap table. This avoids a costly data migration
+ * given ZeroDB's per-row API rate limits.
  */
 
 'use strict';
@@ -41,13 +46,17 @@ exports.listInvestors = async (req, res) => {
     const sectorFilter = (req.query.sector || '').trim().toLowerCase();
     const stageFilter = (req.query.stage || '').trim().toLowerCase();
 
-    const queryOptions = { filter: {}, limit, skip };
+    // Only fetch VC import rows — identified by @vc-import.local email domain
+    const queryOptions = { filter: { email: '@vc-import.local' }, limit, skip };
 
     const result = await zerodbService.queryTable('stakeholders', queryOptions);
     let rows = Array.isArray(result) ? result : (result.data || []);
 
     // Extract row_data from ZeroDB envelope if present
     rows = rows.map((r) => (r.row_data ? { ...r.row_data, _rowId: r.row_id } : r));
+
+    // Ensure only vc-import rows are returned (guard against filter falling back to full scan)
+    rows = rows.filter((r) => (r.email || '').toLowerCase().endsWith('@vc-import.local'));
 
     // Apply text search across name, email, firm, notes
     if (search) {
@@ -101,7 +110,7 @@ exports.countInvestors = async (req, res) => {
   if (!checkRole(req, res)) return;
 
   try {
-    const result = await zerodbService.queryTable('stakeholders', { filter: {}, limit: 1 });
+    const result = await zerodbService.queryTable('stakeholders', { filter: { email: '@vc-import.local' }, limit: 1 });
     const total = result.total ?? (Array.isArray(result) ? result.length : (result.data?.length ?? 0));
     return res.status(200).json({ count: total });
   } catch (error) {
