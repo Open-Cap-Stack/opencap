@@ -61,12 +61,19 @@ function unwrap(result) {
   );
 }
 
-async function getCompanyIntegration(companyId) {
+// Scope integrations by companyId when available, fall back to userId.
+// This lets users connect Clerk before they've created a company.
+async function getIntegration(scopeId, scopeField) {
   const result = await zerodbService.queryTable(INTEGRATIONS_TABLE, {
-    filter: { companyId, provider: 'clerk' },
+    filter: { [scopeField]: scopeId, provider: 'clerk' },
   });
   const rows = unwrap(result);
   return rows[0] || null;
+}
+
+function getScope(user) {
+  if (user?.companyId) return { id: user.companyId, field: 'companyId' };
+  return { id: user?.userId, field: 'userId' };
 }
 
 // ── Clerk API client factory ──────────────────────────────────────────────────
@@ -208,10 +215,10 @@ async function upsertClerkUser(clerkUser, companyId) {
  */
 exports.connect = async (req, res) => {
   const { clerkSecretKey } = req.body;
-  const companyId = req.user?.companyId;
+  const scope = getScope(req.user);
 
-  if (!companyId) {
-    return res.status(400).json({ message: 'Your account must be associated with a company to connect Clerk.' });
+  if (!scope.id) {
+    return res.status(401).json({ message: 'Could not identify your account. Please log in again.' });
   }
 
   if (!clerkSecretKey || typeof clerkSecretKey !== 'string') {
@@ -226,18 +233,21 @@ exports.connect = async (req, res) => {
   try {
     const client = clerkClient(clerkSecretKey);
     const { data: users } = await client.get('/users', { params: { limit: 1 } });
-    const { data: userCount } = await client.get('/users/count');
-    const totalUsers = userCount?.total_count ?? (Array.isArray(users) ? users.length : 0);
+    let totalUsers = Array.isArray(users) ? users.length : 0;
+    try {
+      const { data: countData } = await client.get('/users/count');
+      totalUsers = countData?.total_count ?? totalUsers;
+    } catch { /* count endpoint optional */ }
 
     // Encrypt and store
     const { encryptedKey, iv, authTag } = encryptKey(clerkSecretKey);
     const keyHint = clerkSecretKey.slice(-4);
     const now = new Date().toISOString();
 
-    const existing = await getCompanyIntegration(companyId);
+    const existing = await getIntegration(scope.id, scope.field);
 
     const record = {
-      companyId,
+      [scope.field]: scope.id,
       provider: 'clerk',
       encryptedKey,
       iv,
@@ -250,7 +260,7 @@ exports.connect = async (req, res) => {
 
     if (existing) {
       await zerodbService.updateRows(INTEGRATIONS_TABLE, {
-        filter: { companyId, provider: 'clerk' },
+        filter: { [scope.field]: scope.id, provider: 'clerk' },
         update: record,
       });
     } else {
@@ -281,14 +291,12 @@ exports.connect = async (req, res) => {
  * Removes stored Clerk integration for the company.
  */
 exports.disconnect = async (req, res) => {
-  const companyId = req.user?.companyId;
-  if (!companyId) {
-    return res.status(400).json({ message: 'No company associated with your account.' });
-  }
+  const scope = getScope(req.user);
+  if (!scope.id) return res.status(401).json({ message: 'Could not identify your account.' });
 
   try {
     await zerodbService.deleteRows(INTEGRATIONS_TABLE, {
-      filter: { companyId, provider: 'clerk' },
+      filter: { [scope.field]: scope.id, provider: 'clerk' },
     });
     return res.status(200).json({ disconnected: true });
   } catch (err) {
@@ -302,15 +310,15 @@ exports.disconnect = async (req, res) => {
  * Returns connection state for the company.
  */
 exports.getStatus = async (req, res) => {
-  const configured = !!process.env.CLERK_SECRET_KEY; // OCS's own Clerk key (for webhook receiver)
-  const companyId = req.user?.companyId;
+  const configured = !!process.env.CLERK_SECRET_KEY;
+  const scope = getScope(req.user);
 
   try {
-    if (!companyId) {
-      return res.status(200).json({ configured, connected: false, message: 'No company on account' });
+    if (!scope.id) {
+      return res.status(200).json({ configured, connected: false });
     }
 
-    const integration = await getCompanyIntegration(companyId);
+    const integration = await getIntegration(scope.id, scope.field);
 
     return res.status(200).json({
       configured,
@@ -333,15 +341,14 @@ exports.getStatus = async (req, res) => {
  * Rate-limited: 200ms between pages, retry-once on 429, abort on second 429.
  */
 exports.importUsers = async (req, res) => {
-  const companyId = req.user?.companyId;
-  if (!companyId) {
-    return res.status(400).json({ message: 'No company associated with your account.' });
-  }
+  const scope = getScope(req.user);
+  if (!scope.id) return res.status(401).json({ message: 'Could not identify your account.' });
 
-  const integration = await getCompanyIntegration(companyId);
+  const integration = await getIntegration(scope.id, scope.field);
   if (!integration) {
     return res.status(400).json({ message: 'No Clerk integration connected. Connect your Clerk key first.' });
   }
+  const companyId = req.user?.companyId || null;
 
   let secretKey;
   try {
