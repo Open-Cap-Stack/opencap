@@ -73,6 +73,23 @@ app.post('/api/v1/billing/webhook', webhookRateLimiter, express.raw({ type: 'app
 const stripeConnectWebhookController = require('./controllers/stripeConnectWebhookController');
 app.post('/api/v1/webhooks/stripe-connect', webhookRateLimiter, express.raw({ type: 'application/json' }), stripeConnectWebhookController.handleStripeConnectWebhook);
 
+// Issue #613: Clerk webhook — user sync (raw body required for Svix signature verification)
+const clerkWebhookController = require('./controllers/clerkWebhookController');
+app.post(
+  '/api/v1/webhooks/clerk',
+  webhookRateLimiter,
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    // Expose raw body string for signature verification
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString('utf8');
+      try { req.body = JSON.parse(req.rawBody); } catch { /* handled in controller */ }
+    }
+    next();
+  },
+  clerkWebhookController.handleClerkWebhook
+);
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

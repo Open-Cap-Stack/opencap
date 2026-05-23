@@ -7,6 +7,7 @@ const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const integrationMarketplaceController = require('../../controllers/integrationMarketplaceController');
 const integrationConnectController = require('../../controllers/integrationConnectController');
+const clerkIntegrationController = require('../../controllers/clerkIntegrationController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -30,6 +31,12 @@ router.get('/categories', integrationMarketplaceController.getCategories);
 // Get installed integrations for a company
 // GET /api/v1/integrations/installed
 router.get('/installed', integrationMarketplaceController.getInstalledIntegrations);
+
+// --- Clerk integration (Issue #613) ---
+// GET /api/v1/integrations/clerk/status
+router.get('/clerk/status', clerkIntegrationController.getStatus);
+// POST /api/v1/integrations/clerk/sync
+router.post('/clerk/sync', clerkIntegrationController.syncUser);
 
 // Get integration details
 // GET /api/v1/integrations/:id
