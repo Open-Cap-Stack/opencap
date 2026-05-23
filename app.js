@@ -278,6 +278,7 @@ const routes = {
   boardMeetingRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardMeetingRoutes')), // Board meeting management
   messageRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageRoutes')), // Messaging / conversations
   accountantRoutes: safeRequire(path.join(__dirname, 'routes/v1/accountantRoutes')), // AI 409A accountant review workflow
+  investorDatabaseRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorDatabaseRoutes')), // System-wide VC investor directory
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -451,6 +452,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/messages';
     } else if (key === 'accountantRoutes') {
       path = '/api/v1/accountant';
+    } else if (key === 'investorDatabaseRoutes') {
+      path = '/api/v1/investor-database';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
