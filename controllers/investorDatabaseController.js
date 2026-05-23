@@ -43,7 +43,7 @@ exports.listInvestors = async (req, res) => {
 
     const queryOptions = { filter: {}, limit, skip };
 
-    const result = await zerodbService.queryTable('investors', queryOptions);
+    const result = await zerodbService.queryTable('stakeholders', queryOptions);
     let rows = Array.isArray(result) ? result : (result.data || []);
 
     // Extract row_data from ZeroDB envelope if present
@@ -101,7 +101,7 @@ exports.countInvestors = async (req, res) => {
   if (!checkRole(req, res)) return;
 
   try {
-    const result = await zerodbService.queryTable('investors', { filter: {}, limit: 1 });
+    const result = await zerodbService.queryTable('stakeholders', { filter: {}, limit: 1 });
     const total = result.total ?? (Array.isArray(result) ? result.length : (result.data?.length ?? 0));
     return res.status(200).json({ count: total });
   } catch (error) {
@@ -120,7 +120,7 @@ exports.getInvestorById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await zerodbService.queryTable('investors', {
+    const result = await zerodbService.queryTable('stakeholders', {
       filter: { investorId: id },
       limit: 1,
     });
@@ -130,7 +130,7 @@ exports.getInvestorById = async (req, res) => {
 
     if (rows.length === 0) {
       // Try by stakeholderId field as fallback
-      const result2 = await zerodbService.queryTable('investors', {
+      const result2 = await zerodbService.queryTable('stakeholders', {
         filter: { stakeholderId: id },
         limit: 1,
       });
