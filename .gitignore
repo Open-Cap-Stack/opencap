@@ -161,3 +161,7 @@ __tests__/controllers/temp/
 .claude/mcp.json
 uploads/
 client/
+
+# Allow MCP package compiled output so Railway can serve it
+!packages/opencap-mcp/dist/
+!packages/opencap-mcp/dist/**
