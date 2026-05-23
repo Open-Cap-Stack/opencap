@@ -1298,10 +1298,12 @@ async function adminForcePassword(req, res) {
     return res.status(400).json({ message: 'email and newPassword required' });
   }
   try {
-    let user = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+    let user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.status(404).json({ message: 'User not found' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    await User.findByIdAndUpdate(user._id || user.row_id, { password: hashed, status: 'active', is_active: true });
+    // Use updateOne by email — reliable across ZeroDB's userId/row_id variations
+    await User.updateOne({ email: normalizedEmail }, { password: hashed, status: 'active', is_active: true });
     return res.status(200).json({ message: 'Password updated', email });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to update password', error: err.message });
