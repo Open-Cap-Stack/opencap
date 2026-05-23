@@ -53,48 +53,54 @@ router.get('/', (req, res) => {
 });
 
 // SSE transport endpoint
-// The MCP SDK SSE transport handles the actual HTTP/SSE handshake.
-// We dynamically import the compiled MCP package if available; otherwise
-// return a 503 so the rest of the API stays healthy during rollout.
+// Proxies MCP protocol over SSE by delegating to the compiled ESM package.
+// Each connection gets its own server + transport instance.
 router.get('/sse', async (req, res) => {
   try {
     const token = (req.headers.authorization || '').replace('Bearer ', '') ||
                   req.query.api_key;
 
-    // SSE transport is handled by the MCP server package
-    // When the package is built and available this will be loaded dynamically
-    const mcpPackagePath = '../../packages/opencap-mcp/dist/index.js';
-    let mcpAvailable = false;
-    try {
-      require.resolve(mcpPackagePath);
-      mcpAvailable = true;
-    } catch (_) {
-      mcpAvailable = false;
-    }
+    const path = require('path');
+    const distDir = path.resolve(__dirname, '../../packages/opencap-mcp/dist');
 
-    if (!mcpAvailable) {
+    let createServer, createClient, SSEServerTransport;
+    try {
+      const serverMod = await import(`file://${distDir}/server.js`);
+      const clientMod = await import(`file://${distDir}/client.js`);
+      const sdkMod    = await import('@modelcontextprotocol/sdk/server/sse.js');
+      createServer = serverMod.createServer;
+      createClient = clientMod.createClient;
+      SSEServerTransport = sdkMod.SSEServerTransport;
+    } catch (e) {
       return res.status(503).json({
-        error: 'MCP server package not built',
-        message: 'Run: cd packages/opencap-mcp && npm run build',
+        error: 'MCP server package not available',
+        message: e.message,
         alternative: 'Use npx @opencapstack/mcp-server for local stdio mode',
       });
     }
 
-    // Set SSE headers and hand off to MCP transport
+    // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
     process.env.OPENCAP_API_KEY = token;
-    process.env.TRANSPORT = 'sse';
-    require(mcpPackagePath);
+    const client = createClient(token);
+    const server = createServer(client);
+    const transport = new SSEServerTransport('/api/v1/mcp/messages', res);
+    await server.connect(transport);
 
   } catch (err) {
     if (!res.headersSent) {
       res.status(500).json({ error: 'MCP server error', message: err.message });
     }
   }
+});
+
+// POST endpoint for MCP messages (SSE session continuation)
+router.post('/messages', async (req, res) => {
+  res.status(400).json({ error: 'Session routing not supported in stateless mode. Reconnect via /sse.' });
 });
 
 module.exports = router;
