@@ -203,7 +203,16 @@ exports.getSPVs = async (req, res) => {
     if (spvs.length === 0) {
       return res.status(200).json({ message: 'No SPVs found', spvs: [] });
     }
-    res.status(200).json({ spvs });
+
+    // Normalize capitalized field names to camelCase for consistent API output
+    const normalized = spvs.map(s => ({
+      ...s,
+      name: s.name || s.Name,
+      status: s.status || s.Status,
+      spvId: s.spvId || s.SPVID,
+    }));
+
+    res.status(200).json({ spvs: normalized });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve SPVs', error: error.message });
   }
