@@ -158,6 +158,23 @@ function validateEnvironment() {
     }
   }
 
+  // ENCRYPTION_KEY — required for Clerk customer key storage (Issue #618)
+  if (!process.env.ENCRYPTION_KEY) {
+    const msg = 'ENCRYPTION_KEY is not set — Clerk customer key encryption will fail. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"';
+    if (isProd) {
+      errors.push(msg);
+    } else {
+      warnings.push(msg);
+    }
+  } else if (process.env.ENCRYPTION_KEY.length !== 64 || !/^[0-9a-f]+$/i.test(process.env.ENCRYPTION_KEY)) {
+    const msg = 'ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)';
+    if (isProd) {
+      errors.push(msg);
+    } else {
+      warnings.push(msg);
+    }
+  }
+
   // Emit warnings for non-production environments
   if (warnings.length > 0) {
     warnings.forEach(w => console.warn(`WARNING: ${w}`));

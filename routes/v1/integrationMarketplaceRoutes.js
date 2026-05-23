@@ -32,11 +32,15 @@ router.get('/categories', integrationMarketplaceController.getCategories);
 // GET /api/v1/integrations/installed
 router.get('/installed', integrationMarketplaceController.getInstalledIntegrations);
 
-// --- Clerk integration (Issue #613) ---
-// GET /api/v1/integrations/clerk/status
+// --- Clerk integration (Issues #618, #619) ---
+// GET  /api/v1/integrations/clerk/status
 router.get('/clerk/status', clerkIntegrationController.getStatus);
-// POST /api/v1/integrations/clerk/sync
-router.post('/clerk/sync', clerkIntegrationController.syncUser);
+// POST /api/v1/integrations/clerk/connect  — customer pastes their sk_live_xxx key
+router.post('/clerk/connect', clerkIntegrationController.connect);
+// DELETE /api/v1/integrations/clerk/disconnect
+router.delete('/clerk/disconnect', clerkIntegrationController.disconnect);
+// POST /api/v1/integrations/clerk/import  — bulk import with rate-limit safeguards
+router.post('/clerk/import', clerkIntegrationController.importUsers);
 
 // Get integration details
 // GET /api/v1/integrations/:id
