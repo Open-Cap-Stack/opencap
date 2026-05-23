@@ -27,15 +27,15 @@ const RateLimitConfig = {
 
   endpoints: {
     '/api/v1/auth/login': {
-      maxRequests: 5,
-      windowMs: 60 * 60 * 1000 // 1 hour
+      maxRequests: 20,
+      windowMs: 15 * 60 * 1000 // 20 attempts per 15 min per IP — stops brute force, not normal use
     },
     '/api/v1/auth/register': {
-      maxRequests: 3,
+      maxRequests: 10,
       windowMs: 60 * 60 * 1000
     },
     '/api/v1/auth/forgot-password': {
-      maxRequests: 3,
+      maxRequests: 10,
       windowMs: 60 * 60 * 1000
     }
   },
@@ -264,6 +264,11 @@ function createEndpointRateLimiter(endpoint, options = {}) {
   return async (req, res, next) => {
     // Skip rate limiting in test environment if configured
     if (process.env.NODE_ENV === 'test' && process.env.DISABLE_RATE_LIMIT === 'true') {
+      return next();
+    }
+
+    // Admin users are never rate limited
+    if (req.user?.role === 'admin') {
       return next();
     }
 
