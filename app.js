@@ -163,6 +163,20 @@ const zerodbReady = (async () => {
     databaseMonitor.setupZeroDBMonitoring(zerodbService);
     await databaseAdapter.initialize(process.env.AINATIVE_API_TOKEN);
     console.log('✅ DatabaseAdapter initialized');
+
+    // Seed any new tables that don't auto-create on first insert
+    const newTables = ['reconstruction_jobs'];
+    for (const tbl of newTables) {
+      try {
+        await zerodbService.createTable(tbl, { fields: {} });
+        console.log(`✅ Table "${tbl}" ensured`);
+      } catch (tblErr) {
+        // 409 = already exists, anything else log but don't crash
+        if (tblErr.response?.status !== 409 && !tblErr.message?.includes('already exist')) {
+          console.warn(`⚠️  Could not pre-create table "${tbl}": ${tblErr.message}`);
+        }
+      }
+    }
   } catch (err) {
     console.error('❌ ZeroDB initialization failed:', err.message);
     // Server continues running — DB ops will fail gracefully per request
