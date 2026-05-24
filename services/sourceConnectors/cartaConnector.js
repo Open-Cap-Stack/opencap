@@ -1,12 +1,15 @@
 /**
  * Carta Source Connector
  * Issue #628: OAuth connector stub for Carta — returns mock documents in MVP
+ * Issue #641: Browser automation mode with mock fallback
  *
  * In production this would exchange an OAuth code for tokens and
  * pull real cap table / 409A data via Carta's API. In MVP it returns curated mock data.
+ * When options.automationMode === 'browser', delegates to browserAutomationService.
  */
 
 const { v4: uuidv4 } = require('uuid');
+const { automateCartaFetch } = require('../browserAutomationService');
 
 const MOCK_DOCUMENTS = [
   {
@@ -65,14 +68,35 @@ function connect(oauthCode) {
 
 /**
  * Fetch Carta documents for the given company.
- * MVP: always returns mock data regardless of token.
+ * MVP: returns mock data by default.
+ * When options.automationMode === 'browser' and options.jobId is present,
+ * attempts real Playwright-based extraction first; falls back to mock on failure.
  *
  * @param {string|null} token
  * @param {string} companyName
  * @param {string} founderEmail
+ * @param {{ jobId?: string, automationMode?: string }} [options]
  * @returns {Promise<ConnectorResult>}
  */
-async function fetchDocuments(token, companyName, founderEmail) {
+async function fetchDocuments(token, companyName, founderEmail, options = {}) {
+  const { jobId, automationMode } = options;
+
+  if (automationMode === 'browser' && jobId) {
+    try {
+      const result = await automateCartaFetch(jobId, companyName);
+      if (Array.isArray(result) && result.length > 0) {
+        return {
+          source: 'carta',
+          status: 'success',
+          error: null,
+          documents: result
+        };
+      }
+    } catch {
+      // Automation failed — fall through to mock data
+    }
+  }
+
   const documents = MOCK_DOCUMENTS.map(doc => ({
     id: uuidv4(),
     source: 'carta',
