@@ -152,9 +152,48 @@ function parseJsonFromResponse(content) {
     } catch { /* fall through */ }
   }
 
-  throw new Error(
+  const err = new Error(
     `parseJsonFromResponse: could not extract valid JSON from response: ${clean.slice(0, 300)}`
   );
+  err.rawContent = content;
+  throw err;
 }
 
-module.exports = { ainativeChat, parseJsonFromResponse };
+/**
+ * ainativeChatWithRetry — wraps ainativeChat with tracewright-style retry loop.
+ * On JSON parse failure, injects the bad response + error back into context.
+ * Up to maxRetries attempts.
+ *
+ * @param {Array<{role:string, content:string}>} messages
+ * @param {Object} [options] - same options as ainativeChat
+ * @param {number} [maxRetries=3] - maximum number of attempts
+ * @returns {Promise<{ content: string, parsed: * }>}
+ */
+async function ainativeChatWithRetry(messages, options = {}, maxRetries = 3) {
+  let lastError;
+  let contextMessages = [...messages];
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const content = await ainativeChat(contextMessages, options);
+      const parsed = parseJsonFromResponse(content);
+      return { content, parsed };
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        // Inject error context for next attempt (tracewright pattern)
+        contextMessages = [
+          ...contextMessages,
+          { role: 'assistant', content: err.rawContent || '' },
+          {
+            role: 'user',
+            content: `Your previous response could not be parsed as JSON. Error: ${err.message}. Please respond with valid JSON only, no markdown fences.`
+          }
+        ];
+      }
+    }
+  }
+  throw lastError;
+}
+
+module.exports = { ainativeChat, parseJsonFromResponse, ainativeChatWithRetry };

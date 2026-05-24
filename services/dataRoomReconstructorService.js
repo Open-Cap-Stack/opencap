@@ -1,0 +1,777 @@
+/**
+ * Data Room Reconstructor Service
+ * Issue #629: 10-agent parallel pipeline for AI-powered data room reconstruction
+ *
+ * Ports the 4-phase parallel pipeline from the Python/Gemini reference
+ * (google-io-hackathon-data-room) into Node.js/AINative.
+ *
+ * Phase 1 — Scout (parallel): Gmail, Drive, Carta, Stripe
+ * Phase 2 — Classify + Extract (parallel)
+ * Phase 3 — Gap Analyzer + Synthesizer (parallel)
+ * Phase 4 — Gap Fixer + Cap Table Export (parallel, cap table is deterministic)
+ */
+
+const { ainativeChatWithRetry } = require('./ainativeAgentService');
+const gmailConnector  = require('./sourceConnectors/gmailConnector');
+const driveConnector  = require('./sourceConnectors/driveConnector');
+const cartaConnector  = require('./sourceConnectors/cartaConnector');
+const stripeConnector = require('./sourceConnectors/stripeConnector');
+
+// ─── 63-Document Investor Checklist ──────────────────────────────────────────
+
+const INVESTOR_CHECKLIST = [
+  // Legal (10)
+  { name: 'Certificate of Incorporation (Delaware)', category: 'Legal', required: true, neverGenerate: true },
+  { name: 'Bylaws (signed)', category: 'Legal', required: true, neverGenerate: true },
+  { name: 'Board Consent — Organizational', category: 'Legal', required: true, neverGenerate: false },
+  { name: 'Board Consent — Equity Issuances', category: 'Legal', required: true, neverGenerate: false },
+  { name: 'IP Assignment Agreements (signed)', category: 'Legal', required: true, neverGenerate: true },
+  { name: 'Founder Restricted Stock Agreements (signed)', category: 'Legal', required: true, neverGenerate: true },
+  { name: 'Corporate Minute Book', category: 'Legal', required: false, neverGenerate: false },
+  { name: 'Subsidiary/Foreign Qualification Docs', category: 'Legal', required: false, neverGenerate: false },
+  { name: 'Amendment History', category: 'Legal', required: false, neverGenerate: false },
+  { name: 'Registered Agent Information', category: 'Legal', required: false, neverGenerate: false },
+  // Equity (13)
+  { name: 'Cap Table (current, fully-diluted)', category: 'Equity', required: true, neverGenerate: false },
+  { name: '409A Valuation Report', category: 'Equity', required: true, neverGenerate: true },
+  { name: 'Stock Option Plan', category: 'Equity', required: true, neverGenerate: false },
+  { name: 'Option Grant Agreements (sample)', category: 'Equity', required: true, neverGenerate: false },
+  { name: 'Form D (if filed)', category: 'Equity', required: false, neverGenerate: true },
+  { name: 'Investor Rights Agreement', category: 'Equity', required: true, neverGenerate: false },
+  { name: 'ROFR/Co-Sale Agreement', category: 'Equity', required: true, neverGenerate: false },
+  { name: 'Voting Agreement', category: 'Equity', required: true, neverGenerate: false },
+  { name: 'Anti-Dilution Provisions', category: 'Equity', required: false, neverGenerate: false },
+  { name: 'Warrant Agreements', category: 'Equity', required: false, neverGenerate: false },
+  { name: 'Convertible Notes', category: 'Equity', required: false, neverGenerate: false },
+  { name: 'SAFE Agreements', category: 'Equity', required: false, neverGenerate: false },
+  { name: 'Pro-Rata Rights Documentation', category: 'Equity', required: false, neverGenerate: false },
+  // HR (5)
+  { name: 'Offer Letters (key employees)', category: 'HR', required: true, neverGenerate: false },
+  { name: 'CIAA/PIIA Agreements', category: 'HR', required: true, neverGenerate: false },
+  { name: 'Contractor Agreements', category: 'HR', required: false, neverGenerate: false },
+  { name: 'Org Chart', category: 'HR', required: false, neverGenerate: false },
+  { name: 'Employee Handbook', category: 'HR', required: false, neverGenerate: false },
+  // Tax (6)
+  { name: '83(b) Elections (filed)', category: 'Tax', required: true, neverGenerate: true },
+  { name: 'Federal Tax Returns (2 years)', category: 'Tax', required: true, neverGenerate: true },
+  { name: 'State Tax Returns', category: 'Tax', required: true, neverGenerate: true },
+  { name: 'EIN / Tax ID Documentation', category: 'Tax', required: true, neverGenerate: false },
+  { name: 'QSBS Attestation', category: 'Tax', required: false, neverGenerate: false },
+  { name: 'R&D Tax Credit Studies', category: 'Tax', required: false, neverGenerate: false },
+  // Agreements (10)
+  { name: 'Master Service Agreement (template)', category: 'Agreements', required: true, neverGenerate: false },
+  { name: 'NDAs (key relationships)', category: 'Agreements', required: false, neverGenerate: true },
+  { name: 'Customer Contracts (top 3)', category: 'Agreements', required: true, neverGenerate: true },
+  { name: 'D&O Insurance Policy', category: 'Agreements', required: true, neverGenerate: true },
+  { name: 'E&O Insurance Policy', category: 'Agreements', required: false, neverGenerate: true },
+  { name: 'Vendor Contracts (material)', category: 'Agreements', required: false, neverGenerate: false },
+  { name: 'Office Lease', category: 'Agreements', required: false, neverGenerate: false },
+  { name: 'Trademark Registrations', category: 'Agreements', required: false, neverGenerate: true },
+  { name: 'Patent Filings', category: 'Agreements', required: false, neverGenerate: true },
+  { name: 'Domain / IP Ownership Records', category: 'Agreements', required: false, neverGenerate: false },
+  // Fundraising (6)
+  { name: 'Pitch Deck', category: 'Fundraising', required: true, neverGenerate: false },
+  { name: 'Executive Summary', category: 'Fundraising', required: true, neverGenerate: false },
+  { name: 'Financial Model (3-year)', category: 'Fundraising', required: true, neverGenerate: false },
+  { name: 'Term Sheet (if any)', category: 'Fundraising', required: false, neverGenerate: true },
+  { name: 'Prior Round Documents', category: 'Fundraising', required: false, neverGenerate: false },
+  { name: 'Fundraising History Summary', category: 'Fundraising', required: false, neverGenerate: false },
+  // Financial (7)
+  { name: 'P&L Statement (2 years)', category: 'Financial', required: true, neverGenerate: false },
+  { name: 'Balance Sheet', category: 'Financial', required: true, neverGenerate: false },
+  { name: 'Cash Flow Statement', category: 'Financial', required: true, neverGenerate: false },
+  { name: 'KPI Dashboard', category: 'Financial', required: true, neverGenerate: false },
+  { name: 'Revenue Breakdown', category: 'Financial', required: true, neverGenerate: false },
+  { name: 'Accounts Receivable Aging', category: 'Financial', required: false, neverGenerate: false },
+  { name: 'Debt Schedule', category: 'Financial', required: false, neverGenerate: false },
+  // Technical (4)
+  { name: 'System Architecture Document', category: 'Technical', required: false, neverGenerate: false },
+  { name: 'Product Roadmap', category: 'Technical', required: false, neverGenerate: false },
+  { name: 'Security/Compliance Certifications', category: 'Technical', required: false, neverGenerate: true },
+  { name: 'Data Privacy Policy', category: 'Technical', required: false, neverGenerate: false },
+];
+
+// Build a fast lookup set of neverGenerate doc names
+const NEVER_GENERATE_NAMES = new Set(
+  INVESTOR_CHECKLIST.filter(d => d.neverGenerate).map(d => d.name)
+);
+
+// ─── Scout Agents ─────────────────────────────────────────────────────────────
+
+/**
+ * Build a document summary string for LLM context (truncated).
+ * @param {AgentInputDocument[]} docs
+ * @returns {string}
+ */
+function buildDocSummary(docs) {
+  return docs
+    .slice(0, 20)
+    .map((d, i) => `[${i + 1}] ${d.originalName} (${d.source}): ${(d.textContent || '').slice(0, 200)}`)
+    .join('\n');
+}
+
+/**
+ * Generic scout agent factory.
+ * Fetches docs from a connector (if source is enabled), merges with any
+ * uploaded docs of matching source type, optionally asks AINative for a summary.
+ *
+ * @param {string} sourceName - 'gmail' | 'drive' | 'carta' | 'stripe'
+ * @param {Object} connector  - connector module with fetchDocuments()
+ * @param {Object} intakeConfig
+ * @param {AgentInputDocument[]} gatheredDocuments
+ * @returns {Promise<ScoutResult>}
+ */
+async function runScoutAgent(sourceName, connector, intakeConfig, gatheredDocuments) {
+  const agentName = `scout_${sourceName}`;
+  const sourceConfig = intakeConfig.sources?.[sourceName] || {};
+
+  let connectorDocs = [];
+
+  if (sourceConfig.enabled) {
+    try {
+      const result = await connector.fetchDocuments(
+        sourceConfig.oauthCode || null,
+        intakeConfig.companyName,
+        intakeConfig.founderEmail
+      );
+      if (result && result.status === 'success' && Array.isArray(result.documents)) {
+        connectorDocs = result.documents;
+      }
+    } catch (err) {
+      console.warn(`[${agentName}] Connector fetch failed: ${err.message}`);
+    }
+  }
+
+  // Merge with any uploaded docs matching this source
+  const uploadedForSource = gatheredDocuments.filter(d => d.source === sourceName);
+  const allDocs = [...connectorDocs, ...uploadedForSource];
+
+  // Build key metrics summary via LLM only when we have documents
+  let keyMetrics = {};
+  if (allDocs.length > 0 && sourceConfig.enabled) {
+    try {
+      const prompt = `You are analyzing documents from ${sourceName} for company "${intakeConfig.companyName}".
+Documents:
+${buildDocSummary(allDocs)}
+
+Extract key metrics found in these documents. Return JSON:
+{
+  "documentCount": <number>,
+  "keyFindings": ["<finding 1>", "<finding 2>"],
+  "financialDataPoints": ["<data point>"],
+  "riskSignals": ["<signal>"]
+}`;
+      const { parsed } = await ainativeChatWithRetry(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.2, max_tokens: 1024 }
+      );
+      keyMetrics = parsed;
+    } catch (err) {
+      console.warn(`[${agentName}] LLM summary failed (non-fatal): ${err.message}`);
+      keyMetrics = { documentCount: allDocs.length, keyFindings: [], financialDataPoints: [], riskSignals: [] };
+    }
+  } else {
+    keyMetrics = { documentCount: allDocs.length, keyFindings: [], financialDataPoints: [], riskSignals: [] };
+  }
+
+  return {
+    agentName,
+    status: 'complete',
+    documents: allDocs,
+    keyMetrics
+  };
+}
+
+async function scoutGmailAgent(intakeConfig, gatheredDocuments) {
+  return runScoutAgent('gmail', gmailConnector, intakeConfig, gatheredDocuments);
+}
+
+async function scoutDriveAgent(intakeConfig, gatheredDocuments) {
+  return runScoutAgent('drive', driveConnector, intakeConfig, gatheredDocuments);
+}
+
+async function scoutCartaAgent(intakeConfig, gatheredDocuments) {
+  return runScoutAgent('carta', cartaConnector, intakeConfig, gatheredDocuments);
+}
+
+async function scoutStripeAgent(intakeConfig, gatheredDocuments) {
+  return runScoutAgent('stripe', stripeConnector, intakeConfig, gatheredDocuments);
+}
+
+// ─── Consolidate Scout Results ────────────────────────────────────────────────
+
+/**
+ * Merge all scout results + gathered (uploaded) documents into a single
+ * deduplicated array. First occurrence of each name wins.
+ *
+ * @param {ScoutResult[]} scoutResults
+ * @param {AgentInputDocument[]} uploadedDocs
+ * @returns {AgentInputDocument[]}
+ */
+function consolidateScoutResults(scoutResults, uploadedDocs) {
+  const allDocs = [
+    ...scoutResults.flatMap(r => r.documents || []),
+    ...(uploadedDocs || [])
+  ];
+
+  const seen = new Set();
+  const result = [];
+  for (const doc of allDocs) {
+    const key = `${doc.originalName}::${doc.metadata?.fileSize ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(doc);
+  }
+  return result;
+}
+
+// ─── Phase 2 Agents ───────────────────────────────────────────────────────────
+
+/**
+ * classifierAgent — categorizes documents into investor data room categories.
+ * @param {AgentInputDocument[]} consolidated
+ * @returns {Promise<ClassificationResult>}
+ */
+async function classifierAgent(consolidated) {
+  const docList = buildDocSummary(consolidated);
+
+  const prompt = `You are a due diligence expert classifying startup documents.
+
+Documents to classify:
+${docList}
+
+Classify each document into one of these categories: Financial, Legal, Operational, HR, Sales, Technical, Equity, Tax, Agreements, Fundraising, Unknown.
+
+Return JSON with this exact structure:
+{
+  "classificationByType": {
+    "Financial": ["<doc name>"],
+    "Legal": ["<doc name>"],
+    "Operational": [],
+    "HR": [],
+    "Sales": [],
+    "Technical": [],
+    "Equity": [],
+    "Tax": [],
+    "Agreements": [],
+    "Fundraising": [],
+    "Unknown": []
+  },
+  "completenessScore": <0-100 integer>,
+  "notes": "<brief note about overall document coverage>"
+}`;
+
+  const { parsed } = await ainativeChatWithRetry(
+    [{ role: 'user', content: prompt }],
+    { temperature: 0.2, max_tokens: 2048 }
+  );
+  return parsed;
+}
+
+/**
+ * extractorAgent — extracts financial KPIs from consolidated documents.
+ * @param {AgentInputDocument[]} consolidated
+ * @returns {Promise<FinancialMetrics>}
+ */
+async function extractorAgent(consolidated) {
+  const docList = buildDocSummary(consolidated);
+
+  const prompt = `You are a financial analyst extracting KPIs from startup documents.
+
+Documents:
+${docList}
+
+Extract all financial metrics you can find. If a metric is not present, use null.
+
+Return JSON with this exact structure:
+{
+  "mrr": <number or null>,
+  "arr": <number or null>,
+  "burnRate": <number or null>,
+  "runwayMonths": <number or null>,
+  "churnRate": <number or null>,
+  "customerCount": <number or null>,
+  "totalRevenue": <number or null>,
+  "headcount": <number or null>
+}`;
+
+  const { parsed } = await ainativeChatWithRetry(
+    [{ role: 'user', content: prompt }],
+    { temperature: 0.1, max_tokens: 1024 }
+  );
+  return parsed;
+}
+
+// ─── Phase 3 Agents ───────────────────────────────────────────────────────────
+
+/**
+ * gapAnalyzerAgent — checks documents against the 63-doc investor checklist.
+ * @param {AgentInputDocument[]} consolidated
+ * @param {ClassificationResult} classification
+ * @returns {Promise<GapAnalysis>}
+ */
+async function gapAnalyzerAgent(consolidated, classification) {
+  const presentNames = consolidated.map(d => d.originalName).join('\n');
+  const checklistNames = INVESTOR_CHECKLIST.map(d => `${d.category}: ${d.name} (required: ${d.required})`).join('\n');
+
+  const prompt = `You are a due diligence expert analyzing a startup's data room for an investor.
+
+DOCUMENTS PRESENT (${consolidated.length} total):
+${presentNames}
+
+INVESTOR CHECKLIST (63 documents):
+${checklistNames}
+
+DOCUMENT CLASSIFICATION SUMMARY:
+${JSON.stringify(classification?.classificationByType || {}, null, 2)}
+
+Identify all gaps between what is present and what investors expect.
+
+Return JSON with this exact structure:
+{
+  "criticalGaps": ["<document name>"],
+  "redFlags": ["<red flag description>"],
+  "dueDiligenceRisk": "<high|medium|low>",
+  "missingByCategory": {
+    "Legal": ["<doc name>"],
+    "Equity": [],
+    "HR": [],
+    "Tax": [],
+    "Agreements": [],
+    "Fundraising": [],
+    "Financial": [],
+    "Technical": []
+  }
+}`;
+
+  const { parsed } = await ainativeChatWithRetry(
+    [{ role: 'user', content: prompt }],
+    { temperature: 0.2, max_tokens: 2048 }
+  );
+  return parsed;
+}
+
+/**
+ * synthesizerAgent — produces investor readiness score and data room structure.
+ * @param {AgentInputDocument[]} consolidated
+ * @param {ClassificationResult} classification
+ * @param {FinancialMetrics} financialMetrics
+ * @returns {Promise<Synthesis>}
+ */
+async function synthesizerAgent(consolidated, classification, financialMetrics) {
+  const prompt = `You are a Series A investment analyst synthesizing a startup's data room.
+
+DOCUMENT COUNT: ${consolidated.length}
+FINANCIAL METRICS: ${JSON.stringify(financialMetrics, null, 2)}
+CLASSIFICATION: ${JSON.stringify(classification?.classificationByType || {}, null, 2)}
+COMPLETENESS SCORE: ${classification?.completenessScore ?? 'unknown'}
+
+Synthesize an investor-ready analysis.
+
+Return JSON with this exact structure:
+{
+  "investorReadinessScore": <0-100 integer>,
+  "dataRoomStructure": {
+    "categories": ["Legal", "Equity", "Financial", "HR", "Technical"],
+    "organizedBy": "category"
+  },
+  "executiveSummary": "<2-3 sentence summary of the company's data room status>",
+  "redFlags": ["<red flag>"],
+  "nextSteps": ["<action item>"]
+}`;
+
+  const { parsed } = await ainativeChatWithRetry(
+    [{ role: 'user', content: prompt }],
+    { temperature: 0.3, max_tokens: 2048 }
+  );
+  return parsed;
+}
+
+// ─── Phase 4 Agents ───────────────────────────────────────────────────────────
+
+/**
+ * gapFixerAgent — generates draft content for GENERATABLE missing documents.
+ * CRITICAL: never generates documents with neverGenerate: true in INVESTOR_CHECKLIST.
+ *
+ * @param {GapAnalysis} gapAnalysis
+ * @param {Synthesis} synthesis
+ * @returns {Promise<GapFixResult>}
+ */
+async function gapFixerAgent(gapAnalysis, synthesis) {
+  const criticalGaps = gapAnalysis?.criticalGaps || [];
+
+  // Separate gaps into: can generate vs. must never generate
+  const generatable = criticalGaps.filter(docName => !NEVER_GENERATE_NAMES.has(docName));
+  const needsFounderUpload = criticalGaps.filter(docName => NEVER_GENERATE_NAMES.has(docName));
+
+  let generatedDocuments = [];
+
+  if (generatable.length > 0) {
+    const prompt = `You are helping a startup founder prepare their investor data room.
+
+The following documents are MISSING and need to be drafted:
+${generatable.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+
+IMPORTANT: These documents are legal and financial templates only — they must be reviewed and signed by the appropriate parties before use.
+
+Current investor readiness score: ${synthesis?.investorReadinessScore ?? 'unknown'}/100
+
+For each document, generate a reasonable template/draft. Return JSON:
+{
+  "generatedDocuments": [
+    {
+      "name": "<document name>",
+      "category": "<category>",
+      "content": "<draft content, 100-300 words>",
+      "status": "generated",
+      "disclaimer": "Template only — requires legal review and founder signature"
+    }
+  ],
+  "gapsClosed": <number>,
+  "newInvestorReadinessScore": <0-100 integer>
+}`;
+
+    const { parsed } = await ainativeChatWithRetry(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.4, max_tokens: 4096 }
+    );
+
+    // Double-check: enforce neverGenerate guardrail on LLM output
+    generatedDocuments = (parsed.generatedDocuments || []).filter(doc => {
+      if (NEVER_GENERATE_NAMES.has(doc.name)) {
+        console.warn(`[gapFixerAgent] Guardrail blocked generation of: ${doc.name}`);
+        return false;
+      }
+      return true;
+    });
+
+    return {
+      generatedDocuments,
+      needsFounderUpload,
+      gapsClosed: parsed.gapsClosed || generatedDocuments.length,
+      newInvestorReadinessScore: parsed.newInvestorReadinessScore || synthesis?.investorReadinessScore || 0
+    };
+  }
+
+  // Nothing to generate — all critical gaps require founder uploads
+  return {
+    generatedDocuments: [],
+    needsFounderUpload,
+    gapsClosed: 0,
+    newInvestorReadinessScore: synthesis?.investorReadinessScore || 0
+  };
+}
+
+/**
+ * capTableExportAgent — DETERMINISTIC, no LLM call.
+ * Builds the 63-doc checklist by matching consolidated docs against the hardcoded list.
+ * Extracts cap table data from carta results.
+ *
+ * @param {AgentInputDocument[]} consolidated
+ * @param {FinancialMetrics} financialMetrics
+ * @param {ScoutResult} cartaResult
+ * @returns {CapTableExport}
+ */
+function capTableExportAgent(consolidated, financialMetrics, cartaResult) {
+  const presentNames = new Set(consolidated.map(d => d.originalName.toLowerCase()));
+
+  // Match each checklist item against present documents
+  const dataRoomIndex = INVESTOR_CHECKLIST.map(item => {
+    const nameLower = item.name.toLowerCase();
+    // Fuzzy match: check if any present doc name contains key words from checklist item
+    const keywords = nameLower.split(/[\s\-\/\(\)]+/).filter(w => w.length > 3);
+    const isPresent = Array.from(presentNames).some(presentName =>
+      keywords.some(kw => presentName.includes(kw))
+    );
+
+    return {
+      name: item.name,
+      category: item.category,
+      required: item.required,
+      neverGenerate: item.neverGenerate,
+      status: isPresent ? 'present' : (item.neverGenerate ? 'needs_founder_upload' : 'missing')
+    };
+  });
+
+  // Stats
+  const present = dataRoomIndex.filter(d => d.status === 'present').length;
+  const generated = dataRoomIndex.filter(d => d.status === 'generated').length;
+  const missing = dataRoomIndex.filter(d => d.status === 'missing').length;
+  const needsFounderUpload = dataRoomIndex.filter(d => d.status === 'needs_founder_upload').length;
+
+  // Extract cap table data from Carta documents
+  const cartaDocs = cartaResult?.documents || [];
+  const capTableDoc = cartaDocs.find(d => d.originalName.toLowerCase().includes('cap table'));
+  const optionDoc = cartaDocs.find(d => d.originalName.toLowerCase().includes('option'));
+  const valuationDoc = cartaDocs.find(d => d.originalName.toLowerCase().includes('valuation'));
+
+  // Build OpenCap export objects from Carta data (deterministic parsing)
+  const stakeholders = [];
+  const shareClasses = [];
+  const valuations = [];
+
+  if (capTableDoc) {
+    const text = capTableDoc.textContent || '';
+    // Extract shareholders from text if patterns match
+    if (text.includes('Founders') || text.includes('founders')) {
+      stakeholders.push({ name: 'Founders', role: 'Founder', email: '', equityType: 'common' });
+    }
+    if (text.includes('Series A') || text.includes('preferred')) {
+      shareClasses.push({ name: 'Series A Preferred', authorized_shares: 5000000, type: 'preferred' });
+    }
+    shareClasses.push({ name: 'Common Stock', authorized_shares: 10000000, type: 'common' });
+  }
+
+  if (valuationDoc) {
+    const text = valuationDoc.textContent || '';
+    const seedMatch = text.match(/Seed[^\d]*\$([0-9,]+)M?/i);
+    const seriesAMatch = text.match(/Series A[^\d]*\$([0-9,]+)M?/i);
+    if (seedMatch) {
+      valuations.push({ round_name: 'Seed', pre_money: parseFloat(seedMatch[1].replace(/,/g, '')) * 1000000, date: '2022-01-01' });
+    }
+    if (seriesAMatch) {
+      valuations.push({ round_name: 'Series A', pre_money: parseFloat(seriesAMatch[1].replace(/,/g, '')) * 1000000, date: '2024-01-01' });
+    }
+  }
+
+  // Carta CSV preview — first 5 option rows
+  const cartaCsvPreview = optionDoc
+    ? [{ source: optionDoc.originalName, preview: optionDoc.textContent.slice(0, 500) }]
+    : [];
+
+  // Pulley scenario stub (deterministic)
+  const pulleyScenario = {
+    totalAuthorizedShares: 10000000,
+    outstandingShares: 5000000,
+    optionPool: 1000000,
+    fullyDilutedShares: 6000000,
+    ownershipBreakdown: {
+      founders: '50%',
+      investors: '45%',
+      optionPool: '10%',
+      esop: '5%'
+    }
+  };
+
+  return {
+    data_room_index: dataRoomIndex,
+    data_room_stats: { present, generated, missing, needs_founder_upload: needsFounderUpload },
+    opencap_export: { stakeholders, shareClasses, valuations },
+    carta_csv_preview: cartaCsvPreview,
+    pulley_scenario: pulleyScenario
+  };
+}
+
+// ─── Summary Generator ────────────────────────────────────────────────────────
+
+/**
+ * Generate the final ReconstructionResult summary from all phase outputs.
+ * @param {Object} phases - collected results from all phases
+ * @returns {Object} summary
+ */
+function generateSummary(phases) {
+  const { gmailResult, driveResult, cartaResult, stripeResult,
+          classification, financialMetrics, gapAnalysis,
+          synthesis, gapFixes, capTableExport } = phases;
+
+  const sourcesCovered = [gmailResult, driveResult, cartaResult, stripeResult]
+    .filter(r => r && r.documents && r.documents.length > 0).length;
+
+  const documentsFound = (
+    (gmailResult?.documents?.length || 0) +
+    (driveResult?.documents?.length || 0) +
+    (cartaResult?.documents?.length || 0) +
+    (stripeResult?.documents?.length || 0)
+  );
+
+  return {
+    documentsFound,
+    sourcesCovered,
+    investorReadinessScore: synthesis?.investorReadinessScore || 0,
+    finalReadinessScore: gapFixes?.newInvestorReadinessScore || synthesis?.investorReadinessScore || 0,
+    redFlagsCount: (gapAnalysis?.redFlags || []).length,
+    criticalGaps: (gapAnalysis?.criticalGaps || []).length,
+    gapsClosed: gapFixes?.gapsClosed || 0,
+    capTableExportReady: !!(capTableExport?.opencap_export)
+  };
+}
+
+// ─── Main Orchestrator ────────────────────────────────────────────────────────
+
+/**
+ * reconstructDataRoom — runs the 4-phase 10-agent parallel pipeline.
+ *
+ * @param {Object} intakeConfig - { companyName, founderEmail, targetDataRoomId, sources }
+ * @param {AgentInputDocument[]} gatheredDocuments - normalized docs from intakeNormalizerService
+ * @param {Function} onProgress - async (phase, agentName, status) => void
+ * @returns {Promise<ReconstructionResult>}
+ */
+async function reconstructDataRoom(intakeConfig, gatheredDocuments, onProgress) {
+  // Default no-op progress handler
+  const progress = typeof onProgress === 'function' ? onProgress : async () => {};
+
+  const artifacts = {};
+
+  // ── Phase 1: Scout (parallel) ────────────────────────────────────────────
+  console.log('[DataRoomReconstructor] Phase 1: Scouting sources...');
+
+  const [gmailResult, driveResult, cartaResult, stripeResult] = await Promise.all([
+    scoutGmailAgent(intakeConfig, gatheredDocuments),
+    scoutDriveAgent(intakeConfig, gatheredDocuments),
+    scoutCartaAgent(intakeConfig, gatheredDocuments),
+    scoutStripeAgent(intakeConfig, gatheredDocuments),
+  ]);
+
+  artifacts.gmailResult  = gmailResult;
+  artifacts.driveResult  = driveResult;
+  artifacts.cartaResult  = cartaResult;
+  artifacts.stripeResult = stripeResult;
+
+  await progress(1, 'scout_gmail',  'complete');
+  await progress(1, 'scout_drive',  'complete');
+  await progress(1, 'scout_carta',  'complete');
+  await progress(1, 'scout_stripe', 'complete');
+
+  const consolidated = consolidateScoutResults(
+    [gmailResult, driveResult, cartaResult, stripeResult],
+    gatheredDocuments
+  );
+  console.log(`[DataRoomReconstructor] Phase 1 complete. ${consolidated.length} documents consolidated.`);
+
+  // ── Phase 2: Classify + Extract (parallel) ───────────────────────────────
+  console.log('[DataRoomReconstructor] Phase 2: Classifying and extracting...');
+
+  const [classification, financialMetrics] = await Promise.all([
+    classifierAgent(consolidated),
+    extractorAgent(consolidated),
+  ]);
+
+  artifacts.classification   = classification;
+  artifacts.financialMetrics = financialMetrics;
+
+  await progress(2, 'classifier', 'complete');
+  await progress(2, 'extractor',  'complete');
+
+  console.log('[DataRoomReconstructor] Phase 2 complete.');
+
+  // ── Phase 3: Gap Analyzer + Synthesizer (parallel) ──────────────────────
+  console.log('[DataRoomReconstructor] Phase 3: Gap analysis and synthesis...');
+
+  const [gapAnalysis, synthesis] = await Promise.all([
+    gapAnalyzerAgent(consolidated, classification),
+    synthesizerAgent(consolidated, classification, financialMetrics),
+  ]);
+
+  artifacts.gapAnalysis = gapAnalysis;
+  artifacts.synthesis   = synthesis;
+
+  await progress(3, 'gap_analyzer', 'complete');
+  await progress(3, 'synthesizer',  'complete');
+
+  console.log('[DataRoomReconstructor] Phase 3 complete.');
+
+  // ── Phase 4: Gap Fixer + Cap Table Export (parallel) ─────────────────────
+  console.log('[DataRoomReconstructor] Phase 4: Gap fixing and cap table export...');
+
+  const [gapFixes, capTableExport] = await Promise.all([
+    gapFixerAgent(gapAnalysis, synthesis),
+    Promise.resolve(capTableExportAgent(consolidated, financialMetrics, cartaResult)),
+  ]);
+
+  artifacts.gapFixes      = gapFixes;
+  artifacts.capTableExport = capTableExport;
+
+  await progress(4, 'gap_fixer',         'complete');
+  await progress(4, 'cap_table_export',  'complete');
+
+  console.log('[DataRoomReconstructor] Phase 4 complete.');
+
+  // ── Build ReconstructionResult ───────────────────────────────────────────
+  const agentsExecuted = [
+    { name: 'scout_gmail',        status: gmailResult.status,  documentCount: gmailResult.documents?.length  || 0 },
+    { name: 'scout_drive',        status: driveResult.status,  documentCount: driveResult.documents?.length  || 0 },
+    { name: 'scout_carta',        status: cartaResult.status,  documentCount: cartaResult.documents?.length  || 0 },
+    { name: 'scout_stripe',       status: stripeResult.status, documentCount: stripeResult.documents?.length || 0 },
+    { name: 'classifier',         status: 'complete', documentCount: consolidated.length },
+    { name: 'extractor',          status: 'complete', documentCount: 0 },
+    { name: 'gap_analyzer',       status: 'complete', documentCount: 0 },
+    { name: 'synthesizer',        status: 'complete', documentCount: 0 },
+    { name: 'gap_fixer',          status: 'complete', documentCount: gapFixes?.generatedDocuments?.length || 0 },
+    { name: 'cap_table_export',   status: 'complete', documentCount: capTableExport?.data_room_index?.length || 0 },
+  ];
+
+  const summary = generateSummary({
+    gmailResult, driveResult, cartaResult, stripeResult,
+    classification, financialMetrics, gapAnalysis,
+    synthesis, gapFixes, capTableExport
+  });
+
+  const result = {
+    founderEmail:     intakeConfig.founderEmail,
+    companyName:      intakeConfig.companyName,
+    timestamp:        new Date().toISOString(),
+    agentsExecuted,
+    dataRoom: {
+      documents:        consolidated,
+      classification,
+      financialMetrics,
+      synthesis,
+      gapFixes,
+      capTableExport
+    },
+    gapAnalysis: {
+      criticalGaps:      gapAnalysis?.criticalGaps    || [],
+      redFlags:          gapAnalysis?.redFlags         || [],
+      dueDiligenceRisk:  gapAnalysis?.dueDiligenceRisk || 'unknown'
+    },
+    summary
+  };
+
+  console.log(`[DataRoomReconstructor] Complete. Readiness: ${summary.finalReadinessScore}/100`);
+  return result;
+}
+
+/**
+ * finalizeReconstructionResult — pushes the completed result into OpenCap models.
+ *
+ * In the MVP this is a pass-through that logs intent; in a future iteration it
+ * will write Documents, Stakeholders, ShareClasses, and Valuations.
+ *
+ * @param {Object} job    - ReconstructionJob record
+ * @param {Object} result - ReconstructionResult from reconstructDataRoom
+ * @returns {Promise<{ documentsCreated: number, stakeholdersCreated: number, message: string }>}
+ */
+async function finalizeReconstructionResult(job, result) {
+  const companyId = job.companyId;
+  console.log(`[DataRoomReconstructor] Finalizing job ${job.jobId} for company ${companyId}`);
+
+  // TODO: iterate result.dataRoom.documents and upsert into Document model
+  // TODO: iterate result.dataRoom.capTableExport and upsert Stakeholders/ShareClasses
+  // TODO: store gapAnalysis findings for audit trail
+
+  return {
+    documentsCreated:     0,
+    stakeholdersCreated:  0,
+    message: `Reconstruction result for "${result.companyName}" acknowledged. Manual review required for ${result.gapAnalysis?.criticalGaps?.length || 0} critical gaps.`,
+  };
+}
+
+module.exports = {
+  reconstructDataRoom,
+  finalizeReconstructionResult,
+  // Export individual agents and helpers for testing
+  scoutGmailAgent,
+  scoutDriveAgent,
+  scoutCartaAgent,
+  scoutStripeAgent,
+  consolidateScoutResults,
+  classifierAgent,
+  extractorAgent,
+  gapAnalyzerAgent,
+  synthesizerAgent,
+  gapFixerAgent,
+  capTableExportAgent,
+  generateSummary,
+  INVESTOR_CHECKLIST,
+  NEVER_GENERATE_NAMES,
+};

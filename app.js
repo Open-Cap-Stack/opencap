@@ -279,6 +279,7 @@ const routes = {
   messageRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageRoutes')), // Messaging / conversations
   accountantRoutes: safeRequire(path.join(__dirname, 'routes/v1/accountantRoutes')), // AI 409A accountant review workflow
   investorDatabaseRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorDatabaseRoutes')), // System-wide VC investor directory
+  dataRoomReconstructRoutes: safeRequire(path.join(__dirname, 'routes/v1/dataRoomReconstructRoutes')), // Issue #631: AI Data Room Reconstruction
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -288,7 +289,7 @@ const routes = {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/mcp', '/webhooks'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -454,6 +455,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/accountant';
     } else if (key === 'investorDatabaseRoutes') {
       path = '/api/v1/investor-database';
+    } else if (key === 'dataRoomReconstructRoutes') {
+      path = '/api/v1/reconstruct'; // Issue #631: AI Data Room Reconstruction
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
