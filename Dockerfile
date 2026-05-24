@@ -6,6 +6,7 @@ RUN apk add --no-cache python3 make g++ bash
 
 COPY package*.json ./
 RUN npm install --no-fund --no-audit --omit=dev && npm cache clean --force
+RUN npx playwright install chromium --with-deps
 
 COPY . .
 
