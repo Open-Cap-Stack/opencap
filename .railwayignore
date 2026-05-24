@@ -1,0 +1,6 @@
+.claude/
+node_modules/
+.git/
+*.log
+coverage/
+# Sun May 24 16:33:45 PDT 2026
