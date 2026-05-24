@@ -12,6 +12,7 @@
  *   DELETE /:jobId         — cancel/delete job
  */
 
+const { v4: uuidv4 } = require('uuid');
 const ReconstructionJob = require('../models/ReconstructionJob');
 const zipExtractionService = require('../services/zipExtractionService');
 
@@ -42,10 +43,30 @@ exports.startJob = async (req, res) => {
       });
     }
 
+    // Pre-generate jobId so it can be passed to credentialVault before DB write
+    const jobId = `rj_${uuidv4()}`;
+
+    // Detect and vault Carta credentials ephemerally — NEVER persisted to ZeroDB
+    // Security: Morgan logs only method/URL/status/response-time — NOT request bodies,
+    // so credentials in req.body are not exposed via the logging middleware.
+    // Lazy-load vault to avoid circular deps
+    const credentialVault = require('../services/credentialVault');
+
+    const cartaSource = (sources && sources.carta) ? { ...sources.carta } : {};
+    if (cartaSource.credentials) {
+      // Store credentials ephemerally — NEVER persisted to ZeroDB
+      credentialVault.store(jobId, cartaSource.credentials);
+      delete cartaSource.credentials; // strip before DB write
+      cartaSource.automationMode = 'browser';
+      if (sources) sources.carta = cartaSource;
+    }
+
     const job = await ReconstructionJob.createJob({
+      jobId, // pre-generated
       companyId,
       userId,
       intakeConfig: {
+        jobId,  // pipeline reads this to pass to connectors
         companyName,
         founderEmail,
         targetDataRoomId: targetDataRoomId || null,
