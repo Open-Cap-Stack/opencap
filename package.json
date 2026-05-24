@@ -62,6 +62,7 @@
     "multer": "^2.0.2",
     "nodemailer": "^8.0.7",
     "openai": "^5.10.1",
+    "pdf-parse": "^2.4.5",
     "pdf.js-extract": "^0.2.1",
     "pdfkit": "^0.18.0",
     "sharp": "^0.34.3",
@@ -71,7 +72,8 @@
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^6.0.1",
     "uuid": "^11.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.2",
