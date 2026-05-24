@@ -82,7 +82,7 @@ async function ainativeChat(messages, options = {}) {
         }
       );
 
-      const content = response.data?.choices?.[0]?.message?.content;
+      const content = response?.data?.choices?.[0]?.message?.content;
       if (!content) {
         throw new Error('Empty response from AINative chat/completions');
       }

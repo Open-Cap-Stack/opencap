@@ -8,15 +8,15 @@ jest.mock('axios');
 const axios = require('axios');
 
 describe('ainativeAgentService', () => {
-  let ainativeChat, parseJsonFromResponse;
+  let ainativeChat, parseJsonFromResponse, ainativeChatWithRetry;
 
   beforeAll(() => {
     process.env.AINATIVE_API_TOKEN = 'test-token-abc';
-    ({ ainativeChat, parseJsonFromResponse } = require('../../../services/ainativeAgentService'));
+    ({ ainativeChat, parseJsonFromResponse, ainativeChatWithRetry } = require('../../../services/ainativeAgentService'));
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     process.env.AINATIVE_API_TOKEN = 'test-token-abc';
   });
 
@@ -176,6 +176,85 @@ describe('ainativeAgentService', () => {
   });
 
   // ─── parseJsonFromResponse() ──────────────────────────────────────────────
+
+  describe('ainativeChatWithRetry()', () => {
+
+    function mockSuccessJson(json) {
+      const content = JSON.stringify(json);
+      axios.post.mockResolvedValueOnce({
+        data: { choices: [{ message: { content } }] }
+      });
+    }
+
+    it('returns { content, parsed } on first success', async () => {
+      mockSuccessJson({ score: 42 });
+      const messages = [{ role: 'user', content: 'Give me JSON' }];
+      const result = await ainativeChatWithRetry(messages);
+      expect(result.parsed).toEqual({ score: 42 });
+      expect(typeof result.content).toBe('string');
+    });
+
+    it('retries when LLM returns unparseable response, injecting error context', async () => {
+      // First call: returns prose (not JSON)
+      axios.post
+        .mockResolvedValueOnce({
+          data: { choices: [{ message: { content: 'Here is your answer: not json at all' } }] }
+        })
+        // Second call: returns valid JSON
+        .mockResolvedValueOnce({
+          data: { choices: [{ message: { content: '{"result":"ok"}' } }] }
+        });
+
+      const messages = [{ role: 'user', content: 'Give me JSON' }];
+      const result = await ainativeChatWithRetry(messages, {}, 3);
+
+      expect(result.parsed).toEqual({ result: 'ok' });
+      expect(axios.post).toHaveBeenCalledTimes(2);
+    });
+
+    it('injects the bad response and error message into context on retry', async () => {
+      axios.post
+        .mockResolvedValueOnce({
+          data: { choices: [{ message: { content: 'not json' } }] }
+        })
+        .mockResolvedValueOnce({
+          data: { choices: [{ message: { content: '{"fixed":true}' } }] }
+        });
+
+      const messages = [{ role: 'user', content: 'Give me JSON' }];
+      await ainativeChatWithRetry(messages, {}, 3);
+
+      // Second call should have more messages (original + assistant bad response + user error correction)
+      const secondCallBody = axios.post.mock.calls[1][1];
+      expect(secondCallBody.messages.length).toBeGreaterThan(messages.length);
+      const errorCorrectionMsg = secondCallBody.messages[secondCallBody.messages.length - 1];
+      expect(errorCorrectionMsg.role).toBe('user');
+      expect(errorCorrectionMsg.content).toMatch(/could not be parsed as JSON/);
+    });
+
+    it('throws after exhausting maxRetries', async () => {
+      // All calls return unparseable content
+      axios.post.mockResolvedValue({
+        data: { choices: [{ message: { content: 'not valid json at all, period' } }] }
+      });
+
+      const messages = [{ role: 'user', content: 'Give me JSON' }];
+      await expect(ainativeChatWithRetry(messages, {}, 3)).rejects.toThrow();
+      expect(axios.post).toHaveBeenCalledTimes(3);
+    });
+
+    it('attaches rawContent to error thrown from parseJsonFromResponse', () => {
+      const { parseJsonFromResponse } = require('../../../services/ainativeAgentService');
+      let thrownError;
+      try {
+        parseJsonFromResponse('this is not json');
+      } catch (err) {
+        thrownError = err;
+      }
+      expect(thrownError).toBeDefined();
+      expect(thrownError.rawContent).toBe('this is not json');
+    });
+  });
 
   describe('parseJsonFromResponse()', () => {
     it('parses raw JSON', () => {
