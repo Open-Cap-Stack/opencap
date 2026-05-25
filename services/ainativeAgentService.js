@@ -134,22 +134,62 @@ function parseJsonFromResponse(content) {
     return JSON.parse(clean);
   } catch { /* fall through */ }
 
-  // Extract outermost object { ... }
-  const objStart  = clean.indexOf('{');
-  const objEnd    = clean.lastIndexOf('}');
-  if (objStart !== -1 && objEnd > objStart) {
-    try {
-      return JSON.parse(clean.slice(objStart, objEnd + 1));
-    } catch { /* fall through */ }
+  // Determine whether an object or array appears first
+  const objStart = clean.indexOf('{');
+  const arrStart = clean.indexOf('[');
+  const hasObj = objStart !== -1;
+  const hasArr = arrStart !== -1;
+  const objFirst = hasObj && (!hasArr || objStart < arrStart);
+
+  if (objFirst) {
+    // Try full-span object extraction first
+    const objEnd = clean.lastIndexOf('}');
+    if (objEnd > objStart) {
+      try {
+        return JSON.parse(clean.slice(objStart, objEnd + 1));
+      } catch { /* fall through — LLM may have returned multiple objects */ }
+    }
+
+    // Multiple JSON objects in response: scan forward matching braces to find first complete object
+    let depth = 0;
+    let inStr = false;
+    let escape = false;
+    for (let i = objStart; i < clean.length; i++) {
+      const ch = clean[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inStr) { escape = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') depth++;
+      if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(clean.slice(objStart, i + 1));
+          } catch { break; }
+        }
+      }
+    }
   }
 
   // Extract outermost array [ ... ]
-  const arrStart = clean.indexOf('[');
-  const arrEnd   = clean.lastIndexOf(']');
-  if (arrStart !== -1 && arrEnd > arrStart) {
-    try {
-      return JSON.parse(clean.slice(arrStart, arrEnd + 1));
-    } catch { /* fall through */ }
+  if (hasArr) {
+    const arrEnd = clean.lastIndexOf(']');
+    if (arrEnd > arrStart) {
+      try {
+        return JSON.parse(clean.slice(arrStart, arrEnd + 1));
+      } catch { /* fall through */ }
+    }
+  }
+
+  // Object appeared after array — try it as fallback
+  if (hasObj && !objFirst) {
+    const objEnd = clean.lastIndexOf('}');
+    if (objEnd > objStart) {
+      try {
+        return JSON.parse(clean.slice(objStart, objEnd + 1));
+      } catch { /* fall through */ }
+    }
   }
 
   const err = new Error(
