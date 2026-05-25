@@ -15,6 +15,7 @@ import { waterfallTools } from './tools/waterfall.js';
 import { financialReportTools } from './tools/financialReports.js';
 import { equityGrantTools } from './tools/equityGrants.js';
 import { metaTools } from './tools/meta.js';
+import { portfolioTools } from './tools/portfolio.js';
 import { formatMcpError } from './errors.js';
 const ALL_TOOLS = [
     ...metaTools,
@@ -28,6 +29,7 @@ const ALL_TOOLS = [
     ...dilutionTools,
     ...waterfallTools,
     ...financialReportTools,
+    ...portfolioTools,
 ];
 export function createServer(client) {
     const server = new Server({

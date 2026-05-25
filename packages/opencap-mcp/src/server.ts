@@ -24,6 +24,7 @@ import { waterfallTools } from './tools/waterfall.js';
 import { financialReportTools } from './tools/financialReports.js';
 import { equityGrantTools } from './tools/equityGrants.js';
 import { metaTools } from './tools/meta.js';
+import { portfolioTools } from './tools/portfolio.js';
 import { type ToolDefinition } from './types.js';
 import { formatMcpError } from './errors.js';
 
@@ -39,6 +40,7 @@ const ALL_TOOLS: ToolDefinition[] = [
   ...dilutionTools,
   ...waterfallTools,
   ...financialReportTools,
+  ...portfolioTools,
 ];
 
 export function createServer(client: AxiosInstance): Server {
