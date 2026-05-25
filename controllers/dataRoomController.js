@@ -305,3 +305,70 @@ exports.validateExternalAccess = async (req, res) => {
     res.status(200).json({ dataRoomId: dataRoom.dataRoomId, name: dataRoom.name, description: dataRoom.description, documentCount: dataRoom.documents.length });
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
+
+/**
+ * GET /api/v1/data-rooms/:id/diff
+ * Issue #655: Aggregate document-level changes across an entire data room
+ * between two timestamps.
+ * Query params: from (ISO date), to (ISO date)
+ * Returns: { added: [], removed: [], modified: [], summary: string }
+ */
+exports.getDiff = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ message: 'Both "from" and "to" query parameters are required (ISO date strings)' });
+    }
+
+    const dataRoom = await DataRoom.findByDataRoomId(req.params.id);
+    if (!dataRoom) return res.status(404).json({ message: 'Data room not found' });
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format. Use ISO 8601 (e.g. 2024-01-01T00:00:00.000Z)' });
+    }
+
+    const documents = dataRoom.documents || [];
+
+    const added = [];
+    const removed = [];
+    const modified = [];
+
+    for (const doc of documents) {
+      const addedAt = doc.addedAt ? new Date(doc.addedAt) : null;
+      const modifiedAt = doc.modifiedAt ? new Date(doc.modifiedAt) : null;
+      const removedAt = doc.removedAt ? new Date(doc.removedAt) : null;
+
+      // Document added within range
+      if (addedAt && addedAt >= fromDate && addedAt <= toDate) {
+        added.push({ documentId: doc.documentId, name: doc.name, addedAt: doc.addedAt });
+      }
+
+      // Document removed within range
+      if (removedAt && removedAt >= fromDate && removedAt <= toDate) {
+        removed.push({ documentId: doc.documentId, name: doc.name, removedAt: doc.removedAt });
+      }
+
+      // Document modified within range (but not added in this range)
+      if (
+        modifiedAt && modifiedAt >= fromDate && modifiedAt <= toDate &&
+        !(addedAt && addedAt >= fromDate && addedAt <= toDate)
+      ) {
+        modified.push({ documentId: doc.documentId, name: doc.name, modifiedAt: doc.modifiedAt });
+      }
+    }
+
+    const totalChanges = added.length + removed.length + modified.length;
+    const summary = totalChanges === 0
+      ? `No changes between ${from} and ${to}`
+      : `${added.length} added, ${removed.length} removed, ${modified.length} modified between ${from} and ${to}`;
+
+    res.status(200).json({ added, removed, modified, summary });
+  } catch (error) {
+    console.error('Data room diff failed:', error);
+    res.status(500).json({ message: error.message });
+  }
+};

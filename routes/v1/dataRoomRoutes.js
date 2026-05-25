@@ -25,4 +25,7 @@ router.get('/:id/activity', dataRoomController.getActivityLog);
 router.post('/:id/export', dataRoomController.exportAsZip);
 router.post('/:id/external-link', dataRoomController.generateExternalLink);
 
+// Issue #655: Data room diff — document-level changes between two timestamps
+router.get('/:id/diff', dataRoomController.getDiff);
+
 module.exports = router;
