@@ -9,6 +9,7 @@
  */
 
 const axios = require('axios');
+const JSON5 = require('json5');
 
 const AINATIVE_BASE = 'https://api.ainative.studio/v1';
 const DEFAULT_MODEL = 'llama-3.1-8b';
@@ -191,6 +192,19 @@ function parseJsonFromResponse(content) {
       } catch { /* fall through */ }
     }
   }
+
+  // Last resort: JSON5 lenient parser handles trailing commas, duplicate keys, comments
+  try {
+    if (hasObj) {
+      const objEnd = clean.lastIndexOf('}');
+      if (objEnd > objStart) return JSON5.parse(clean.slice(objStart, objEnd + 1));
+    }
+    if (hasArr) {
+      const arrEnd = clean.lastIndexOf(']');
+      if (arrEnd > arrStart) return JSON5.parse(clean.slice(arrStart, arrEnd + 1));
+    }
+    return JSON5.parse(clean);
+  } catch { /* fall through */ }
 
   const err = new Error(
     `parseJsonFromResponse: could not extract valid JSON from response: ${clean.slice(0, 300)}`
