@@ -46,9 +46,8 @@ exports.listInvestors = async (req, res) => {
     const sectorFilter = (req.query.sector || '').trim().toLowerCase();
     const stageFilter = (req.query.stage || '').trim().toLowerCase();
 
-    // VC investor rows are in the stakeholders table with companyId: ainative-studio
-    // and email domain @vc-import.local. ZeroDB doesn't support suffix matching so
-    // we query by companyId and filter client-side.
+    // VC investor rows are in the stakeholders table with companyId: ainative-studio.
+    // skip/limit are passed to ZeroDB so pagination happens at the DB level.
     const queryOptions = { filter: { companyId: 'ainative-studio' }, limit, skip };
 
     const result = await zerodbService.queryTable('stakeholders', queryOptions);
@@ -56,9 +55,6 @@ exports.listInvestors = async (req, res) => {
 
     // Extract row_data from ZeroDB envelope if present
     rows = rows.map((r) => (r.row_data ? { ...r.row_data, _rowId: r.row_id } : r));
-
-    // Only return vc-import rows (guards against any future real stakeholders with this companyId)
-    rows = rows.filter((r) => (r.email || '').toLowerCase().endsWith('@vc-import.local'));
 
     // Apply text search across name, email, firm, notes
     if (search) {
