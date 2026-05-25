@@ -171,8 +171,13 @@ const zerodbReady = (async () => {
         await zerodbService.createTable(tbl, { fields: {} });
         console.log(`✅ Table "${tbl}" ensured`);
       } catch (tblErr) {
-        // 409 = already exists, anything else log but don't crash
-        if (tblErr.response?.status !== 409 && !tblErr.message?.includes('already exist')) {
+        // 409 = already exists; ZeroDB also returns 500 with UniqueViolation when table exists
+        const detail = tblErr.response?.data?.detail || '';
+        const alreadyExists = tblErr.response?.status === 409 ||
+          tblErr.message?.includes('already exist') ||
+          detail.includes('UniqueViolation') ||
+          detail.includes('already exists');
+        if (!alreadyExists) {
           console.warn(`⚠️  Could not pre-create table "${tbl}": ${tblErr.message}`);
         }
       }
