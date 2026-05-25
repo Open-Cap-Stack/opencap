@@ -17,6 +17,7 @@ const express = require('express');
 const router = express.Router();
 const billingController = require('../../controllers/billingController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { requireUserNotAgent } = require('../../middleware/rbacMiddleware');
 
 // ============================================================
 // Webhook route - NO authentication (uses Stripe signature)
@@ -43,8 +44,10 @@ router.get('/plans', billingController.getPlans);
 
 // ============================================================
 // All routes below require authentication
+// Agents are explicitly blocked from billing endpoints
 // ============================================================
 router.use(authenticateToken);
+router.use(requireUserNotAgent);
 
 /**
  * @route GET /api/v1/billing/current-plan

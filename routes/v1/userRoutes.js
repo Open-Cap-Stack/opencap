@@ -3,13 +3,15 @@ const router = express.Router();
 const userController = require('../../controllers/userController');
 const settingsController = require('../../controllers/settingsController');
 const { authenticate } = require('../../middleware/authMiddleware');
+const { requireUserNotAgent } = require('../../middleware/rbacMiddleware');
 const { uploadSingle, handleUploadError } = require('../../middleware/profilePhotoUpload');
 
 // Public routes
 router.post('/', userController.createUser);
 
-// Protected routes
+// Protected routes — agents are explicitly blocked from user management
 router.use(authenticate);
+router.use(requireUserNotAgent);
 
 // Get current user profile
 router.get('/profile', userController.getProfile);

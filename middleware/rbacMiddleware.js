@@ -188,10 +188,76 @@ const hasPermission = (requiredPermission) => {
   };
 };
 
+/**
+ * Agent capability scope map
+ * Defines which capability labels an agent JWT may carry, and what
+ * underlying access those labels grant. Agents are provisioned with
+ * one or more capability strings; access is denied unless the agent's
+ * capabilities array contains the exact scope required.
+ */
+const agentCapabilities = {
+  'read:cap_table':  ['read:equity', 'read:companies', 'read:users'],
+  'read:documents':  ['read:documents'],
+  'read:reports':    ['read:reports'],
+  'write:documents': ['read:documents', 'write:documents'],
+  'admin:all':       ['admin:all'], // only for explicitly provisioned agents
+};
+
+/**
+ * Middleware factory: verify that an agent JWT carries a required capability.
+ * For non-agent requests the check is skipped and next() is called immediately,
+ * so the middleware is safe to stack in front of the normal hasRole/hasPermission
+ * guards without affecting existing human-user flows.
+ *
+ * @param {string} requiredCapability - One of the keys in agentCapabilities
+ * @returns {Function} Express middleware
+ */
+const hasAgentCapability = (requiredCapability) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    // Non-agent requests fall through to normal RBAC handling
+    if (req.user.type !== 'agent') {
+      return next();
+    }
+
+    const capabilities = Array.isArray(req.user.capabilities) ? req.user.capabilities : [];
+    if (capabilities.includes(requiredCapability)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      message: `Agent token lacks required capability: ${requiredCapability}`,
+    });
+  };
+};
+
+/**
+ * Middleware: block agent tokens from reaching user-sensitive endpoints.
+ * Apply after authenticateToken on routes that must never be accessible
+ * to machine credentials (user management, billing, admin panel, API key
+ * management).
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+const requireUserNotAgent = (req, res, next) => {
+  if (req.user?.type === 'agent') {
+    return res.status(403).json({ message: 'Agent tokens cannot access this endpoint' });
+  }
+  return next();
+};
+
 module.exports = {
   checkPermission,
   hasRole,
   hasPermission,
   getUserPermissions, // Export for testing
-  rolePermissions // Export for reference
+  rolePermissions,    // Export for reference
+  agentCapabilities,
+  hasAgentCapability,
+  requireUserNotAgent,
 };

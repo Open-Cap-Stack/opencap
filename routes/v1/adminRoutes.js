@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { requireUserNotAgent } = require('../../middleware/rbacMiddleware');
 const adminController = require('../../controllers/adminController');
 
-// Apply authentication middleware to all routes
+// Apply authentication middleware to all routes — agents are blocked from admin panel
 router.use(authenticateToken);
+router.use(requireUserNotAgent);
 
 // Route for creating a new admin
 router.post('/admins', adminController.createAdmin);
