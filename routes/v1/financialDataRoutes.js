@@ -13,7 +13,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const financialDataService = require('../../services/financialDataService');
-const { authenticate: authenticateJWT } = require('../../middleware/jwtAuth');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 const { securityLogger } = require('../../middleware/securityAuditLogger');
 
@@ -54,7 +54,7 @@ const upload = multer({
 });
 
 // Apply authentication to all routes
-router.use(authenticateJWT);
+router.use(authenticateToken);
 
 /**
  * @swagger
@@ -112,7 +112,7 @@ router.use(authenticateJWT);
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/import', hasRole(['admin', 'financial_manager']), upload.single('file'), async (req, res) => {
+router.post('/import', hasRole(['super_admin', 'admin', 'founder', 'accountant']), upload.single('file'), async (req, res) => {
   let filePath = null;
   
   try {
@@ -236,7 +236,7 @@ router.post('/import', hasRole(['admin', 'financial_manager']), upload.single('f
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/export', hasRole(['admin', 'financial_manager', 'analyst']), async (req, res) => {
+router.get('/export', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager']), async (req, res) => {
   try {
     const { exportType, format, companyId, startDate, endDate, limit } = req.query;
     

@@ -56,7 +56,7 @@ const TABLE_SCHEMAS = {
   },
 
   user_models: {
-    description: 'Alternative user model from userModel.js (separate from users table)',
+    description: 'Legacy user model table (Admin/Editor/Viewer) — superseded by users table with 9-role system',
     fields: {
       userId: { type: 'TEXT', notNull: true, unique: true },
       username: { type: 'TEXT', notNull: true },

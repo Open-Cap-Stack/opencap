@@ -1,8 +1,11 @@
 /**
- * JWT Authentication Middleware
+ * JWT Authentication Middleware (DEPRECATED)
  * [Bug] OCAE-304: Fix SPVasset tests with JWT authentication
- * 
- * This middleware handles JWT token validation and role-based access control
+ *
+ * DEPRECATED: Use middleware/authMiddleware.js (authenticateToken) instead.
+ * This file uses req.user.roles (array) which is inconsistent with the
+ * authoritative single req.user.role field from authMiddleware.js.
+ * Kept only to avoid breaking legacy tests — do not use in new routes.
  */
 const jwt = require('jsonwebtoken');
 
