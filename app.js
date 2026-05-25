@@ -299,6 +299,8 @@ const routes = {
   accountantRoutes: safeRequire(path.join(__dirname, 'routes/v1/accountantRoutes')), // AI 409A accountant review workflow
   investorDatabaseRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorDatabaseRoutes')), // System-wide VC investor directory
   dataRoomReconstructRoutes: safeRequire(path.join(__dirname, 'routes/v1/dataRoomReconstructRoutes')), // Issue #631: AI Data Room Reconstruction
+  migrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/migrationRoutes')), // Issue #652: Carta migration score tool
+  capTableHealthRoutes: safeRequire(path.join(__dirname, 'routes/v1/capTableHealthRoutes')), // Issue #660: Cap table health scorecard
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -476,6 +478,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/investor-database';
     } else if (key === 'dataRoomReconstructRoutes') {
       path = '/api/v1/reconstruct'; // Issue #631: AI Data Room Reconstruction
+    } else if (key === 'migrationRoutes') {
+      path = '/api/v1/migration'; // Issue #652: Carta migration score tool
+    } else if (key === 'capTableHealthRoutes') {
+      path = '/api/v1/cap-table'; // Issue #660: Cap table health scorecard
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
