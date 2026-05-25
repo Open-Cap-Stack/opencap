@@ -1,6 +1,8 @@
 /**
  * DataRoom Routes - v1
  * Issue #194: Build Data Room Backend Infrastructure
+ * Issue #655: Data room diff
+ * Issue #657: Data room sharing — access audit log + password protection
  */
 
 const express = require('express');
@@ -24,5 +26,12 @@ router.post('/:id/permissions', dataRoomController.managePermissions);
 router.get('/:id/activity', dataRoomController.getActivityLog);
 router.post('/:id/export', dataRoomController.exportAsZip);
 router.post('/:id/external-link', dataRoomController.generateExternalLink);
+
+// Issue #655: Data room diff — document-level changes between two timestamps
+router.get('/:id/diff', dataRoomController.getDiff);
+
+// Issue #657: Access audit log and link access tracking
+router.get('/:id/access-log', dataRoomController.getAccessLog);
+router.post('/:id/log-access', dataRoomController.logLinkAccess);
 
 module.exports = router;

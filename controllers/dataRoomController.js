@@ -287,11 +287,18 @@ exports.generateExternalLink = async (req, res) => {
     const dataRoom = await DataRoom.findByDataRoomId(req.params.id);
     if (!dataRoom) return res.status(404).json({ message: 'Data room not found' });
     if (!DataRoom.hasPermission(dataRoom, req.user?.userId, 'admin') && req.user?.role !== 'admin') return res.status(403).json({ message: 'Admin permission required' });
-    const { expiresInHours = 24, maxViews } = req.body;
+    const { expiresInHours = 24, maxViews, password } = req.body;
     const accessLink = await DataRoom.generateAccessLink(req.params.id, expiresInHours, { createdBy: req.user?.userId, maxViews });
-    try { await DataRoom.logActivity(req.params.id, { action: 'external_link_generated', userId: req.user?.userId, details: { expiresInHours, maxViews } }); } catch (e) {}
+    // Issue #657: Store password hash if password protection requested
+    const passwordProtected = Boolean(password);
+    if (passwordProtected && accessLink.accessToken) {
+      const crypto = require('crypto');
+      const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+      try { await DataRoom.updateOne({ dataRoomId: req.params.id }, { $set: { [`accessLinks.${accessLink.accessToken}.passwordHash`]: passwordHash } }); } catch (e) {}
+    }
+    try { await DataRoom.logActivity(req.params.id, { action: 'external_link_generated', userId: req.user?.userId, details: { expiresInHours, maxViews, passwordProtected } }); } catch (e) {}
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    res.status(200).json({ ...accessLink, accessUrl: `${baseUrl}/data-room/${req.params.id}/external?token=${accessLink.accessToken}` });
+    res.status(200).json({ ...accessLink, passwordProtected, accessUrl: `${baseUrl}/data-room/${req.params.id}/external?token=${accessLink.accessToken}` });
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
@@ -304,4 +311,69 @@ exports.validateExternalAccess = async (req, res) => {
     const dataRoom = await DataRoom.findByDataRoomId(req.params.id);
     res.status(200).json({ dataRoomId: dataRoom.dataRoomId, name: dataRoom.name, description: dataRoom.description, documentCount: dataRoom.documents.length });
   } catch (error) { res.status(500).json({ message: error.message }); }
+};
+
+/**
+ * GET /api/v1/data-rooms/:id/access-log
+ * Issue #657: Return audit log of external link accesses (who opened link, docs viewed, timestamp)
+ */
+exports.getAccessLog = async (req, res) => {
+  try {
+    const dataRoom = await DataRoom.findByDataRoomId(req.params.id);
+    if (!dataRoom) return res.status(404).json({ message: 'Data room not found' });
+    const hasAccess = DataRoom.hasPermission(dataRoom, req.user?.userId, 'admin');
+    if (!hasAccess && dataRoom.ownerCompany !== req.user?.companyId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin permission required to view access log' });
+    }
+    const accessLog = dataRoom.accessLog || [];
+    const { page = 1, limit = 50 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const paginatedLog = accessLog.slice(skip, skip + limitNum);
+    res.status(200).json({
+      accessLog: paginatedLog,
+      pagination: { page: pageNum, limit: limitNum, total: accessLog.length }
+    });
+  } catch (error) {
+    console.error('Failed to get access log:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/data-rooms/:id/log-access
+ * Issue #657: Track external link access — called when a link recipient opens the data room
+ * Body: { token, documentsViewed: [], ipAddress }
+ */
+exports.logLinkAccess = async (req, res) => {
+  try {
+    const dataRoom = await DataRoom.findByDataRoomId(req.params.id);
+    if (!dataRoom) return res.status(404).json({ message: 'Data room not found' });
+
+    const { token, documentsViewed = [], ipAddress } = req.body;
+    const { v4: uuidv4 } = require('uuid');
+
+    const accessEntry = {
+      accessId: `al_${uuidv4()}`,
+      token: token || null,
+      accessedAt: new Date().toISOString(),
+      ipAddress: ipAddress || req.ip || null,
+      documentsViewed
+    };
+
+    const existingLog = dataRoom.accessLog || [];
+    const updatedLog = [accessEntry, ...existingLog];
+
+    try {
+      await DataRoom.updateOne({ dataRoomId: req.params.id }, { $set: { accessLog: updatedLog } });
+    } catch (e) {
+      console.error('Failed to persist access log entry:', e.message);
+    }
+
+    res.status(200).json({ message: 'Access logged', accessId: accessEntry.accessId });
+  } catch (error) {
+    console.error('Failed to log link access:', error);
+    res.status(500).json({ message: error.message });
+  }
 };
