@@ -47,7 +47,7 @@ const testUsers = [
     firstName: 'Test',
     lastName: 'User',
     email: 'test@opencapstack.com',
-    role: 'user',
+    role: 'employee',
     status: 'active',
     companyId: 'opencap-test-001',
     password: generatePassword()

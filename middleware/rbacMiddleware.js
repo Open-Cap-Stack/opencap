@@ -11,27 +11,92 @@
  * This defines what permissions each role has access to
  */
 const rolePermissions = {
+  'super_admin': [
+    'read:users', 'write:users', 'delete:users',
+    'read:companies', 'write:companies', 'delete:companies',
+    'read:reports', 'write:reports', 'delete:reports',
+    'read:spv', 'write:spv', 'delete:spv',
+    'read:assets', 'write:assets', 'delete:assets',
+    'read:compliance', 'write:compliance', 'delete:compliance',
+    'read:equity', 'write:equity',
+    'read:documents', 'write:documents',
+    'read:valuations', 'write:valuations', 'sign:valuations',
+    'financialReports.view',
+    'admin:all',
+    'platform:manage_roles', 'platform:manage_tenants', 'platform:view_audit_logs'
+  ],
   'admin': [
     'read:users', 'write:users', 'delete:users',
     'read:companies', 'write:companies', 'delete:companies',
+    'read:reports', 'write:reports', 'delete:reports',
+    'read:spv', 'write:spv', 'delete:spv',
+    'read:assets', 'write:assets', 'delete:assets',
+    'read:compliance', 'write:compliance', 'delete:compliance',
+    'read:equity', 'write:equity',
+    'read:documents', 'write:documents',
+    'read:valuations', 'write:valuations',
     'financialReports.view',
     'admin:all'
   ],
   'founder': [
-    'read:users', 'write:users', 'delete:users',
-    'read:companies', 'write:companies', 'delete:companies',
+    'read:users', 'write:users',
+    'read:companies', 'write:companies',
+    'read:reports', 'write:reports',
+    'read:spv', 'write:spv',
+    'read:assets', 'write:assets',
+    'read:compliance', 'write:compliance',
+    'read:equity', 'write:equity',
+    'read:documents', 'write:documents',
+    'read:valuations',
     'financialReports.view',
     'admin:all'
   ],
+  'accountant': [
+    'read:users',
+    'read:companies',
+    'read:reports',
+    'read:compliance', 'write:compliance',
+    'read:documents',
+    'read:valuations', 'write:valuations', 'sign:valuations'
+  ],
+  'investor': [
+    'read:users',
+    'read:companies',
+    'read:reports',
+    'read:spv',
+    'read:assets',
+    'read:compliance',
+    'read:equity'
+  ],
   'manager': [
     'read:users', 'write:users',
-    'read:companies', 'write:companies'
+    'read:companies', 'write:companies',
+    'read:reports', 'write:reports',
+    'read:spv', 'write:spv',
+    'read:assets', 'write:assets',
+    'read:compliance', 'write:compliance'
   ],
-  'user': [
-    'read:companies'
+  'employee': [
+    'read:own_equity',
+    'read:own_documents',
+    'read:valuation',
+    'read:companies',
+    'read:compliance'
+  ],
+  'service_provider': [
+    'read:users',
+    'read:companies',
+    'read:reports',
+    'read:compliance', 'write:compliance',
+    'read:documents',
+    'read:spv',
+    'read:assets'
   ],
   'client': [
-    'read:companies'
+    'read:companies',
+    'read:reports',
+    'read:spv',
+    'read:assets'
   ]
 };
 

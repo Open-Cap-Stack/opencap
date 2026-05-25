@@ -41,9 +41,9 @@ describe('UserController', () => {
 
   describe('createUser', () => {
     it('should create a user successfully', async () => {
-      req.body = { userId: 'user-123', name: 'John Doe', username: 'johndoe', email: 'john@example.com', password: 'securepassword123', role: 'user' };
+      req.body = { userId: 'user-123', name: 'John Doe', username: 'johndoe', email: 'john@example.com', password: 'securepassword123', role: 'employee' };
       User.findOne.mockResolvedValue(null);
-      const mockUser = { _id: 'mongo-id-123', userId: 'user-123', name: 'John Doe', username: 'johndoe', email: 'john@example.com', role: 'user' };
+      const mockUser = { _id: 'mongo-id-123', userId: 'user-123', name: 'John Doe', username: 'johndoe', email: 'john@example.com', role: 'employee' };
       User.create.mockResolvedValue(mockUser);
       await userController.createUser(req, res);
       expect(res.statusCode).toBe(201);
@@ -58,7 +58,7 @@ describe('UserController', () => {
     });
 
     it('should return 400 when email already exists', async () => {
-      req.body = { userId: 'user-456', name: 'Jane Doe', username: 'janedoe', email: 'existing@example.com', password: 'password123', role: 'user' };
+      req.body = { userId: 'user-456', name: 'Jane Doe', username: 'janedoe', email: 'existing@example.com', password: 'password123', role: 'employee' };
       User.findOne.mockResolvedValue({ _id: 'existing-id', email: 'existing@example.com' });
       await userController.createUser(req, res);
       expect(res.statusCode).toBe(400);
@@ -66,7 +66,7 @@ describe('UserController', () => {
     });
 
     it('should return 500 on database error during creation', async () => {
-      req.body = { userId: 'user-789', name: 'Error User', username: 'erroruser', email: 'error@example.com', password: 'password123', role: 'user' };
+      req.body = { userId: 'user-789', name: 'Error User', username: 'erroruser', email: 'error@example.com', password: 'password123', role: 'employee' };
       User.findOne.mockResolvedValue(null);
       User.create.mockRejectedValue(new Error('Database connection failed'));
       await userController.createUser(req, res);
@@ -102,7 +102,7 @@ describe('UserController', () => {
   describe('getUserById', () => {
     it('should return user by ID successfully', async () => {
       req.params = { id: 'user-id-123' };
-      User.findById.mockResolvedValue({ _id: 'user-id-123', email: 'john@example.com', role: 'user' });
+      User.findById.mockResolvedValue({ _id: 'user-id-123', email: 'john@example.com', role: 'employee' });
       await userController.getUserById(req, res);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData()).email).toBe('john@example.com');

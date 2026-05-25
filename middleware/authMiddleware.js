@@ -269,7 +269,7 @@ const authenticateToken = async (req, res, next) => {
             userId: localUser.userId,
             _id: localUser._id || localUser.userId,
             email: localUser.email,
-            role: localUser.role || 'user',
+            role: localUser.role || 'employee',
             permissions: localUser.permissions || [],
             companyId: localUser.companyId
           };
@@ -337,7 +337,7 @@ const validateAINativeToken = async (token) => {
       userId: ainativeUser.id,
       email: ainativeUser.email,
       name: ainativeUser.name,
-      role: 'user', // Default role for AINative users
+      role: 'employee', // Default role for AINative users
       permissions: [],
       isAINativeUser: true
     };
@@ -380,9 +380,9 @@ const provisionUserFromToken = async (decoded) => {
       lastName: lastName,
       displayName: name,
       password: crypto.randomBytes(32).toString('hex'),
-      role: decoded.role || 'user',
+      role: decoded.role || 'employee',
       status: 'active',
-      permissions: User.getPermissionsForRole(decoded.role || 'user'),
+      permissions: User.getPermissionsForRole(decoded.role || 'employee'),
       companyId: decoded.companyId || null,
       lastLogin: new Date().toISOString(),
       authProvider: 'jwt'
@@ -429,9 +429,9 @@ const provisionAINativeUser = async (ainativeUser) => {
       lastName: lastName,
       displayName: ainativeUser.name || ainativeUser.email.split('@')[0],
       password: crypto.randomBytes(32).toString('hex'), // Random — SSO users don't use password auth
-      role: 'user',
+      role: 'employee',
       status: 'active',
-      permissions: User.getPermissionsForRole('user'),
+      permissions: User.getPermissionsForRole('employee'),
       profile: {
         bio: '',
         avatar: null,
@@ -453,7 +453,7 @@ const provisionAINativeUser = async (ainativeUser) => {
       userId: ainativeUser.userId,
       email: ainativeUser.email,
       name: ainativeUser.name,
-      role: 'user',
+      role: 'employee',
       permissions: [],
       isAINativeUser: true,
       provisioningFailed: true

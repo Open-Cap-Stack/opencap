@@ -62,7 +62,7 @@ describe('Document Management Integration Tests', () => {
     userToken = jwt.sign(
       {
         userId: 'test-user-456',
-        role: 'user',
+        role: 'employee',
         companyId: 'company-123',
         permissions: ['read:documents', 'write:documents', 'delete:documents']
       },
@@ -565,7 +565,7 @@ describe('Document Management Integration Tests', () => {
       const otherUserToken = jwt.sign(
         {
           userId: 'other-user',
-          role: 'user',
+          role: 'employee',
           companyId: 'other-company'
         },
         process.env.JWT_SECRET,

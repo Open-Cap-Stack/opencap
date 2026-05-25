@@ -451,7 +451,7 @@ describe('Settings Controller', () => {
             req.user = { userId };
 
             const mockCompany = { companyId };
-            const mockUser = { userId, companyId, role: 'user', permissions: ['read:companies'] };
+            const mockUser = { userId, companyId, role: 'employee', permissions: ['read:companies'] };
 
             Company.findByCompanyId.mockResolvedValue(mockCompany);
             User.findByUserId.mockResolvedValue(mockUser);

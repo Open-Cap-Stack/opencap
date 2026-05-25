@@ -44,7 +44,7 @@ const getActor = (req) => {
     userId: user.id || user._id || user.userId || 'anonymous',
     email: user.email || 'unknown',
     name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
-    role: user.role || 'user'
+    role: user.role || 'employee'
   };
 };
 

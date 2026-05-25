@@ -811,7 +811,7 @@ describe('Database Adapter Service', () => {
     });
 
     it('should handle complete lifecycle: create, find, update, delete', async () => {
-      const userData = { userId: 'USER_001', email: 'test@example.com', role: 'user' };
+      const userData = { userId: 'USER_001', email: 'test@example.com', role: 'employee' };
 
       // Create
       zerodbService.insertRow.mockResolvedValue({ _id: 'doc_123', ...userData });

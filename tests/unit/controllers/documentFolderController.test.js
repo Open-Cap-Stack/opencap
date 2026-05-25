@@ -47,7 +47,7 @@ describe('Document Folder Controller', () => {
             user: {
                 userId: 'user-123',
                 companyId: 'company-456',
-                role: 'user'
+                role: 'employee'
             }
         };
     });

@@ -40,7 +40,7 @@ describe('Document Controller - ZeroDB Migration', () => {
       user: {
         userId: 'user-123',
         companyId: 'company-456',
-        role: 'user'
+        role: 'employee'
       }
     };
 
@@ -153,7 +153,7 @@ describe('Document Controller - ZeroDB Migration', () => {
     });
 
     it('should apply company filter for non-admin users', async () => {
-      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'user' };
+      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'employee' };
       mockReq.query = { companyId: 'company-456' };
 
       zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [] });
@@ -410,7 +410,7 @@ describe('Document Controller - ZeroDB Migration', () => {
   describe('searchDocuments', () => {
     it('should perform semantic search using vector service', async () => {
       mockReq.body = { query: 'financial reports', limit: 10, threshold: 0.5 };
-      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'user' };
+      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'employee' };
 
       const searchResults = [
         { metadata: { id: 'doc-1' }, score: 0.95 },
@@ -469,7 +469,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
     it('should apply access control filters', async () => {
       mockReq.body = { query: 'test' };
-      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'user' };
+      mockReq.user = { userId: 'user-123', companyId: 'company-456', role: 'employee' };
 
       const searchResults = [{ metadata: { id: 'doc-1' }, score: 0.9 }];
       vectorService.searchSimilarDocuments = jest.fn().mockResolvedValue(searchResults);
@@ -543,7 +543,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
     it('should deny access to unauthorized users', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'other-user', role: 'user' };
+      mockReq.user = { userId: 'other-user', role: 'employee' };
 
       const privateDoc = {
         id: 'doc-123',
@@ -616,7 +616,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
     it('should deny access to unauthorized users', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'other-user', role: 'user' };
+      mockReq.user = { userId: 'other-user', role: 'employee' };
 
       const privateDoc = {
         id: 'doc-123',
@@ -665,7 +665,7 @@ describe('Document Controller - ZeroDB Migration', () => {
     });
 
     it('should deny access to non-admin users', async () => {
-      mockReq.user = { userId: 'user-123', role: 'user' };
+      mockReq.user = { userId: 'user-123', role: 'employee' };
 
       await documentController.bulkIndexDocuments(mockReq, mockRes);
 
@@ -772,7 +772,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
     it('should allow document owners to access their documents', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'user-123', role: 'user' };
+      mockReq.user = { userId: 'user-123', role: 'employee' };
 
       const ownedDoc = {
         id: 'doc-123',
@@ -790,7 +790,7 @@ describe('Document Controller - ZeroDB Migration', () => {
 
     it('should allow shared users to access shared documents', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'shared-user', role: 'user' };
+      mockReq.user = { userId: 'shared-user', role: 'employee' };
 
       const sharedDoc = {
         id: 'doc-123',

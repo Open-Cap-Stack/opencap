@@ -148,7 +148,7 @@ async function seedUsers(companies) {
         lastName: lastName,
         email: `user${i + 1}@${company.CompanyName.toLowerCase().replace(/\\s+/g, '')}.com`,
         password: hashedPassword,
-        role: userRoles[i % userRoles.length] === 'founder' ? 'admin' : (userRoles[i % userRoles.length] === 'investor' ? 'client' : 'user'),
+        role: userRoles[i % userRoles.length] === 'founder' ? 'admin' : (userRoles[i % userRoles.length] === 'investor' ? 'client' : 'employee'),
         profile: {
           bio: `${getRandomJobTitle()} at ${company.CompanyName}`,
           phoneNumber: generatePhoneNumber(),

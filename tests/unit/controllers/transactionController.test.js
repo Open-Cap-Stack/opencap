@@ -23,7 +23,7 @@ describe('Transaction Controller (ZeroDB)', () => {
       params: {},
       query: {},
       body: {},
-      user: { id: 'user-123', role: 'user' }
+      user: { id: 'user-123', role: 'employee' }
     };
 
     mockRes = {

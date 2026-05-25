@@ -75,7 +75,7 @@ describe('409A PDF Generation (Issue #566)', () => {
   beforeEach(() => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
-    req.user = { _id: 'user_1', role: 'user' };
+    req.user = { _id: 'user_1', role: 'employee' };
     jest.clearAllMocks();
   });
 
@@ -106,7 +106,7 @@ describe('409A PDF Generation (Issue #566)', () => {
       const finished = new Promise((resolve) => passthrough.on('finish', resolve));
 
       await valuation409AController.downloadPDF(
-        { ...req, params: { valuationId: 'val_test_123' }, user: { _id: 'user_1', role: 'user' } },
+        { ...req, params: { valuationId: 'val_test_123' }, user: { _id: 'user_1', role: 'employee' } },
         passthrough
       );
 
@@ -126,7 +126,7 @@ describe('409A PDF Generation (Issue #566)', () => {
     it('should return 403 for a non-released valuation when user is not admin/accountant', async () => {
       const valuation = buildReleasedValuation({ status: 'draft_received' });
       req.params = { valuationId: 'val_test_123' };
-      req.user = { _id: 'user_1', role: 'user' };
+      req.user = { _id: 'user_1', role: 'employee' };
 
       Valuation409A.findOne.mockResolvedValue(valuation);
 
@@ -240,7 +240,7 @@ describe('409A PDF Generation (Issue #566)', () => {
     it('should call generatePDF with the correct valuationId', async () => {
       const valuation = buildReleasedValuation();
       req.params = { valuationId: 'val_buffer_test' };
-      req.user = { _id: 'user_1', role: 'user' };
+      req.user = { _id: 'user_1', role: 'employee' };
 
       Valuation409A.findOne.mockImplementation((query) => {
         if (query.valuationId === 'val_buffer_test') return Promise.resolve({ ...valuation, valuationId: 'val_buffer_test' });

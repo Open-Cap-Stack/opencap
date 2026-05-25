@@ -429,7 +429,7 @@ describe('Settings Endpoints Integration Tests', () => {
             const mockUser = {
                 userId: 'regular_user',
                 companyId,
-                role: 'user',
+                role: 'employee',
                 permissions: ['read:companies']
             };
 

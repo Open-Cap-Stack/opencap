@@ -181,7 +181,7 @@ async function handleUserCreated(clerkUser) {
   await zerodbService.insertRow(USERS_TABLE, {
     userId,
     ...record,
-    role: 'user',
+    role: 'employee',
     companyId: null,
     createdAt: now,
     updatedAt: now,

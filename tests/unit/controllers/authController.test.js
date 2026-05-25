@@ -69,7 +69,7 @@ describe('AuthController', () => {
 
   describe('registerUser', () => {
     it('should register a new user successfully', async () => {
-      req.body = { firstName: 'John', lastName: 'Doe', email: 'john.doe@example.com', password: 'Password123!', confirmPassword: 'Password123!', role: 'user' };
+      req.body = { firstName: 'John', lastName: 'Doe', email: 'john.doe@example.com', password: 'Password123!', confirmPassword: 'Password123!', role: 'employee' };
       User.findOne.mockResolvedValue(null);
       User.create.mockResolvedValue({ _id: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john.doe@example.com' });
       await authController.registerUser(req, res);
@@ -160,7 +160,7 @@ describe('AuthController', () => {
   describe('loginUser', () => {
     it('should login a user successfully', async () => {
       req.body = { email: 'john@example.com', password: 'Password123!' };
-      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', password: 'hashed_password', role: 'user', permissions: ['read:users'], companyId: 'company_1' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', password: 'hashed_password', role: 'employee', permissions: ['read:users'], companyId: 'company_1' });
       bcrypt.compare.mockResolvedValue(true);
       await authController.loginUser(req, res);
       expect(res.statusCode).toBe(200);
@@ -172,7 +172,7 @@ describe('AuthController', () => {
         expect.objectContaining({
           userId: 'user_123',
           email: 'john@example.com',
-          role: 'user',
+          role: 'employee',
           permissions: ['read:users'],
           companyId: 'company_1'
         }),
@@ -327,7 +327,7 @@ describe('AuthController', () => {
     it('should refresh access token successfully with full claims', async () => {
       req.body = { refreshToken: 'valid_refresh_token' };
       jwt.verify.mockReturnValue({ userId: 'user_123' });
-      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'user', status: 'active', permissions: ['read:users'], companyId: 'company_1' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'employee', status: 'active', permissions: ['read:users'], companyId: 'company_1' });
       jwt.sign.mockReturnValue('new_access_token');
       await authController.refreshToken(req, res);
       expect(res.statusCode).toBe(200);
@@ -337,7 +337,7 @@ describe('AuthController', () => {
         expect.objectContaining({
           userId: 'user_123',
           email: 'john@example.com',
-          role: 'user',
+          role: 'employee',
           permissions: ['read:users'],
           companyId: 'company_1'
         }),
@@ -370,7 +370,7 @@ describe('AuthController', () => {
     it('should return 403 if user account is not active', async () => {
       req.body = { refreshToken: 'valid_refresh_token' };
       jwt.verify.mockReturnValue({ userId: 'user_123' });
-      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', role: 'user', status: 'suspended' });
+      User.findOne.mockResolvedValue({ _id: 'user_123', userId: 'user_123', role: 'employee', status: 'suspended' });
       await authController.refreshToken(req, res);
       expect(res.statusCode).toBe(403);
     });
@@ -380,7 +380,7 @@ describe('AuthController', () => {
       jwt.verify.mockReturnValue({ userId: 'user_123' });
       User.findOne
         .mockResolvedValueOnce(null) // first call with { userId } returns null
-        .mockResolvedValueOnce({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'user', status: 'active', permissions: [] });
+        .mockResolvedValueOnce({ _id: 'user_123', userId: 'user_123', email: 'john@example.com', role: 'employee', status: 'active', permissions: [] });
       jwt.sign.mockReturnValue('new_access_token');
       await authController.refreshToken(req, res);
       expect(res.statusCode).toBe(200);
@@ -540,7 +540,7 @@ describe('AuthController', () => {
         userId: 'local-user-1',
         email: 'user@example.com',
         displayName: 'Test User',
-        role: 'user',
+        role: 'employee',
         permissions: ['read'],
         companyId: 'company-1'
       };
@@ -584,7 +584,7 @@ describe('AuthController', () => {
         expect.objectContaining({
           userId: 'local-user-1',
           email: 'user@example.com',
-          role: 'user',
+          role: 'employee',
           permissions: ['read'],
           companyId: 'company-1'
         }),
@@ -603,7 +603,7 @@ describe('AuthController', () => {
       provisionAINativeUser.mockResolvedValue({
         userId: 'local-2',
         email: 'fallback@example.com',
-        role: 'user',
+        role: 'employee',
         permissions: []
       });
 

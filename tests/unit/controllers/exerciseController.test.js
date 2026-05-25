@@ -24,7 +24,7 @@ describe('ExerciseController', () => {
       body: {},
       params: {},
       query: {},
-      user: { id: 'user-001', userId: 'user-001', companyId: 'company-123', role: 'user' }
+      user: { id: 'user-001', userId: 'user-001', companyId: 'company-123', role: 'employee' }
     };
 
     mockRes = {

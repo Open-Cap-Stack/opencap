@@ -21,7 +21,7 @@ const testUsers = {
   regularUser: {
     email: 'user@opencap.test',
     password: 'UserPass123!',
-    role: 'user',
+    role: 'employee',
     firstName: 'Regular',
     lastName: 'User'
   },

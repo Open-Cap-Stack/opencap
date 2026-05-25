@@ -30,7 +30,7 @@ describe('EquityGrant Controller', () => {
   beforeEach(() => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
-    req.user = { userId: 'user_123', companyId: 'COMP-001', role: 'user', permissions: [] };
+    req.user = { userId: 'user_123', companyId: 'COMP-001', role: 'employee', permissions: [] };
     jest.clearAllMocks();
   });
 

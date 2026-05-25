@@ -75,7 +75,7 @@ async function apiRegister(request, overrides = {}) {
     lastName:  'Tester',
     email:     uniqueEmail(),
     password:  VALID_PASSWORD,
-    role:      'user',
+    role:      'employee',
   };
   const payload = { ...defaults, ...overrides };
   const response = await request.post(`${API_BASE}/api/v1/auth/register`, { data: payload });
@@ -122,7 +122,7 @@ test.describe('Registration — API', () => {
   test('POST /register returns 400 when firstName is missing', async ({ request }) => {
     const email = uniqueEmail('noreg');
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { lastName: 'Tester', email, password: VALID_PASSWORD, role: 'user' },
+      data: { lastName: 'Tester', email, password: VALID_PASSWORD, role: 'employee' },
     });
     expectStatusOrRateLimit(response.status(), 400);
     if (response.status() === 400) {
@@ -134,14 +134,14 @@ test.describe('Registration — API', () => {
   test('POST /register returns 400 when lastName is missing', async ({ request }) => {
     const email = uniqueEmail('noreg');
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'E2E', email, password: VALID_PASSWORD, role: 'user' },
+      data: { firstName: 'E2E', email, password: VALID_PASSWORD, role: 'employee' },
     });
     expectStatusOrRateLimit(response.status(), 400);
   });
 
   test('POST /register returns 400 for invalid email format', async ({ request }) => {
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'E2E', lastName: 'T', email: 'not-an-email', password: VALID_PASSWORD, role: 'user' },
+      data: { firstName: 'E2E', lastName: 'T', email: 'not-an-email', password: VALID_PASSWORD, role: 'employee' },
     });
     expectStatusOrRateLimit(response.status(), 400);
     if (response.status() === 400) {
@@ -152,7 +152,7 @@ test.describe('Registration — API', () => {
 
   test('POST /register returns 400 for password below 8 chars', async ({ request }) => {
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'E2E', lastName: 'T', email: uniqueEmail(), password: 'Sh0rt!', role: 'user' },
+      data: { firstName: 'E2E', lastName: 'T', email: uniqueEmail(), password: 'Sh0rt!', role: 'employee' },
     });
     expectStatusOrRateLimit(response.status(), 400);
     if (response.status() === 400) {
@@ -163,7 +163,7 @@ test.describe('Registration — API', () => {
 
   test('POST /register returns 400 for password that fails complexity rule', async ({ request }) => {
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'E2E', lastName: 'T', email: uniqueEmail(), password: 'alllowercase1!', role: 'user' },
+      data: { firstName: 'E2E', lastName: 'T', email: uniqueEmail(), password: 'alllowercase1!', role: 'employee' },
     });
     // No uppercase → fails complexity regex
     expectStatusOrRateLimit(response.status(), 400);
@@ -189,7 +189,7 @@ test.describe('Registration — API', () => {
     await apiRegister(request, { email });
     // Second registration with same email
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'Copy', lastName: 'Cat', email, password: VALID_PASSWORD, role: 'user' },
+      data: { firstName: 'Copy', lastName: 'Cat', email, password: VALID_PASSWORD, role: 'employee' },
     });
     expectStatusOrRateLimit(response.status(), 400);
     if (response.status() === 400) {
@@ -202,7 +202,7 @@ test.describe('Registration — API', () => {
     const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
       data: {
         firstName: 'E2E', lastName: 'T', email: uniqueEmail(),
-        password: VALID_PASSWORD, confirmPassword: 'Different@123', role: 'user',
+        password: VALID_PASSWORD, confirmPassword: 'Different@123', role: 'employee',
       },
     });
     expectStatusOrRateLimit(response.status(), 400);
@@ -397,7 +397,7 @@ test.describe('Login — Browser UI', () => {
 
     // Use the API directly to register (faster than UI for setup)
     const registerResp = await page.request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'UI', lastName: 'Login', email, password, role: 'user' },
+      data: { firstName: 'UI', lastName: 'Login', email, password, role: 'employee' },
     });
     // Skip if rate-limited; we can't proceed without a registered user
     test.skip(registerResp.status() === 429, 'Setup registration rate-limited');
@@ -546,7 +546,7 @@ test.describe('Token Storage — localStorage contract', () => {
 
     // Pre-register via API
     const reg = await page.request.post(`${API_BASE}/api/v1/auth/register`, {
-      data: { firstName: 'Tok', lastName: 'User', email, password, role: 'user' },
+      data: { firstName: 'Tok', lastName: 'User', email, password, role: 'employee' },
     });
     test.skip(reg.status() === 429, 'Setup registration rate-limited');
     expect(reg.status()).toBe(201);
@@ -562,7 +562,7 @@ test.describe('Token Storage — localStorage contract', () => {
           message:      'Login successful',
           accessToken:  fakeAccessToken,
           refreshToken: fakeRefreshToken,
-          user: { email, role: 'user' },
+          user: { email, role: 'employee' },
         }),
       });
     });

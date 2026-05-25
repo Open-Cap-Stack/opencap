@@ -134,7 +134,7 @@ describe('listInvestors', () => {
 
     const { req, res } = mockReqRes({
       params: { id: 'spv_1' },
-      user: { _id: 'user_1', userId: 'user_1', companyId: 'comp_1', role: 'user' }
+      user: { _id: 'user_1', userId: 'user_1', companyId: 'comp_1', role: 'employee' }
     });
     await controller.listInvestors(req, res);
 

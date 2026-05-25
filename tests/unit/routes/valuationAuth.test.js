@@ -320,7 +320,7 @@ describe('Valuation Routes Authentication Middleware', () => {
       User.findOne = jest.fn().mockResolvedValue({
         userId: 'user_inactive',
         email: 'inactive@example.com',
-        role: 'user',
+        role: 'employee',
         status: 'inactive', // Inactive status
         permissions: [],
         companyId: 'company_123'

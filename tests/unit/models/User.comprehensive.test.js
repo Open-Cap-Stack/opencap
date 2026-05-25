@@ -63,14 +63,12 @@ jest.mock('../../../models/User', () => {
         'read:assets', 'write:assets',
         'read:compliance', 'write:compliance'
       ],
-      user: [
-        'read:users',
+      employee: [
+        'read:own_equity',
+        'read:own_documents',
+        'read:valuation',
         'read:companies',
-        'read:reports',
-        'read:spv',
-        'read:assets',
-        'read:compliance',
-        'write:compliance'
+        'read:compliance'
       ],
       client: [
         'read:users',
@@ -119,7 +117,7 @@ describe('User Model', () => {
         lastName: 'Doe',
         email: 'john.doe@example.com',
         password: 'securePassword123',
-        role: 'user'
+        role: 'employee'
       };
 
       const user = new User(userData);
@@ -138,7 +136,7 @@ describe('User Model', () => {
         lastName: 'Smith',
         email: 'jane.smith@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       expect(user.displayName).toBe('Jane Smith');
@@ -151,7 +149,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'test@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       expect(user.status).toBe('pending');
@@ -164,7 +162,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'test@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       expect(user.profile).toBeDefined();
@@ -207,21 +205,23 @@ describe('User Model', () => {
       expect(user.permissions).not.toContain('delete:users');
     });
 
-    it('should set user permissions for user role', () => {
+    it('should set user permissions for employee role', () => {
       const user = new User({
         userId: 'user-123',
         firstName: 'Regular',
         lastName: 'User',
         email: 'user@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
-      expect(user.permissions).toContain('read:users');
+      expect(user.permissions).toContain('read:own_equity');
       expect(user.permissions).toContain('read:companies');
-      expect(user.permissions).toContain('write:compliance');
+      expect(user.permissions).toContain('read:compliance');
       expect(user.permissions).not.toContain('write:users');
       expect(user.permissions).not.toContain('delete:users');
+      expect(user.permissions).not.toContain('read:users');
+      expect(user.permissions).not.toContain('write:compliance');
     });
 
     it('should set client permissions for client role', () => {
@@ -276,7 +276,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'profile@example.com',
         password: 'password123',
-        role: 'user',
+        role: 'employee',
         profile: profileData
       });
 
@@ -293,7 +293,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'partial@example.com',
         password: 'password123',
-        role: 'user',
+        role: 'employee',
         profile: {
           bio: 'Just a bio',
           phoneNumber: '+1-555-0123'
@@ -317,7 +317,7 @@ describe('User Model', () => {
           lastName: 'Test',
           email: `${status}@example.com`,
           password: 'password123',
-          role: 'user',
+          role: 'employee',
           status: status
         });
 
@@ -332,7 +332,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'company@example.com',
         password: 'password123',
-        role: 'user',
+        role: 'employee',
         companyId: 'comp-456'
       });
 
@@ -348,7 +348,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'login@example.com',
         password: 'password123',
-        role: 'user',
+        role: 'employee',
         lastLogin: loginTime
       });
 
@@ -367,7 +367,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'reset@example.com',
         password: 'password123',
-        role: 'user',
+        role: 'employee',
         passwordResetToken: resetToken,
         passwordResetExpires: expiryDate
       });
@@ -383,7 +383,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'noreset@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       expect(user.passwordResetToken).toBeUndefined();
@@ -399,7 +399,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'secure@example.com',
         password: 'superSecretPassword',
-        role: 'user',
+        role: 'employee',
         passwordResetToken: 'secret-token',
         passwordResetExpires: new Date()
       });
@@ -439,7 +439,7 @@ describe('User Model', () => {
 
   describe('Role Validation', () => {
     it('should handle all valid role values', () => {
-      const validRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
+      const validRoles = ['admin', 'founder', 'investor', 'manager', 'employee', 'client'];
 
       validRoles.forEach(role => {
         const user = new User({
@@ -587,7 +587,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'save@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       user.save.mockResolvedValue(user);
@@ -604,7 +604,7 @@ describe('User Model', () => {
         lastName: 'User',
         email: 'error@example.com',
         password: 'password123',
-        role: 'user'
+        role: 'employee'
       });
 
       const saveError = new Error('Database connection failed');

@@ -22,7 +22,7 @@ const userSchema = {
     role: {
         type: 'string',
         required: true,
-        enum: ['super_admin', 'admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant']
+        enum: ['super_admin', 'admin', 'founder', 'investor', 'manager', 'employee', 'client', 'accountant', 'service_provider']
     },
     permissions: { type: 'array', default: [] },
     status: {
@@ -105,15 +105,22 @@ const rolePermissions = {
         'read:assets', 'write:assets',
         'read:compliance', 'write:compliance'
     ],
-    user: [
+    employee: [
+        'read:own_equity',
+        'read:own_documents',
+        'read:valuation',
+        'read:companies',
+        'read:compliance'
+    ],
+    service_provider: [
         'read:users',
         'read:companies',
-        'write:companies',
         'read:reports',
-        'read:spv',
-        'read:assets',
         'read:compliance',
-        'write:compliance'
+        'write:compliance',
+        'read:documents',
+        'read:spv',
+        'read:assets'
     ],
     client: [
         'read:users',

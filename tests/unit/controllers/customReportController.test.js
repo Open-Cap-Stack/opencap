@@ -42,7 +42,7 @@ describe('CustomReportController Tests', () => {
       params: {},
       query: {},
       body: {},
-      user: { userId: 'user-001', companyId: 'company-001', role: 'user' }
+      user: { userId: 'user-001', companyId: 'company-001', role: 'employee' }
     };
     res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
     next = jest.fn();

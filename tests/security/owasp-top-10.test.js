@@ -42,7 +42,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
       firstName: 'Test',
       lastName: 'User',
       email: 'testuser@example.com',
-      role: 'user',
+      role: 'employee',
       status: 'active',
       permissions: ['read:companies']
     };
@@ -214,7 +214,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
               lastName: 'User',
               email: `weak${Date.now()}@example.com`,
               password: weakPassword,
-              role: 'user'
+              role: 'employee'
             });
 
           expect(response.status).toBe(400);
@@ -313,7 +313,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
             lastName: 'User',
             email: `xss${Date.now()}@example.com`,
             password: 'ValidPass123!',
-            role: 'user'
+            role: 'employee'
           });
 
         if (response.status === 201) {
@@ -344,7 +344,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
             lastName: 'User',
             email: 'existing@example.com',
             password: 'ValidPass123!',
-            role: 'user'
+            role: 'employee'
           });
 
         // Try to register again
@@ -355,7 +355,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
             lastName: 'User',
             email: 'existing@example.com',
             password: 'ValidPass123!',
-            role: 'user'
+            role: 'employee'
           });
 
         // Should still provide meaningful error but not enumerate
@@ -387,7 +387,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
         // Create unverified user token
         const unverifiedUser = {
           userId: 'unverified-001',
-          role: 'user',
+          role: 'employee',
           emailVerified: false
         };
 
@@ -550,7 +550,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
             lastName: 'User',
             email: `weak${Date.now()}@example.com`,
             password: 'weak',
-            role: 'user'
+            role: 'employee'
           });
 
         expect(response.status).toBe(400);
@@ -644,7 +644,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
             lastName: 'User',
             email: 'invalid-email',
             password: 'ValidPass123!',
-            role: 'user'
+            role: 'employee'
           });
 
         expect(response.status).toBe(400);
@@ -666,7 +666,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
               lastName: 'User',
               email: email,
               password: 'ValidPass123!',
-              role: 'user'
+              role: 'employee'
             });
 
           expect(response.status).toBe(400);
@@ -698,7 +698,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
           lastName: 'User',
           email: `test${Date.now()}@example.com`,
           password: 'ValidPass123!',
-          role: 'user'
+          role: 'employee'
         };
 
         const response = await request(app)

@@ -11,7 +11,7 @@ describe('verifyCompanyAccess middleware', () => {
 
   beforeEach(() => {
     req = {
-      user: { userId: 'user-1', companyId: 'company-A', role: 'user' },
+      user: { userId: 'user-1', companyId: 'company-A', role: 'employee' },
       body: {},
       params: {},
       query: {},

@@ -33,7 +33,7 @@ describe('TaxCalculator Controller - ZeroDB Migration', () => {
       body: {},
       params: {},
       query: {},
-      user: { userId: 'user_123', companyId: 'company_123', role: 'user' },
+      user: { userId: 'user_123', companyId: 'company_123', role: 'employee' },
     };
     res = {
       status: jest.fn().mockReturnThis(),

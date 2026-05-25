@@ -181,7 +181,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'closing' };
-      req.user = { id: 'lead-user-1', role: 'user' };
+      req.user = { id: 'lead-user-1', role: 'employee' };
 
       SPV.findOne.mockResolvedValue(spv);
       SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'closing' });
@@ -224,7 +224,7 @@ describe('SPV Status Transition (Issue #580)', () => {
         const spv = mockSPV({ Status: fromStatus, fundLead: 'lead-user-1' });
         req.params = { id: spv.SPVID };
         req.body = { status: 'canceled' };
-        req.user = { id: 'lead-user-1', role: 'user' };
+        req.user = { id: 'lead-user-1', role: 'employee' };
 
         SPV.findOne.mockResolvedValue(spv);
         SPV.findOneAndUpdate.mockResolvedValue({ ...spv, Status: 'canceled' });
@@ -343,7 +343,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({ Status: 'in_review' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'raising' };
-      req.user = { id: 'user-456', role: 'user' };
+      req.user = { id: 'user-456', role: 'employee' };
 
       SPV.findOne.mockResolvedValue(spv);
 
@@ -384,7 +384,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'closing' };
-      req.user = { id: 'other-user', role: 'user' };
+      req.user = { id: 'other-user', role: 'employee' };
 
       SPV.findOne.mockResolvedValue(spv);
 
@@ -426,7 +426,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({ Status: 'closing', fundLead: 'lead-user-1' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'wired' };
-      req.user = { id: 'lead-user-1', role: 'user' };
+      req.user = { id: 'lead-user-1', role: 'employee' };
 
       SPV.findOne.mockResolvedValue(spv);
 
@@ -440,7 +440,7 @@ describe('SPV Status Transition (Issue #580)', () => {
       const spv = mockSPV({ Status: 'raising', fundLead: 'lead-user-1' });
       req.params = { id: spv.SPVID };
       req.body = { status: 'canceled' };
-      req.user = { id: 'other-user', role: 'user' };
+      req.user = { id: 'other-user', role: 'employee' };
 
       SPV.findOne.mockResolvedValue(spv);
 

@@ -35,7 +35,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       body: {},
       params: {},
       query: {},
-      user: { userId: 'user_123', companyId: 'company_123', role: 'user', permissions: [] }
+      user: { userId: 'user_123', companyId: 'company_123', role: 'employee', permissions: [] }
     };
 
     mockRes = {

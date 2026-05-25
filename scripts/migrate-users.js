@@ -100,7 +100,7 @@ async function ensureUsersTable() {
         displayName: { type: 'string' },
         email: { type: 'string', required: true, unique: true },
         password: { type: 'string', required: true },
-        role: { type: 'string', required: true, enum: ['admin', 'manager', 'user', 'client'] },
+        role: { type: 'string', required: true, enum: ['super_admin', 'admin', 'founder', 'investor', 'manager', 'employee', 'client', 'accountant', 'service_provider'] },
         permissions: { type: 'array' },
         status: { type: 'string', enum: ['active', 'pending', 'inactive', 'suspended'], default: 'pending' },
         companyId: { type: 'string', indexed: true },

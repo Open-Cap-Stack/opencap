@@ -16,7 +16,7 @@ describe('User Model Role Enum Validation', () => {
   });
 
   describe('Role Enum Values', () => {
-    const expectedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
+    const expectedRoles = ['admin', 'founder', 'investor', 'manager', 'employee', 'client', 'service_provider'];
 
     it('should have role field defined in schema', () => {
       expect(User.schema.role).toBeDefined();
@@ -40,14 +40,14 @@ describe('User Model Role Enum Validation', () => {
     });
 
     it('should maintain backward compatibility with existing roles', () => {
-      const existingRoles = ['admin', 'manager', 'user', 'client'];
+      const existingRoles = ['admin', 'manager', 'employee', 'client'];
       existingRoles.forEach(role => {
         expect(User.schema.role.enum).toContain(role);
       });
     });
 
-    it('should have exactly 8 role values', () => {
-      expect(User.schema.role.enum.length).toBe(8);
+    it('should have exactly 9 role values', () => {
+      expect(User.schema.role.enum.length).toBe(9);
     });
 
     it('should include super_admin role for platform-wide administrators', () => {

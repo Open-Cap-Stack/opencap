@@ -305,7 +305,7 @@ exports.getAccessPolicyTemplates = async (req, res) => {
         resourceType: 'stakeholder',
         actions: ['read'],
         conditions: {
-          roleRequired: 'user',
+          roleRequired: 'employee',
           stakeholderType: null
         },
         status: 'active',

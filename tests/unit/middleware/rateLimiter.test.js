@@ -95,7 +95,7 @@ describe('Enhanced Rate Limiter Middleware', () => {
 
     it('should apply user limits for authenticated user', async () => {
       const limiter = createRoleTieredRateLimiter();
-      req.user = { role: 'user', userId: 'user123' };
+      req.user = { role: 'employee', userId: 'user123' };
 
       await limiter(req, res, next);
       expect(next).toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('Enhanced Rate Limiter Middleware', () => {
 
     it('should track remaining requests correctly', async () => {
       const limiter = createRoleTieredRateLimiter();
-      req.user = { role: 'user', userId: 'user-remaining-test' };
+      req.user = { role: 'employee', userId: 'user-remaining-test' };
 
       await limiter(req, res, next);
 

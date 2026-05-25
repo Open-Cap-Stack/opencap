@@ -26,7 +26,7 @@ const productionUsers = [
     firstName: 'Test',
     lastName: 'User',
     email: 'test@opencapstack.com',
-    role: 'user',
+    role: 'employee',
     status: 'active',
     companyId: 'opencap-test-001',
     password: 'nzNN6YtN#EA3' // Same as local for consistency

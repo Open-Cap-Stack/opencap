@@ -233,7 +233,7 @@ test.describe('Auth Pages — UI', () => {
 
   test('Login redirects to /dashboard after successful auth', async ({ page }) => {
     const mockToken = MOCK_TOKEN;
-    const mockUser = { id: '1', email: 'test@test.com', role: 'user', status: 'active' };
+    const mockUser = { id: '1', email: 'test@test.com', role: 'employee', status: 'active' };
 
     // Register wildcard FIRST so specific routes registered after take priority
     // (Playwright uses last-registered-wins, so we need specific routes registered after wildcard)

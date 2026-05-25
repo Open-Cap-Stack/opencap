@@ -158,7 +158,7 @@ describe('AuthMiddleware', () => {
       const mockUser = {
         userId: 'user123',
         email: 'test@example.com',
-        role: 'user',
+        role: 'employee',
         permissions: ['read:companies'],
         companyId: 'company456',
         status: 'active'
@@ -173,7 +173,7 @@ describe('AuthMiddleware', () => {
         userId: 'user123',
         _id: 'user123',
         email: 'test@example.com',
-        role: 'user',
+        role: 'employee',
         permissions: ['read:companies'],
         companyId: 'company456'
       });
@@ -207,7 +207,7 @@ describe('AuthMiddleware', () => {
       const mockUser = {
         userId: 'user123',
         email: 'test@example.com',
-        role: 'user',
+        role: 'employee',
         status: 'suspended'
       };
       User.findOne.mockResolvedValue(mockUser);
@@ -254,7 +254,7 @@ describe('AuthMiddleware', () => {
       const mockUser = {
         userId: 'user123',
         email: 'test@example.com',
-        role: 'user',
+        role: 'employee',
         companyId: 'company456',
         status: 'active'
         // No permissions array

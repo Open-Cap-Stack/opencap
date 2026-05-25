@@ -33,7 +33,7 @@ describe('User Management Integration Tests', () => {
     username: 'integrationuser',
     email: 'integration.user@opencap.com',
     password: 'SecurePassword123!',
-    role: 'user'
+    role: 'employee'
   };
 
   const adminUser = {
@@ -91,7 +91,7 @@ describe('User Management Integration Tests', () => {
     userToken = jwt.sign(
       {
         userId: 'regular-test-user',
-        role: 'user',
+        role: 'employee',
         permissions: ['read:users']
       },
       process.env.JWT_SECRET,
@@ -410,7 +410,7 @@ describe('User Management Integration Tests', () => {
           username: 'lifecycleuser',
           email: 'lifecycle@opencap.com',
           password: 'LifecyclePass123!',
-          role: 'user'
+          role: 'employee'
         });
 
       expect(createResponse.status).toBe(201);
@@ -505,7 +505,7 @@ describe('User Management Integration Tests', () => {
 
   describe('User Roles and Permissions', () => {
     it('should create users with different roles', async () => {
-      const roles = ['admin', 'founder', 'investor', 'manager', 'user', 'client'];
+      const roles = ['admin', 'founder', 'investor', 'manager', 'employee', 'client'];
 
       for (const role of roles) {
         const response = await request(app)

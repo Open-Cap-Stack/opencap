@@ -58,7 +58,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
       user: {
         userId: 'user-123',
         companyId: 'company-456',
-        role: 'user'
+        role: 'employee'
       }
     };
 
@@ -165,7 +165,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should deny access to unauthorized users', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'other-user', companyId: 'other-company', role: 'user' };
+      mockReq.user = { userId: 'other-user', companyId: 'other-company', role: 'employee' };
 
       const privateDoc = {
         ...mockDocument,
@@ -201,7 +201,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should allow document owner to download their document', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'owner-user', role: 'user' };
+      mockReq.user = { userId: 'owner-user', role: 'employee' };
 
       const ownedDoc = {
         ...mockDocument,
@@ -218,7 +218,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should allow shared users to download shared document', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'shared-user', role: 'user' };
+      mockReq.user = { userId: 'shared-user', role: 'employee' };
 
       const sharedDoc = {
         ...mockDocument,
@@ -399,7 +399,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should deny access to unauthorized users', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'other-user', companyId: 'other-company', role: 'user' };
+      mockReq.user = { userId: 'other-user', companyId: 'other-company', role: 'employee' };
 
       const privateDoc = {
         ...mockDocument,
@@ -475,7 +475,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should return access permissions for a document', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'owner-user', role: 'user' };
+      mockReq.user = { userId: 'owner-user', role: 'employee' };
 
       zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [mockDocument] });
 
@@ -499,7 +499,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should return limited permissions for shared users', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'user-1', role: 'user' };
+      mockReq.user = { userId: 'user-1', role: 'employee' };
 
       zerodbService.queryTable = jest.fn().mockResolvedValue({ rows: [mockDocument] });
 
@@ -552,7 +552,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should return view-only permissions for public documents to any user', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'random-user', role: 'user' };
+      mockReq.user = { userId: 'random-user', role: 'employee' };
 
       const publicDoc = {
         ...mockDocument,
@@ -575,7 +575,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should deny access info to completely unauthorized users for private docs', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'unauthorized-user', companyId: 'other-company', role: 'user' };
+      mockReq.user = { userId: 'unauthorized-user', companyId: 'other-company', role: 'employee' };
 
       const privateDoc = {
         ...mockDocument,
@@ -592,7 +592,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
 
     it('should return company-wide access info for company documents', async () => {
       mockReq.params = { id: 'doc-123' };
-      mockReq.user = { userId: 'company-user', companyId: 'company-456', role: 'user' };
+      mockReq.user = { userId: 'company-user', companyId: 'company-456', role: 'employee' };
 
       const companyDoc = {
         ...mockDocument,
@@ -628,7 +628,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
   describe('Access Control Helper - checkDocumentAccess', () => {
     it('should grant access to public documents for any user', async () => {
       const doc = { accessLevel: 'public' };
-      const user = { userId: 'anyone', role: 'user' };
+      const user = { userId: 'anyone', role: 'employee' };
 
       // This tests the internal access check logic used by all endpoints
       mockReq.params = { id: 'doc-123' };
@@ -652,7 +652,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
         accessLevel: 'private',
         uploadedBy: 'owner-123'
       };
-      const user = { userId: 'owner-123', role: 'user' };
+      const user = { userId: 'owner-123', role: 'employee' };
 
       mockReq.params = { id: 'doc-123' };
       mockReq.user = user;
@@ -676,7 +676,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
         uploadedBy: 'owner-123',
         sharedWith: ['shared-user-1', 'shared-user-2']
       };
-      const user = { userId: 'shared-user-1', role: 'user' };
+      const user = { userId: 'shared-user-1', role: 'employee' };
 
       mockReq.params = { id: 'doc-123' };
       mockReq.user = user;
@@ -700,7 +700,7 @@ describe('Document Download and Preview Endpoints - Issue #122', () => {
         uploadedBy: 'owner-123',
         companyId: 'company-456'
       };
-      const user = { userId: 'colleague', companyId: 'company-456', role: 'user' };
+      const user = { userId: 'colleague', companyId: 'company-456', role: 'employee' };
 
       mockReq.params = { id: 'doc-123' };
       mockReq.user = user;

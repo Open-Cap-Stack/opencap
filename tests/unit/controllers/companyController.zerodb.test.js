@@ -935,7 +935,7 @@ describe('Company Controller - ZeroDB Migration', () => {
 
     it('should update req.user companyId after creating a company when user has no companyId', async () => {
       mockReq.body = { ...onboardingData };
-      mockReq.user = { userId: 'user-1', role: 'user', companyId: null };
+      mockReq.user = { userId: 'user-1', role: 'employee', companyId: null };
 
       const createdCompany = {
         row_id: 'zerodb-new-id',
@@ -986,7 +986,7 @@ describe('Company Controller - ZeroDB Migration', () => {
 
     it('should still return 201 even if user update fails (non-blocking)', async () => {
       mockReq.body = { ...onboardingData };
-      mockReq.user = { userId: 'user-1', role: 'user', companyId: null };
+      mockReq.user = { userId: 'user-1', role: 'employee', companyId: null };
 
       zerodbService.queryTable.mockResolvedValue([]); // no duplicate
       zerodbService.insertRow.mockResolvedValue({

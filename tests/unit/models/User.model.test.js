@@ -113,14 +113,14 @@ describe('User Model', () => {
     // Role enum
     // -------------------------------------------------------------------------
     describe('role enum', () => {
-        const expectedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant'];
+        const expectedRoles = ['admin', 'founder', 'investor', 'manager', 'employee', 'client', 'accountant', 'super_admin', 'service_provider'];
 
         it('has role field with enum array', () => {
             expect(Array.isArray(User.schema.role.enum)).toBe(true);
         });
 
-        it('has exactly 7 role values (includes accountant)', () => {
-            expect(User.schema.role.enum.length).toBe(7);
+        it('has exactly 9 role values', () => {
+            expect(User.schema.role.enum.length).toBe(9);
         });
 
         expectedRoles.forEach(role => {
@@ -182,7 +182,7 @@ describe('User Model', () => {
         it('generates userId when not provided', async () => {
             await User.create({
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: 'plain123', role: 'user'
+                email: 'jane@example.com', password: 'plain123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.userId).toMatch(/^user_/);
@@ -192,7 +192,7 @@ describe('User Model', () => {
             await User.create({
                 userId: 'user_custom_123',
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: 'plain123', role: 'user'
+                email: 'jane@example.com', password: 'plain123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.userId).toBe('user_custom_123');
@@ -201,7 +201,7 @@ describe('User Model', () => {
         it('builds displayName from firstName + lastName when missing', async () => {
             await User.create({
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: 'plain123', role: 'user'
+                email: 'jane@example.com', password: 'plain123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.displayName).toBe('Jane Doe');
@@ -210,7 +210,7 @@ describe('User Model', () => {
         it('preserves provided displayName', async () => {
             await User.create({
                 firstName: 'Jane', lastName: 'Doe', displayName: 'JD',
-                email: 'jane@example.com', password: 'plain123', role: 'user'
+                email: 'jane@example.com', password: 'plain123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.displayName).toBe('JD');
@@ -228,7 +228,7 @@ describe('User Model', () => {
         it('hashes plaintext password (not already hashed)', async () => {
             await User.create({
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: 'plaintext123', role: 'user'
+                email: 'jane@example.com', password: 'plaintext123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.password).toMatch(/^\$2/);
@@ -238,7 +238,7 @@ describe('User Model', () => {
             const alreadyHashed = '$2b$10$examplehashvalue12345678901234567890123456789';
             await User.create({
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: alreadyHashed, role: 'user'
+                email: 'jane@example.com', password: alreadyHashed, role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.password).toBe(alreadyHashed);
@@ -277,7 +277,7 @@ describe('User Model', () => {
         it('sets default profile structure when not provided', async () => {
             await User.create({
                 firstName: 'Jane', lastName: 'Doe',
-                email: 'jane@example.com', password: 'plain123', role: 'user'
+                email: 'jane@example.com', password: 'plain123', role: 'employee'
             });
             const inserted = zerodbService.insertRow.mock.calls[0][1];
             expect(inserted.profile).toBeDefined();
@@ -341,7 +341,7 @@ describe('User Model', () => {
     // -------------------------------------------------------------------------
     describe('toJSON()', () => {
         it('removes password', () => {
-            const result = User.toJSON({ userId: 'u1', email: 'a@b.com', password: 'secret', role: 'user' });
+            const result = User.toJSON({ userId: 'u1', email: 'a@b.com', password: 'secret', role: 'employee' });
             expect(result.password).toBeUndefined();
             expect(result.email).toBe('a@b.com');
         });
@@ -414,7 +414,7 @@ describe('User Model', () => {
         });
 
         it('returns false when user has no permissions array', () => {
-            expect(User.hasPermission({ role: 'user' }, 'read:users')).toBe(false);
+            expect(User.hasPermission({ role: 'employee' }, 'read:users')).toBe(false);
         });
 
         it('returns true for admin:all regardless of specific permission', () => {

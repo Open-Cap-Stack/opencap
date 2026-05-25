@@ -26,7 +26,7 @@ describe('Profile Photo Upload Integration Tests', () => {
       lastName: 'User',
       email: 'photo.test@example.com',
       password: 'hashedPassword123',
-      role: 'user',
+      role: 'employee',
       status: 'active',
       companyId: 'company_test_123'
     });

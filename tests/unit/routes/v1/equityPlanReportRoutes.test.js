@@ -44,7 +44,7 @@ const mockAuthMiddleware = {
     req.user = {
       userId: 'user-123',
       email: 'test@example.com',
-      role: 'user',
+      role: 'employee',
       permissions: [],
       companyId: 'COMP-001'
     };

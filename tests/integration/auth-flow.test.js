@@ -28,7 +28,7 @@ describe('Authentication Flow Integration Tests', () => {
     email: 'integration.test@opencap.com',
     password: 'SecurePass123!',
     confirmPassword: 'SecurePass123!',
-    role: 'user'
+    role: 'employee'
   };
 
   beforeAll(async () => {

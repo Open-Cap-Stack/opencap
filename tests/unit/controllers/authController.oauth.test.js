@@ -107,7 +107,7 @@ describe('authController.oauthLogin - Production Verification', () => {
         email: 'user@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        role: 'user',
+        role: 'employee',
         status: 'active',
         password: 'hashed-password'
       };
@@ -152,7 +152,7 @@ describe('authController.oauthLogin - Production Verification', () => {
         email: 'newuser@example.com',
         firstName: 'Jane',
         lastName: 'Smith',
-        role: 'user',
+        role: 'employee',
         status: 'active',
         emailVerified: true,
         oauthProvider: 'google',
@@ -171,7 +171,7 @@ describe('authController.oauthLogin - Production Verification', () => {
           firstName: 'Jane',
           lastName: 'Smith',
           email: 'newuser@example.com',
-          role: 'user',
+          role: 'employee',
           status: 'active',
           emailVerified: true,
           oauthProvider: 'google',
@@ -203,7 +203,7 @@ describe('authController.oauthLogin - Production Verification', () => {
         email: 'existing@example.com',
         firstName: 'Bob',
         lastName: 'Jones',
-        role: 'user',
+        role: 'employee',
         password: 'hashed-password'
       };
 
@@ -239,7 +239,7 @@ describe('authController.oauthLogin - Production Verification', () => {
         _id: 'user-id',
         userId: 'user_abc',
         email: 'user@example.com',
-        role: 'user',
+        role: 'employee',
         password: 'hash'
       };
 
@@ -253,7 +253,7 @@ describe('authController.oauthLogin - Production Verification', () => {
       await authController.oauthLogin(req, res);
 
       expect(jwt.sign).toHaveBeenCalledWith(
-        { userId: 'user_abc', email: 'user@example.com', role: 'user', permissions: [], companyId: null },
+        { userId: 'user_abc', email: 'user@example.com', role: 'employee', permissions: [], companyId: null },
         'test-jwt-secret',
         { expiresIn: '1h' }
       );
@@ -913,7 +913,7 @@ describe('authController.oauthLogin - Production Verification', () => {
         _id: 'user-id',
         userId: 'user_li',
         email: 'token@example.com',
-        role: 'user',
+        role: 'employee',
         password: 'hash'
       });
       User.updateOne.mockResolvedValue({ modifiedCount: 1 });

@@ -334,7 +334,7 @@ describe('Valuation Routes Authentication', () => {
         firstName: 'Inactive',
         lastName: 'User',
         password: 'Test123!@#',
-        role: 'user',
+        role: 'employee',
         status: 'inactive', // Inactive status
         companyId: 'test-company-123'
       });

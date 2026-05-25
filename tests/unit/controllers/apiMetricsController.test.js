@@ -260,7 +260,7 @@ describe('ApiMetricsController', () => {
     });
 
     it('should require admin role', async () => {
-      req.user = { role: 'user' };
+      req.user = { role: 'employee' };
 
       await controller.resetMetrics(req, res);
 

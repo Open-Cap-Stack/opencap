@@ -415,7 +415,7 @@ describe('Fundraising Routes Authentication', () => {
         {
           userId: 'user-456',
           email: 'user@example.com',
-          role: 'user', // Regular user, not admin
+          role: 'employee', // Regular user, not admin
           companyId: mockCompanyId
         },
         testSecret,
@@ -425,7 +425,7 @@ describe('Fundraising Routes Authentication', () => {
       User.findOne.mockResolvedValue({
         userId: 'user-456',
         email: 'user@example.com',
-        role: 'user',
+        role: 'employee',
         status: 'active',
         permissions: ['fundraising:read'],
         companyId: mockCompanyId

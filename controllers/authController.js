@@ -55,7 +55,7 @@ const createEmailTransporter = () => {
  */
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, password, confirmPassword, role = 'user', companyId } = req.body;
+    const { firstName, lastName, password, confirmPassword, role = 'employee', companyId } = req.body;
     const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     // Validate required fields
@@ -106,7 +106,7 @@ const registerUser = async (req, res) => {
     }
 
     // Validate role matches User model schema
-    const allowedRoles = ['admin', 'founder', 'investor', 'manager', 'user', 'client', 'accountant'];
+    const allowedRoles = ['super_admin', 'admin', 'founder', 'investor', 'manager', 'employee', 'client', 'accountant', 'service_provider'];
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({
         message: `Role must be one of: ${allowedRoles.join(', ')}`
@@ -452,7 +452,7 @@ const oauthLogin = async (req, res) => {
           lastName: userInfo.family_name,
           email: userInfo.email,
           password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-          role: 'user',
+          role: 'employee',
           status: 'active',
           emailVerified: true,
           oauthProvider: provider,
@@ -1089,7 +1089,7 @@ const exchangeAINativeToken = async (req, res) => {
         userId: response.data.id,
         email: (response.data.email || '').trim().toLowerCase(),
         name: response.data.name,
-        role: 'user',
+        role: 'employee',
         permissions: [],
         isAINativeUser: true
       };
@@ -1108,7 +1108,7 @@ const exchangeAINativeToken = async (req, res) => {
       {
         userId,
         email: localUser.email,
-        role: localUser.role || 'user',
+        role: localUser.role || 'employee',
         permissions: localUser.permissions || [],
         companyId: localUser.companyId || null
       },
@@ -1130,7 +1130,7 @@ const exchangeAINativeToken = async (req, res) => {
         userId,
         email: localUser.email,
         name: displayName,
-        role: localUser.role || 'user',
+        role: localUser.role || 'employee',
         permissions: localUser.permissions || [],
         companyId: localUser.companyId
       }
@@ -1174,7 +1174,7 @@ const ainativeLogin = async (req, res) => {
         userId: data.id,
         email: (data.email || '').trim().toLowerCase(),
         name: data.name,
-        role: 'user',
+        role: 'employee',
         permissions: [],
         isAINativeUser: true,
       };
@@ -1186,7 +1186,7 @@ const ainativeLogin = async (req, res) => {
     const userId = localUser.userId;
 
     const accessToken = jwt.sign(
-      { userId, email: localUser.email, role: localUser.role || 'user', permissions: localUser.permissions || [], companyId: localUser.companyId || null },
+      { userId, email: localUser.email, role: localUser.role || 'employee', permissions: localUser.permissions || [], companyId: localUser.companyId || null },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -1200,7 +1200,7 @@ const ainativeLogin = async (req, res) => {
       message: 'Login successful',
       accessToken,
       refreshToken: localRefreshToken,
-      user: { userId, email: localUser.email, name: localUser.displayName || localUser.name || ainativeUser.name, role: localUser.role || 'user', permissions: localUser.permissions || [], companyId: localUser.companyId },
+      user: { userId, email: localUser.email, name: localUser.displayName || localUser.name || ainativeUser.name, role: localUser.role || 'employee', permissions: localUser.permissions || [], companyId: localUser.companyId },
     });
   } catch (error) {
     console.error('AINative login error:', error.message);

@@ -25,7 +25,7 @@ jest.mock('../../../../controllers/subscriptionTierController', () => ({
 
 jest.mock('../../../../middleware/authMiddleware', () => ({
   authenticateToken: jest.fn((req, res, next) => {
-    req.user = { id: 'user-001', role: 'user' };
+    req.user = { id: 'user-001', role: 'employee' };
     next();
   }),
   requireAdmin: jest.fn((req, res, next) => {
@@ -183,7 +183,7 @@ describe('Subscription Tier Routes', () => {
 
     it('should reject non-admin users', async () => {
       authenticateToken.mockImplementation((req, res, next) => {
-        req.user = { id: 'user-001', role: 'user' };
+        req.user = { id: 'user-001', role: 'employee' };
         next();
       });
 
@@ -220,7 +220,7 @@ describe('Subscription Tier Routes', () => {
 
     it('should reject non-admin users', async () => {
       authenticateToken.mockImplementation((req, res, next) => {
-        req.user = { id: 'user-001', role: 'user' };
+        req.user = { id: 'user-001', role: 'employee' };
         next();
       });
 
@@ -256,7 +256,7 @@ describe('Subscription Tier Routes', () => {
 
     it('should reject non-admin users', async () => {
       authenticateToken.mockImplementation((req, res, next) => {
-        req.user = { id: 'user-001', role: 'user' };
+        req.user = { id: 'user-001', role: 'employee' };
         next();
       });
 

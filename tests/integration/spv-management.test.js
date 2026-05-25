@@ -69,7 +69,7 @@ describe('SPV Management Integration Tests', () => {
     userToken = jwt.sign(
       {
         userId: 'regular-user',
-        role: 'user',
+        role: 'employee',
         permissions: ['read:spv']
       },
       process.env.JWT_SECRET,

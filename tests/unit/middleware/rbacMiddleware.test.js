@@ -46,8 +46,8 @@ describe('RBAC Middleware', () => {
       expect(rolePermissions.manager).toContain('read:companies');
     });
 
-    it('should define permissions for user role', () => {
-      expect(rolePermissions.user).toContain('read:companies');
+    it('should define permissions for employee role', () => {
+      expect(rolePermissions.employee).toContain('read:companies');
     });
 
     it('should define permissions for client role', () => {
@@ -88,7 +88,7 @@ describe('RBAC Middleware', () => {
 
     it('should combine explicit and role-based permissions', () => {
       const user = {
-        role: 'user',
+        role: 'employee',
         permissions: ['custom:permission']
       };
       const permissions = getUserPermissions(user);
@@ -98,7 +98,7 @@ describe('RBAC Middleware', () => {
 
     it('should not duplicate permissions', () => {
       const user = {
-        role: 'user',
+        role: 'employee',
         permissions: ['read:companies'] // Same as role permission
       };
       const permissions = getUserPermissions(user);
@@ -118,7 +118,7 @@ describe('RBAC Middleware', () => {
 
     it('should handle user with non-array permissions', () => {
       const user = {
-        role: 'user',
+        role: 'employee',
         permissions: 'not-an-array'
       };
       const permissions = getUserPermissions(user);
@@ -164,7 +164,7 @@ describe('RBAC Middleware', () => {
 
     it('should return false if user lacks permission', () => {
       const user = {
-        role: 'user',
+        role: 'employee',
         permissions: []
       };
       const result = checkPermission(user, 'admin:all');
@@ -210,7 +210,7 @@ describe('RBAC Middleware', () => {
     });
 
     it('should return 403 if user lacks required role', () => {
-      req.user = { role: 'user' };
+      req.user = { role: 'employee' };
       const middleware = hasRole('admin');
       middleware(req, res, next);
 
@@ -278,7 +278,7 @@ describe('RBAC Middleware', () => {
     });
 
     it('should accept array of permissions', () => {
-      req.user = { role: 'user', permissions: [] };
+      req.user = { role: 'employee', permissions: [] };
       const middleware = hasPermission(['read:companies', 'write:companies']);
       middleware(req, res, next);
 

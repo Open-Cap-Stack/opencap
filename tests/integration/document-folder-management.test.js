@@ -30,7 +30,7 @@ app.use((req, res, next) => {
     req.user = {
         userId: 'test-user-123',
         companyId: 'test-company-456',
-        role: 'user'
+        role: 'employee'
     };
     next();
 });

@@ -32,7 +32,7 @@ describe('Tax Document Controller', () => {
       user: {
         userId: 'user123',
         companyId: 'company123',
-        role: 'user'
+        role: 'employee'
       }
     };
     res = {

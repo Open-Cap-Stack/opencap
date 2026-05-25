@@ -59,7 +59,7 @@ describe('Financial Reports Lifecycle Integration Tests', () => {
     authToken = jwt.sign(
       {
         userId: 'test-user-123',
-        role: 'user',
+        role: 'employee',
         permissions: ['read:reports', 'create:reports', 'update:reports', 'delete:reports']
       },
       process.env.JWT_SECRET,

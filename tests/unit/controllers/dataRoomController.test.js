@@ -14,7 +14,7 @@ describe('DataRoom Controller', () => {
   let mockReq, mockRes;
   beforeEach(() => {
     jest.clearAllMocks();
-    mockReq = { body: {}, params: {}, query: {}, user: { userId: 'user-123', companyId: 'company-456', role: 'user' } };
+    mockReq = { body: {}, params: {}, query: {}, user: { userId: 'user-123', companyId: 'company-456', role: 'employee' } };
     mockRes = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
   });
 

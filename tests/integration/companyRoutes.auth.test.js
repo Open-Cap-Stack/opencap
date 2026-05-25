@@ -51,7 +51,7 @@ describe('Company Routes - Auth/RBAC Integration', () => {
   const readOnlyToken = () => makeToken({
     id: 'user-readonly',
     email: 'reader@test.com',
-    role: 'user',
+    role: 'employee',
     permissions: []
   });
 
@@ -109,7 +109,7 @@ describe('Company Routes - Auth/RBAC Integration', () => {
     });
   });
 
-  describe('Read-only user (role: user)', () => {
+  describe('Read-only user (role: employee)', () => {
     it('GET /api/v1/companies should succeed (has read:companies)', async () => {
       const res = await request(app)
         .get('/api/v1/companies')

@@ -16,7 +16,7 @@ describe('allowCompanySetup middleware', () => {
 
   beforeEach(() => {
     req = {
-      user: { userId: 'user-1', role: 'user', companyId: null }
+      user: { userId: 'user-1', role: 'employee', companyId: null }
     };
     res = {
       status: jest.fn().mockReturnThis(),

@@ -19,7 +19,7 @@ function generateObjectId() {
 /**
  * Generate JWT token for testing
  */
-function generateTestToken(userId = 'test-user-id', role = 'user') {
+function generateTestToken(userId = 'test-user-id', role = 'employee') {
   const secret = process.env.JWT_SECRET || 'test-secret-key';
   return jwt.sign(
     { 
@@ -42,7 +42,7 @@ async function createTestUser(userData = {}) {
     lastName: 'User',
     email: `test-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`,
     password: await bcrypt.hash('password123', 10),
-    role: 'user',
+    role: 'employee',
     status: 'active',
     companyId: generateObjectId(),
     emailVerified: true,

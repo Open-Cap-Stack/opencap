@@ -158,7 +158,7 @@ exports.resolveApiKey = async (plaintext) => {
     return {
       userId: user.userId || user._id,
       email: user.email,
-      role: user.role || 'user',
+      role: user.role || 'employee',
       companyId: user.companyId || keyRecord.companyId || null,
       apiKeyId: keyRecord.keyId,
       apiKeyName: keyRecord.name,

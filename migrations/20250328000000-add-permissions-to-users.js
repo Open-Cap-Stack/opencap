@@ -51,8 +51,8 @@ module.exports = {
     
     // Update each user with appropriate permissions
     const operations = users.map(user => {
-      const role = user.role || 'user'; // Default to 'user' if no role
-      const permissions = rolePermissions[role] || rolePermissions.user;
+      const role = user.role || 'employee'; // Default to 'employee' if no role
+      const permissions = rolePermissions[role] || rolePermissions.employee;
       
       return {
         updateOne: {

@@ -186,7 +186,7 @@ async function upsertClerkUser(clerkUser, companyId) {
     // Update — never overwrite companyId or role if already set
     const safe = { ...updates };
     if (existing[0].companyId) delete safe.companyId;
-    if (existing[0].role && existing[0].role !== 'user') delete safe.role;
+    if (existing[0].role && existing[0].role !== 'employee') delete safe.role;
 
     await zerodbService.updateRows(USERS_TABLE, {
       filter: { userId: existing[0].userId || existing[0].id },
@@ -198,7 +198,7 @@ async function upsertClerkUser(clerkUser, companyId) {
     await zerodbService.insertRow(USERS_TABLE, {
       userId,
       email: primaryEmail,
-      role: 'user',
+      role: 'employee',
       companyId: companyId || null,
       createdAt: now,
       ...updates,
