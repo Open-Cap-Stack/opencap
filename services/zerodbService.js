@@ -50,6 +50,31 @@ class ZeroDBService {
   }
   
   /**
+   * Retry a ZeroDB API call on transient 502/503/timeout errors.
+   * @param {Function} fn - async function to call
+   * @param {number} maxAttempts
+   * @returns {*} result of fn
+   */
+  async _withRetry(fn, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        const status = err.response?.status;
+        const isTransient = status === 502 || status === 503 || status === 504 ||
+          err.code === 'ECONNRESET' || err.code === 'ECONNABORTED' ||
+          (err.message && err.message.includes('timeout'));
+        if (!isTransient || attempt === maxAttempts) throw err;
+        lastError = err;
+        const delay = 500 * attempt;
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Initialize ZeroDB service with authentication
    * @param {string} token - JWT token for authentication
    */
@@ -217,10 +242,10 @@ class ZeroDBService {
       // Insert each row individually using row_data format
       const results = [];
       for (const row of rows) {
-        const response = await this.client.post(
+        const response = await this._withRetry(() => this.client.post(
           `/api/v1/projects/${this.projectId}/database/tables/${tableName}/rows`,
           { row_data: row }
-        );
+        ));
         results.push(response.data);
       }
       return { data: results };
@@ -256,10 +281,10 @@ class ZeroDBService {
       const body = { filter: normalizedFilter, limit: safeLimit, sort, projection };
       if (skip > 0) body.skip = skip;
 
-      const response = await this.client.post(
+      const response = await this._withRetry(() => this.client.post(
         `/api/v1/projects/${this.projectId}/database/tables/${tableName}/query`,
         body
-      );
+      ));
       return response.data;
     } catch (error) {
       // Handle table not found gracefully - return empty array
@@ -330,10 +355,10 @@ class ZeroDBService {
           const updateData = update.$set || update;
           const newRowData = { ...row.row_data, ...updateData };
 
-          await this.client.put(
+          await this._withRetry(() => this.client.put(
             `/api/v1/projects/${this.projectId}/database/tables/${tableName}/rows/${rowId}`,
             { row_data: newRowData }
-          );
+          ));
           modifiedCount++;
         }
       }
@@ -712,10 +737,10 @@ class ZeroDBService {
       }
 
       // Single row insert
-      const response = await this.client.post(
+      const response = await this._withRetry(() => this.client.post(
         `/api/v1/projects/${this.projectId}/database/tables/${tableName}/rows`,
         { row_data: rowData }
-      );
+      ));
       return { data: [response.data] };
     } catch (error) {
       console.error('Error inserting row:', error.message);
