@@ -7,12 +7,13 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const databaseAdapter = require('../../services/databaseAdapter');
 
 router.use(authenticateToken);
 
 // GET /api/v1/board-meetings
-router.get('/', async (req, res) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const companyId = req.user?.companyId || req.query.companyId;
     if (!companyId) {
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/board-meetings
-router.post('/', async (req, res) => {
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const companyId = req.user?.companyId || req.body.companyId;
     if (!companyId) {
@@ -54,7 +55,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/v1/board-meetings/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const meeting = await databaseAdapter.findById('BoardMeeting', req.params.id);
     if (!meeting) {
@@ -67,7 +68,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/v1/board-meetings/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const updated = await databaseAdapter.findByIdAndUpdate(
       'BoardMeeting',
@@ -85,7 +86,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/v1/board-meetings/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const deleted = await databaseAdapter.findByIdAndDelete('BoardMeeting', req.params.id);
     if (!deleted) {

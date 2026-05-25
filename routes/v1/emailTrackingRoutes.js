@@ -10,6 +10,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const emailTrackingController = require('../../controllers/emailTrackingController');
 
 // Apply authentication middleware to all routes
@@ -58,7 +59,7 @@ router.use(authenticateToken);
  *       400:
  *         description: Invalid input
  */
-router.post('/', emailTrackingController.createEmailTracking);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.createEmailTracking);
 
 /**
  * @swagger
@@ -92,7 +93,7 @@ router.post('/', emailTrackingController.createEmailTracking);
  *       200:
  *         description: List of tracking records
  */
-router.get('/', emailTrackingController.listEmailTracking);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.listEmailTracking);
 
 /**
  * @swagger
@@ -124,7 +125,7 @@ router.get('/', emailTrackingController.listEmailTracking);
  *       200:
  *         description: Email analytics data
  */
-router.get('/analytics', emailTrackingController.getAnalytics);
+router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getAnalytics);
 
 /**
  * @swagger
@@ -141,7 +142,7 @@ router.get('/analytics', emailTrackingController.getAnalytics);
  *       200:
  *         description: Engagement report
  */
-router.get('/engagement', emailTrackingController.getEngagementReport);
+router.get('/engagement', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getEngagementReport);
 
 /**
  * @swagger
@@ -158,7 +159,7 @@ router.get('/engagement', emailTrackingController.getEngagementReport);
  *       200:
  *         description: List of bounced emails
  */
-router.get('/bounced', emailTrackingController.getBouncedEmails);
+router.get('/bounced', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getBouncedEmails);
 
 /**
  * @swagger
@@ -175,7 +176,7 @@ router.get('/bounced', emailTrackingController.getBouncedEmails);
  *       200:
  *         description: List of suppressed emails
  */
-router.get('/suppressed', emailTrackingController.getSuppressedEmails);
+router.get('/suppressed', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getSuppressedEmails);
 
 /**
  * @swagger
@@ -193,7 +194,7 @@ router.get('/suppressed', emailTrackingController.getSuppressedEmails);
  *       200:
  *         description: Suppression status
  */
-router.get('/suppression/:email', emailTrackingController.checkEmailSuppression);
+router.get('/suppression/:email', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.checkEmailSuppression);
 
 /**
  * @swagger
@@ -213,7 +214,7 @@ router.get('/suppression/:email', emailTrackingController.checkEmailSuppression)
  *       404:
  *         description: Email not found in suppression list
  */
-router.delete('/suppression/:email', emailTrackingController.removeSuppression);
+router.delete('/suppression/:email', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.removeSuppression);
 
 /**
  * @swagger
@@ -236,7 +237,7 @@ router.delete('/suppression/:email', emailTrackingController.removeSuppression);
  *               type: string
  *               format: binary
  */
-router.get('/pixel/:trackingId', emailTrackingController.handlePixelTracking);
+router.get('/pixel/:trackingId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.handlePixelTracking);
 
 /**
  * @swagger
@@ -261,7 +262,7 @@ router.get('/pixel/:trackingId', emailTrackingController.handlePixelTracking);
  *       400:
  *         description: Missing URL parameter
  */
-router.get('/click/:trackingId', emailTrackingController.handleClickTracking);
+router.get('/click/:trackingId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.handleClickTracking);
 
 /**
  * @swagger
@@ -288,7 +289,7 @@ router.get('/click/:trackingId', emailTrackingController.handleClickTracking);
  *       400:
  *         description: Unsupported provider
  */
-router.post('/webhook/:provider', emailTrackingController.handleWebhook);
+router.post('/webhook/:provider', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.handleWebhook);
 
 /**
  * @swagger
@@ -308,7 +309,7 @@ router.post('/webhook/:provider', emailTrackingController.handleWebhook);
  *       404:
  *         description: Record not found
  */
-router.get('/message/:messageId', emailTrackingController.getEmailTrackingByMessageId);
+router.get('/message/:messageId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getEmailTrackingByMessageId);
 
 /**
  * @swagger
@@ -328,6 +329,6 @@ router.get('/message/:messageId', emailTrackingController.getEmailTrackingByMess
  *       404:
  *         description: Record not found
  */
-router.get('/:id', emailTrackingController.getEmailTracking);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), emailTrackingController.getEmailTracking);
 
 module.exports = router;

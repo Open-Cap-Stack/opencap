@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const cacheController = require('../../controllers/cacheController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 /**
  * @swagger
@@ -29,7 +30,7 @@ const { authenticateToken } = require('../../middleware/authMiddleware');
  *       200:
  *         description: Cache statistics
  */
-router.get('/stats', authenticateToken, cacheController.getStats);
+router.get('/stats', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.getStats);
 
 /**
  * @swagger
@@ -45,7 +46,7 @@ router.get('/stats', authenticateToken, cacheController.getStats);
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/flush', authenticateToken, cacheController.flush);
+router.post('/flush', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.flush);
 
 /**
  * @swagger
@@ -74,7 +75,7 @@ router.post('/flush', authenticateToken, cacheController.flush);
  *       200:
  *         description: Cache invalidated successfully
  */
-router.post('/invalidate', authenticateToken, cacheController.invalidate);
+router.post('/invalidate', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.invalidate);
 
 /**
  * @swagger
@@ -104,7 +105,7 @@ router.post('/invalidate', authenticateToken, cacheController.invalidate);
  *       200:
  *         description: List of cache keys
  */
-router.get('/keys', authenticateToken, cacheController.listKeys);
+router.get('/keys', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.listKeys);
 
 /**
  * @swagger
@@ -135,7 +136,7 @@ router.get('/keys', authenticateToken, cacheController.listKeys);
  *       201:
  *         description: Cache key set successfully
  */
-router.post('/keys', authenticateToken, cacheController.setKey);
+router.post('/keys', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.setKey);
 
 /**
  * @swagger
@@ -156,7 +157,7 @@ router.post('/keys', authenticateToken, cacheController.setKey);
  *       200:
  *         description: Cache key value
  */
-router.get('/keys/:key', authenticateToken, cacheController.getKey);
+router.get('/keys/:key', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.getKey);
 
 /**
  * @swagger
@@ -179,7 +180,7 @@ router.get('/keys/:key', authenticateToken, cacheController.getKey);
  *       404:
  *         description: Key not found
  */
-router.delete('/keys/:key', authenticateToken, cacheController.deleteKey);
+router.delete('/keys/:key', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.deleteKey);
 
 /**
  * @swagger
@@ -193,7 +194,7 @@ router.delete('/keys/:key', authenticateToken, cacheController.deleteKey);
  *       200:
  *         description: Query cache statistics
  */
-router.get('/query-stats', authenticateToken, cacheController.getQueryCacheStats);
+router.get('/query-stats', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.getQueryCacheStats);
 
 /**
  * @swagger
@@ -227,7 +228,7 @@ router.get('/query-stats', authenticateToken, cacheController.getQueryCacheStats
  *       403:
  *         description: Insufficient permissions
  */
-router.post('/warm', authenticateToken, cacheController.warmCache);
+router.post('/warm', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.warmCache);
 
 /**
  * @swagger
@@ -241,7 +242,7 @@ router.post('/warm', authenticateToken, cacheController.warmCache);
  *       200:
  *         description: Database metrics
  */
-router.get('/metrics', authenticateToken, cacheController.getDatabaseMetrics);
+router.get('/metrics', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.getDatabaseMetrics);
 
 /**
  * @swagger
@@ -274,7 +275,7 @@ router.get('/metrics', authenticateToken, cacheController.getDatabaseMetrics);
  *       403:
  *         description: Insufficient permissions
  */
-router.get('/performance-report', authenticateToken, cacheController.generatePerformanceReport);
+router.get('/performance-report', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.generatePerformanceReport);
 
 /**
  * @swagger
@@ -290,6 +291,6 @@ router.get('/performance-report', authenticateToken, cacheController.generatePer
  *       503:
  *         description: Database is unhealthy
  */
-router.get('/health', authenticateToken, cacheController.getDatabaseHealth);
+router.get('/health', authenticateToken, hasRole(['super_admin', 'admin']), cacheController.getDatabaseHealth);
 
 module.exports = router;

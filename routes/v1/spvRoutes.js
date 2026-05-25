@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const SPVController = require('../../controllers/SPV');
 const SPVNestedController = require('../../controllers/SPVNested');
 const SPVInvestorController = require('../../controllers/SPVInvestor');
@@ -21,14 +22,14 @@ router.use(authenticateToken);
  * @desc Create a new SPV
  * @access Private
  */
-router.post('/', SPVController.createSPV);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.createSPV);
 
 /**
  * @route GET /api/spvs
  * @desc Get all SPVs
  * @access Private
  */
-router.get('/', SPVController.getSPVs);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVs);
 
 /**
  * Special handler for trailing slash requests to return 404
@@ -43,28 +44,28 @@ router.get('///', (req, res) => {
  * @desc Get SPV analytics and summary data
  * @access Private
  */
-router.get('/analytics', SPVController.getSPVAnalytics);
+router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVAnalytics);
 
 /**
  * @route GET /api/spvs/status/:status
  * @desc Get SPVs by status (Active, Pending, Closed)
  * @access Private
  */
-router.get('/status/:status', SPVController.getSPVsByStatus);
+router.get('/status/:status', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVsByStatus);
 
 /**
  * @route GET /api/spvs/compliance/:status
  * @desc Get SPVs by compliance status (Compliant, NonCompliant, PendingReview)
  * @access Private
  */
-router.get('/compliance/:status', SPVController.getSPVsByComplianceStatus);
+router.get('/compliance/:status', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVsByComplianceStatus);
 
 /**
  * @route GET /api/spvs/parent/:id
  * @desc Get SPVs by parent company ID
  * @access Private
  */
-router.get('/parent/:id', SPVController.getSPVsByParentCompany);
+router.get('/parent/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVsByParentCompany);
 
 /**
  * SPV LP Investor Endpoints (Issue #590)
@@ -76,35 +77,35 @@ router.get('/parent/:id', SPVController.getSPVsByParentCompany);
  * @desc List all LP investors for an SPV (supports ?status= filter)
  * @access Private
  */
-router.get('/:id/investors', SPVInvestorController.listInvestors);
+router.get('/:id/investors', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.listInvestors);
 
 /**
  * @route POST /api/v1/spv/:id/invite
  * @desc Invite LPs to an SPV by email
  * @access Private
  */
-router.post('/:id/invite', SPVInvestorController.inviteInvestors);
+router.post('/:id/invite', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.inviteInvestors);
 
 /**
  * @route GET /api/v1/spv/:id/invite-link
  * @desc Get a shareable invite link for an SPV
  * @access Private
  */
-router.get('/:id/invite-link', SPVInvestorController.getInviteLink);
+router.get('/:id/invite-link', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.getInviteLink);
 
 /**
  * @route PATCH /api/v1/spv/:id/investors/:investorId
  * @desc Update an LP investor record (status, committedAmount, tags, notes)
  * @access Private
  */
-router.patch('/:id/investors/:investorId', SPVInvestorController.updateInvestor);
+router.patch('/:id/investors/:investorId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.updateInvestor);
 
 /**
  * @route DELETE /api/v1/spv/:id/investors/:investorId
  * @desc Remove an LP investor from an SPV
  * @access Private
  */
-router.delete('/:id/investors/:investorId', SPVInvestorController.deleteInvestor);
+router.delete('/:id/investors/:investorId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.deleteInvestor);
 
 /**
  * SPV Nested Endpoints (Issue #123)
@@ -116,35 +117,35 @@ router.delete('/:id/investors/:investorId', SPVInvestorController.deleteInvestor
  * @desc Get all investments for an SPV
  * @access Private
  */
-router.get('/:id/investments', SPVNestedController.getSPVInvestments);
+router.get('/:id/investments', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVInvestments);
 
 /**
  * @route GET /api/spvs/:id/performance
  * @desc Get performance metrics for an SPV (NAV, ROI, IRR)
  * @access Private
  */
-router.get('/:id/performance', SPVNestedController.getSPVPerformance);
+router.get('/:id/performance', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVPerformance);
 
 /**
  * @route GET /api/spvs/:id/reports/:type
  * @desc Generate report for an SPV (summary, detailed, tax)
  * @access Private
  */
-router.get('/:id/reports/:type', SPVNestedController.getSPVReport);
+router.get('/:id/reports/:type', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVReport);
 
 /**
  * @route PUT /api/spvs/:id/status
  * @desc Transition SPV status with lifecycle guards (Issue #580)
  * @access Private
  */
-router.put('/:id/status', SPVController.transitionStatus);
+router.put('/:id/status', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.transitionStatus);
 
 /**
  * @route POST /api/spvs/:id/submit
  * @desc Submit SPV for review (transitions draft → in_review)
  * @access Private
  */
-router.post('/:id/submit', (req, res, next) => {
+router.post('/:id/submit', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   req.body = { ...req.body, status: 'in_review' };
   next();
 }, SPVController.transitionStatus);
@@ -154,21 +155,21 @@ router.post('/:id/submit', (req, res, next) => {
  * @desc Close an SPV
  * @access Private
  */
-router.post('/:id/close', SPVNestedController.closeSPV);
+router.post('/:id/close', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.closeSPV);
 
 /**
  * @route POST /api/spvs/:id/liquidate
  * @desc Liquidate an SPV and distribute assets
  * @access Private
  */
-router.post('/:id/liquidate', SPVNestedController.liquidateSPV);
+router.post('/:id/liquidate', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.liquidateSPV);
 
 /**
  * @route GET /api/spvs/:id
  * @desc Get SPV by ID (either MongoDB ID or custom SPVID)
  * @access Private
  */
-router.get('/:id', (req, res, next) => {
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   // Check for empty ID parameter and handle it directly
   if (!req.params.id || req.params.id.trim() === '') {
     return res.status(404).json({ message: 'SPV ID is required' });
@@ -181,14 +182,14 @@ router.get('/:id', (req, res, next) => {
  * @desc Update an SPV by ID (both PUT and PATCH supported for partial updates)
  * @access Private
  */
-router.patch('/:id', (req, res, next) => {
+router.patch('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   if (!req.params.id || req.params.id.trim() === '') {
     return res.status(404).json({ message: 'SPV ID is required' });
   }
   next();
 }, SPVController.updateSPV);
 
-router.put('/:id', (req, res, next) => {
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   // Check for empty ID parameter and handle it directly
   if (!req.params.id || req.params.id.trim() === '') {
     return res.status(404).json({ message: 'SPV ID is required' });
@@ -201,7 +202,7 @@ router.put('/:id', (req, res, next) => {
  * @desc Delete an SPV by ID
  * @access Private
  */
-router.delete('/:id', (req, res, next) => {
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   // Check for empty ID parameter and handle it directly
   if (!req.params.id || req.params.id.trim() === '') {
     return res.status(404).json({ message: 'SPV ID is required' });

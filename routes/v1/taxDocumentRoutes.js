@@ -23,6 +23,7 @@ const taxDocumentController = require('../../controllers/taxDocumentController')
 router.get(
     '/',
     authenticateToken,
+    hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'employee']),
     taxDocumentController.listTaxDocuments
 );
 
@@ -34,6 +35,7 @@ router.get(
 router.get(
     '/:id',
     authenticateToken,
+    hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'employee']),
     taxDocumentController.getTaxDocument
 );
 
@@ -45,6 +47,7 @@ router.get(
 router.get(
     '/:id/download',
     authenticateToken,
+    hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'employee']),
     taxDocumentController.downloadTaxDocument
 );
 
@@ -56,7 +59,7 @@ router.get(
 router.post(
     '/',
     authenticateToken,
-    hasRole(['admin', 'accountant', 'finance']),
+    hasRole(['super_admin', 'admin', 'founder', 'accountant']),
     taxDocumentController.createTaxDocument
 );
 
@@ -80,7 +83,7 @@ router.put(
 router.delete(
     '/:id',
     authenticateToken,
-    hasRole(['admin']),
+    hasRole(['super_admin', 'admin']),
     taxDocumentController.deleteTaxDocument
 );
 

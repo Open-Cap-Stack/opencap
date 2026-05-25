@@ -7,8 +7,9 @@ const express = require('express');
 const router = express.Router();
 const investmentTrackerController = require('../../controllers/investmentTrackerController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Route for tracking investments
-router.post('/', authenticateToken, investmentTrackerController.trackInvestment);
+router.post('/', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), investmentTrackerController.trackInvestment);
 
 module.exports = router;

@@ -16,6 +16,7 @@ const express = require('express');
 const router = express.Router();
 const accessGroupController = require('../../controllers/accessGroupController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all access group routes
 router.use(authenticateToken);
@@ -25,14 +26,14 @@ router.use(authenticateToken);
  * @desc Get all access groups for the authenticated user's company
  * @access Private
  */
-router.get('/', accessGroupController.getAllAccessGroups);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), accessGroupController.getAllAccessGroups);
 
 /**
  * @route GET /api/v1/access-groups/:id
  * @desc Get access group by ID
  * @access Private
  */
-router.get('/:id', accessGroupController.getAccessGroupById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), accessGroupController.getAccessGroupById);
 
 /**
  * @route POST /api/v1/access-groups
@@ -43,7 +44,7 @@ router.get('/:id', accessGroupController.getAccessGroupById);
  *   description?: string
  * }
  */
-router.post('/', accessGroupController.createAccessGroup);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), accessGroupController.createAccessGroup);
 
 /**
  * @route PUT /api/v1/access-groups/:id
@@ -51,13 +52,13 @@ router.post('/', accessGroupController.createAccessGroup);
  * @access Private
  * @body Partial group object with fields to update
  */
-router.put('/:id', accessGroupController.updateAccessGroup);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), accessGroupController.updateAccessGroup);
 
 /**
  * @route DELETE /api/v1/access-groups/:id
  * @desc Delete an access group
  * @access Private
  */
-router.delete('/:id', accessGroupController.deleteAccessGroup);
+router.delete('/:id', hasRole(['super_admin', 'admin']), accessGroupController.deleteAccessGroup);
 
 module.exports = router;

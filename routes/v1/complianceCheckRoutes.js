@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const ComplianceCheck = require('../../models/ComplianceCheck');
 const { isValidObjectId } = require('../../utils/inputSanitizer');
 const router = express.Router();
@@ -8,7 +9,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Create a new compliance check
-router.post('/', async (req, res) => {
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { CheckID } = req.body;
 
@@ -57,7 +58,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get all compliance checks
-router.get('/', async (req, res) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const checks = await ComplianceCheck.find({}, { sort: { Timestamp: -1 } });
     res.status(200).json({
@@ -75,7 +76,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add a route to find non-compliant checks - MOVED BEFORE :id ROUTES TO PREVENT ROUTE MATCHING ISSUES
-router.get('/non-compliant', async (req, res) => {
+router.get('/non-compliant', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const nonCompliantChecks = await ComplianceCheck.findNonCompliant();
     res.status(200).json({ complianceChecks: nonCompliantChecks });
@@ -89,7 +90,7 @@ router.get('/non-compliant', async (req, res) => {
 });
 
 // Get compliance check by ID - New Endpoint
-router.get('/:id', async (req, res) => {
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -118,7 +119,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update compliance check by ID - New Endpoint
-router.put('/:id', async (req, res) => {
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -173,7 +174,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a compliance check
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { id } = req.params;
 

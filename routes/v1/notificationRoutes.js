@@ -6,6 +6,7 @@
  */
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const notificationController = require('../../controllers/Notification');
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.use(authenticateToken);
  * POST /api/v1/notifications
  * Create a new notification
  */
-router.post('/', notificationController.createNotification);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), notificationController.createNotification);
 
 /**
  * GET /api/v1/notifications
@@ -29,7 +30,7 @@ router.post('/', notificationController.createNotification);
  * - limit: Number of results (default: 100)
  * - offset: Number to skip (default: 0)
  */
-router.get('/', notificationController.getNotifications);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), notificationController.getNotifications);
 
 /**
  * POST /api/v1/notifications/mark-read
@@ -40,18 +41,18 @@ router.get('/', notificationController.getNotifications);
  * - markAll: Boolean to mark all unread notifications as read
  * - companyId: Optional company ID filter when markAll is true
  */
-router.post('/mark-read', notificationController.markNotificationsRead);
+router.post('/mark-read', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), notificationController.markNotificationsRead);
 
 /**
  * GET /api/v1/notifications/:id
  * Get a notification by ID
  */
-router.get('/:id', notificationController.getNotificationById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), notificationController.getNotificationById);
 
 /**
  * DELETE /api/v1/notifications/:id
  * Delete a notification by ID
  */
-router.delete('/:id', notificationController.deleteNotification);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), notificationController.deleteNotification);
 
 module.exports = router;

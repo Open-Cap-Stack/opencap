@@ -8,6 +8,7 @@ const router = express.Router();
 const stakeholderController = require('../../controllers/stakeholderController');
 const bulkReportsController = require('../../controllers/bulkReportsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const qsbsEligibilityService = require('../../services/qsbsEligibilityService');
 
 // Apply authentication to all stakeholder routes
@@ -17,13 +18,13 @@ router.use(authenticateToken);
  * POST /api/v1/stakeholders/reports/bulk
  * Generate bulk reports for multiple stakeholders
  */
-router.post('/reports/bulk', bulkReportsController.generateBulkReports);
+router.post('/reports/bulk', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkReportsController.generateBulkReports);
 
 /**
  * GET /api/v1/stakeholders
  * Get all stakeholders (supports companyId, projectId, role, status filters + pagination)
  */
-router.get('/', stakeholderController.getAllStakeholders);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.getAllStakeholders);
 
 /**
  * GET /api/v1/stakeholders/:id/qsbs-eligibility
@@ -31,7 +32,7 @@ router.get('/', stakeholderController.getAllStakeholders);
  * Query params: entityType, grossAssetsAtIssuance, acquisitionDate, businessType,
  *               sharesAcquired, acquisitionPrice
  */
-router.get('/:id/qsbs-eligibility', async (req, res) => {
+router.get('/:id/qsbs-eligibility', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { entityType, grossAssetsAtIssuance, acquisitionDate, businessType, sharesAcquired, acquisitionPrice } = req.query;
     const eligibilityData = {
@@ -55,24 +56,24 @@ router.get('/:id/qsbs-eligibility', async (req, res) => {
  * GET /api/v1/stakeholders/:id
  * Get stakeholder by ID (_id or stakeholderId)
  */
-router.get('/:id', stakeholderController.getStakeholderById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.getStakeholderById);
 
 /**
  * POST /api/v1/stakeholders
  * Create a new stakeholder
  */
-router.post('/', stakeholderController.createStakeholder);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.createStakeholder);
 
 /**
  * PUT /api/v1/stakeholders/:id
  * Update a stakeholder
  */
-router.put('/:id', stakeholderController.updateStakeholderById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.updateStakeholderById);
 
 /**
  * DELETE /api/v1/stakeholders/:id
  * Delete a stakeholder
  */
-router.delete('/:id', stakeholderController.deleteStakeholderById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.deleteStakeholderById);
 
 module.exports = router;

@@ -8,36 +8,37 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const equityGrantController = require('../../controllers/equityGrantController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
 // Grant Templates
-router.get('/templates', equityGrantController.getGrantTemplates);
-router.post('/from-template', equityGrantController.createGrantFromTemplate);
+router.get('/templates', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getGrantTemplates);
+router.post('/from-template', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.createGrantFromTemplate);
 
 // Grant CRUD
-router.post('/', equityGrantController.createEquityGrant);
-router.get('/', equityGrantController.getEquityGrants);
-router.get('/:id', equityGrantController.getEquityGrantById);
-router.put('/:id', equityGrantController.updateEquityGrant);
-router.delete('/:id', equityGrantController.deleteEquityGrant);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.createEquityGrant);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getEquityGrants);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getEquityGrantById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.updateEquityGrant);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.deleteEquityGrant);
 
 // Grant Status Management
-router.patch('/:id/status', equityGrantController.updateGrantStatus);
+router.patch('/:id/status', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.updateGrantStatus);
 
 // Exercise Operations
-router.post('/:id/exercise', equityGrantController.exerciseGrant);
+router.post('/:id/exercise', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.exerciseGrant);
 
 // Vesting Information
-router.get('/:id/vesting', equityGrantController.getVestingSchedule);
+router.get('/:id/vesting', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getVestingSchedule);
 
 // Equity Value Calculation
-router.get('/:id/value', equityGrantController.calculateEquityValue);
+router.get('/:id/value', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.calculateEquityValue);
 
 // Employee-specific routes
-router.get('/employee/:employeeId', equityGrantController.getGrantsByEmployee);
-router.get('/employee/:employeeId/summary', equityGrantController.getEmployeeGrantSummary);
+router.get('/employee/:employeeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getGrantsByEmployee);
+router.get('/employee/:employeeId/summary', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityGrantController.getEmployeeGrantSummary);
 
 module.exports = router;

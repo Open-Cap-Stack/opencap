@@ -7,6 +7,7 @@
  */
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const bulkMessageController = require('../../controllers/bulkMessageController');
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.use(authenticateToken);
  * - metadata: Additional custom data
  * - tags: Array of tags for categorization
  */
-router.post('/', bulkMessageController.createBulkMessage);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.createBulkMessage);
 
 /**
  * GET /api/v1/bulk-messages
@@ -44,7 +45,7 @@ router.post('/', bulkMessageController.createBulkMessage);
  * - limit: Number of results (default: 50)
  * - offset: Number to skip (default: 0)
  */
-router.get('/', bulkMessageController.getBulkMessages);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.getBulkMessages);
 
 /**
  * GET /api/v1/bulk-messages/history
@@ -55,13 +56,13 @@ router.get('/', bulkMessageController.getBulkMessages);
  * - limit: Number of results (default: 50)
  * - offset: Number to skip (default: 0)
  */
-router.get('/history', bulkMessageController.getMessageHistory);
+router.get('/history', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.getMessageHistory);
 
 /**
  * GET /api/v1/bulk-messages/:id
  * Get a bulk message by ID
  */
-router.get('/:id', bulkMessageController.getBulkMessageById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.getBulkMessageById);
 
 /**
  * PUT /api/v1/bulk-messages/:id
@@ -69,19 +70,19 @@ router.get('/:id', bulkMessageController.getBulkMessageById);
  *
  * Body: Same as POST, but only specified fields are updated
  */
-router.put('/:id', bulkMessageController.updateBulkMessage);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.updateBulkMessage);
 
 /**
  * DELETE /api/v1/bulk-messages/:id
  * Delete a bulk message
  */
-router.delete('/:id', bulkMessageController.deleteBulkMessage);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.deleteBulkMessage);
 
 /**
  * POST /api/v1/bulk-messages/:id/send
  * Send a bulk message immediately
  */
-router.post('/:id/send', bulkMessageController.sendBulkMessage);
+router.post('/:id/send', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.sendBulkMessage);
 
 /**
  * POST /api/v1/bulk-messages/:id/schedule
@@ -90,30 +91,30 @@ router.post('/:id/send', bulkMessageController.sendBulkMessage);
  * Body:
  * - scheduledAt: ISO 8601 datetime for when to send
  */
-router.post('/:id/schedule', bulkMessageController.scheduleBulkMessage);
+router.post('/:id/schedule', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.scheduleBulkMessage);
 
 /**
  * POST /api/v1/bulk-messages/:id/cancel
  * Cancel a scheduled message
  */
-router.post('/:id/cancel', bulkMessageController.cancelScheduledMessage);
+router.post('/:id/cancel', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.cancelScheduledMessage);
 
 /**
  * GET /api/v1/bulk-messages/:id/recipients
  * Preview recipients for a bulk message based on filter
  */
-router.get('/:id/recipients', bulkMessageController.previewRecipients);
+router.get('/:id/recipients', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.previewRecipients);
 
 /**
  * GET /api/v1/bulk-messages/:id/status
  * Get delivery status for a bulk message
  */
-router.get('/:id/status', bulkMessageController.getDeliveryStatus);
+router.get('/:id/status', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.getDeliveryStatus);
 
 /**
  * POST /api/v1/bulk-messages/:id/retry
  * Retry sending to failed recipients
  */
-router.post('/:id/retry', bulkMessageController.retryFailedRecipients);
+router.post('/:id/retry', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkMessageController.retryFailedRecipients);
 
 module.exports = router;

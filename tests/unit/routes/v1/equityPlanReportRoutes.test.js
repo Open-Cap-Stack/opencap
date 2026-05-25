@@ -55,6 +55,12 @@ const mockAuthMiddleware = {
 
 jest.mock('../../../../middleware/authMiddleware', () => mockAuthMiddleware);
 
+jest.mock('../../../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next(),
+  hasPermission: () => (req, res, next) => next(),
+  requireUserNotAgent: (req, res, next) => next(),
+}));
+
 const equityPlanReportRoutes = require('../../../../routes/v1/equityPlanReportRoutes');
 const equityPlanReportController = require('../../../../controllers/equityPlanReportController');
 

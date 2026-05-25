@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const valuation409ATriggerService = require('../../services/valuation409ATriggerService');
 
 router.use(authenticateToken);
@@ -15,7 +16,7 @@ router.use(authenticateToken);
  * Check whether a company's 409A is stale and detect trigger events
  * Query params: companyId, lastValuationDate
  */
-router.get('/409a/staleness-check', async (req, res) => {
+router.get('/409a/staleness-check', hasRole(['super_admin', 'admin', 'founder', 'accountant']), async (req, res) => {
   try {
     const { companyId, lastValuationDate } = req.query;
 

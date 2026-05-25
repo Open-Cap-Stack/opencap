@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../../controllers/paymentController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 /**
  * Payment Intent Routes
@@ -27,19 +28,19 @@ const { authenticateToken } = require('../../middleware/authMiddleware');
  * - metadata: Additional metadata (optional)
  * - invoiceId: Associated invoice ID (optional)
  */
-router.post('/intents', authenticateToken, paymentController.createPaymentIntent);
+router.post('/intents', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.createPaymentIntent);
 
 /**
  * POST /api/v1/payments/:id/confirm
  * Confirm a pending payment
  */
-router.post('/:id/confirm', authenticateToken, paymentController.confirmPayment);
+router.post('/:id/confirm', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.confirmPayment);
 
 /**
  * POST /api/v1/payments/:id/process
  * Process/capture a confirmed payment
  */
-router.post('/:id/process', authenticateToken, paymentController.processPayment);
+router.post('/:id/process', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.processPayment);
 
 /**
  * POST /api/v1/payments/:id/refund
@@ -49,13 +50,13 @@ router.post('/:id/process', authenticateToken, paymentController.processPayment)
  * - amount: Partial refund amount (optional, defaults to full refund)
  * - reason: Refund reason (optional)
  */
-router.post('/:id/refund', authenticateToken, paymentController.refundPayment);
+router.post('/:id/refund', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.refundPayment);
 
 /**
  * GET /api/v1/payments/:id
  * Get a payment by ID
  */
-router.get('/:id', authenticateToken, paymentController.getPayment);
+router.get('/:id', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.getPayment);
 
 /**
  * GET /api/v1/payments
@@ -70,7 +71,7 @@ router.get('/:id', authenticateToken, paymentController.getPayment);
  * - page: Page number (default: 1)
  * - limit: Items per page (default: 10, max: 100)
  */
-router.get('/', authenticateToken, paymentController.getPaymentHistory);
+router.get('/', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.getPaymentHistory);
 
 /**
  * Payment Method Routes
@@ -89,13 +90,13 @@ router.get('/', authenticateToken, paymentController.getPaymentHistory);
  * - billingDetails: Billing details (optional)
  * - metadata: Additional metadata (optional)
  */
-router.post('/customers/:customerId/methods', authenticateToken, paymentController.addPaymentMethod);
+router.post('/customers/:customerId/methods', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.addPaymentMethod);
 
 /**
  * DELETE /api/v1/payments/customers/:customerId/methods/:methodId
  * Remove a payment method
  */
-router.delete('/customers/:customerId/methods/:methodId', authenticateToken, paymentController.removePaymentMethod);
+router.delete('/customers/:customerId/methods/:methodId', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.removePaymentMethod);
 
 /**
  * GET /api/v1/payments/customers/:customerId/methods
@@ -104,13 +105,13 @@ router.delete('/customers/:customerId/methods/:methodId', authenticateToken, pay
  * Query Parameters:
  * - type: Filter by type (optional)
  */
-router.get('/customers/:customerId/methods', authenticateToken, paymentController.getPaymentMethods);
+router.get('/customers/:customerId/methods', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.getPaymentMethods);
 
 /**
  * PUT /api/v1/payments/customers/:customerId/methods/:methodId/default
  * Set a payment method as default
  */
-router.put('/customers/:customerId/methods/:methodId/default', authenticateToken, paymentController.setDefaultPaymentMethod);
+router.put('/customers/:customerId/methods/:methodId/default', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'accountant']), paymentController.setDefaultPaymentMethod);
 
 /**
  * Webhook Routes

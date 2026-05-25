@@ -9,25 +9,26 @@ const express = require('express');
 const router = express.Router();
 const customReportController = require('../../controllers/customReportController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
 // Metadata endpoints - must be before parameterized routes
-router.get('/data-sources', customReportController.getDataSources);
-router.get('/fields', customReportController.getAvailableFields);
-router.post('/preview', customReportController.previewReport);
+router.get('/data-sources', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.getDataSources);
+router.get('/fields', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.getAvailableFields);
+router.post('/preview', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.previewReport);
 
 // Basic CRUD operations
-router.post('/', customReportController.createCustomReport);
-router.get('/', customReportController.listCustomReports);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.createCustomReport);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.listCustomReports);
 
 // Individual resource routes
-router.get('/:id', customReportController.getCustomReport);
-router.put('/:id', customReportController.updateCustomReport);
-router.delete('/:id', customReportController.deleteCustomReport);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.getCustomReport);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.updateCustomReport);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.deleteCustomReport);
 
 // Report execution
-router.post('/:id/execute', customReportController.executeCustomReport);
+router.post('/:id/execute', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), customReportController.executeCustomReport);
 
 module.exports = router;

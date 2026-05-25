@@ -7,6 +7,7 @@ const router = express.Router();
 const safeController = require('../../controllers/safeController');
 const SAFE = require('../../models/SAFE');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Local helper (mirrors the one in safeController)
 function normalizeSafeType(safe) {
@@ -19,31 +20,31 @@ function normalizeSafeType(safe) {
 router.use(authenticateToken);
 
 // SAFE CRUD operations
-router.post('/', safeController.createSAFE);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.createSAFE);
 // Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
-router.get('/', (req, res, next) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), (req, res, next) => {
   // Always delegate to getCompanySAFEs — it handles null/default companyId by returning all
   const companyId = req.user?.companyId || 'default';
   req.params = { ...req.params, companyId };
   return safeController.getCompanySAFEs(req, res, next);
 });
-router.get('/company/:companyId', safeController.getCompanySAFEs);
-router.get('/company/:companyId/summary', safeController.getCompanySummary);
-router.get('/:safeId', safeController.getSAFE);
-router.put('/:safeId', safeController.updateSAFE);
-router.patch('/:safeId/status', safeController.updateStatus);
-router.delete('/:safeId', safeController.deleteSAFE);
+router.get('/company/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getCompanySAFEs);
+router.get('/company/:companyId/summary', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getCompanySummary);
+router.get('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getSAFE);
+router.put('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.updateSAFE);
+router.patch('/:safeId/status', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.updateStatus);
+router.delete('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.deleteSAFE);
 
 // SAFE workflow
-router.post('/:safeId/send', safeController.sendSAFE);
-router.post('/:safeId/sign/investor', safeController.recordInvestorSignature);
-router.post('/:safeId/sign/company', safeController.recordCompanySignature);
-router.post('/:safeId/fund', safeController.markFunded);
-router.post('/:safeId/cancel', safeController.cancelSAFE);
+router.post('/:safeId/send', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.sendSAFE);
+router.post('/:safeId/sign/investor', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.recordInvestorSignature);
+router.post('/:safeId/sign/company', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.recordCompanySignature);
+router.post('/:safeId/fund', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.markFunded);
+router.post('/:safeId/cancel', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.cancelSAFE);
 
 // Conversion operations
-router.post('/company/:companyId/conversion/preview', safeController.previewConversion);
-router.post('/company/:companyId/conversion/create', safeController.createConversions);
-router.post('/conversion/:conversionId/execute', safeController.executeConversion);
+router.post('/company/:companyId/conversion/preview', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.previewConversion);
+router.post('/company/:companyId/conversion/create', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.createConversions);
+router.post('/conversion/:conversionId/execute', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.executeConversion);
 
 module.exports = router;

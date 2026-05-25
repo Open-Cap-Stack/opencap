@@ -10,6 +10,7 @@ const express = require('express');
 const router = express.Router();
 const fundraisingAnalyticsController = require('../../controllers/fundraisingAnalyticsController');
 const { authenticate } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -20,7 +21,7 @@ router.use(authenticate);
  * @access  Private
  * Note: Alias for frontend that calls GET /fundraising-analytics without companyId param
  */
-router.get('/', (req, res, next) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
   // Derive companyId from authenticated user
   const companyId = req.user?.companyId || req.query.companyId;
   if (!companyId) {

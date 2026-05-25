@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const graphAnalyticsController = require('../../controllers/graphAnalyticsController');
 
 // Apply authentication middleware to all routes
@@ -20,42 +21,42 @@ router.use(authenticateToken);
  * @desc Create a new node
  * @access Private
  */
-router.post('/nodes', graphAnalyticsController.createNode);
+router.post('/nodes', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.createNode);
 
 /**
  * @route GET /api/v1/graph/nodes
  * @desc Find nodes with filters
  * @access Private
  */
-router.get('/nodes', graphAnalyticsController.findNodes);
+router.get('/nodes', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.findNodes);
 
 /**
  * @route POST /api/v1/graph/nodes/batch
  * @desc Batch create nodes
  * @access Private
  */
-router.post('/nodes/batch', graphAnalyticsController.batchCreateNodes);
+router.post('/nodes/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.batchCreateNodes);
 
 /**
  * @route GET /api/v1/graph/nodes/:label/:id
  * @desc Get a node by label and ID
  * @access Private
  */
-router.get('/nodes/:label/:id', graphAnalyticsController.getNode);
+router.get('/nodes/:label/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getNode);
 
 /**
  * @route DELETE /api/v1/graph/nodes/:label/:id
  * @desc Delete a node
  * @access Private
  */
-router.delete('/nodes/:label/:id', graphAnalyticsController.deleteNode);
+router.delete('/nodes/:label/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.deleteNode);
 
 /**
  * @route GET /api/v1/graph/nodes/:label/:id/related
  * @desc Get related nodes
  * @access Private
  */
-router.get('/nodes/:label/:id/related', graphAnalyticsController.getRelatedNodes);
+router.get('/nodes/:label/:id/related', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getRelatedNodes);
 
 // ==================== Relationship Operations ====================
 
@@ -64,28 +65,28 @@ router.get('/nodes/:label/:id/related', graphAnalyticsController.getRelatedNodes
  * @desc Create a relationship
  * @access Private
  */
-router.post('/relationships', graphAnalyticsController.createRelationship);
+router.post('/relationships', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.createRelationship);
 
 /**
  * @route POST /api/v1/graph/relationships/batch
  * @desc Batch create relationships
  * @access Private
  */
-router.post('/relationships/batch', graphAnalyticsController.batchCreateRelationships);
+router.post('/relationships/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.batchCreateRelationships);
 
 /**
  * @route GET /api/v1/graph/relationships/:id
  * @desc Get a relationship by ID
  * @access Private
  */
-router.get('/relationships/:id', graphAnalyticsController.getRelationship);
+router.get('/relationships/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getRelationship);
 
 /**
  * @route DELETE /api/v1/graph/relationships/:id
  * @desc Delete a relationship
  * @access Private
  */
-router.delete('/relationships/:id', graphAnalyticsController.deleteRelationship);
+router.delete('/relationships/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.deleteRelationship);
 
 // ==================== Path Finding ====================
 
@@ -94,14 +95,14 @@ router.delete('/relationships/:id', graphAnalyticsController.deleteRelationship)
  * @desc Find shortest path between nodes
  * @access Private
  */
-router.post('/paths/shortest', graphAnalyticsController.findShortestPath);
+router.post('/paths/shortest', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.findShortestPath);
 
 /**
  * @route POST /api/v1/graph/paths/all
  * @desc Find all paths between nodes
  * @access Private
  */
-router.post('/paths/all', graphAnalyticsController.findAllPaths);
+router.post('/paths/all', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.findAllPaths);
 
 // ==================== Cypher Query ====================
 
@@ -110,7 +111,7 @@ router.post('/paths/all', graphAnalyticsController.findAllPaths);
  * @desc Execute a Cypher query
  * @access Private
  */
-router.post('/query', graphAnalyticsController.runCypherQuery);
+router.post('/query', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.runCypherQuery);
 
 // ==================== Graph Statistics ====================
 
@@ -119,7 +120,7 @@ router.post('/query', graphAnalyticsController.runCypherQuery);
  * @desc Get graph statistics
  * @access Private
  */
-router.get('/stats', graphAnalyticsController.getGraphStats);
+router.get('/stats', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getGraphStats);
 
 // ==================== Compliance Graph ====================
 
@@ -128,35 +129,35 @@ router.get('/stats', graphAnalyticsController.getGraphStats);
  * @desc Track compliance trail
  * @access Private
  */
-router.post('/compliance/trail', graphAnalyticsController.trackComplianceTrail);
+router.post('/compliance/trail', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.trackComplianceTrail);
 
 /**
  * @route GET /api/v1/graph/compliance/trail/:documentId
  * @desc Get compliance trail for a document
  * @access Private
  */
-router.get('/compliance/trail/:documentId', graphAnalyticsController.getComplianceTrail);
+router.get('/compliance/trail/:documentId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getComplianceTrail);
 
 /**
  * @route GET /api/v1/graph/compliance/audit/:documentId
  * @desc Get audit path for a document
  * @access Private
  */
-router.get('/compliance/audit/:documentId', graphAnalyticsController.getAuditPath);
+router.get('/compliance/audit/:documentId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getAuditPath);
 
 /**
  * @route GET /api/v1/graph/compliance/gaps/:documentId
  * @desc Find compliance gaps for a document
  * @access Private
  */
-router.get('/compliance/gaps/:documentId', graphAnalyticsController.findComplianceGaps);
+router.get('/compliance/gaps/:documentId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.findComplianceGaps);
 
 /**
  * @route GET /api/v1/graph/compliance/report/:companyId
  * @desc Generate compliance report for a company
  * @access Private
  */
-router.get('/compliance/report/:companyId', graphAnalyticsController.generateComplianceReport);
+router.get('/compliance/report/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.generateComplianceReport);
 
 // ==================== Network Analysis ====================
 
@@ -165,55 +166,55 @@ router.get('/compliance/report/:companyId', graphAnalyticsController.generateCom
  * @desc Calculate centrality metrics
  * @access Private
  */
-router.post('/analysis/centrality', graphAnalyticsController.calculateCentrality);
+router.post('/analysis/centrality', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.calculateCentrality);
 
 /**
  * @route POST /api/v1/graph/analysis/communities
  * @desc Detect communities in the graph
  * @access Private
  */
-router.post('/analysis/communities', graphAnalyticsController.detectCommunities);
+router.post('/analysis/communities', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.detectCommunities);
 
 /**
  * @route POST /api/v1/graph/analysis/influence
  * @desc Analyze node influence
  * @access Private
  */
-router.post('/analysis/influence', graphAnalyticsController.analyzeInfluence);
+router.post('/analysis/influence', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.analyzeInfluence);
 
 /**
  * @route GET /api/v1/graph/analysis/stats
  * @desc Get network statistics
  * @access Private
  */
-router.get('/analysis/stats', graphAnalyticsController.getNetworkStats);
+router.get('/analysis/stats', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getNetworkStats);
 
 /**
  * @route GET /api/v1/graph/analysis/visualization
  * @desc Get data formatted for visualization
  * @access Private
  */
-router.get('/analysis/visualization', graphAnalyticsController.getVisualizationData);
+router.get('/analysis/visualization', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getVisualizationData);
 
 /**
  * @route GET /api/v1/graph/analysis/nodes/:label/:id/centrality
  * @desc Get centrality for a specific node
  * @access Private
  */
-router.get('/analysis/nodes/:label/:id/centrality', graphAnalyticsController.getNodeCentrality);
+router.get('/analysis/nodes/:label/:id/centrality', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getNodeCentrality);
 
 /**
  * @route GET /api/v1/graph/analysis/nodes/:label/:id/influence
  * @desc Get influence score for a specific node
  * @access Private
  */
-router.get('/analysis/nodes/:label/:id/influence', graphAnalyticsController.getInfluenceScore);
+router.get('/analysis/nodes/:label/:id/influence', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getInfluenceScore);
 
 /**
  * @route GET /api/v1/graph/analysis/nodes/:label/:id/community
  * @desc Get community for a specific node
  * @access Private
  */
-router.get('/analysis/nodes/:label/:id/community', graphAnalyticsController.getNodeCommunity);
+router.get('/analysis/nodes/:label/:id/community', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), graphAnalyticsController.getNodeCommunity);
 
 module.exports = router;

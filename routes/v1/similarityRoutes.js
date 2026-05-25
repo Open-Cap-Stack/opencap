@@ -9,6 +9,7 @@
 const express = require('express');
 const similarityController = require('../../controllers/similarityController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 const router = express.Router();
 
@@ -20,45 +21,35 @@ const router = express.Router();
  * POST /api/similarity/stakeholders/search
  * Find similar stakeholders to a given stakeholder profile
  */
-router.post('/stakeholders/search',
-  authenticateToken,
-  similarityController.findSimilarStakeholders
+router.post('/stakeholders/search', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findSimilarStakeholders
 );
 
 /**
  * GET /api/similarity/stakeholders/:id/similar
  * Find similar stakeholders by stakeholder ID
  */
-router.get('/stakeholders/:id/similar',
-  authenticateToken,
-  similarityController.findSimilarStakeholdersById
+router.get('/stakeholders/:id/similar', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findSimilarStakeholdersById
 );
 
 /**
  * GET /api/similarity/stakeholders/search/role
  * Search stakeholders by role-based query
  */
-router.get('/stakeholders/search/role',
-  authenticateToken,
-  similarityController.searchStakeholdersByRole
+router.get('/stakeholders/search/role', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.searchStakeholdersByRole
 );
 
 /**
  * POST /api/similarity/stakeholders/index
  * Index a stakeholder for similarity search
  */
-router.post('/stakeholders/index',
-  authenticateToken,
-  similarityController.indexStakeholder
+router.post('/stakeholders/index', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.indexStakeholder
 );
 
 /**
  * POST /api/similarity/stakeholders/index-all
  * Index all stakeholders from database
  */
-router.post('/stakeholders/index-all',
-  authenticateToken,
-  similarityController.indexAllStakeholders
+router.post('/stakeholders/index-all', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.indexAllStakeholders
 );
 
 // =================
@@ -69,45 +60,35 @@ router.post('/stakeholders/index-all',
  * POST /api/similarity/companies/search
  * Find similar companies to a given company profile
  */
-router.post('/companies/search',
-  authenticateToken,
-  similarityController.findSimilarCompanies
+router.post('/companies/search', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findSimilarCompanies
 );
 
 /**
  * GET /api/similarity/companies/:id/similar
  * Find similar companies by company ID
  */
-router.get('/companies/:id/similar',
-  authenticateToken,
-  similarityController.findSimilarCompaniesById
+router.get('/companies/:id/similar', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findSimilarCompaniesById
 );
 
 /**
  * GET /api/similarity/companies/search/type
  * Search companies by type-based query
  */
-router.get('/companies/search/type',
-  authenticateToken,
-  similarityController.searchCompaniesByType
+router.get('/companies/search/type', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.searchCompaniesByType
 );
 
 /**
  * POST /api/similarity/companies/index
  * Index a company for similarity search
  */
-router.post('/companies/index',
-  authenticateToken,
-  similarityController.indexCompany
+router.post('/companies/index', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.indexCompany
 );
 
 /**
  * POST /api/similarity/companies/index-all
  * Index all companies from database
  */
-router.post('/companies/index-all',
-  authenticateToken,
-  similarityController.indexAllCompanies
+router.post('/companies/index-all', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.indexAllCompanies
 );
 
 // ==========================
@@ -118,18 +99,14 @@ router.post('/companies/index-all',
  * POST /api/similarity/network/connections
  * Find network connections for a stakeholder
  */
-router.post('/network/connections',
-  authenticateToken,
-  similarityController.findNetworkConnections
+router.post('/network/connections', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findNetworkConnections
 );
 
 /**
  * POST /api/similarity/match/companies
  * Find companies matching stakeholder investment criteria
  */
-router.post('/match/companies',
-  authenticateToken,
-  similarityController.findCompaniesForStakeholder
+router.post('/match/companies', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.findCompaniesForStakeholder
 );
 
 // =========
@@ -140,9 +117,7 @@ router.post('/match/companies',
  * GET /api/similarity/analytics
  * Get similarity search analytics
  */
-router.get('/analytics',
-  authenticateToken,
-  similarityController.getAnalytics
+router.get('/analytics', authenticateToken, hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), similarityController.getAnalytics
 );
 
 module.exports = router;

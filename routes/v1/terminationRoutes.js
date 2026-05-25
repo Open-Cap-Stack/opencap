@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const terminationController = require('../../controllers/terminationController');
 
 // Apply authentication middleware to all routes
@@ -59,7 +60,7 @@ router.use(authenticateToken);
  *       400:
  *         description: Invalid request
  */
-router.post('/', terminationController.createTermination);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.createTermination);
 
 /**
  * @swagger
@@ -85,7 +86,7 @@ router.post('/', terminationController.createTermination);
  *       200:
  *         description: List of terminations
  */
-router.get('/', terminationController.getTerminations);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.getTerminations);
 
 /**
  * @swagger
@@ -108,7 +109,7 @@ router.get('/', terminationController.getTerminations);
  *       200:
  *         description: Vesting calculation result
  */
-router.post('/calculate-vesting', terminationController.calculateVesting);
+router.post('/calculate-vesting', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.calculateVesting);
 
 /**
  * @swagger
@@ -131,7 +132,7 @@ router.post('/calculate-vesting', terminationController.calculateVesting);
  *       200:
  *         description: List of terminations with expiring windows
  */
-router.get('/expiring-windows', terminationController.getExpiringExerciseWindows);
+router.get('/expiring-windows', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.getExpiringExerciseWindows);
 
 /**
  * @swagger
@@ -151,7 +152,7 @@ router.get('/expiring-windows', terminationController.getExpiringExerciseWindows
  *       404:
  *         description: Termination not found
  */
-router.get('/:id', terminationController.getTerminationById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.getTerminationById);
 
 /**
  * @swagger
@@ -177,7 +178,7 @@ router.get('/:id', terminationController.getTerminationById);
  *       404:
  *         description: Termination not found
  */
-router.put('/:id', terminationController.updateTermination);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.updateTermination);
 
 /**
  * @swagger
@@ -197,7 +198,7 @@ router.put('/:id', terminationController.updateTermination);
  *       404:
  *         description: Termination not found
  */
-router.delete('/:id', terminationController.deleteTermination);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.deleteTermination);
 
 /**
  * @swagger
@@ -215,7 +216,7 @@ router.delete('/:id', terminationController.deleteTermination);
  *       200:
  *         description: Exercise window status
  */
-router.get('/:id/exercise-window', terminationController.getExerciseWindowStatus);
+router.get('/:id/exercise-window', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.getExerciseWindowStatus);
 
 /**
  * @swagger
@@ -250,7 +251,7 @@ router.get('/:id/exercise-window', terminationController.getExerciseWindowStatus
  *       400:
  *         description: Cannot extend expired window
  */
-router.post('/:id/extend-window', terminationController.extendExerciseWindow);
+router.post('/:id/extend-window', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.extendExerciseWindow);
 
 /**
  * @swagger
@@ -286,7 +287,7 @@ router.post('/:id/extend-window', terminationController.extendExerciseWindow);
  *       400:
  *         description: Exercise window expired or insufficient shares
  */
-router.post('/:id/exercise', terminationController.recordExercise);
+router.post('/:id/exercise', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.recordExercise);
 
 /**
  * @swagger
@@ -306,7 +307,7 @@ router.post('/:id/exercise', terminationController.recordExercise);
  *       404:
  *         description: Termination not found
  */
-router.post('/:id/documents', terminationController.generateDocuments);
+router.post('/:id/documents', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.generateDocuments);
 
 /**
  * @swagger
@@ -326,6 +327,6 @@ router.post('/:id/documents', terminationController.generateDocuments);
  *       404:
  *         description: Termination not found
  */
-router.post('/:id/update-status', terminationController.updateStatus);
+router.post('/:id/update-status', hasRole(['super_admin', 'admin', 'founder', 'manager']), terminationController.updateStatus);
 
 module.exports = router;

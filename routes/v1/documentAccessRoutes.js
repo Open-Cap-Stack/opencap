@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const documentAccessController = require('../../controllers/documentAccessController');
 
 // Apply authentication middleware to all routes
@@ -28,10 +29,10 @@ router.post(
 );
 
 // Get all document accesses
-router.get('/', documentAccessController.getDocumentAccesses);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAccessController.getDocumentAccesses);
 
 // Get document access by ID
-router.get('/:id', documentAccessController.getDocumentAccessById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAccessController.getDocumentAccessById);
 
 // Update document access with validation
 router.put(
@@ -42,6 +43,6 @@ router.put(
 );
 
 // Delete document access
-router.delete('/:id', documentAccessController.deleteDocumentAccess);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAccessController.deleteDocumentAccess);
 
 module.exports = router;

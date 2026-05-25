@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const valuation409AExportController = require('../../controllers/valuation409AExportController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply auth middleware to all routes
 router.use(authenticateToken);
@@ -31,7 +32,7 @@ router.use(authenticateToken);
  *       200:
  *         description: Export requirements and data checklist
  */
-router.get('/requirements', valuation409AExportController.getExportRequirements);
+router.get('/requirements', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.getExportRequirements);
 
 /**
  * @swagger
@@ -61,7 +62,7 @@ router.get('/requirements', valuation409AExportController.getExportRequirements)
  *       404:
  *         description: Company not found
  */
-router.post('/validate', valuation409AExportController.validateExportData);
+router.post('/validate', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.validateExportData);
 
 /**
  * @swagger
@@ -114,7 +115,7 @@ router.post('/validate', valuation409AExportController.validateExportData);
  *       404:
  *         description: Company not found
  */
-router.post('/', valuation409AExportController.exportFullPackage);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.exportFullPackage);
 
 /**
  * @swagger
@@ -137,7 +138,7 @@ router.post('/', valuation409AExportController.exportFullPackage);
  *       404:
  *         description: Export not found
  */
-router.get('/:exportId', valuation409AExportController.getExport);
+router.get('/:exportId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.getExport);
 
 /**
  * @swagger
@@ -162,7 +163,7 @@ router.get('/:exportId', valuation409AExportController.getExport);
  *       410:
  *         description: Export has expired
  */
-router.get('/:exportId/download', valuation409AExportController.downloadExport);
+router.get('/:exportId/download', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.downloadExport);
 
 /**
  * @swagger
@@ -191,7 +192,7 @@ router.get('/:exportId/download', valuation409AExportController.downloadExport);
  *       404:
  *         description: Company not found
  */
-router.get('/:companyId/cap-table', valuation409AExportController.exportCapTable);
+router.get('/:companyId/cap-table', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.exportCapTable);
 
 /**
  * @swagger
@@ -219,7 +220,7 @@ router.get('/:companyId/cap-table', valuation409AExportController.exportCapTable
  *       404:
  *         description: Company not found
  */
-router.get('/:companyId/financials', valuation409AExportController.exportFinancials);
+router.get('/:companyId/financials', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.exportFinancials);
 
 /**
  * @swagger
@@ -254,6 +255,6 @@ router.get('/:companyId/financials', valuation409AExportController.exportFinanci
  *       404:
  *         description: Company not found
  */
-router.get('/:companyId/transactions', valuation409AExportController.exportTransactions);
+router.get('/:companyId/transactions', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AExportController.exportTransactions);
 
 module.exports = router;

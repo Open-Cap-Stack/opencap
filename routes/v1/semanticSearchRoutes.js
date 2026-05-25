@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const semanticSearchController = require('../../controllers/semanticSearchController');
 
 // Apply authentication middleware to all routes
@@ -98,7 +99,7 @@ router.use(authenticateToken);
  *       500:
  *         description: Search service error
  */
-router.post('/', semanticSearchController.searchDocuments);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), semanticSearchController.searchDocuments);
 
 /**
  * @swagger
@@ -128,7 +129,7 @@ router.post('/', semanticSearchController.searchDocuments);
  *       500:
  *         description: Service error
  */
-router.get('/suggestions', semanticSearchController.getSuggestions);
+router.get('/suggestions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), semanticSearchController.getSuggestions);
 
 /**
  * @swagger
@@ -149,6 +150,6 @@ router.get('/suggestions', semanticSearchController.getSuggestions);
  *       500:
  *         description: Service error
  */
-router.get('/analytics', semanticSearchController.getSearchAnalytics);
+router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), semanticSearchController.getSearchAnalytics);
 
 module.exports = router;

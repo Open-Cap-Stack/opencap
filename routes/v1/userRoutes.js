@@ -3,18 +3,18 @@ const router = express.Router();
 const userController = require('../../controllers/userController');
 const settingsController = require('../../controllers/settingsController');
 const { authenticate } = require('../../middleware/authMiddleware');
-const { requireUserNotAgent } = require('../../middleware/rbacMiddleware');
+const { requireUserNotAgent, hasRole } = require('../../middleware/rbacMiddleware');
 const { uploadSingle, handleUploadError } = require('../../middleware/profilePhotoUpload');
 
 // Public routes
-router.post('/', userController.createUser);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.createUser);
 
 // Protected routes — agents are explicitly blocked from user management
 router.use(authenticate);
 router.use(requireUserNotAgent);
 
 // Get current user profile
-router.get('/profile', userController.getProfile);
+router.get('/profile', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.getProfile);
 
 /**
  * @swagger
@@ -120,32 +120,32 @@ router.get('/profile', userController.getProfile);
  *         description: Internal server error
  */
 router.post('/profile/photo', uploadSingle, handleUploadError, userController.uploadProfilePhoto);
-router.delete('/profile/photo', userController.deleteProfilePhoto);
+router.delete('/profile/photo', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.deleteProfilePhoto);
 
 // User settings endpoints
-router.get('/settings', settingsController.getUserSettings);
-router.put('/settings', settingsController.updateUserSettings);
-router.post('/settings/reset', settingsController.resetUserSettings);
+router.get('/settings', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), settingsController.getUserSettings);
+router.put('/settings', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), settingsController.updateUserSettings);
+router.post('/settings/reset', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), settingsController.resetUserSettings);
 
 // Get all users
-router.get('/', userController.getAllUsers);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.getAllUsers);
 
 // Bulk delete users (admin only, requires confirmation, max 10)
 // Issue #487: Prevent mass user wipe with safety guards
 // NOTE: Must be registered before /:id to avoid route collision
-router.post('/bulk-delete', userController.bulkDeleteUsers);
+router.post('/bulk-delete', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.bulkDeleteUsers);
 
 // Get user by ID
-router.get('/:id', userController.getUserById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.getUserById);
 
 // Update user by ID
-router.put('/:id', userController.updateUserById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.updateUserById);
 
 // Delete user by ID (soft-delete)
-router.delete('/:id', userController.deleteUserById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.deleteUserById);
 
 // Hard-delete user by ID (admin only, cleans up related data)
 // Issue #485: Ensure orphaned data cleanup on user deletion
-router.delete('/:id/hard', userController.hardDeleteUserById);
+router.delete('/:id/hard', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.hardDeleteUserById);
 
 module.exports = router;

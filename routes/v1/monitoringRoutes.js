@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -32,7 +33,7 @@ function initializeMonitoring(services) {
  * GET /api/v1/monitoring/health
  * Get overall system health status
  */
-router.get('/health', (req, res) => {
+router.get('/health', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const health = monitoringDashboard.getHealthStatus();
     res.json({
@@ -51,7 +52,7 @@ router.get('/health', (req, res) => {
  * GET /api/v1/monitoring/metrics/zerodb
  * Get current ZeroDB metrics
  */
-router.get('/metrics/zerodb', (req, res) => {
+router.get('/metrics/zerodb', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const metrics = monitoringDashboard.getZeroDBMetrics();
     res.json({
@@ -70,7 +71,7 @@ router.get('/metrics/zerodb', (req, res) => {
  * GET /api/v1/monitoring/metrics/sync
  * Get sync metrics (MongoDB <-> ZeroDB)
  */
-router.get('/metrics/sync', (req, res) => {
+router.get('/metrics/sync', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const metrics = monitoringDashboard.getSyncMetrics();
     res.json({
@@ -89,7 +90,7 @@ router.get('/metrics/sync', (req, res) => {
  * GET /api/v1/monitoring/metrics/system
  * Get system resource metrics
  */
-router.get('/metrics/system', (req, res) => {
+router.get('/metrics/system', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const metrics = monitoringDashboard.getSystemMetrics();
     res.json({
@@ -108,7 +109,7 @@ router.get('/metrics/system', (req, res) => {
  * GET /api/v1/monitoring/summary
  * Get comprehensive monitoring summary
  */
-router.get('/summary', (req, res) => {
+router.get('/summary', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const summary = monitoringDashboard.getSummary();
     res.json({
@@ -127,7 +128,7 @@ router.get('/summary', (req, res) => {
  * GET /api/v1/monitoring/metrics/prometheus
  * Get Prometheus-compatible metrics
  */
-router.get('/metrics/prometheus', (req, res) => {
+router.get('/metrics/prometheus', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const prometheusText = monitoringDashboard.getPrometheusMetrics();
     res.set('Content-Type', 'text/plain');
@@ -144,7 +145,7 @@ router.get('/metrics/prometheus', (req, res) => {
  * GET /api/v1/monitoring/metrics/timeseries/:metricPath
  * Get time series data for a specific metric
  */
-router.get('/metrics/timeseries/:metricPath', (req, res) => {
+router.get('/metrics/timeseries/:metricPath', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const { metricPath } = req.params;
     const timeRange = parseInt(req.query.timeRange) || 3600000; // Default 1 hour
@@ -170,7 +171,7 @@ router.get('/metrics/timeseries/:metricPath', (req, res) => {
  * GET /api/v1/monitoring/alerts
  * Get active alerts
  */
-router.get('/alerts', (req, res) => {
+router.get('/alerts', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const activeAlerts = alertService.getActiveAlerts();
     res.json({
@@ -192,7 +193,7 @@ router.get('/alerts', (req, res) => {
  * GET /api/v1/monitoring/alerts/history
  * Get alert history
  */
-router.get('/alerts/history', (req, res) => {
+router.get('/alerts/history', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const timeRange = parseInt(req.query.timeRange) || 86400000; // Default 24 hours
     const history = alertService.getAlertHistory(timeRange);
@@ -216,7 +217,7 @@ router.get('/alerts/history', (req, res) => {
  * POST /api/v1/monitoring/alerts/:alertId/acknowledge
  * Acknowledge an alert
  */
-router.post('/alerts/:alertId/acknowledge', (req, res) => {
+router.post('/alerts/:alertId/acknowledge', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const { alertId } = req.params;
     const { acknowledgedBy } = req.body;
@@ -246,7 +247,7 @@ router.post('/alerts/:alertId/acknowledge', (req, res) => {
  * GET /api/v1/monitoring/alerts/statistics
  * Get alert statistics
  */
-router.get('/alerts/statistics', (req, res) => {
+router.get('/alerts/statistics', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const stats = alertService.getStatistics();
     res.json({
@@ -265,7 +266,7 @@ router.get('/alerts/statistics', (req, res) => {
  * GET /api/v1/monitoring/performance/slow-queries
  * Analyze slow queries
  */
-router.get('/performance/slow-queries', (req, res) => {
+router.get('/performance/slow-queries', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const threshold = parseInt(req.query.threshold) || 1000;
     const analysis = performanceOptimizer.analyzeSlowQueries(threshold);
@@ -285,7 +286,7 @@ router.get('/performance/slow-queries', (req, res) => {
  * GET /api/v1/monitoring/performance/index-recommendations
  * Get index recommendations
  */
-router.get('/performance/index-recommendations', (req, res) => {
+router.get('/performance/index-recommendations', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const recommendations = performanceOptimizer.recommendIndexes();
     res.json({
@@ -307,7 +308,7 @@ router.get('/performance/index-recommendations', (req, res) => {
  * GET /api/v1/monitoring/performance/batch-optimization
  * Get batch size optimization recommendations
  */
-router.get('/performance/batch-optimization', (req, res) => {
+router.get('/performance/batch-optimization', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const optimization = performanceOptimizer.optimizeBatchSize();
     res.json({
@@ -326,7 +327,7 @@ router.get('/performance/batch-optimization', (req, res) => {
  * GET /api/v1/monitoring/performance/connection-pool
  * Analyze connection pool usage
  */
-router.get('/performance/connection-pool', (req, res) => {
+router.get('/performance/connection-pool', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const analysis = performanceOptimizer.analyzeConnectionPool();
     res.json({
@@ -345,7 +346,7 @@ router.get('/performance/connection-pool', (req, res) => {
  * GET /api/v1/monitoring/performance/caching-strategy
  * Get caching strategy recommendations
  */
-router.get('/performance/caching-strategy', (req, res) => {
+router.get('/performance/caching-strategy', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const strategy = performanceOptimizer.suggestCachingStrategy();
     res.json({
@@ -364,7 +365,7 @@ router.get('/performance/caching-strategy', (req, res) => {
  * GET /api/v1/monitoring/performance/query-distribution
  * Get query distribution analysis
  */
-router.get('/performance/query-distribution', (req, res) => {
+router.get('/performance/query-distribution', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const distribution = performanceOptimizer.analyzeQueryDistribution();
     res.json({
@@ -383,7 +384,7 @@ router.get('/performance/query-distribution', (req, res) => {
  * GET /api/v1/monitoring/performance/report
  * Generate comprehensive optimization report
  */
-router.get('/performance/report', (req, res) => {
+router.get('/performance/report', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const report = performanceOptimizer.generateOptimizationReport();
     res.json({
@@ -402,7 +403,7 @@ router.get('/performance/report', (req, res) => {
  * POST /api/v1/monitoring/performance/export
  * Export performance data
  */
-router.post('/performance/export', (req, res) => {
+router.post('/performance/export', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     const format = req.query.format || 'json';
     const data = performanceOptimizer.exportData(format);
@@ -433,7 +434,7 @@ router.post('/performance/export', (req, res) => {
  * GET /api/v1/monitoring/zerodb/dashboard
  * Get comprehensive ZeroDB monitoring dashboard data
  */
-router.get('/zerodb/dashboard', (req, res) => {
+router.get('/zerodb/dashboard', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -458,7 +459,7 @@ router.get('/zerodb/dashboard', (req, res) => {
  * GET /api/v1/monitoring/zerodb/metrics
  * Get current ZeroDB operation metrics
  */
-router.get('/zerodb/metrics', (req, res) => {
+router.get('/zerodb/metrics', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -483,7 +484,7 @@ router.get('/zerodb/metrics', (req, res) => {
  * GET /api/v1/monitoring/zerodb/metrics/prometheus
  * Get ZeroDB metrics in Prometheus format
  */
-router.get('/zerodb/metrics/prometheus', (req, res) => {
+router.get('/zerodb/metrics/prometheus', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -506,7 +507,7 @@ router.get('/zerodb/metrics/prometheus', (req, res) => {
  * GET /api/v1/monitoring/zerodb/slow-queries
  * Get slow ZeroDB queries
  */
-router.get('/zerodb/slow-queries', (req, res) => {
+router.get('/zerodb/slow-queries', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -536,7 +537,7 @@ router.get('/zerodb/slow-queries', (req, res) => {
  * GET /api/v1/monitoring/zerodb/alerts
  * Get active ZeroDB alerts
  */
-router.get('/zerodb/alerts', (req, res) => {
+router.get('/zerodb/alerts', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -564,7 +565,7 @@ router.get('/zerodb/alerts', (req, res) => {
  * GET /api/v1/monitoring/zerodb/recommendations/indexes
  * Get ZeroDB index recommendations
  */
-router.get('/zerodb/recommendations/indexes', (req, res) => {
+router.get('/zerodb/recommendations/indexes', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -592,7 +593,7 @@ router.get('/zerodb/recommendations/indexes', (req, res) => {
  * GET /api/v1/monitoring/zerodb/recommendations/caching
  * Get ZeroDB caching recommendations
  */
-router.get('/zerodb/recommendations/caching', (req, res) => {
+router.get('/zerodb/recommendations/caching', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -617,7 +618,7 @@ router.get('/zerodb/recommendations/caching', (req, res) => {
  * GET /api/v1/monitoring/zerodb/timeseries/:metricPath
  * Get ZeroDB time series data
  */
-router.get('/zerodb/timeseries/:metricPath', (req, res) => {
+router.get('/zerodb/timeseries/:metricPath', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -648,7 +649,7 @@ router.get('/zerodb/timeseries/:metricPath', (req, res) => {
  * GET /api/v1/monitoring/zerodb/operations/recent
  * Get recent ZeroDB operations
  */
-router.get('/zerodb/operations/recent', (req, res) => {
+router.get('/zerodb/operations/recent', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -677,7 +678,7 @@ router.get('/zerodb/operations/recent', (req, res) => {
  * POST /api/v1/monitoring/zerodb/export
  * Export ZeroDB monitoring data
  */
-router.post('/zerodb/export', (req, res) => {
+router.post('/zerodb/export', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({
@@ -713,7 +714,7 @@ router.post('/zerodb/export', (req, res) => {
  * POST /api/v1/monitoring/zerodb/reset
  * Reset ZeroDB monitoring data (admin only)
  */
-router.post('/zerodb/reset', (req, res) => {
+router.post('/zerodb/reset', hasRole(['super_admin', 'admin']), (req, res) => {
   try {
     if (!zerodbMonitoringService) {
       return res.status(503).json({

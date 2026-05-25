@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 const documentProcessingController = require('../../controllers/documentProcessingController');
 
@@ -52,7 +53,7 @@ const documentAnalysisController = require('../../controllers/documentAnalysisCo
  *       500:
  *         description: Server error
  */
-router.post('/documents/extract', documentProcessingController.extractText);
+router.post('/documents/extract', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.extractText);
 
 /**
  * @swagger
@@ -62,7 +63,7 @@ router.post('/documents/extract', documentProcessingController.extractText);
  *     description: Clean and normalize text for further processing
  *     tags: [AI Document Processing]
  */
-router.post('/documents/preprocess', documentProcessingController.preprocessText);
+router.post('/documents/preprocess', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.preprocessText);
 
 /**
  * @swagger
@@ -72,7 +73,7 @@ router.post('/documents/preprocess', documentProcessingController.preprocessText
  *     description: Detect the language of document text
  *     tags: [AI Document Processing]
  */
-router.post('/documents/detect-language', documentProcessingController.detectLanguage);
+router.post('/documents/detect-language', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.detectLanguage);
 
 /**
  * @swagger
@@ -82,7 +83,7 @@ router.post('/documents/detect-language', documentProcessingController.detectLan
  *     description: Extract companies, people, dates, money, and other entities
  *     tags: [AI Document Processing]
  */
-router.post('/documents/extract-entities', documentProcessingController.extractEntities);
+router.post('/documents/extract-entities', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.extractEntities);
 
 /**
  * @swagger
@@ -92,7 +93,7 @@ router.post('/documents/extract-entities', documentProcessingController.extractE
  *     description: Process multiple documents at once
  *     tags: [AI Document Processing]
  */
-router.post('/documents/batch', documentProcessingController.processBatch);
+router.post('/documents/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.processBatch);
 
 /**
  * @swagger
@@ -102,7 +103,7 @@ router.post('/documents/batch', documentProcessingController.processBatch);
  *     description: Returns list of supported document MIME types
  *     tags: [AI Document Processing]
  */
-router.get('/documents/supported-types', documentProcessingController.getSupportedTypes);
+router.get('/documents/supported-types', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentProcessingController.getSupportedTypes);
 
 // ==========================================
 // Document Classification Routes
@@ -137,7 +138,7 @@ router.get('/documents/supported-types', documentProcessingController.getSupport
  *       200:
  *         description: Classification result
  */
-router.post('/classify', documentClassificationController.classifyDocument);
+router.post('/classify', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.classifyDocument);
 
 /**
  * @swagger
@@ -147,7 +148,7 @@ router.post('/classify', documentClassificationController.classifyDocument);
  *     description: Get confidence score for a specific classification type
  *     tags: [AI Document Classification]
  */
-router.post('/classify/confidence', documentClassificationController.getClassificationConfidence);
+router.post('/classify/confidence', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.getClassificationConfidence);
 
 /**
  * @swagger
@@ -157,7 +158,7 @@ router.post('/classify/confidence', documentClassificationController.getClassifi
  *     description: Train/update classifier with new examples
  *     tags: [AI Document Classification]
  */
-router.post('/classify/train', documentClassificationController.trainClassifier);
+router.post('/classify/train', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.trainClassifier);
 
 /**
  * @swagger
@@ -167,7 +168,7 @@ router.post('/classify/train', documentClassificationController.trainClassifier)
  *     description: Get accuracy and usage statistics
  *     tags: [AI Document Classification]
  */
-router.get('/classify/stats', documentClassificationController.getClassificationStats);
+router.get('/classify/stats', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.getClassificationStats);
 
 /**
  * @swagger
@@ -177,7 +178,7 @@ router.get('/classify/stats', documentClassificationController.getClassification
  *     description: Classify multiple documents at once
  *     tags: [AI Document Classification]
  */
-router.post('/classify/batch', documentClassificationController.classifyBatch);
+router.post('/classify/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.classifyBatch);
 
 /**
  * @swagger
@@ -187,7 +188,7 @@ router.post('/classify/batch', documentClassificationController.classifyBatch);
  *     description: Submit correction for a classification
  *     tags: [AI Document Classification]
  */
-router.post('/classify/feedback', documentClassificationController.submitFeedback);
+router.post('/classify/feedback', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.submitFeedback);
 
 /**
  * @swagger
@@ -197,7 +198,7 @@ router.post('/classify/feedback', documentClassificationController.submitFeedbac
  *     description: Returns list of supported document types
  *     tags: [AI Document Classification]
  */
-router.get('/classify/types', documentClassificationController.getSupportedTypes);
+router.get('/classify/types', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.getSupportedTypes);
 
 /**
  * @swagger
@@ -207,7 +208,7 @@ router.get('/classify/types', documentClassificationController.getSupportedTypes
  *     description: Returns history of classifier training
  *     tags: [AI Document Classification]
  */
-router.get('/classify/training-history', documentClassificationController.getTrainingHistory);
+router.get('/classify/training-history', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentClassificationController.getTrainingHistory);
 
 // ==========================================
 // Document Summarization Routes
@@ -245,7 +246,7 @@ router.get('/classify/training-history', documentClassificationController.getTra
  *       200:
  *         description: Summary result
  */
-router.post('/summarize', documentSummaryController.generateSummary);
+router.post('/summarize', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentSummaryController.generateSummary);
 
 /**
  * @swagger
@@ -255,7 +256,7 @@ router.post('/summarize', documentSummaryController.generateSummary);
  *     description: Extract key points from document
  *     tags: [AI Document Summarization]
  */
-router.post('/summarize/key-points', documentSummaryController.extractKeyPoints);
+router.post('/summarize/key-points', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentSummaryController.extractKeyPoints);
 
 /**
  * @swagger
@@ -265,7 +266,7 @@ router.post('/summarize/key-points', documentSummaryController.extractKeyPoints)
  *     description: Generate a short executive summary
  *     tags: [AI Document Summarization]
  */
-router.post('/summarize/executive', documentSummaryController.generateExecutiveSummary);
+router.post('/summarize/executive', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentSummaryController.generateExecutiveSummary);
 
 /**
  * @swagger
@@ -275,7 +276,7 @@ router.post('/summarize/executive', documentSummaryController.generateExecutiveS
  *     description: Create unified summary from multiple documents
  *     tags: [AI Document Summarization]
  */
-router.post('/summarize/multiple', documentSummaryController.summarizeMultiple);
+router.post('/summarize/multiple', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentSummaryController.summarizeMultiple);
 
 /**
  * @swagger
@@ -285,7 +286,7 @@ router.post('/summarize/multiple', documentSummaryController.summarizeMultiple);
  *     description: Summarize multiple documents individually
  *     tags: [AI Document Summarization]
  */
-router.post('/summarize/batch', documentSummaryController.summarizeBatch);
+router.post('/summarize/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentSummaryController.summarizeBatch);
 
 // ==========================================
 // Document Analysis Routes
@@ -314,7 +315,7 @@ router.post('/summarize/batch', documentSummaryController.summarizeBatch);
  *       200:
  *         description: Analysis result
  */
-router.post('/analyze', documentAnalysisController.analyzeDocument);
+router.post('/analyze', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.analyzeDocument);
 
 /**
  * @swagger
@@ -324,7 +325,7 @@ router.post('/analyze', documentAnalysisController.analyzeDocument);
  *     description: Analyze document sentiment (positive, negative, neutral)
  *     tags: [AI Document Analysis]
  */
-router.post('/analyze/sentiment', documentAnalysisController.analyzeSentiment);
+router.post('/analyze/sentiment', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.analyzeSentiment);
 
 /**
  * @swagger
@@ -334,7 +335,7 @@ router.post('/analyze/sentiment', documentAnalysisController.analyzeSentiment);
  *     description: Identify risk indicators in document
  *     tags: [AI Document Analysis]
  */
-router.post('/analyze/risks', documentAnalysisController.detectRisks);
+router.post('/analyze/risks', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.detectRisks);
 
 /**
  * @swagger
@@ -344,7 +345,7 @@ router.post('/analyze/risks', documentAnalysisController.detectRisks);
  *     description: Extract revenue, profit, expenses, and other financial figures
  *     tags: [AI Document Analysis]
  */
-router.post('/analyze/financial', documentAnalysisController.extractFinancialData);
+router.post('/analyze/financial', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.extractFinancialData);
 
 /**
  * @swagger
@@ -354,7 +355,7 @@ router.post('/analyze/financial', documentAnalysisController.extractFinancialDat
  *     description: Generate AI-powered insights from document
  *     tags: [AI Document Analysis]
  */
-router.post('/analyze/insights', documentAnalysisController.generateInsights);
+router.post('/analyze/insights', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.generateInsights);
 
 /**
  * @swagger
@@ -364,6 +365,6 @@ router.post('/analyze/insights', documentAnalysisController.generateInsights);
  *     description: Analyze multiple documents at once
  *     tags: [AI Document Analysis]
  */
-router.post('/analyze/batch', documentAnalysisController.analyzeBatch);
+router.post('/analyze/batch', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentAnalysisController.analyzeBatch);
 
 module.exports = router;

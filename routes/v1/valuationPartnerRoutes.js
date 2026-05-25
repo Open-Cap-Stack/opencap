@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const valuationPartnerController = require('../../controllers/valuationPartnerController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply auth middleware
 router.use(authenticateToken);
@@ -51,7 +52,7 @@ router.use(authenticateToken);
  *       201:
  *         description: Partner created
  */
-router.post('/', valuationPartnerController.createPartner);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.createPartner);
 
 /**
  * @swagger
@@ -78,7 +79,7 @@ router.post('/', valuationPartnerController.createPartner);
  *       200:
  *         description: List of partners
  */
-router.get('/', valuationPartnerController.getPartners);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getPartners);
 
 /**
  * @swagger
@@ -109,7 +110,7 @@ router.get('/', valuationPartnerController.getPartners);
  *       200:
  *         description: Search results
  */
-router.get('/search', valuationPartnerController.searchPartners);
+router.get('/search', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.searchPartners);
 
 /**
  * @swagger
@@ -129,7 +130,7 @@ router.get('/search', valuationPartnerController.searchPartners);
  *       200:
  *         description: List of active partners
  */
-router.get('/company/:companyId/active', valuationPartnerController.getActivePartners);
+router.get('/company/:companyId/active', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getActivePartners);
 
 /**
  * @swagger
@@ -149,7 +150,7 @@ router.get('/company/:companyId/active', valuationPartnerController.getActivePar
  *       200:
  *         description: Partner details
  */
-router.get('/:partnerId', valuationPartnerController.getPartner);
+router.get('/:partnerId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getPartner);
 
 /**
  * @swagger
@@ -169,7 +170,7 @@ router.get('/:partnerId', valuationPartnerController.getPartner);
  *       200:
  *         description: Partner updated
  */
-router.put('/:partnerId', valuationPartnerController.updatePartner);
+router.put('/:partnerId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.updatePartner);
 
 /**
  * @swagger
@@ -189,7 +190,7 @@ router.put('/:partnerId', valuationPartnerController.updatePartner);
  *       200:
  *         description: Partner summary
  */
-router.get('/:partnerId/summary', valuationPartnerController.getPartnerSummary);
+router.get('/:partnerId/summary', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getPartnerSummary);
 
 /**
  * @swagger
@@ -209,7 +210,7 @@ router.get('/:partnerId/summary', valuationPartnerController.getPartnerSummary);
  *       200:
  *         description: Partner activated
  */
-router.post('/:partnerId/activate', valuationPartnerController.activatePartner);
+router.post('/:partnerId/activate', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.activatePartner);
 
 /**
  * @swagger
@@ -237,7 +238,7 @@ router.post('/:partnerId/activate', valuationPartnerController.activatePartner);
  *       200:
  *         description: Partner deactivated
  */
-router.post('/:partnerId/deactivate', valuationPartnerController.deactivatePartner);
+router.post('/:partnerId/deactivate', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.deactivatePartner);
 
 /**
  * @swagger
@@ -275,7 +276,7 @@ router.post('/:partnerId/deactivate', valuationPartnerController.deactivatePartn
  *       200:
  *         description: Contact added
  */
-router.post('/:partnerId/contacts', valuationPartnerController.addContact);
+router.post('/:partnerId/contacts', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.addContact);
 
 /**
  * @swagger
@@ -300,7 +301,7 @@ router.post('/:partnerId/contacts', valuationPartnerController.addContact);
  *       200:
  *         description: Primary contact set
  */
-router.post('/:partnerId/contacts/:contactId/primary', valuationPartnerController.setPrimaryContact);
+router.post('/:partnerId/contacts/:contactId/primary', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.setPrimaryContact);
 
 /**
  * @swagger
@@ -343,7 +344,7 @@ router.post('/:partnerId/contacts/:contactId/primary', valuationPartnerControlle
  *       201:
  *         description: Call scheduled
  */
-router.post('/:partnerId/calls', valuationPartnerController.scheduleCall);
+router.post('/:partnerId/calls', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.scheduleCall);
 
 /**
  * @swagger
@@ -363,7 +364,7 @@ router.post('/:partnerId/calls', valuationPartnerController.scheduleCall);
  *       200:
  *         description: List of upcoming calls
  */
-router.get('/:partnerId/calls/upcoming', valuationPartnerController.getUpcomingCalls);
+router.get('/:partnerId/calls/upcoming', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getUpcomingCalls);
 
 /**
  * @swagger
@@ -409,7 +410,7 @@ router.get('/:partnerId/calls/upcoming', valuationPartnerController.getUpcomingC
  *       200:
  *         description: Call status updated
  */
-router.put('/:partnerId/calls/:callId/status', valuationPartnerController.updateCallStatus);
+router.put('/:partnerId/calls/:callId/status', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.updateCallStatus);
 
 /**
  * @swagger
@@ -447,7 +448,7 @@ router.put('/:partnerId/calls/:callId/status', valuationPartnerController.update
  *       200:
  *         description: Communication added
  */
-router.post('/:partnerId/communications', valuationPartnerController.addCommunication);
+router.post('/:partnerId/communications', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.addCommunication);
 
 /**
  * @swagger
@@ -471,6 +472,6 @@ router.post('/:partnerId/communications', valuationPartnerController.addCommunic
  *       200:
  *         description: Communication history
  */
-router.get('/:partnerId/communications', valuationPartnerController.getCommunicationHistory);
+router.get('/:partnerId/communications', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuationPartnerController.getCommunicationHistory);
 
 module.exports = router;

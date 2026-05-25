@@ -16,6 +16,13 @@ jest.mock('../../../../middleware/authMiddleware', () => ({
   }
 }));
 
+// Mock RBAC middleware — these tests verify route wiring, not role enforcement
+jest.mock('../../../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next(),
+  hasPermission: () => (req, res, next) => next(),
+  requireUserNotAgent: (req, res, next) => next(),
+}));
+
 // Mock the service
 jest.mock('../../../../services/reportLibraryService', () => ({
   getCategories: jest.fn(),

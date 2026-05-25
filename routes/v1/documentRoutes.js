@@ -14,6 +14,7 @@ const path = require('path');
 const os = require('os');
 const documentController = require('../../controllers/documentController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all document routes
 router.use(authenticateToken);
@@ -48,66 +49,66 @@ const upload = multer({
 // Issue #188: Add Document Folder Management Endpoints
 
 // POST /api/v1/documents/folders - Create a new folder
-router.post('/folders', documentController.createFolder);
+router.post('/folders', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.createFolder);
 
 // GET /api/v1/documents/folders - List folders (optionally filtered by parent)
-router.get('/folders', documentController.getFolders);
+router.get('/folders', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getFolders);
 
 // GET /api/v1/documents/folders/:id - Get folder by ID
-router.get('/folders/:id', documentController.getFolderById);
+router.get('/folders/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getFolderById);
 
 // PUT /api/v1/documents/folders/:id - Update folder by ID
-router.put('/folders/:id', documentController.updateFolderById);
+router.put('/folders/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.updateFolderById);
 
 // DELETE /api/v1/documents/folders/:id - Delete folder by ID
-router.delete('/folders/:id', documentController.deleteFolderById);
+router.delete('/folders/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.deleteFolderById);
 
 // GET /api/v1/documents/folders/:id/contents - Get folder contents
-router.get('/folders/:id/contents', documentController.getFolderContents);
+router.get('/folders/:id/contents', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getFolderContents);
 
 // Search and Analytics (specific routes before :id)
 // GET /api/v1/documents/analytics - Get general document analytics
-router.get('/analytics', documentController.getGeneralAnalytics);
+router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getGeneralAnalytics);
 
 // POST /api/v1/documents/search - Semantic search for documents
-router.post('/search', documentController.searchDocuments);
+router.post('/search', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.searchDocuments);
 
 // POST /api/v1/documents/bulk-index - Bulk index documents for vector search
-router.post('/bulk-index', documentController.bulkIndexDocuments);
+router.post('/bulk-index', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.bulkIndexDocuments);
 
 // CRUD Operations
 // GET /api/v1/documents - Get all documents with search and filtering
-router.get('/', documentController.getDocuments);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocuments);
 
 // POST /api/v1/documents - Create a new document (with file upload)
-router.post('/', upload.single('file'), documentController.createDocument);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), upload.single('file'), documentController.createDocument);
 
 // GET /api/v1/documents/:id - Get a document by ID
-router.get('/:id', documentController.getDocumentById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocumentById);
 
 // PUT /api/v1/documents/:id - Update a document by ID
-router.put('/:id', documentController.updateDocumentById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.updateDocumentById);
 
 // DELETE /api/v1/documents/:id - Delete a document by ID
-router.delete('/:id', documentController.deleteDocumentById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.deleteDocumentById);
 
 // GET /api/v1/documents/:id/similar - Find similar documents
-router.get('/:id/similar', documentController.findSimilarDocuments);
+router.get('/:id/similar', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.findSimilarDocuments);
 
 // GET /api/v1/documents/:id/analytics - Get document analytics
-router.get('/:id/analytics', documentController.getDocumentAnalytics);
+router.get('/:id/analytics', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocumentAnalytics);
 
 // Issue #122: Download, Preview, and Access Endpoints
 // GET /api/v1/documents/:id/download - Download document file
-router.get('/:id/download', documentController.downloadDocument);
+router.get('/:id/download', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.downloadDocument);
 
 // GET /api/v1/documents/:id/preview - Get document preview metadata
-router.get('/:id/preview', documentController.getDocumentPreview);
+router.get('/:id/preview', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocumentPreview);
 
 // GET /api/v1/documents/:id/access - Get document access permissions
-router.get('/:id/access', documentController.getDocumentAccess);
+router.get('/:id/access', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocumentAccess);
 
 // POST /api/v1/documents/:id/access - Log document access
-router.post('/:id/access', documentController.logDocumentAccess);
+router.post('/:id/access', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.logDocumentAccess);
 
 module.exports = router;

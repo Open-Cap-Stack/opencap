@@ -14,6 +14,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const investorRightsController = require('../../controllers/investorRightsController');
 
 // Apply authentication middleware to all routes
@@ -29,7 +30,7 @@ router.use(authenticateToken);
  * @query {string} status - Filter by status
  * @access Public
  */
-router.get('/', investorRightsController.getAllInvestorRights);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.getAllInvestorRights);
 
 /**
  * @route GET /api/v1/investor-rights/expiring
@@ -38,7 +39,7 @@ router.get('/', investorRightsController.getAllInvestorRights);
  * @query {string} companyId - Optional company filter
  * @access Public
  */
-router.get('/expiring', investorRightsController.getExpiringRights);
+router.get('/expiring', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.getExpiringRights);
 
 /**
  * @route POST /api/v1/investor-rights/check-conflicts
@@ -49,7 +50,7 @@ router.get('/expiring', investorRightsController.getExpiringRights);
  * @body {Object} terms - Right terms
  * @access Public
  */
-router.post('/check-conflicts', investorRightsController.checkConflicts);
+router.post('/check-conflicts', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.checkConflicts);
 
 /**
  * @route GET /api/v1/investor-rights/share-class/:shareClassId
@@ -57,7 +58,7 @@ router.post('/check-conflicts', investorRightsController.checkConflicts);
  * @param {string} shareClassId - Share class ID
  * @access Public
  */
-router.get('/share-class/:shareClassId', investorRightsController.getRightsByShareClass);
+router.get('/share-class/:shareClassId', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.getRightsByShareClass);
 
 /**
  * @route GET /api/v1/investor-rights/report/:companyId
@@ -65,7 +66,7 @@ router.get('/share-class/:shareClassId', investorRightsController.getRightsBySha
  * @param {string} companyId - Company ID
  * @access Public
  */
-router.get('/report/:companyId', investorRightsController.generateReport);
+router.get('/report/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.generateReport);
 
 /**
  * @route GET /api/v1/investor-rights/:id
@@ -73,7 +74,7 @@ router.get('/report/:companyId', investorRightsController.generateReport);
  * @param {string} id - Investor right ID
  * @access Public
  */
-router.get('/:id', investorRightsController.getInvestorRightById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.getInvestorRightById);
 
 /**
  * @route POST /api/v1/investor-rights
@@ -92,7 +93,7 @@ router.get('/:id', investorRightsController.getInvestorRightById);
  * @body {string} notes - Additional notes
  * @access Public
  */
-router.post('/', investorRightsController.createInvestorRight);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.createInvestorRight);
 
 /**
  * @route PUT /api/v1/investor-rights/:id
@@ -100,7 +101,7 @@ router.post('/', investorRightsController.createInvestorRight);
  * @param {string} id - Investor right ID
  * @access Public
  */
-router.put('/:id', investorRightsController.updateInvestorRight);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.updateInvestorRight);
 
 /**
  * @route DELETE /api/v1/investor-rights/:id
@@ -108,7 +109,7 @@ router.put('/:id', investorRightsController.updateInvestorRight);
  * @param {string} id - Investor right ID
  * @access Public
  */
-router.delete('/:id', investorRightsController.deleteInvestorRight);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.deleteInvestorRight);
 
 /**
  * @route POST /api/v1/investor-rights/:id/exercise
@@ -119,7 +120,7 @@ router.delete('/:id', investorRightsController.deleteInvestorRight);
  * @body {string} notes - Exercise notes
  * @access Public
  */
-router.post('/:id/exercise', investorRightsController.exerciseRight);
+router.post('/:id/exercise', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.exerciseRight);
 
 /**
  * @route POST /api/v1/investor-rights/:id/waive
@@ -129,7 +130,7 @@ router.post('/:id/exercise', investorRightsController.exerciseRight);
  * @body {string} documentReference - Reference to waiver document
  * @access Public
  */
-router.post('/:id/waive', investorRightsController.waiveRight);
+router.post('/:id/waive', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.waiveRight);
 
 /**
  * @route GET /api/v1/investor-rights/:id/audit
@@ -137,6 +138,6 @@ router.post('/:id/waive', investorRightsController.waiveRight);
  * @param {string} id - Investor right ID
  * @access Public
  */
-router.get('/:id/audit', investorRightsController.getAuditHistory);
+router.get('/:id/audit', hasRole(['super_admin', 'admin', 'founder', 'manager']), investorRightsController.getAuditHistory);
 
 module.exports = router;

@@ -9,27 +9,28 @@ const express = require('express');
 const router = express.Router();
 const equityPlanReportController = require('../../controllers/equityPlanReportController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
 // Report type and format info
-router.get('/types', equityPlanReportController.getAvailableReportTypes);
-router.get('/formats', equityPlanReportController.getAvailableFormats);
+router.get('/types', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.getAvailableReportTypes);
+router.get('/formats', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.getAvailableFormats);
 
 // Generate specific report types
-router.post('/generate/option-pool-summary', equityPlanReportController.generateOptionPoolSummary);
-router.post('/generate/grant-status', equityPlanReportController.generateGrantStatusReport);
-router.post('/generate/vesting-schedule', equityPlanReportController.generateVestingScheduleReport);
-router.post('/generate/dilution-analysis', equityPlanReportController.generateDilutionAnalysis);
+router.post('/generate/option-pool-summary', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.generateOptionPoolSummary);
+router.post('/generate/grant-status', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.generateGrantStatusReport);
+router.post('/generate/vesting-schedule', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.generateVestingScheduleReport);
+router.post('/generate/dilution-analysis', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.generateDilutionAnalysis);
 
 // Report CRUD
-router.post('/', equityPlanReportController.createReport);
-router.get('/', equityPlanReportController.getReports);
-router.get('/:id', equityPlanReportController.getReportById);
-router.delete('/:id', equityPlanReportController.deleteReport);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.createReport);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.getReports);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.getReportById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.deleteReport);
 
 // Export report
-router.get('/:id/export', equityPlanReportController.exportReport);
+router.get('/:id/export', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanReportController.exportReport);
 
 module.exports = router;

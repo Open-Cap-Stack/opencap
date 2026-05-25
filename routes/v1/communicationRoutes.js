@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const Communication = require('../../models/Communication');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
@@ -8,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 router.use(authenticateToken);
 
 // POST /api/communications - Create a new communication
-router.post('/', async (req, res) => {
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { communicationId, MessageType, Sender, Recipient, Timestamp, Content, ThreadId } = req.body;
 
@@ -39,7 +40,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/communications/thread - Create a new message in a thread
-router.post('/thread', async (req, res) => {
+router.post('/thread', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { MessageType, Sender, Recipient, Content, ThreadId } = req.body;
 
@@ -76,7 +77,7 @@ router.post('/thread', async (req, res) => {
 });
 
 // GET /api/communications - Get all communications
-router.get('/', async (req, res) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const communications = await Communication.find({});
     // Return 200 with empty array for consistent REST API behavior
@@ -87,7 +88,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/communications/thread/:threadId - Get all messages in a thread
-router.get('/thread/:threadId', async (req, res) => {
+router.get('/thread/:threadId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const threadId = req.params.threadId;
     const messages = await Communication.findByThread(threadId);
@@ -100,7 +101,7 @@ router.get('/thread/:threadId', async (req, res) => {
 });
 
 // GET /api/communications/user/:userId - Get all messages for a user
-router.get('/user/:userId', async (req, res) => {
+router.get('/user/:userId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const userId = req.params.userId;
 
@@ -127,7 +128,7 @@ router.get('/user/:userId', async (req, res) => {
 });
 
 // GET /api/communications/:id - Get communication by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const communication = await Communication.findOne({ communicationId: req.params.id });
     if (!communication) {
@@ -140,7 +141,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/communications/:id - Update communication by ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     // Validate that at least one updatable field is provided
     const { MessageType, Content, Recipient } = req.body;
@@ -178,7 +179,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/communications/:id - Delete communication by ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const communication = await Communication.findOneAndDelete({ communicationId: req.params.id });
 

@@ -18,6 +18,7 @@ const express = require('express');
 const router = express.Router();
 const stakeholderReportController = require('../../controllers/stakeholderReportController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -62,7 +63,7 @@ router.use(authenticateToken);
  *       500:
  *         description: Server error
  */
-router.get('/:id/reports', stakeholderReportController.getStakeholderReports);
+router.get('/:id/reports', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.getStakeholderReports);
 
 /**
  * @swagger
@@ -103,7 +104,7 @@ router.get('/:id/reports', stakeholderReportController.getStakeholderReports);
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/holdings', stakeholderReportController.generateHoldingsReport);
+router.post('/:id/reports/holdings', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.generateHoldingsReport);
 
 /**
  * @swagger
@@ -152,7 +153,7 @@ router.post('/:id/reports/holdings', stakeholderReportController.generateHolding
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/transactions', stakeholderReportController.generateTransactionsReport);
+router.post('/:id/reports/transactions', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.generateTransactionsReport);
 
 /**
  * @swagger
@@ -193,7 +194,7 @@ router.post('/:id/reports/transactions', stakeholderReportController.generateTra
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/valuations', stakeholderReportController.generateValuationsReport);
+router.post('/:id/reports/valuations', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.generateValuationsReport);
 
 /**
  * @swagger
@@ -238,7 +239,7 @@ router.post('/:id/reports/valuations', stakeholderReportController.generateValua
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/tax', stakeholderReportController.generateTaxReport);
+router.post('/:id/reports/tax', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.generateTaxReport);
 
 /**
  * @swagger
@@ -293,7 +294,7 @@ router.post('/:id/reports/tax', stakeholderReportController.generateTaxReport);
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/schedule', stakeholderReportController.scheduleAutomatedDelivery);
+router.post('/:id/reports/schedule', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.scheduleAutomatedDelivery);
 
 /**
  * @swagger
@@ -343,7 +344,7 @@ router.post('/:id/reports/schedule', stakeholderReportController.scheduleAutomat
  *       500:
  *         description: Server error
  */
-router.post('/:id/reports/:reportId/email', stakeholderReportController.emailReport);
+router.post('/:id/reports/:reportId/email', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.emailReport);
 
 /**
  * @swagger
@@ -374,7 +375,7 @@ router.post('/:id/reports/:reportId/email', stakeholderReportController.emailRep
  *       500:
  *         description: Server error
  */
-router.get('/:id/reports/:reportId', stakeholderReportController.getReportById);
+router.get('/:id/reports/:reportId', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.getReportById);
 
 /**
  * @swagger
@@ -405,6 +406,6 @@ router.get('/:id/reports/:reportId', stakeholderReportController.getReportById);
  *       500:
  *         description: Server error
  */
-router.get('/:id/reports/:reportId/download', stakeholderReportController.downloadReport);
+router.get('/:id/reports/:reportId/download', hasRole(['super_admin', 'admin', 'founder', 'manager']), stakeholderReportController.downloadReport);
 
 module.exports = router;

@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const capTableHealthService = require('../../services/capTableHealthService');
 
 router.use(authenticateToken);
@@ -16,7 +17,7 @@ router.use(authenticateToken);
  * Query: companyId (required), and optionally lastValuationDate
  * Body can also contain full data payload for richer scoring
  */
-router.get('/health-score', async (req, res) => {
+router.get('/health-score', hasRole(['super_admin', 'admin', 'founder', 'manager']), async (req, res) => {
   try {
     const { companyId, lastValuationDate } = req.query;
 

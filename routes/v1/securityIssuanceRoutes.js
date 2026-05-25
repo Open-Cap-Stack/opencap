@@ -12,6 +12,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const securityIssuanceController = require('../../controllers/securityIssuanceController');
 
 // Apply authentication middleware to all routes
@@ -113,7 +114,7 @@ router.use(authenticateToken);
  *       200:
  *         description: List of security issuances
  */
-router.get('/', securityIssuanceController.getAllSecurityIssuances);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getAllSecurityIssuances);
 
 /**
  * @swagger
@@ -133,7 +134,7 @@ router.get('/', securityIssuanceController.getAllSecurityIssuances);
  *       400:
  *         description: Invalid input
  */
-router.post('/', securityIssuanceController.createSecurityIssuance);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.createSecurityIssuance);
 
 /**
  * @swagger
@@ -151,7 +152,7 @@ router.post('/', securityIssuanceController.createSecurityIssuance);
  *       200:
  *         description: Compliance status summary
  */
-router.get('/compliance', securityIssuanceController.getComplianceStatus);
+router.get('/compliance', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getComplianceStatus);
 
 /**
  * @swagger
@@ -168,7 +169,7 @@ router.get('/compliance', securityIssuanceController.getComplianceStatus);
  *       200:
  *         description: List of overdue filings
  */
-router.get('/overdue', securityIssuanceController.getOverdueFilings);
+router.get('/overdue', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getOverdueFilings);
 
 /**
  * @swagger
@@ -191,7 +192,7 @@ router.get('/overdue', securityIssuanceController.getOverdueFilings);
  *       200:
  *         description: List of upcoming deadlines
  */
-router.get('/deadlines', securityIssuanceController.getUpcomingDeadlines);
+router.get('/deadlines', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getUpcomingDeadlines);
 
 /**
  * @swagger
@@ -213,7 +214,7 @@ router.get('/deadlines', securityIssuanceController.getUpcomingDeadlines);
  *       200:
  *         description: List of issuances
  */
-router.get('/exemption', securityIssuanceController.getByExemptionType);
+router.get('/exemption', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getByExemptionType);
 
 /**
  * @swagger
@@ -236,7 +237,7 @@ router.get('/exemption', securityIssuanceController.getByExemptionType);
  *       200:
  *         description: State filing requirements
  */
-router.get('/state-requirements', securityIssuanceController.getStateFilingRequirements);
+router.get('/state-requirements', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getStateFilingRequirements);
 
 /**
  * @swagger
@@ -256,7 +257,7 @@ router.get('/state-requirements', securityIssuanceController.getStateFilingRequi
  *       404:
  *         description: Security issuance not found
  */
-router.get('/:id', securityIssuanceController.getSecurityIssuanceById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.getSecurityIssuanceById);
 
 /**
  * @swagger
@@ -282,7 +283,7 @@ router.get('/:id', securityIssuanceController.getSecurityIssuanceById);
  *       404:
  *         description: Security issuance not found
  */
-router.put('/:id', securityIssuanceController.updateSecurityIssuanceById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.updateSecurityIssuanceById);
 
 /**
  * @swagger
@@ -302,7 +303,7 @@ router.put('/:id', securityIssuanceController.updateSecurityIssuanceById);
  *       404:
  *         description: Security issuance not found
  */
-router.delete('/:id', securityIssuanceController.deleteSecurityIssuanceById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.deleteSecurityIssuanceById);
 
 /**
  * @swagger
@@ -328,7 +329,7 @@ router.delete('/:id', securityIssuanceController.deleteSecurityIssuanceById);
  *       404:
  *         description: Security issuance not found
  */
-router.post('/:id/state-filings', securityIssuanceController.addStateFiling);
+router.post('/:id/state-filings', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.addStateFiling);
 
 /**
  * @swagger
@@ -359,6 +360,6 @@ router.post('/:id/state-filings', securityIssuanceController.addStateFiling);
  *       404:
  *         description: Security issuance or state filing not found
  */
-router.put('/:id/state-filings/:stateCode', securityIssuanceController.updateStateFiling);
+router.put('/:id/state-filings/:stateCode', hasRole(['super_admin', 'admin', 'founder', 'manager']), securityIssuanceController.updateStateFiling);
 
 module.exports = router;

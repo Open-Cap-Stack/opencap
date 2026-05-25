@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const materialEventController = require('../../controllers/materialEventController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply auth middleware to all routes
 router.use(authenticateToken);
@@ -59,7 +60,7 @@ router.use(authenticateToken);
  *       400:
  *         description: Invalid input
  */
-router.post('/', materialEventController.createEvent);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.createEvent);
 
 /**
  * @swagger
@@ -79,7 +80,7 @@ router.post('/', materialEventController.createEvent);
  *       200:
  *         description: List of events requiring action
  */
-router.get('/action-required', materialEventController.getActionRequired);
+router.get('/action-required', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getActionRequired);
 
 /**
  * @swagger
@@ -99,7 +100,7 @@ router.get('/action-required', materialEventController.getActionRequired);
  *       200:
  *         description: List of valuation trigger events
  */
-router.get('/valuation-triggers', materialEventController.getValuationTriggers);
+router.get('/valuation-triggers', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getValuationTriggers);
 
 /**
  * @swagger
@@ -133,7 +134,7 @@ router.get('/valuation-triggers', materialEventController.getValuationTriggers);
  *       201:
  *         description: Event detected and created
  */
-router.post('/detect/fundraising-round', materialEventController.detectFromFundraisingRound);
+router.post('/detect/fundraising-round', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.detectFromFundraisingRound);
 
 /**
  * @swagger
@@ -169,7 +170,7 @@ router.post('/detect/fundraising-round', materialEventController.detectFromFundr
  *       201:
  *         description: Event detected and created
  */
-router.post('/detect/employee-change', materialEventController.detectFromEmployeeChange);
+router.post('/detect/employee-change', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.detectFromEmployeeChange);
 
 /**
  * @swagger
@@ -201,7 +202,7 @@ router.post('/detect/employee-change', materialEventController.detectFromEmploye
  *       200:
  *         description: List of material events
  */
-router.get('/company/:companyId', materialEventController.getCompanyEvents);
+router.get('/company/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getCompanyEvents);
 
 /**
  * @swagger
@@ -221,7 +222,7 @@ router.get('/company/:companyId', materialEventController.getCompanyEvents);
  *       200:
  *         description: Event summary
  */
-router.get('/company/:companyId/summary', materialEventController.getCompanySummary);
+router.get('/company/:companyId/summary', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getCompanySummary);
 
 /**
  * @swagger
@@ -241,7 +242,7 @@ router.get('/company/:companyId/summary', materialEventController.getCompanySumm
  *       200:
  *         description: Compliance dashboard data
  */
-router.get('/company/:companyId/compliance-dashboard', materialEventController.getComplianceDashboard);
+router.get('/company/:companyId/compliance-dashboard', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getComplianceDashboard);
 
 /**
  * @swagger
@@ -263,7 +264,7 @@ router.get('/company/:companyId/compliance-dashboard', materialEventController.g
  *       404:
  *         description: Event not found
  */
-router.get('/:eventId', materialEventController.getEvent);
+router.get('/:eventId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.getEvent);
 
 /**
  * @swagger
@@ -283,7 +284,7 @@ router.get('/:eventId', materialEventController.getEvent);
  *       200:
  *         description: Event updated
  */
-router.put('/:eventId', materialEventController.updateEvent);
+router.put('/:eventId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.updateEvent);
 
 /**
  * @swagger
@@ -303,7 +304,7 @@ router.put('/:eventId', materialEventController.updateEvent);
  *       200:
  *         description: Event acknowledged
  */
-router.post('/:eventId/acknowledge', materialEventController.acknowledgeEvent);
+router.post('/:eventId/acknowledge', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.acknowledgeEvent);
 
 /**
  * @swagger
@@ -343,7 +344,7 @@ router.post('/:eventId/acknowledge', materialEventController.acknowledgeEvent);
  *       200:
  *         description: Event marked as action required
  */
-router.post('/:eventId/action-required', materialEventController.markActionRequired);
+router.post('/:eventId/action-required', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.markActionRequired);
 
 /**
  * @swagger
@@ -373,7 +374,7 @@ router.post('/:eventId/action-required', materialEventController.markActionRequi
  *       200:
  *         description: Event resolved
  */
-router.post('/:eventId/resolve', materialEventController.resolveEvent);
+router.post('/:eventId/resolve', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.resolveEvent);
 
 /**
  * @swagger
@@ -404,7 +405,7 @@ router.post('/:eventId/resolve', materialEventController.resolveEvent);
  *       200:
  *         description: Event dismissed
  */
-router.post('/:eventId/dismiss', materialEventController.dismissEvent);
+router.post('/:eventId/dismiss', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.dismissEvent);
 
 /**
  * @swagger
@@ -440,7 +441,7 @@ router.post('/:eventId/dismiss', materialEventController.dismissEvent);
  *       200:
  *         description: Action item added
  */
-router.post('/:eventId/action-items', materialEventController.addActionItem);
+router.post('/:eventId/action-items', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.addActionItem);
 
 /**
  * @swagger
@@ -465,6 +466,6 @@ router.post('/:eventId/action-items', materialEventController.addActionItem);
  *       200:
  *         description: Action item completed
  */
-router.post('/:eventId/action-items/:actionItemId/complete', materialEventController.completeActionItem);
+router.post('/:eventId/action-items/:actionItemId/complete', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), materialEventController.completeActionItem);
 
 module.exports = router;

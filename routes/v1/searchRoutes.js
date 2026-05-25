@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const searchController = require('../../controllers/searchController');
 
 // Apply authentication middleware to all routes
@@ -344,7 +345,7 @@ router.use(authenticateToken);
  *                   type: string
  *                   example: "An error occurred while processing your search request"
  */
-router.get('/', searchController.globalSearch);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), searchController.globalSearch);
 
 /**
  * @swagger
@@ -431,6 +432,6 @@ router.get('/', searchController.globalSearch);
  *                   type: string
  *                   example: "Failed to get search suggestions"
  */
-router.get('/suggestions', searchController.getSearchSuggestions);
+router.get('/suggestions', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), searchController.getSearchSuggestions);
 
 module.exports = router;

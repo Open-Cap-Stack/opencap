@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const multer = require('multer');
 const fileStorageController = require('../../controllers/fileStorageController');
 
@@ -100,7 +101,7 @@ const upload = multer({
  *       500:
  *         description: Server error
  */
-router.post('/', upload.single('file'), fileStorageController.uploadFile);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), upload.single('file'), fileStorageController.uploadFile);
 
 /**
  * @swagger
@@ -151,7 +152,7 @@ router.post('/batch', upload.array('files', 10), fileStorageController.uploadMul
  *       200:
  *         description: Search results
  */
-router.post('/search', fileStorageController.searchFiles);
+router.post('/search', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.searchFiles);
 
 /**
  * @swagger
@@ -167,7 +168,7 @@ router.post('/search', fileStorageController.searchFiles);
  *             schema:
  *               $ref: '#/components/schemas/StorageUsage'
  */
-router.get('/usage', fileStorageController.getStorageUsage);
+router.get('/usage', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.getStorageUsage);
 
 /**
  * @swagger
@@ -192,7 +193,7 @@ router.get('/usage', fileStorageController.getStorageUsage);
  *       200:
  *         description: List of files with pagination
  */
-router.get('/', fileStorageController.listFiles);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.listFiles);
 
 /**
  * @swagger
@@ -212,7 +213,7 @@ router.get('/', fileStorageController.listFiles);
  *       404:
  *         description: File not found
  */
-router.get('/:id/download', fileStorageController.downloadFile);
+router.get('/:id/download', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.downloadFile);
 
 /**
  * @swagger
@@ -235,7 +236,7 @@ router.get('/:id/download', fileStorageController.downloadFile);
  *       200:
  *         description: Presigned URL
  */
-router.get('/:id/url', fileStorageController.getPresignedUrl);
+router.get('/:id/url', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.getPresignedUrl);
 
 /**
  * @swagger
@@ -259,7 +260,7 @@ router.get('/:id/url', fileStorageController.getPresignedUrl);
  *       404:
  *         description: File not found
  */
-router.get('/:id/metadata', fileStorageController.getFileMetadata);
+router.get('/:id/metadata', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.getFileMetadata);
 
 /**
  * @swagger
@@ -290,7 +291,7 @@ router.get('/:id/metadata', fileStorageController.getFileMetadata);
  *       404:
  *         description: File not found
  */
-router.patch('/:id/metadata', fileStorageController.updateFileMetadata);
+router.patch('/:id/metadata', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.updateFileMetadata);
 
 /**
  * @swagger
@@ -308,7 +309,7 @@ router.patch('/:id/metadata', fileStorageController.updateFileMetadata);
  *       200:
  *         description: Version history
  */
-router.get('/:id/versions', fileStorageController.getVersionHistory);
+router.get('/:id/versions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.getVersionHistory);
 
 /**
  * @swagger
@@ -338,7 +339,7 @@ router.get('/:id/versions', fileStorageController.getVersionHistory);
  *       201:
  *         description: New version created
  */
-router.post('/:id/versions', upload.single('file'), fileStorageController.createVersion);
+router.post('/:id/versions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), upload.single('file'), fileStorageController.createVersion);
 
 /**
  * @swagger
@@ -365,7 +366,7 @@ router.post('/:id/versions', upload.single('file'), fileStorageController.create
  *       200:
  *         description: Version restored
  */
-router.post('/:id/restore', fileStorageController.restoreVersion);
+router.post('/:id/restore', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.restoreVersion);
 
 /**
  * @swagger
@@ -390,6 +391,6 @@ router.post('/:id/restore', fileStorageController.restoreVersion);
  *       404:
  *         description: File not found
  */
-router.delete('/:id', fileStorageController.deleteFile);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fileStorageController.deleteFile);
 
 module.exports = router;

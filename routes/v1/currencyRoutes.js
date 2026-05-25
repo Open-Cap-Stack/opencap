@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const currencyController = require('../../controllers/currencyController');
 
 // Apply authentication middleware to all routes
@@ -18,48 +19,48 @@ router.use(authenticateToken);
  * @desc Convert amount from one currency to another
  * @access Public
  */
-router.post('/convert', currencyController.convertCurrency);
+router.post('/convert', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.convertCurrency);
 
 /**
  * @route GET /api/v1/currency/rate
  * @desc Get exchange rate between two currencies
  * @access Public
  */
-router.get('/rate', currencyController.getExchangeRate);
+router.get('/rate', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.getExchangeRate);
 
 /**
  * @route POST /api/v1/currency/rates/update
  * @desc Update exchange rates from external source
  * @access Private (Admin)
  */
-router.post('/rates/update', currencyController.updateRates);
+router.post('/rates/update', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.updateRates);
 
 /**
  * @route GET /api/v1/currency/supported
  * @desc Get list of supported currencies
  * @access Public
  */
-router.get('/supported', currencyController.getSupportedCurrencies);
+router.get('/supported', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.getSupportedCurrencies);
 
 /**
  * @route GET /api/v1/currency/format
  * @desc Format currency amount
  * @access Public
  */
-router.get('/format', currencyController.formatCurrency);
+router.get('/format', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.formatCurrency);
 
 /**
  * @route GET /api/v1/currency/history
  * @desc Get exchange rate history
  * @access Public
  */
-router.get('/history', currencyController.getRateHistory);
+router.get('/history', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.getRateHistory);
 
 /**
  * @route POST /api/v1/currency/batch-convert
  * @desc Batch convert multiple amounts
  * @access Public
  */
-router.post('/batch-convert', currencyController.batchConvert);
+router.post('/batch-convert', hasRole(['super_admin', 'admin', 'founder', 'accountant']), currencyController.batchConvert);
 
 module.exports = router;

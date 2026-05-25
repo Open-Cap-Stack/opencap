@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const dataProcessingController = require('../../controllers/dataProcessingController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -54,7 +55,7 @@ router.use(authenticateToken);
  *       500:
  *         description: Pipeline execution failed
  */
-router.post('/etl/run', dataProcessingController.runETLPipeline);
+router.post('/etl/run', hasRole(['super_admin', 'admin']), dataProcessingController.runETLPipeline);
 
 /**
  * @swagger
@@ -68,7 +69,7 @@ router.post('/etl/run', dataProcessingController.runETLPipeline);
  *       200:
  *         description: List of running pipelines
  */
-router.get('/etl/running', dataProcessingController.listRunningPipelines);
+router.get('/etl/running', hasRole(['super_admin', 'admin']), dataProcessingController.listRunningPipelines);
 
 /**
  * @swagger
@@ -90,7 +91,7 @@ router.get('/etl/running', dataProcessingController.listRunningPipelines);
  *       404:
  *         description: Pipeline not found
  */
-router.get('/etl/:pipelineId/status', dataProcessingController.getPipelineStatus);
+router.get('/etl/:pipelineId/status', hasRole(['super_admin', 'admin']), dataProcessingController.getPipelineStatus);
 
 /**
  * @swagger
@@ -112,7 +113,7 @@ router.get('/etl/:pipelineId/status', dataProcessingController.getPipelineStatus
  *       400:
  *         description: Cannot cancel pipeline
  */
-router.post('/etl/:pipelineId/cancel', dataProcessingController.cancelPipeline);
+router.post('/etl/:pipelineId/cancel', hasRole(['super_admin', 'admin']), dataProcessingController.cancelPipeline);
 
 // =====================================
 // Batch Processing Routes
@@ -152,7 +153,7 @@ router.post('/etl/:pipelineId/cancel', dataProcessingController.cancelPipeline);
  *       400:
  *         description: Invalid job configuration
  */
-router.post('/batch/schedule', dataProcessingController.scheduleBatchJob);
+router.post('/batch/schedule', hasRole(['super_admin', 'admin']), dataProcessingController.scheduleBatchJob);
 
 /**
  * @swagger
@@ -172,7 +173,7 @@ router.post('/batch/schedule', dataProcessingController.scheduleBatchJob);
  *       200:
  *         description: List of batch jobs
  */
-router.get('/batch/jobs', dataProcessingController.listBatchJobs);
+router.get('/batch/jobs', hasRole(['super_admin', 'admin']), dataProcessingController.listBatchJobs);
 
 /**
  * @swagger
@@ -186,7 +187,7 @@ router.get('/batch/jobs', dataProcessingController.listBatchJobs);
  *       200:
  *         description: Queue statistics
  */
-router.get('/batch/stats', dataProcessingController.getQueueStats);
+router.get('/batch/stats', hasRole(['super_admin', 'admin']), dataProcessingController.getQueueStats);
 
 /**
  * @swagger
@@ -208,7 +209,7 @@ router.get('/batch/stats', dataProcessingController.getQueueStats);
  *       404:
  *         description: Job not found
  */
-router.get('/batch/:jobId/status', dataProcessingController.getBatchJobStatus);
+router.get('/batch/:jobId/status', hasRole(['super_admin', 'admin']), dataProcessingController.getBatchJobStatus);
 
 /**
  * @swagger
@@ -238,7 +239,7 @@ router.get('/batch/:jobId/status', dataProcessingController.getBatchJobStatus);
  *       400:
  *         description: Cannot cancel job
  */
-router.post('/batch/:jobId/cancel', dataProcessingController.cancelBatchJob);
+router.post('/batch/:jobId/cancel', hasRole(['super_admin', 'admin']), dataProcessingController.cancelBatchJob);
 
 /**
  * @swagger
@@ -261,7 +262,7 @@ router.post('/batch/:jobId/cancel', dataProcessingController.cancelBatchJob);
  *       400:
  *         description: Invalid action
  */
-router.post('/batch/queue/:action', dataProcessingController.manageQueue);
+router.post('/batch/queue/:action', hasRole(['super_admin', 'admin']), dataProcessingController.manageQueue);
 
 // =====================================
 // Data Quality Routes
@@ -295,7 +296,7 @@ router.post('/batch/queue/:action', dataProcessingController.manageQueue);
  *       400:
  *         description: Invalid input
  */
-router.post('/quality/validate', dataProcessingController.validateDataQuality);
+router.post('/quality/validate', hasRole(['super_admin', 'admin']), dataProcessingController.validateDataQuality);
 
 /**
  * @swagger
@@ -324,7 +325,7 @@ router.post('/quality/validate', dataProcessingController.validateDataQuality);
  *       400:
  *         description: Invalid input
  */
-router.post('/quality/completeness', dataProcessingController.checkCompleteness);
+router.post('/quality/completeness', hasRole(['super_admin', 'admin']), dataProcessingController.checkCompleteness);
 
 /**
  * @swagger
@@ -362,7 +363,7 @@ router.post('/quality/completeness', dataProcessingController.checkCompleteness)
  *       400:
  *         description: Invalid input
  */
-router.post('/quality/anomalies', dataProcessingController.detectAnomalies);
+router.post('/quality/anomalies', hasRole(['super_admin', 'admin']), dataProcessingController.detectAnomalies);
 
 /**
  * @swagger
@@ -391,7 +392,7 @@ router.post('/quality/anomalies', dataProcessingController.detectAnomalies);
  *       400:
  *         description: Invalid input
  */
-router.post('/quality/report', dataProcessingController.generateQualityReport);
+router.post('/quality/report', hasRole(['super_admin', 'admin']), dataProcessingController.generateQualityReport);
 
 /**
  * @swagger
@@ -418,7 +419,7 @@ router.post('/quality/report', dataProcessingController.generateQualityReport);
  *       400:
  *         description: Invalid input
  */
-router.post('/quality/profile', dataProcessingController.profileData);
+router.post('/quality/profile', hasRole(['super_admin', 'admin']), dataProcessingController.profileData);
 
 // =====================================
 // Stream Processing Routes
@@ -436,7 +437,7 @@ router.post('/quality/profile', dataProcessingController.profileData);
  *       200:
  *         description: Stream processing metrics
  */
-router.get('/stream/metrics', dataProcessingController.getStreamMetrics);
+router.get('/stream/metrics', hasRole(['super_admin', 'admin']), dataProcessingController.getStreamMetrics);
 
 /**
  * @swagger
@@ -450,6 +451,6 @@ router.get('/stream/metrics', dataProcessingController.getStreamMetrics);
  *       200:
  *         description: Dead letter queue events
  */
-router.get('/stream/dlq', dataProcessingController.getDeadLetterQueue);
+router.get('/stream/dlq', hasRole(['super_admin', 'admin']), dataProcessingController.getDeadLetterQueue);
 
 module.exports = router;

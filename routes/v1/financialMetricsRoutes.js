@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const financialMetricsController = require('../../controllers/v1/financialMetricsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const { hasPermission } = require('../../middleware/rbacMiddleware');
+const { hasRole, hasPermission  } = require('../../middleware/rbacMiddleware');
 
 /**
  * @swagger

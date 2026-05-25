@@ -10,6 +10,7 @@ const express = require('express');
 const router = express.Router();
 const ApiMetricsController = require('../../controllers/apiMetricsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Create controller instance
 const metricsController = new ApiMetricsController();
@@ -44,7 +45,7 @@ const metricsController = new ApiMetricsController();
  *       200:
  *         description: Dashboard metrics data
  */
-router.get('/dashboard', authenticateToken, metricsController.getDashboard);
+router.get('/dashboard', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getDashboard);
 
 /**
  * @swagger
@@ -75,7 +76,7 @@ router.get('/dashboard', authenticateToken, metricsController.getDashboard);
  *       200:
  *         description: Performance report
  */
-router.get('/report', authenticateToken, metricsController.getPerformanceReport);
+router.get('/report', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getPerformanceReport);
 
 /**
  * @swagger
@@ -104,7 +105,7 @@ router.get('/report', authenticateToken, metricsController.getPerformanceReport)
  *       400:
  *         description: Missing endpoint parameter
  */
-router.get('/endpoints/:endpoint', authenticateToken, metricsController.getEndpointMetrics);
+router.get('/endpoints/:endpoint', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getEndpointMetrics);
 
 /**
  * @swagger
@@ -130,7 +131,7 @@ router.get('/endpoints/:endpoint', authenticateToken, metricsController.getEndpo
  *       200:
  *         description: Percentile data
  */
-router.get('/endpoints/:endpoint/percentiles', authenticateToken, metricsController.getPercentiles);
+router.get('/endpoints/:endpoint/percentiles', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getPercentiles);
 
 /**
  * @swagger
@@ -156,7 +157,7 @@ router.get('/endpoints/:endpoint/percentiles', authenticateToken, metricsControl
  *       200:
  *         description: Histogram data
  */
-router.get('/endpoints/:endpoint/histogram', authenticateToken, metricsController.getHistogram);
+router.get('/endpoints/:endpoint/histogram', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getHistogram);
 
 /**
  * @swagger
@@ -176,7 +177,7 @@ router.get('/endpoints/:endpoint/histogram', authenticateToken, metricsControlle
  *       200:
  *         description: Error rates by endpoint
  */
-router.get('/errors', authenticateToken, metricsController.getErrorRates);
+router.get('/errors', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getErrorRates);
 
 /**
  * @swagger
@@ -196,7 +197,7 @@ router.get('/errors', authenticateToken, metricsController.getErrorRates);
  *       200:
  *         description: Throughput data by endpoint
  */
-router.get('/throughput', authenticateToken, metricsController.getThroughput);
+router.get('/throughput', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getThroughput);
 
 /**
  * @swagger
@@ -216,7 +217,7 @@ router.get('/throughput', authenticateToken, metricsController.getThroughput);
  *       200:
  *         description: List of slowest endpoints
  */
-router.get('/slowest', authenticateToken, metricsController.getSlowestEndpoints);
+router.get('/slowest', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getSlowestEndpoints);
 
 /**
  * @swagger
@@ -230,7 +231,7 @@ router.get('/slowest', authenticateToken, metricsController.getSlowestEndpoints)
  *       200:
  *         description: Health status
  */
-router.get('/health', authenticateToken, metricsController.getHealthStatus);
+router.get('/health', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.getHealthStatus);
 
 /**
  * @swagger
@@ -255,6 +256,6 @@ router.get('/health', authenticateToken, metricsController.getHealthStatus);
  *       403:
  *         description: Admin access required
  */
-router.post('/reset', authenticateToken, metricsController.resetMetrics);
+router.post('/reset', authenticateToken, hasRole(['super_admin', 'admin']), metricsController.resetMetrics);
 
 module.exports = router;

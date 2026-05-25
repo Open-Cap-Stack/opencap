@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const valuation409AController = require('../../controllers/valuation409AController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const valuation409ATriggerService = require('../../services/valuation409ATriggerService');
 
 // Apply auth middleware to all routes
@@ -21,17 +22,17 @@ router.use(authenticateToken);
  */
 
 // Get all valuations
-router.get('/', valuation409AController.getAllValuations);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getAllValuations);
 
 // Get valuation analytics
-router.get('/analytics', valuation409AController.getValuationAnalytics);
+router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getValuationAnalytics);
 
 /**
  * GET /api/v1/valuations/409a/staleness-check
  * Issue #654: Detect stale 409A valuations and trigger conditions
  * Query: companyId (required), lastValuationDate (optional ISO date)
  */
-router.get('/409a/staleness-check', async (req, res) => {
+router.get('/409a/staleness-check', hasRole(['super_admin', 'admin', 'founder', 'accountant']), async (req, res) => {
   try {
     const { companyId, lastValuationDate } = req.query;
     if (!companyId) return res.status(400).json({ message: 'companyId query parameter is required' });
@@ -48,13 +49,13 @@ router.get('/409a/staleness-check', async (req, res) => {
 });
 
 // ── AI-powered 409A workflow (must be before /:valuationId to avoid conflicts) ─
-router.post('/:valuationId/submit-inputs', valuation409AController.submitInputs);
-router.post('/:valuationId/payment-session', valuation409AController.createPaymentSession);
-router.post('/:valuationId/mark-paid', valuation409AController.markPaid);
-router.post('/:valuationId/run-ai', valuation409AController.runAI);
-router.get('/:valuationId/ai-status', valuation409AController.getAIStatus);
-router.get('/:valuationId/report', valuation409AController.getAIReport);
-router.get('/:valuationId/pdf', valuation409AController.downloadPDF);
+router.post('/:valuationId/submit-inputs', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.submitInputs);
+router.post('/:valuationId/payment-session', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.createPaymentSession);
+router.post('/:valuationId/mark-paid', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.markPaid);
+router.post('/:valuationId/run-ai', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.runAI);
+router.get('/:valuationId/ai-status', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getAIStatus);
+router.get('/:valuationId/report', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getAIReport);
+router.get('/:valuationId/pdf', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.downloadPDF);
 
 /**
  * @swagger
@@ -77,7 +78,7 @@ router.get('/:valuationId/pdf', valuation409AController.downloadPDF);
  *       400:
  *         description: Missing companyId parameter
  */
-router.get('/latest', valuation409AController.getLatestValuation);
+router.get('/latest', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getLatestValuation);
 
 /**
  * @swagger
@@ -112,7 +113,7 @@ router.get('/latest', valuation409AController.getLatestValuation);
  *       400:
  *         description: Invalid input
  */
-router.post('/', valuation409AController.createValuationRequest);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.createValuationRequest);
 
 /**
  * @swagger
@@ -133,7 +134,7 @@ router.post('/', valuation409AController.createValuationRequest);
  *       200:
  *         description: List of expiring valuations
  */
-router.get('/expiring', valuation409AController.getExpiringValuations);
+router.get('/expiring', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getExpiringValuations);
 
 /**
  * @swagger
@@ -147,7 +148,7 @@ router.get('/expiring', valuation409AController.getExpiringValuations);
  *       200:
  *         description: Expired valuations processed
  */
-router.post('/process-expired', valuation409AController.processExpiredValuations);
+router.post('/process-expired', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.processExpiredValuations);
 
 /**
  * @swagger
@@ -179,7 +180,7 @@ router.post('/process-expired', valuation409AController.processExpiredValuations
  *       200:
  *         description: List of valuations
  */
-router.get('/company/:companyId', valuation409AController.getCompanyValuations);
+router.get('/company/:companyId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getCompanyValuations);
 
 /**
  * @swagger
@@ -201,7 +202,7 @@ router.get('/company/:companyId', valuation409AController.getCompanyValuations);
  *       404:
  *         description: No current valuation found
  */
-router.get('/company/:companyId/current', valuation409AController.getCurrentValuation);
+router.get('/company/:companyId/current', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getCurrentValuation);
 
 /**
  * @swagger
@@ -221,7 +222,7 @@ router.get('/company/:companyId/current', valuation409AController.getCurrentValu
  *       200:
  *         description: Valuation history
  */
-router.get('/company/:companyId/history', valuation409AController.getValuationHistory);
+router.get('/company/:companyId/history', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getValuationHistory);
 
 /**
  * @swagger
@@ -241,7 +242,7 @@ router.get('/company/:companyId/history', valuation409AController.getValuationHi
  *       200:
  *         description: Valuation summary
  */
-router.get('/company/:companyId/summary', valuation409AController.getCompanySummary);
+router.get('/company/:companyId/summary', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getCompanySummary);
 
 /**
  * @swagger
@@ -263,7 +264,7 @@ router.get('/company/:companyId/summary', valuation409AController.getCompanySumm
  *       404:
  *         description: Valuation not found
  */
-router.get('/:valuationId', valuation409AController.getValuation);
+router.get('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getValuation);
 
 /**
  * @swagger
@@ -290,8 +291,8 @@ router.get('/:valuationId', valuation409AController.getValuation);
  *       400:
  *         description: Cannot update valuation in current status
  */
-router.put('/:valuationId', valuation409AController.updateValuation);
-router.delete('/:valuationId', valuation409AController.deleteValuation);
+router.put('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.updateValuation);
+router.delete('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.deleteValuation);
 
 /**
  * @swagger
@@ -328,7 +329,7 @@ router.delete('/:valuationId', valuation409AController.deleteValuation);
  *       200:
  *         description: Firm assigned
  */
-router.post('/:valuationId/assign-firm', valuation409AController.assignValuationFirm);
+router.post('/:valuationId/assign-firm', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.assignValuationFirm);
 
 /**
  * @swagger
@@ -363,7 +364,7 @@ router.post('/:valuationId/assign-firm', valuation409AController.assignValuation
  *       200:
  *         description: Draft received
  */
-router.post('/:valuationId/receive-draft', valuation409AController.receiveDraft);
+router.post('/:valuationId/receive-draft', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.receiveDraft);
 
 /**
  * @swagger
@@ -383,7 +384,7 @@ router.post('/:valuationId/receive-draft', valuation409AController.receiveDraft)
  *       200:
  *         description: Review started
  */
-router.post('/:valuationId/start-review', valuation409AController.startReview);
+router.post('/:valuationId/start-review', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.startReview);
 
 /**
  * @swagger
@@ -413,7 +414,7 @@ router.post('/:valuationId/start-review', valuation409AController.startReview);
  *       200:
  *         description: Valuation approved
  */
-router.post('/:valuationId/approve', valuation409AController.approveValuation);
+router.post('/:valuationId/approve', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.approveValuation);
 
 /**
  * @swagger
@@ -441,7 +442,7 @@ router.post('/:valuationId/approve', valuation409AController.approveValuation);
  *       200:
  *         description: Valuation cancelled
  */
-router.post('/:valuationId/cancel', valuation409AController.cancelValuation);
+router.post('/:valuationId/cancel', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.cancelValuation);
 
 /**
  * @swagger
@@ -478,7 +479,7 @@ router.post('/:valuationId/cancel', valuation409AController.cancelValuation);
  *       200:
  *         description: Document added
  */
-router.post('/:valuationId/documents', valuation409AController.addDocument);
+router.post('/:valuationId/documents', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.addDocument);
 
 // ============================================================================
 // AUDIT TRAIL ROUTES (Issue #63)
@@ -504,7 +505,7 @@ router.post('/:valuationId/documents', valuation409AController.addDocument);
  *       404:
  *         description: Valuation not found
  */
-router.get('/:valuationId/audit-trail', valuation409AController.getValuationAuditTrail);
+router.get('/:valuationId/audit-trail', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getValuationAuditTrail);
 
 /**
  * @swagger
@@ -529,7 +530,7 @@ router.get('/:valuationId/audit-trail', valuation409AController.getValuationAudi
  *       200:
  *         description: IRS compliance report with requirement checklist
  */
-router.get('/company/:companyId/compliance/irs', valuation409AController.generateIRSComplianceReport);
+router.get('/company/:companyId/compliance/irs', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.generateIRSComplianceReport);
 
 /**
  * @swagger
@@ -554,7 +555,7 @@ router.get('/company/:companyId/compliance/irs', valuation409AController.generat
  *       200:
  *         description: GAAP compliance report
  */
-router.get('/company/:companyId/compliance/gaap', valuation409AController.generateGAAPComplianceReport);
+router.get('/company/:companyId/compliance/gaap', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.generateGAAPComplianceReport);
 
 /**
  * @swagger
@@ -588,7 +589,7 @@ router.get('/company/:companyId/compliance/gaap', valuation409AController.genera
  *       200:
  *         description: Comprehensive audit report with IRS, GAAP compliance and history
  */
-router.get('/company/:companyId/audit-report', valuation409AController.generateAuditReport);
+router.get('/company/:companyId/audit-report', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.generateAuditReport);
 
 /**
  * @swagger
@@ -614,6 +615,6 @@ router.get('/company/:companyId/audit-report', valuation409AController.generateA
  *       200:
  *         description: Exported audit data
  */
-router.get('/company/:companyId/audit-export', valuation409AController.exportAuditData);
+router.get('/company/:companyId/audit-export', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.exportAuditData);
 
 module.exports = router;

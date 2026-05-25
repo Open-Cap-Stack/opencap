@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const bulkReportsController = require('../../controllers/bulkReportsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -25,7 +26,7 @@ router.use(authenticateToken);
  *   ]
  * }
  */
-router.post('/', bulkReportsController.generateBulkReports);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkReportsController.generateBulkReports);
 
 /**
  * GET /api/v1/reports/bulk
@@ -34,18 +35,18 @@ router.post('/', bulkReportsController.generateBulkReports);
  * Query params:
  * - status: Filter by job status (optional)
  */
-router.get('/', bulkReportsController.getUserBulkJobs);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkReportsController.getUserBulkJobs);
 
 /**
  * GET /api/v1/reports/bulk/:jobId
  * Get status of a specific bulk job
  */
-router.get('/:jobId', bulkReportsController.getBulkJobStatus);
+router.get('/:jobId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkReportsController.getBulkJobStatus);
 
 /**
  * DELETE /api/v1/reports/bulk/:jobId
  * Cancel a bulk job
  */
-router.delete('/:jobId', bulkReportsController.cancelBulkJob);
+router.delete('/:jobId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), bulkReportsController.cancelBulkJob);
 
 module.exports = router;

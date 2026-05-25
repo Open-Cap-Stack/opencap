@@ -10,6 +10,7 @@
 const express = require('express');
 const rlhfController = require('../../controllers/rlhfController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 const router = express.Router();
 
@@ -21,9 +22,7 @@ const router = express.Router();
  * POST /api/rlhf/feedback
  * Submit feedback on an AI interaction (thumbs up/down, rating, comment)
  */
-router.post('/feedback',
-  authenticateToken,
-  rlhfController.submitFeedback
+router.post('/feedback', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.submitFeedback
 );
 
 // =====================
@@ -34,9 +33,7 @@ router.post('/feedback',
  * POST /api/rlhf/interaction
  * Record an AI interaction (prompt/response pair)
  */
-router.post('/interaction',
-  authenticateToken,
-  rlhfController.recordInteraction
+router.post('/interaction', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.recordInteraction
 );
 
 // =====================
@@ -47,9 +44,7 @@ router.post('/interaction',
  * POST /api/rlhf/usage
  * Track AI feature usage event
  */
-router.post('/usage',
-  authenticateToken,
-  rlhfController.trackUsage
+router.post('/usage', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.trackUsage
 );
 
 // =====================
@@ -60,9 +55,7 @@ router.post('/usage',
  * POST /api/rlhf/correction
  * Submit a correction to an AI response
  */
-router.post('/correction',
-  authenticateToken,
-  rlhfController.submitCorrection
+router.post('/correction', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.submitCorrection
 );
 
 // =====================
@@ -73,36 +66,28 @@ router.post('/correction',
  * GET /api/rlhf/analytics
  * Get aggregated RLHF dashboard metrics
  */
-router.get('/analytics',
-  authenticateToken,
-  rlhfController.getAnalytics
+router.get('/analytics', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.getAnalytics
 );
 
 /**
  * GET /api/rlhf/analytics/feedback
  * Get feedback-specific analytics
  */
-router.get('/analytics/feedback',
-  authenticateToken,
-  rlhfController.getFeedbackAnalytics
+router.get('/analytics/feedback', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.getFeedbackAnalytics
 );
 
 /**
  * GET /api/rlhf/analytics/interactions
  * Get interaction-specific analytics
  */
-router.get('/analytics/interactions',
-  authenticateToken,
-  rlhfController.getInteractionAnalytics
+router.get('/analytics/interactions', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.getInteractionAnalytics
 );
 
 /**
  * GET /api/rlhf/analytics/corrections
  * Get correction-specific analytics
  */
-router.get('/analytics/corrections',
-  authenticateToken,
-  rlhfController.getCorrectionAnalytics
+router.get('/analytics/corrections', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.getCorrectionAnalytics
 );
 
 // =====================
@@ -113,18 +98,14 @@ router.get('/analytics/corrections',
  * GET /api/rlhf/export
  * Export RLHF data for training (JSON, JSONL, CSV)
  */
-router.get('/export',
-  authenticateToken,
-  rlhfController.exportData
+router.get('/export', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.exportData
 );
 
 /**
  * GET /api/rlhf/user-export
  * Export current user's RLHF data
  */
-router.get('/user-export',
-  authenticateToken,
-  rlhfController.exportUserData
+router.get('/user-export', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.exportUserData
 );
 
 // =====================
@@ -135,27 +116,21 @@ router.get('/user-export',
  * GET /api/rlhf/consent
  * Get user's consent settings
  */
-router.get('/consent',
-  authenticateToken,
-  rlhfController.getConsent
+router.get('/consent', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.getConsent
 );
 
 /**
  * PUT /api/rlhf/consent
  * Update user's consent settings for RLHF data collection
  */
-router.put('/consent',
-  authenticateToken,
-  rlhfController.updateConsent
+router.put('/consent', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.updateConsent
 );
 
 /**
  * DELETE /api/rlhf/user-data
  * Delete current user's RLHF data (right to be forgotten)
  */
-router.delete('/user-data',
-  authenticateToken,
-  rlhfController.deleteUserData
+router.delete('/user-data', authenticateToken, hasRole(['super_admin', 'admin']), rlhfController.deleteUserData
 );
 
 module.exports = router;

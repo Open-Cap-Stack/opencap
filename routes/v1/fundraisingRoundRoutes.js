@@ -9,14 +9,15 @@ const express = require('express');
 const router = express.Router();
 const fundraisingRoundController = require('../../controllers/fundraisingRoundController');
 const { authenticate } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all routes
 router.use(authenticate);
 
-router.post('/', fundraisingRoundController.createFundraisingRound);
-router.get('/', fundraisingRoundController.getFundraisingRounds);
-router.get('/:id', fundraisingRoundController.getFundraisingRoundById);
-router.put('/:id', fundraisingRoundController.updateFundraisingRound);
-router.delete('/:id', fundraisingRoundController.deleteFundraisingRound);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fundraisingRoundController.createFundraisingRound);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fundraisingRoundController.getFundraisingRounds);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fundraisingRoundController.getFundraisingRoundById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fundraisingRoundController.updateFundraisingRound);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), fundraisingRoundController.deleteFundraisingRound);
 
 module.exports = router;

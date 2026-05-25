@@ -17,7 +17,7 @@ const express = require('express');
 const router = express.Router();
 const billingController = require('../../controllers/billingController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const { requireUserNotAgent } = require('../../middleware/rbacMiddleware');
+const { requireUserNotAgent, hasRole } = require('../../middleware/rbacMiddleware');
 
 // ============================================================
 // Webhook route - NO authentication (uses Stripe signature)
@@ -54,149 +54,149 @@ router.use(requireUserNotAgent);
  * @desc Get current subscription plan details
  * @access Private
  */
-router.get('/current-plan', billingController.getCurrentPlan);
+router.get('/current-plan', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getCurrentPlan);
 
 /**
  * @route GET /api/v1/billing/usage
  * @desc Get usage metrics against plan limits
  * @access Private
  */
-router.get('/usage', billingController.getUsageMetrics);
+router.get('/usage', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getUsageMetrics);
 
 /**
  * @route GET /api/v1/billing/invoices
  * @desc List invoices with pagination and filtering
  * @access Private
  */
-router.get('/invoices', billingController.getInvoices);
+router.get('/invoices', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getInvoices);
 
 /**
  * @route POST /api/v1/billing/invoices
  * @desc Create a new invoice
  * @access Private
  */
-router.post('/invoices', billingController.createInvoice);
+router.post('/invoices', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.createInvoice);
 
 /**
  * @route GET /api/v1/billing/invoices/:id
  * @desc Get invoice details by ID
  * @access Private
  */
-router.get('/invoices/:id', billingController.getInvoiceById);
+router.get('/invoices/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getInvoiceById);
 
 /**
  * @route PUT /api/v1/billing/invoices/:id
  * @desc Update an invoice
  * @access Private
  */
-router.put('/invoices/:id', billingController.updateInvoice);
+router.put('/invoices/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.updateInvoice);
 
 /**
  * @route GET /api/v1/billing/invoices/:id/download
  * @desc Download invoice as PDF
  * @access Private
  */
-router.get('/invoices/:id/download', billingController.downloadInvoice);
+router.get('/invoices/:id/download', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.downloadInvoice);
 
 /**
  * @route GET /api/v1/billing/payment-methods
  * @desc List payment methods
  * @access Private
  */
-router.get('/payment-methods', billingController.getPaymentMethods);
+router.get('/payment-methods', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getPaymentMethods);
 
 /**
  * @route POST /api/v1/billing/payment-methods
  * @desc Add a new payment method
  * @access Private
  */
-router.post('/payment-methods', billingController.addPaymentMethod);
+router.post('/payment-methods', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.addPaymentMethod);
 
 /**
  * @route POST /api/v1/billing/payment-methods/:id/set-default
  * @desc Set a payment method as default
  * @access Private
  */
-router.post('/payment-methods/:id/set-default', billingController.setDefaultPaymentMethod);
+router.post('/payment-methods/:id/set-default', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.setDefaultPaymentMethod);
 
 /**
  * @route DELETE /api/v1/billing/payment-methods/:id
  * @desc Remove a payment method
  * @access Private
  */
-router.delete('/payment-methods/:id', billingController.removePaymentMethod);
+router.delete('/payment-methods/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.removePaymentMethod);
 
 /**
  * @route POST /api/v1/billing/upgrade
  * @desc Upgrade subscription plan
  * @access Private
  */
-router.post('/upgrade', billingController.upgradePlan);
+router.post('/upgrade', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.upgradePlan);
 
 /**
  * @route POST /api/v1/billing/downgrade
  * @desc Downgrade subscription plan (effective at period end)
  * @access Private
  */
-router.post('/downgrade', billingController.downgradePlan);
+router.post('/downgrade', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.downgradePlan);
 
 /**
  * @route GET /api/v1/billing/payment-history
  * @desc Get payment history with summary
  * @access Private
  */
-router.get('/payment-history', billingController.getPaymentHistory);
+router.get('/payment-history', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getPaymentHistory);
 
 /**
  * @route POST /api/v1/billing/checkout-session
  * @desc Create a Stripe Checkout session
  * @access Private
  */
-router.post('/checkout-session', billingController.createCheckoutSession);
+router.post('/checkout-session', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.createCheckoutSession);
 
 // Keep legacy endpoint for backward compatibility
-router.post('/stripe-checkout', billingController.createCheckoutSession);
+router.post('/stripe-checkout', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.createCheckoutSession);
 
 /**
  * @route POST /api/v1/billing/verify-session
  * @desc Verify a Stripe Checkout session and activate subscription
  * @access Private
  */
-router.post('/verify-session', billingController.verifyCheckoutSession);
+router.post('/verify-session', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.verifyCheckoutSession);
 
 /**
  * @route POST /api/v1/billing/cancel
  * @desc Cancel subscription
  * @access Private
  */
-router.post('/cancel', billingController.cancelSubscription);
+router.post('/cancel', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.cancelSubscription);
 
 /**
  * @route POST /api/v1/billing/reactivate
  * @desc Reactivate a cancelled subscription
  * @access Private
  */
-router.post('/reactivate', billingController.reactivateSubscription);
+router.post('/reactivate', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.reactivateSubscription);
 
 /**
  * @route POST /api/v1/billing/setup-intent
  * @desc Create a Stripe Setup Intent for payment method collection
  * @access Private
  */
-router.post('/setup-intent', billingController.createSetupIntent);
+router.post('/setup-intent', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.createSetupIntent);
 
 /**
  * @route POST /api/v1/billing/customer-portal
  * @desc Create a Stripe Customer Portal session
  * @access Private
  */
-router.post('/customer-portal', billingController.createCustomerPortalSession);
+router.post('/customer-portal', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.createCustomerPortalSession);
 
 /**
  * @route GET /api/v1/billing/checkout-session/:sessionId
  * @desc Get checkout session details for success page
  * @access Private
  */
-router.get('/checkout-session/:sessionId', billingController.getCheckoutSession);
+router.get('/checkout-session/:sessionId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), billingController.getCheckoutSession);
 
 module.exports = router;

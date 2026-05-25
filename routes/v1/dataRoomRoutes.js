@@ -9,35 +9,36 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 const dataRoomController = require('../../controllers/dataRoomController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
-router.get('/stats', dataRoomController.getDataRoomStats);
-router.get('/:id/external', dataRoomController.validateExternalAccess);
-router.post('/', dataRoomController.createDataRoom);
-router.get('/', dataRoomController.getDataRooms);
-router.get('/:id', dataRoomController.getDataRoomById);
-router.put('/:id', dataRoomController.updateDataRoom);
-router.delete('/:id', dataRoomController.deleteDataRoom);
-router.post('/:id/documents', dataRoomController.addDocument);
-router.delete('/:id/documents/:docId', dataRoomController.removeDocument);
-router.post('/:id/permissions', dataRoomController.managePermissions);
-router.get('/:id/activity', dataRoomController.getActivityLog);
-router.post('/:id/export', dataRoomController.exportAsZip);
-router.post('/:id/external-link', dataRoomController.generateExternalLink);
+router.get('/stats', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getDataRoomStats);
+router.get('/:id/external', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.validateExternalAccess);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.createDataRoom);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getDataRooms);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getDataRoomById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.updateDataRoom);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.deleteDataRoom);
+router.post('/:id/documents', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.addDocument);
+router.delete('/:id/documents/:docId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.removeDocument);
+router.post('/:id/permissions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.managePermissions);
+router.get('/:id/activity', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getActivityLog);
+router.post('/:id/export', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.exportAsZip);
+router.post('/:id/external-link', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.generateExternalLink);
 
 // Issue #655: Data room diff — document-level changes between two timestamps
-router.get('/:id/diff', dataRoomController.getDiff);
+router.get('/:id/diff', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getDiff);
 
 // Issue #657: Access audit log and link access tracking
-router.get('/:id/access-log', dataRoomController.getAccessLog);
-router.post('/:id/log-access', dataRoomController.logLinkAccess);
+router.get('/:id/access-log', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getAccessLog);
+router.post('/:id/log-access', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.logLinkAccess);
 
 // Issue #659: AI deal room Q&A
 const dealRoomChatService = require('../../services/dealRoomChatService');
-router.post('/:id/chat', async (req, res) => {
+router.post('/:id/chat', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), async (req, res) => {
   try {
     const { question, topK } = req.body;
     if (!question) return res.status(400).json({ message: 'question is required' });

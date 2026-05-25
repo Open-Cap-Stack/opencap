@@ -17,6 +17,7 @@ const express = require('express');
 const router = express.Router();
 const accessPolicyController = require('../../controllers/accessPolicyController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
+const { hasRole } = require('../../middleware/rbacMiddleware');
 
 // Apply authentication to all access policy routes
 router.use(authenticateToken);
@@ -26,21 +27,21 @@ router.use(authenticateToken);
  * @desc Get predefined access policy templates
  * @access Private
  */
-router.get('/templates', accessPolicyController.getAccessPolicyTemplates);
+router.get('/templates', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), accessPolicyController.getAccessPolicyTemplates);
 
 /**
  * @route GET /api/v1/access-policies
  * @desc Get all access policies for the authenticated user's company
  * @access Private
  */
-router.get('/', accessPolicyController.getAllAccessPolicies);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), accessPolicyController.getAllAccessPolicies);
 
 /**
  * @route GET /api/v1/access-policies/:id
  * @desc Get access policy by ID
  * @access Private
  */
-router.get('/:id', accessPolicyController.getAccessPolicyById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), accessPolicyController.getAccessPolicyById);
 
 /**
  * @route POST /api/v1/access-policies
@@ -55,7 +56,7 @@ router.get('/:id', accessPolicyController.getAccessPolicyById);
  *   status?: 'active' | 'inactive'
  * }
  */
-router.post('/', accessPolicyController.createAccessPolicy);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), accessPolicyController.createAccessPolicy);
 
 /**
  * @route PUT /api/v1/access-policies/:id
@@ -63,13 +64,13 @@ router.post('/', accessPolicyController.createAccessPolicy);
  * @access Private
  * @body Partial policy object with fields to update
  */
-router.put('/:id', accessPolicyController.updateAccessPolicy);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), accessPolicyController.updateAccessPolicy);
 
 /**
  * @route DELETE /api/v1/access-policies/:id
  * @desc Delete an access policy
  * @access Private
  */
-router.delete('/:id', accessPolicyController.deleteAccessPolicy);
+router.delete('/:id', hasRole(['super_admin', 'admin']), accessPolicyController.deleteAccessPolicy);
 
 module.exports = router;
