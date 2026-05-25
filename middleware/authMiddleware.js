@@ -52,9 +52,24 @@ async function findUserCached(userId) {
   const now = Date.now();
   const cached = userCache.get(userId);
   if (cached && cached.expiresAt > now) return cached.user;
-  const user = await User.findOne({ userId });
-  if (user) userCache.set(userId, { user, expiresAt: now + USER_CACHE_TTL_MS });
-  return user;
+  // Retry up to 3 times on transient ZeroDB errors
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const user = await User.findOne({ userId });
+      if (user) userCache.set(userId, { user, expiresAt: now + USER_CACHE_TTL_MS });
+      return user;
+    } catch (err) {
+      const status = err.response?.status;
+      const isTransient = status === 502 || status === 503 || status === 504 ||
+        err.code === 'ECONNRESET' || err.code === 'ECONNABORTED' ||
+        (err.message && err.message.includes('timeout'));
+      if (!isTransient || attempt === 3) throw err;
+      lastErr = err;
+      await new Promise(r => setTimeout(r, 400 * attempt));
+    }
+  }
+  throw lastErr;
 }
 
 // Periodic cleanup of expired blacklisted tokens (every 10 minutes)
