@@ -5,6 +5,7 @@
  */
 const SPVAsset = require('../models/SPVasset');
 const SPV = require('../models/SPV');
+const { assertCompanyOwnership } = require('../middleware/companyScope');
 
 /**
  * Helper function to validate ID format (UUID or row_id)
@@ -86,9 +87,7 @@ exports.getSPVAssetById = async (req, res) => {
       asset = await SPVAsset.findById(assetId);
     }
 
-    if (!asset) {
-      return res.status(404).json({ message: 'SPVAsset not found' });
-    }
+    if (!assertCompanyOwnership(req, res, asset)) return;
 
     return res.status(200).json(asset);
   } catch (error) {
@@ -232,6 +231,11 @@ exports.updateSPVAsset = async (req, res) => {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
 
+    // Verify ownership before mutating (only enforces when record is found)
+    let precheck = await SPVAsset.findByAssetID(assetId);
+    if (!precheck) precheck = await SPVAsset.findById(assetId);
+    if (precheck && !assertCompanyOwnership(req, res, precheck)) return;
+
     // Create a copy of the request body and remove immutable fields
     const updates = { ...req.body };
 
@@ -282,6 +286,11 @@ exports.deleteSPVAsset = async (req, res) => {
     if (!isValidId(assetId)) {
       return res.status(400).json({ message: 'Invalid SPV Asset ID format' });
     }
+
+    // Verify ownership before deleting (only enforces when record is found)
+    let existing = await SPVAsset.findByAssetID(assetId);
+    if (!existing) existing = await SPVAsset.findById(assetId);
+    if (existing && !assertCompanyOwnership(req, res, existing)) return;
 
     // Try to delete by AssetID first, then by row_id
     let deletedAsset = await SPVAsset.findOneAndDelete({ AssetID: assetId.toUpperCase() });

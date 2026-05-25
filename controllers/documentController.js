@@ -12,6 +12,7 @@ const fileStorageService = require('../services/fileStorageService');
 const eventStreamingService = require('../services/eventStreamingService');
 const DocumentFolder = require('../models/DocumentFolder');
 const { errorResponse } = require('../middleware/errorResponse');
+const { assertCompanyOwnership } = require('../middleware/companyScope');
 
 const crypto = require('crypto');
 
@@ -352,6 +353,7 @@ exports.getDocumentById = async (req, res) => {
         if (!document) {
             return errorResponse(res, 404, 'Document not found');
         }
+        if (!assertCompanyOwnership(req, res, document)) return;
 
         res.status(200).json(document);
     } catch (error) {
@@ -364,6 +366,13 @@ exports.getDocumentById = async (req, res) => {
  */
 exports.updateDocumentById = async (req, res) => {
     try {
+        // Verify ownership before mutating
+        const existing = await findDocumentById(req.params.id);
+        if (!existing) {
+            return errorResponse(res, 404, 'Document not found');
+        }
+        if (!assertCompanyOwnership(req, res, existing)) return;
+
         const updateData = {
             ...req.body,
             updatedAt: new Date().toISOString()
@@ -430,12 +439,13 @@ exports.updateDocumentById = async (req, res) => {
  */
 exports.deleteDocumentById = async (req, res) => {
     try {
-        // Find the document first
+        // Find the document first (also validates ownership)
         const document = await findDocumentById(req.params.id);
 
         if (!document) {
             return errorResponse(res, 404, 'Document not found');
         }
+        if (!assertCompanyOwnership(req, res, document)) return;
 
         // Delete from ZeroDB - use row_id if available for direct deletion
         if (document.row_id) {

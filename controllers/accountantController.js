@@ -10,6 +10,7 @@ const Valuation409A = require('../models/Valuation409A');
 const User = require('../models/User');
 const emailService = require('../services/valuation409AEmailService');
 const stripeService = require('../services/stripeService');
+const { assertCompanyOwnership } = require('../middleware/companyScope');
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ exports.addAnnotation = async (req, res) => {
 
     let val = await Valuation409A.findOne({ valuationId });
     if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
-    if (!val) return res.status(404).json({ success: false, error: 'Valuation not found' });
+    if (!assertCompanyOwnership(req, res, val)) return;
 
     const fk = val.valuationId ? { valuationId: val.valuationId } : { row_id: val.row_id };
     const existing = val.accountantReview || { annotations: [], changeRequests: [], overallNotes: '' };
@@ -178,7 +179,7 @@ exports.resolveAnnotation = async (req, res) => {
 
     let val = await Valuation409A.findOne({ valuationId });
     if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
-    if (!val) return res.status(404).json({ success: false, error: 'Valuation not found' });
+    if (!assertCompanyOwnership(req, res, val)) return;
 
     const fk = val.valuationId ? { valuationId: val.valuationId } : { row_id: val.row_id };
     const review = val.accountantReview || { annotations: [], changeRequests: [] };
@@ -215,7 +216,7 @@ exports.approveAndSign = async (req, res) => {
 
     let val = await Valuation409A.findOne({ valuationId });
     if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
-    if (!val) return res.status(404).json({ success: false, error: 'Valuation not found' });
+    if (!assertCompanyOwnership(req, res, val)) return;
 
     const fk = val.valuationId ? { valuationId: val.valuationId } : { row_id: val.row_id };
     const now = new Date().toISOString();
@@ -274,7 +275,7 @@ exports.releaseToCompany = async (req, res) => {
 
     let val = await Valuation409A.findOne({ valuationId });
     if (!val) val = await Valuation409A.findOne({ row_id: valuationId });
-    if (!val) return res.status(404).json({ success: false, error: 'Valuation not found' });
+    if (!assertCompanyOwnership(req, res, val)) return;
     if (val.status !== 'accountant_approved') {
       return res.status(400).json({ success: false, error: 'Valuation must be accountant_approved before release' });
     }

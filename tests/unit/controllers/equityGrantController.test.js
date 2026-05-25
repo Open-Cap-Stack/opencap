@@ -165,7 +165,8 @@ describe('EquityGrant Controller', () => {
       const mockGrant = {
         _id: 'grant123',
         grantId: 'GRANT-001',
-        employeeId: 'EMP-001',
+        // userId matches req.user.userId so employee self-service check passes
+        userId: 'user_123',
         numberOfShares: 10000
       };
       req.params = { id: 'grant123' };
@@ -208,6 +209,8 @@ describe('EquityGrant Controller', () => {
         grantId: 'GRANT-001',
         numberOfShares: 15000
       };
+      // Pre-fetch returns null → ownership guard skips (no existing record to check)
+      databaseAdapter.findById.mockResolvedValue(null);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedGrant);
 
       await equityGrantController.updateEquityGrant(req, res);
@@ -225,6 +228,7 @@ describe('EquityGrant Controller', () => {
     it('should return 404 when grant not found', async () => {
       req.params = { id: 'nonexistent' };
       req.body = { numberOfShares: 15000 };
+      databaseAdapter.findById.mockResolvedValue(null);
       databaseAdapter.findByIdAndUpdate.mockResolvedValue(null);
 
       await equityGrantController.updateEquityGrant(req, res);
@@ -249,6 +253,8 @@ describe('EquityGrant Controller', () => {
     it('should delete equity grant successfully', async () => {
       req.params = { id: 'grant123' };
       const mockDeletedGrant = { _id: 'grant123', grantId: 'GRANT-001' };
+      // Pre-fetch returns null → ownership guard skips (no existing record to check)
+      databaseAdapter.findById.mockResolvedValue(null);
       databaseAdapter.findByIdAndDelete.mockResolvedValue(mockDeletedGrant);
 
       await equityGrantController.deleteEquityGrant(req, res);
@@ -260,6 +266,7 @@ describe('EquityGrant Controller', () => {
 
     it('should return 404 when grant not found', async () => {
       req.params = { id: 'nonexistent' };
+      databaseAdapter.findById.mockResolvedValue(null);
       databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
 
       await equityGrantController.deleteEquityGrant(req, res);

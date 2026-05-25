@@ -7,6 +7,7 @@
 
 const databaseAdapter = require('../services/databaseAdapter');
 const equityGrantService = require('../services/equityGrantService');
+const { assertCompanyOwnership, assertUserOwnership } = require('../middleware/companyScope');
 
 // Valid status values
 const VALID_STATUSES = ['pending', 'approved', 'active', 'exercised', 'cancelled', 'expired'];
@@ -76,6 +77,14 @@ exports.getEquityGrantById = async (req, res) => {
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }
+    if (!assertCompanyOwnership(req, res, grant)) return;
+
+    // Employee self-service: employees may only view their own grant
+    if (req.user?.role === 'employee') {
+      const userIdField = grant.userId ? 'userId' : 'employeeId';
+      if (!assertUserOwnership(req, res, grant, userIdField)) return;
+    }
+
     res.status(200).json(grant);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -87,6 +96,10 @@ exports.getEquityGrantById = async (req, res) => {
  */
 exports.updateEquityGrant = async (req, res) => {
   try {
+    // Fetch first to verify ownership before mutating
+    const existing = await databaseAdapter.findById('EquityGrant', req.params.id);
+    if (existing && !assertCompanyOwnership(req, res, existing)) return;
+
     const grant = await databaseAdapter.findByIdAndUpdate(
       'EquityGrant',
       req.params.id,
@@ -107,6 +120,10 @@ exports.updateEquityGrant = async (req, res) => {
  */
 exports.deleteEquityGrant = async (req, res) => {
   try {
+    // Fetch first to verify ownership before deleting
+    const existing = await databaseAdapter.findById('EquityGrant', req.params.id);
+    if (existing && !assertCompanyOwnership(req, res, existing)) return;
+
     const grant = await databaseAdapter.findByIdAndDelete('EquityGrant', req.params.id);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
