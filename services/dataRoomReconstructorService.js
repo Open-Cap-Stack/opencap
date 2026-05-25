@@ -417,22 +417,26 @@ async function gapFixerAgent(gapAnalysis, synthesis) {
   let generatedDocuments = [];
 
   if (generatable.length > 0) {
+    // Limit batch size to avoid LLM token truncation — process max 8 docs at a time
+    const BATCH_SIZE = 8;
+    const batch = generatable.slice(0, BATCH_SIZE);
+
     const prompt = `You are helping a startup founder prepare their investor data room.
 
 The following documents are MISSING and need to be drafted:
-${generatable.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+${batch.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 
 IMPORTANT: These documents are legal and financial templates only — they must be reviewed and signed by the appropriate parties before use.
 
 Current investor readiness score: ${synthesis?.investorReadinessScore ?? 'unknown'}/100
 
-For each document, generate a reasonable template/draft. Return JSON:
+For each document, generate a concise template/draft (50-100 words max per document). Return JSON:
 {
   "generatedDocuments": [
     {
       "name": "<document name>",
       "category": "<category>",
-      "content": "<draft content, 100-300 words>",
+      "content": "<draft content, 50-100 words>",
       "status": "generated",
       "disclaimer": "Template only — requires legal review and founder signature"
     }
@@ -443,7 +447,7 @@ For each document, generate a reasonable template/draft. Return JSON:
 
     const { parsed } = await ainativeChatWithRetry(
       [{ role: 'user', content: prompt }],
-      { temperature: 0.4, max_tokens: 4096 }
+      { temperature: 0.4, max_tokens: 8192 }
     );
 
     // Double-check: enforce neverGenerate guardrail on LLM output

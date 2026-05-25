@@ -77,11 +77,11 @@ describe('ainativeAgentService', () => {
       expect(body.temperature).toBe(0.3);
     });
 
-    it('sets default max_tokens to 4096', async () => {
+    it('sets default max_tokens to 8192', async () => {
       mockSuccess();
       await ainativeChat(messages);
       const [, body] = axios.post.mock.calls[0];
-      expect(body.max_tokens).toBe(4096);
+      expect(body.max_tokens).toBe(8192);
     });
 
     it('respects temperature override', async () => {

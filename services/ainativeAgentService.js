@@ -14,7 +14,7 @@ const JSON5 = require('json5');
 const AINATIVE_BASE = 'https://api.ainative.studio/v1';
 const DEFAULT_MODEL = 'llama-3.1-8b';
 const DEFAULT_TEMPERATURE = 0.3;
-const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 8192;
 const REQUEST_TIMEOUT_MS = 120000;
 
 // Fallback chain: primary → alternates tried in order on 429/402/503/529
