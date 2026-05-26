@@ -137,40 +137,37 @@ class FileStorageService {
     const contentType = this.getContentType(fileName);
     const fileKey = `opencap/files/${Date.now()}-${fileName}`;
 
+    const fullMetadata = {
+      ...metadata,
+      companyId,
+      uploadedBy,
+      category,
+      original_name: fileName,
+      content_type: contentType
+    };
+
     try {
-      // Create form data for file upload
-      // Use /database/storage/upload endpoint (not /database/files which is metadata-only)
-      // See: https://github.com/AINative-Studio/core/issues/1077
-      const fullMetadata = {
-        ...metadata,
-        companyId,
-        uploadedBy,
-        category,
-        original_name: fileName,
-        content_type: contentType
-      };
+      const response = await zerodbService.client.post(
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files`,
+        {
+          file_key: fileKey,
+          file_name: fileName,
+          content_type: contentType,
+          size_bytes: fileBuffer.length,
+          file_content_base64: fileBuffer.toString('base64'),
+          file_metadata: fullMetadata
+        }
+      );
 
-      // Store file as a ZeroDB database record (base64 content + metadata)
-      // ZeroDB database/files endpoint is metadata-only; use database records for binary storage
-      const fileRecord = await databaseAdapter.create('file_storage', {
-        file_key: fileKey,
-        file_name: fileName,
-        content_type: contentType,
-        size_bytes: fileBuffer.length,
-        file_content_base64: fileBuffer.toString('base64'),
-        ...fullMetadata,
-        stored_at: new Date().toISOString()
-      });
-
-      const fileId = fileRecord?.id || fileRecord?._id || fileRecord?.row_id || fileKey;
+      const fileId = response.data.file_id || response.data.id || fileKey;
       return {
         id: fileId,
-        fileKey: fileKey,
-        fileName: fileName,
-        size: fileBuffer.length,
-        contentType: contentType,
+        fileKey: response.data.file_key || fileKey,
+        fileName: response.data.file_name || fileName,
+        size: response.data.size_bytes || fileBuffer.length,
+        contentType: response.data.content_type || contentType,
         metadata: fullMetadata,
-        createdAt: new Date().toISOString()
+        createdAt: response.data.created_at || new Date().toISOString()
       };
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
@@ -235,48 +232,55 @@ class FileStorageService {
     const axios = require('axios');
 
     try {
-      // Retrieve file record from ZeroDB database storage
-      const record = await databaseAdapter.findById('file_storage', fileId);
-      if (!record) {
-        throw new Error('File not found');
-      }
+      // Get file metadata and download URL from ZeroDB
+      const response = await zerodbService.client.get(
+        `/v1/public/zerodb/${zerodbService.projectId}/database/files/${fileId}`
+      );
 
-      const file_name = record.file_name || record.fileName;
-      const content_type = record.content_type || record.contentType || 'application/octet-stream';
-      const size_bytes = record.size_bytes || record.size || 0;
+      const { download_url, file_name, content_type, size_bytes } = response.data;
 
       if (returnUrl) {
-        // No presigned URLs available; return a data URI for small files
-        const b64 = record.file_content_base64;
         return {
-          url: b64 ? `data:${content_type};base64,${b64}` : null,
+          url: download_url,
           fileName: file_name,
           contentType: content_type,
           size: size_bytes
         };
       }
 
-      const b64 = record.file_content_base64;
-      const data = b64 ? Buffer.from(b64, 'base64') : Buffer.alloc(0);
+      // Download the actual file content
+      const fileResponse = await axios.get(download_url, {
+        responseType: stream ? 'stream' : 'arraybuffer'
+      });
+
+      const actualContentType = fileResponse.headers['content-type'] || content_type;
 
       const result = {
-        data: stream ? null : data,
-        contentType: content_type,
+        data: stream ? null : fileResponse.data,
+        contentType: actualContentType,
         size: size_bytes,
         fileName: file_name
       };
 
       if (stream) {
-        const { Readable } = require('stream');
-        result.stream = Readable.from(data);
+        result.stream = fileResponse.data;
       }
 
       if (includeMetadata) {
-        result.metadata = { fileName: file_name, contentType: content_type, size: size_bytes };
+        result.metadata = { fileName: file_name, contentType: actualContentType, size: size_bytes };
       }
 
       return result;
     } catch (error) {
+      if (error.response?.status === 404 || error.message === 'File not found') {
+        throw new Error('File not found');
+      }
+      if (error.response?.status === 503) {
+        throw new Error('Service temporarily unavailable');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
       if (error.message === 'File not found') throw error;
       throw new Error(`Failed to download file: ${error.message}`);
     }

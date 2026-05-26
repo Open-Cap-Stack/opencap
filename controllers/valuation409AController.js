@@ -140,6 +140,14 @@ exports.updateValuation = async (req, res) => {
       });
     }
 
+    // Reject updates for approved valuations
+    if (valuation.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot update an approved valuation'
+      });
+    }
+
     // Use the actual stored valuationId for subsequent lookups
     const resolvedId = valuation.valuationId || valuationId;
 
@@ -993,6 +1001,13 @@ exports.getValuationAnalytics = async (req, res) => {
 exports.getLatestValuation = async (req, res) => {
   try {
     const { companyId } = req.query;
+
+    if (!companyId) {
+      return res.status(400).json({
+        success: false,
+        error: 'companyId query parameter is required'
+      });
+    }
 
     // Try approved/current first
     let valuation = null;

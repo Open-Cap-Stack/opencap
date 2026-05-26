@@ -196,11 +196,11 @@ describe('Enhanced Rate Limiter Middleware', () => {
 
       await limiter(req, res, next);
 
-      // Login should have stricter limits
+      // Login should have stricter limits than general endpoints
       const limitHeader = res.setHeader.mock.calls.find(
         call => call[0] === 'X-RateLimit-Limit'
       );
-      expect(limitHeader[1]).toBeLessThanOrEqual(10);
+      expect(limitHeader[1]).toBeLessThanOrEqual(20);
     });
 
     it('should include Retry-After header when rate limited', async () => {

@@ -10,6 +10,12 @@ jest.mock('../../../middleware/authMiddleware', () => ({
   authenticateToken: (req, res, next) => next()
 }));
 
+// Mock RBAC middleware
+jest.mock('../../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next()
+}));
+
 // Mock controller
 jest.mock('../../../controllers/fundraisingRoundController', () => ({
   createFundraisingRound: jest.fn((req, res) => res.status(201).json({ id: '1' })),

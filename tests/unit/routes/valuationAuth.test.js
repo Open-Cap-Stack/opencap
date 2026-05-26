@@ -29,7 +29,8 @@ jest.mock('../../../models/Valuation409A');
 jest.mock('../../../models/ValuationPartner');
 jest.mock('../../../models/User');
 
-const { authenticateToken } = require('../../../middleware/authMiddleware');
+const authMiddleware = require('../../../middleware/authMiddleware');
+const { authenticateToken } = authMiddleware;
 const User = require('../../../models/User');
 
 describe('Valuation Routes Authentication Middleware', () => {
@@ -76,6 +77,9 @@ describe('Valuation Routes Authentication Middleware', () => {
 
     // Clear all mocks
     jest.clearAllMocks();
+
+    // Clear the in-memory user cache so tests don't share cached state
+    authMiddleware.__clearCacheForTesting();
 
     // Mock User.findOne to return a valid user
     User.findOne = jest.fn().mockResolvedValue({

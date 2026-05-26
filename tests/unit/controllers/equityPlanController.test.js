@@ -66,6 +66,8 @@ describe('EquityPlan Controller', () => {
 
   describe('getEquityPlans', () => {
     it('should return all equity plans', async () => {
+      req = httpMocks.createRequest({ user: { companyId: 'company_123' } });
+      res = httpMocks.createResponse();
       const mockPlans = [
         { _id: 'plan1', planName: 'Plan A', totalShares: 1000000 },
         { _id: 'plan2', planName: 'Plan B', totalShares: 2000000 }
@@ -74,7 +76,7 @@ describe('EquityPlan Controller', () => {
 
       await equityPlanController.getEquityPlans(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityPlan', {});
+      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityPlan', { companyId: 'company_123' });
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData())).toEqual(mockPlans);
     });
@@ -89,6 +91,8 @@ describe('EquityPlan Controller', () => {
     });
 
     it('should return 500 on database error', async () => {
+      req = httpMocks.createRequest({ user: { companyId: 'company_123' } });
+      res = httpMocks.createResponse();
       databaseAdapter.find.mockRejectedValue(new Error('Database error'));
 
       await equityPlanController.getEquityPlans(req, res);

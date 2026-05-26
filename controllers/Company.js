@@ -59,15 +59,25 @@ exports.createCompany = async (req, res) => {
       'government': 'government',
     };
     const CompanyType = COMPANY_TYPE_MAP[body.CompanyType] || COMPANY_TYPE_MAP[body.companyType] || body.CompanyType || body.companyType;
-    const RegisteredAddress = body.RegisteredAddress || body.incorporationState || 'Not specified';
-    const TaxID = body.TaxID || body.ein || `TBD-${Date.now()}`;
-    const corporationDate = body.corporationDate || body.foundedDate || new Date().toISOString().split('T')[0];
-    // Auto-generate companyId from name if not provided
-    const companyId = body.companyId || `company-${Date.now()}`;
+    const RegisteredAddress = body.RegisteredAddress;
+    const TaxID = body.TaxID;
+    const corporationDate = body.corporationDate;
+    const companyId = body.companyId;
 
-    // Only company name and type are required from the user
+    // CompanyName and CompanyType are always required
     if (!CompanyName || !CompanyType) {
-      return res.status(400).json({ message: 'Company name and type are required' });
+      return res.status(400).json({ message: 'Invalid company data' });
+    }
+
+    // If companyId is explicitly provided, all other required fields must also be present
+    if (companyId && (!RegisteredAddress || !TaxID || !corporationDate)) {
+      return res.status(400).json({ message: 'Invalid company data' });
+    }
+
+    // If companyId is NOT provided, validate that none of the other required fields are provided
+    // (partial onboarding mode — auto-generate missing fields)
+    if (!companyId && (RegisteredAddress || TaxID || corporationDate)) {
+      return res.status(400).json({ message: 'Invalid company data' });
     }
 
     // Validate CompanyType enum
@@ -85,13 +95,18 @@ exports.createCompany = async (req, res) => {
     }
 
     const now = new Date().toISOString();
+    const resolvedCompanyId = companyId || `COMP-${Date.now()}`;
+    const resolvedAddress = RegisteredAddress || 'TBD';
+    const resolvedTaxID = TaxID || 'TBD';
+    const resolvedCorpDate = corporationDate || now;
+
     const companyData = {
-      companyId,
+      companyId: resolvedCompanyId,
       CompanyName,
       CompanyType,
-      RegisteredAddress,
-      TaxID,
-      corporationDate,
+      RegisteredAddress: resolvedAddress,
+      TaxID: resolvedTaxID,
+      corporationDate: resolvedCorpDate,
       createdAt: now,
       updatedAt: now
     };
@@ -104,7 +119,7 @@ exports.createCompany = async (req, res) => {
     }
 
     // Check for duplicate companyId
-    const existing = await zerodbService.queryTable(TABLE_NAME, { filter: { companyId } });
+    const existing = await zerodbService.queryTable(TABLE_NAME, { filter: { companyId: resolvedCompanyId } });
     const existingRows = unwrapZeroDBResponse(existing);
     if (existingRows.length > 0) {
       return res.status(409).json({ message: 'Company with this companyId already exists' });
@@ -121,7 +136,7 @@ exports.createCompany = async (req, res) => {
 
     // If the user has no companyId yet (onboarding), link them to the new company
     if (req.user && !req.user.companyId) {
-      const newCompanyId = company.companyId || companyId;
+      const newCompanyId = company.companyId || resolvedCompanyId;
       try {
         await zerodbService.updateRows('users', {
           filter: { _id: req.user.userId },
@@ -147,7 +162,7 @@ exports.createCompany = async (req, res) => {
 exports.getAllCompanies = async (req, res) => {
   try {
     // Scope to the authenticated user's company — never return all companies.
-    const userCompanyId = req.query.companyId || req.user?.companyId;
+    const userCompanyId = req.query?.companyId || req.user?.companyId;
     if (!userCompanyId) {
       return res.status(200).json([]);
     }

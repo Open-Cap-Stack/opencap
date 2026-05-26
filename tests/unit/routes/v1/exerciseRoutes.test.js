@@ -37,6 +37,12 @@ jest.mock('../../../../middleware/authMiddleware', () => ({
   })
 }));
 
+// Mock RBAC middleware
+jest.mock('../../../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next()
+}));
+
 const exerciseController = require('../../../../controllers/exerciseController');
 
 describe('Exercise Routes', () => {

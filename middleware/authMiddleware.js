@@ -576,5 +576,7 @@ module.exports = {
   verifyTokenWithTimeout,
   validateAINativeToken,
   provisionAINativeUser,
-  provisionUserFromToken
+  provisionUserFromToken,
+  // Test helper — clears the in-memory user cache between test cases
+  __clearCacheForTesting: () => userCache.clear()
 };

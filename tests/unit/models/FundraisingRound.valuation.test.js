@@ -64,7 +64,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
 
     describe('Schema Validation', () => {
         it('should have correct table name', () => {
-            expect(FundraisingRound.tableName).toBe('securities');
+            expect(FundraisingRound.tableName).toBe('fundraising_rounds');
         });
 
         it('should validate required fields', async () => {
@@ -213,7 +213,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
 
             expect(round).toBeDefined();
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     roundId: roundData.roundId,
                     preMoneyValuation: roundData.preMoneyValuation,
@@ -241,7 +241,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.create(roundData);
 
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     postMoneyValuation: 15000000 // 10M + 5M
                 })
@@ -265,7 +265,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.create(roundData);
 
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     pricePerShare: 2.5 // 10M / 4M shares
                 })
@@ -289,7 +289,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.create(roundData);
 
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     isDownRound: true
                 })
@@ -311,7 +311,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.create(roundData);
 
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     isArmsLength: true
                 })
@@ -340,7 +340,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
 
             expect(round).toBeDefined();
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     valuationCap: 8000000,
                     discount: 20,
@@ -366,7 +366,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.create(roundData);
 
             expect(zerodbService.insertRow).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     RoundType: 'CONVERTIBLE_NOTE',
                     valuationMethod: 'CONVERTIBLE_NOTE'
@@ -779,7 +779,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             });
 
             expect(zerodbService.updateRows).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     filter: { roundId: 'FR-001', _type: 'fundraising_round' },
                     update: {
@@ -809,7 +809,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             });
 
             expect(zerodbService.updateRows).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     update: {
                         $set: expect.objectContaining({
@@ -851,7 +851,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             await FundraisingRound.link409AValuation('FR-001', 'val-409a-001');
 
             expect(zerodbService.updateRows).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     update: {
                         $set: expect.objectContaining({
@@ -942,7 +942,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
 
             expect(rounds).toHaveLength(2);
             expect(zerodbService.queryTable).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     filter: expect.objectContaining({
                         companyId: 'company-123'
@@ -960,7 +960,7 @@ describe('FundraisingRound Model - Valuation Fields', () => {
             });
 
             expect(zerodbService.queryTable).toHaveBeenCalledWith(
-                'securities',
+                'fundraising_rounds',
                 expect.objectContaining({
                     sort: { date: -1 },
                     limit: 10

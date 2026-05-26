@@ -61,6 +61,8 @@ describe('AuthMiddleware', () => {
     // Setup default mock implementations
     mongoDbConnection.withRetry = jest.fn(fn => fn());
     User.findOne = jest.fn();
+    // Clear the in-memory user cache so tests don't share cached state
+    authMiddleware.__clearCacheForTesting();
     // Mock axios.get to reject immediately so AINative validation fails fast
     jest.spyOn(axios, 'get').mockRejectedValue(new Error('Network error'));
   });

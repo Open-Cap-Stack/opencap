@@ -24,13 +24,14 @@ const buildNotificationFilter = (query, user) => {
     filter.companyId = companyId;
   }
 
-  // Filter by notification type — ZeroDB only supports equality; single type only
+  // Filter by notification type
   if (query.type) {
     const types = query.type.split(',').map(t => t.trim());
     if (types.length === 1) {
       filter.notificationType = types[0];
+    } else {
+      filter.notificationType = { $in: types };
     }
-    // For multiple types, skip DB filter; JS post-filtering applied in getNotifications
   }
 
   // Filter by read/unread status
@@ -106,27 +107,19 @@ exports.getNotifications = async (req, res) => {
       page: req.query.page
     });
 
-    // Fetch with higher limit to allow JS post-filtering
-    const fetchLimit = limit + skip + 500;
-    let allNotifications = await databaseAdapter.find('Notification', filter, {
-      limit: fetchLimit,
-      sort: { Timestamp: -1 }
-    });
+    const [allNotifications, total, unreadCount] = await Promise.all([
+      databaseAdapter.find('Notification', filter, {
+        limit,
+        skip,
+        sort: { Timestamp: -1 }
+      }),
+      databaseAdapter.count('Notification', filter),
+      databaseAdapter.count('Notification', { ...filter, isRead: false })
+    ]);
 
-    // JS post-filtering for multi-type (ZeroDB doesn't support $in)
-    if (req.query.type) {
-      const types = req.query.type.split(',').map(t => t.trim());
-      if (types.length > 1) {
-        allNotifications = allNotifications.filter(n => types.includes(n.notificationType));
-      }
-    }
+    const hasMore = skip + allNotifications.length < total;
 
-    const total = allNotifications.length;
-    const unreadCount = allNotifications.filter(n => !n.isRead).length;
-    const notifications = allNotifications.slice(skip, skip + limit);
-    const hasMore = skip + notifications.length < total;
-
-    res.status(200).json({ notifications, total, hasMore, unreadCount });
+    res.status(200).json({ notifications: allNotifications, total, hasMore, unreadCount });
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve notifications', error: error.message });
   }

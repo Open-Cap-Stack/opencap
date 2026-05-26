@@ -108,7 +108,10 @@ describe('SPV Controller', () => {
       SPV.find.mockResolvedValue(mockSPVs);
       await spvController.getSPVs(req, res);
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res._getData())).toEqual({ spvs: mockSPVs });
+      const data = JSON.parse(res._getData());
+      expect(data.spvs).toHaveLength(2);
+      expect(data.spvs[0]).toMatchObject({ _id: 'spv1', SPVID: 'SPV001', spvId: 'SPV001' });
+      expect(data.spvs[1]).toMatchObject({ _id: 'spv2', SPVID: 'SPV002', spvId: 'SPV002' });
       expect(SPV.find).toHaveBeenCalledWith({ ParentCompanyID: 'COMPANY001' });
     });
 

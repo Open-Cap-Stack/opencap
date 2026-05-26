@@ -1,7 +1,7 @@
 /**
  * Pagination helper - enforces max limits on list endpoints
  */
-const MAX_LIMIT = 500;
+const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 20;
 
 function parsePagination(query) {

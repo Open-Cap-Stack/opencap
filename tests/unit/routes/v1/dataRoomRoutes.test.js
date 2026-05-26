@@ -30,7 +30,16 @@ jest.mock('../../../../controllers/dataRoomController', () => ({
   getActivityLog: jest.fn((req, res) => res.status(200).json({ activities: [] })),
   exportAsZip: jest.fn((req, res) => res.status(200).json({ message: 'Exporting' })),
   generateExternalLink: jest.fn((req, res) => res.status(200).json({ accessToken: 'token' })),
-  validateExternalAccess: jest.fn((req, res) => res.status(200).json({ valid: true }))
+  validateExternalAccess: jest.fn((req, res) => res.status(200).json({ valid: true })),
+  getDiff: jest.fn((req, res) => res.status(200).json({ diff: [] })),
+  getAccessLog: jest.fn((req, res) => res.status(200).json({ log: [] })),
+  logLinkAccess: jest.fn((req, res) => res.status(200).json({ logged: true }))
+}));
+
+// Mock RBAC middleware
+jest.mock('../../../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next()
 }));
 
 const dataRoomRoutes = require('../../../../routes/v1/dataRoomRoutes');

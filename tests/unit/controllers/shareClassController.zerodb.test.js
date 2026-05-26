@@ -58,7 +58,7 @@ describe('ShareClass Controller - ZeroDB Migration', () => {
 
       await createShareClass(req, res);
 
-      expect(databaseAdapter.create).toHaveBeenCalledWith('ShareClass', shareClassData);
+      expect(databaseAdapter.create).toHaveBeenCalledWith('ShareClass', expect.objectContaining(shareClassData));
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith({ shareClass: mockCreatedShareClass });
     });

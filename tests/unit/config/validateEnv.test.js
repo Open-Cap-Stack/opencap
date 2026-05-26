@@ -67,6 +67,7 @@ describe('validateEnvironment', () => {
       process.env.PLUGIN_CLIENT_ID = 'test-client-id';
       process.env.PLUGIN_CLIENT_SECRET = 'test-client-secret';
       process.env.PLUGIN_REDIRECT_URI = 'https://example.com/callback';
+      process.env.ENCRYPTION_KEY = 'a'.repeat(64);
 
       const result = validateEnvironment();
       expect(result.errors).toHaveLength(0);
@@ -98,6 +99,7 @@ describe('validateEnvironment', () => {
       process.env.PLUGIN_CLIENT_ID = 'test-client-id';
       process.env.PLUGIN_CLIENT_SECRET = 'test-client-secret';
       process.env.PLUGIN_REDIRECT_URI = 'https://example.com/callback';
+      process.env.ENCRYPTION_KEY = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
 
       const result = validateEnvironment();
       expect(result.errors).toHaveLength(0);
@@ -113,6 +115,7 @@ describe('validateEnvironment', () => {
       process.env.PLUGIN_CLIENT_ID = 'test-client-id';
       process.env.PLUGIN_CLIENT_SECRET = 'test-client-secret';
       process.env.PLUGIN_REDIRECT_URI = 'https://example.com/callback';
+      process.env.ENCRYPTION_KEY = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
       delete process.env.ZERODB_API_KEY;
 
       const result = validateEnvironment();
@@ -170,6 +173,7 @@ describe('validateEnvironment', () => {
       process.env.JWT_REFRESH_SECRET = 'r1e2f3r4e5s6h7s8e9c0r1e2t3k4e5y6';
       process.env.ZERODB_API_KEY = 'dev-key';
       process.env.STRIPE_SECRET_KEY = 'sk_test_valid_key';
+      process.env.ENCRYPTION_KEY = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
 
       const result = validateEnvironment();
       expect(result.warnings).toHaveLength(0);

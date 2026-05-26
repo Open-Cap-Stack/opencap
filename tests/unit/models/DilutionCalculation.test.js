@@ -601,7 +601,7 @@ describe('DilutionCalculation Model', () => {
         'dilution_calculations',
         expect.objectContaining({
           filter: { companyId: 'company-123' },
-          limit: 0
+          limit: 1
         })
       );
     });

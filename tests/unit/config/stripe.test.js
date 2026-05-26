@@ -80,10 +80,12 @@ describe('Stripe Config', () => {
             expect(stripeConfig.PLANS.enterprise.limits.apiCallsPerMonth).toBe(-1);
         });
 
-        it('should not have per-seat user limits', () => {
-            Object.values(stripeConfig.PLANS).forEach(plan => {
-                expect(plan.limits.users).toBeUndefined();
-            });
+        it('should not have per-seat user limits for paid plans', () => {
+            // Free plan has a seat cap (users: 5), paid plans are usage-based (users: -1)
+            expect(stripeConfig.PLANS.free.limits.users).toBe(5);
+            expect(stripeConfig.PLANS.starter.limits.users).toBe(-1);
+            expect(stripeConfig.PLANS.professional.limits.users).toBe(-1);
+            expect(stripeConfig.PLANS.enterprise.limits.users).toBe(-1);
         });
     });
 

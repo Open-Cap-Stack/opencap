@@ -26,18 +26,26 @@ const buildActivityFilter = (query, user) => {
     filter.companyId = companyId;
   }
 
-  // Filter by activity type — ZeroDB only supports equality; use single type only
+  // Filter by activity type
   if (query.type) {
     const types = query.type.split(',').map(t => t.trim());
-    // ZeroDB does not support $in; only filter by single type
     if (types.length === 1) {
       filter.activityType = types[0];
+    } else {
+      filter.activityType = { $in: types };
     }
-    // For multiple types, skip filter (JS post-filtering will handle it)
   }
 
-  // Note: date range filters ($gte/$lte) are not supported by ZeroDB's basic equality filter.
-  // We store startDate/endDate in the query for JS-side post-filtering.
+  // Date range filter
+  if (query.startDate || query.endDate) {
+    filter.timestamp = {};
+    if (query.startDate) {
+      filter.timestamp.$gte = new Date(query.startDate);
+    }
+    if (query.endDate) {
+      filter.timestamp.$lte = new Date(query.endDate);
+    }
+  }
 
   return filter;
 };
@@ -73,7 +81,7 @@ exports.createActivity = async (req, res) => {
  */
 exports.getActivities = async (req, res) => {
   try {
-    // Build filter from query parameters (ZeroDB equality only)
+    // Build filter from query parameters
     const filter = buildActivityFilter(req.query, req.user);
 
     // Handle pagination
@@ -86,34 +94,18 @@ exports.getActivities = async (req, res) => {
       skip = (page - 1) * limit;
     }
 
-    // Fetch with higher limit to allow JS post-filtering
-    const fetchLimit = limit + skip + 500;
-    let activities = await databaseAdapter.find('Activity', filter, {
-      limit: fetchLimit,
-      sort: { timestamp: -1 }
-    });
+    const [activities, total] = await Promise.all([
+      databaseAdapter.find('Activity', filter, {
+        limit,
+        skip,
+        sort: { timestamp: -1 }
+      }),
+      databaseAdapter.count('Activity', filter)
+    ]);
 
-    // JS post-filtering for multi-type and date ranges (ZeroDB doesn't support $in/$gte/$lte)
-    if (req.query.type) {
-      const types = req.query.type.split(',').map(t => t.trim());
-      if (types.length > 1) {
-        activities = activities.filter(a => types.includes(a.activityType));
-      }
-    }
-    if (req.query.startDate) {
-      const start = new Date(req.query.startDate);
-      activities = activities.filter(a => a.timestamp && new Date(a.timestamp) >= start);
-    }
-    if (req.query.endDate) {
-      const end = new Date(req.query.endDate);
-      activities = activities.filter(a => a.timestamp && new Date(a.timestamp) <= end);
-    }
+    const hasMore = skip + activities.length < total;
 
-    const total = activities.length;
-    const paged = activities.slice(skip, skip + limit);
-    const hasMore = skip + paged.length < total;
-
-    res.status(200).json({ activities: paged, total, hasMore });
+    res.status(200).json({ activities, total, hasMore });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching activities' });
   }

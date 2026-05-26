@@ -370,6 +370,7 @@ describe('Valuation409A Controller', () => {
     it('should return null when no valuation exists', async () => {
       mockReq.query = { companyId: 'company_123' };
       Valuation409A.findCurrentValuation.mockResolvedValue(null);
+      Valuation409A.find.mockResolvedValue([]);
 
       await valuation409AController.getLatestValuation(mockReq, mockRes);
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, valuation: null }));

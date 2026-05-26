@@ -480,7 +480,7 @@ describe('DilutionScenario Model', () => {
         'dilution_scenarios',
         expect.objectContaining({
           filter: { companyId: 'company-123' },
-          limit: 0
+          limit: 1
         })
       );
     });

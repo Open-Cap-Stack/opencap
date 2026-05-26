@@ -215,6 +215,7 @@ describe('Company Controller - ZeroDB Migration', () => {
 
   describe('getAllCompanies', () => {
     it('should return all companies successfully', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       const mockCompanies = [
         {
           _id: 'id-1',
@@ -227,7 +228,7 @@ describe('Company Controller - ZeroDB Migration', () => {
         },
         {
           _id: 'id-2',
-          companyId: 'COMP-002',
+          companyId: 'COMP-001',
           CompanyName: 'Company Two',
           CompanyType: 'corporation',
           RegisteredAddress: '456 Oak Ave',
@@ -240,21 +241,23 @@ describe('Company Controller - ZeroDB Migration', () => {
 
       await companyController.getAllCompanies(mockReq, mockRes);
 
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {});
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', { filter: { companyId: 'COMP-001' } });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockCompanies);
     });
 
     it('should return 404 when no companies exist', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       zerodbService.queryTable.mockResolvedValue([]);
 
       await companyController.getAllCompanies(mockReq, mockRes);
 
-      expect(mockRes.status).toHaveBeenCalledWith(404);
-      expect(mockRes.json).toHaveBeenCalledWith({ message: 'No companies found' });
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith([]);
     });
 
     it('should return 500 when ZeroDB query fails', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       zerodbService.queryTable.mockRejectedValue(new Error('Query failed'));
 
       await companyController.getAllCompanies(mockReq, mockRes);
@@ -264,17 +267,20 @@ describe('Company Controller - ZeroDB Migration', () => {
     });
 
     it('should handle null response correctly', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       zerodbService.queryTable.mockResolvedValue(null);
 
       await companyController.getAllCompanies(mockReq, mockRes);
 
-      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith([]);
     });
 
     it('should handle large dataset', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       const largeDataset = Array.from({ length: 100 }, (_, i) => ({
         _id: `id-${i}`,
-        companyId: `COMP-${i.toString().padStart(3, '0')}`,
+        companyId: 'COMP-001',
         CompanyName: `Company ${i}`,
         CompanyType: 'startup',
         RegisteredAddress: `${i} Main St`,
@@ -647,6 +653,7 @@ describe('Company Controller - ZeroDB Migration', () => {
     });
 
     it('should handle ZeroDB connection refused errors', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       zerodbService.queryTable.mockRejectedValue(new Error('ECONNREFUSED'));
 
       await companyController.getAllCompanies(mockReq, mockRes);
@@ -656,6 +663,7 @@ describe('Company Controller - ZeroDB Migration', () => {
     });
 
     it('should handle authentication errors gracefully', async () => {
+      mockReq.user = { companyId: 'COMP-001' };
       const authError = new Error('Unauthorized');
       authError.response = { status: 401 };
       zerodbService.queryTable.mockRejectedValue(authError);
@@ -1018,9 +1026,10 @@ describe('Company Controller - ZeroDB Migration', () => {
 
       // Test read all
       jest.clearAllMocks();
+      mockReq.user = { companyId: 'COMP-001' };
       zerodbService.queryTable.mockResolvedValue([{ _id: 'id-1' }]);
       await companyController.getAllCompanies(mockReq, mockRes);
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', {});
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('companies', { filter: { companyId: 'COMP-001' } });
 
       // Test read by ID
       jest.clearAllMocks();

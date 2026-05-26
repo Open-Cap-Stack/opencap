@@ -177,7 +177,7 @@ describe('AuthController', () => {
           companyId: 'company_1'
         }),
         'test-secret',
-        { expiresIn: '1h' }
+        { expiresIn: '24h' }
       );
       // Verify lastLogin is updated
       expect(User.updateLastLogin).toHaveBeenCalledWith('user_123');
@@ -342,7 +342,7 @@ describe('AuthController', () => {
           companyId: 'company_1'
         }),
         'test-secret',
-        { expiresIn: '1h' }
+        { expiresIn: '24h' }
       );
     });
 
@@ -589,7 +589,7 @@ describe('AuthController', () => {
           companyId: 'company-1'
         }),
         'test-secret',
-        { expiresIn: '1h' }
+        { expiresIn: '24h' }
       );
     });
 

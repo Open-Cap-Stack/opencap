@@ -12,6 +12,14 @@ jest.mock('../../../services/databaseAdapter', () => ({
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
+  count: jest.fn().mockResolvedValue(0),
+  findOne: jest.fn().mockResolvedValue(null),
+}));
+
+// Mock User model
+jest.mock('../../../models/User', () => ({
+  countDocuments: jest.fn().mockResolvedValue(0),
+  findOne: jest.fn(),
 }));
 
 // Import controller after mocking
@@ -50,18 +58,22 @@ describe('Invite Management Controller - ZeroDB Migration', () => {
         invitedBy: 'admin@company.com',
         status: 'pending',
       };
-      req.body = inviteData;
+      req.body = { ...inviteData };
 
       const mockCreatedInvite = {
         _id: 'invite123',
         ...inviteData,
+        companyId: 'company_123',
       };
 
       databaseAdapter.create.mockResolvedValue(mockCreatedInvite);
 
       await createInvite(req, res);
 
-      expect(databaseAdapter.create).toHaveBeenCalledWith('Invite', inviteData);
+      expect(databaseAdapter.create).toHaveBeenCalledWith(
+        'Invite',
+        expect.objectContaining({ ...inviteData, companyId: 'company_123' })
+      );
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(mockCreatedInvite);
     });
