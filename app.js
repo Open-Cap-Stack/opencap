@@ -306,6 +306,7 @@ const routes = {
   employeeSelfServiceRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeSelfServiceRoutes')), // Phase 3: Employee self-service equity API
   serviceProviderRoutes: safeRequire(path.join(__dirname, 'routes/v1/serviceProviderRoutes')), // Phase 4: Service provider invite flow
   auditLogRoutes: safeRequire(path.join(__dirname, 'routes/v1/auditLogRoutes')), // Phase 5: Audit logging
+  readinessRoutes: safeRequire(path.join(__dirname, 'routes/v1/readinessRoutes')), // Issue #651: Investor readiness score
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -315,7 +316,7 @@ const routes = {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -497,6 +498,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/service-providers'; // Phase 4: Service provider invite flow
     } else if (key === 'auditLogRoutes') {
       path = '/api/v1/audit-logs'; // Phase 5: Audit logging
+    } else if (key === 'readinessRoutes') {
+      path = '/api/v1/readiness'; // Issue #651: Investor readiness score
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

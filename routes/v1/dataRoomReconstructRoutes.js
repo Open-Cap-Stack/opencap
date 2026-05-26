@@ -33,6 +33,9 @@ router.get('/status/:jobId', hasRole(['super_admin', 'admin', 'founder', 'manage
 // POST /api/v1/reconstruct/:jobId/finalize
 router.post('/:jobId/finalize', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), ctrl.finalizeJob);
 
+// GET /api/v1/reconstruct/:jobId/export/ocf
+router.get('/:jobId/export/ocf', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), ctrl.exportOCF);
+
 // GET /api/v1/reconstruct/jobs
 router.get('/jobs', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), ctrl.listJobs);
 

@@ -16,6 +16,15 @@ const { v4: uuidv4 } = require('uuid');
 const ReconstructionJob = require('../models/ReconstructionJob');
 const zipExtractionService = require('../services/zipExtractionService');
 
+// Lazy-loaded OCF export service
+let _ocfExportService;
+function getOCFExportService() {
+  if (!_ocfExportService) {
+    _ocfExportService = require('../services/ocfExportService');
+  }
+  return _ocfExportService;
+}
+
 // Lazy-loaded so the module can be required before it is written
 let _reconstructorService;
 function getReconstructorService() {
@@ -275,6 +284,17 @@ exports.finalizeJob = async (req, res) => {
       { $set: { 'progress.finalizeComplete': true, updatedAt: new Date().toISOString() } }
     );
 
+    // Optional OCF export when format=ocf is requested
+    const exportFormat = req.query.format || req.body.exportFormat;
+    if (exportFormat === 'ocf') {
+      const companyId = job.companyId || req.user?.companyId;
+      if (companyId) {
+        const { exportToOCF } = getOCFExportService();
+        const ocfResult = await exportToOCF(companyId);
+        return res.status(200).json({ success: true, jobId, ...finalizeResult, ocf: ocfResult });
+      }
+    }
+
     return res.status(200).json({ success: true, jobId, ...finalizeResult });
   } catch (err) {
     console.error('[reconstruct] finalizeJob error:', err);
@@ -295,6 +315,42 @@ exports.listJobs = async (req, res) => {
     return res.status(200).json({ success: true, jobs, total: jobs.length });
   } catch (err) {
     console.error('[reconstruct] listJobs error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/reconstruct/:jobId/export/ocf
+// Streams the full OCF JSON package for a completed reconstruction job.
+// ---------------------------------------------------------------------------
+exports.exportOCF = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = await ReconstructionJob.findByJobId(jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, error: `Job ${jobId} not found` });
+    }
+    if (job.status !== 'complete') {
+      return res.status(409).json({
+        success: false,
+        error: `Job must be "complete" to export. Current status: "${job.status}"`,
+      });
+    }
+
+    const companyId = job.companyId || req.user?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ success: false, error: 'Cannot determine companyId for export' });
+    }
+
+    const { exportToOCF } = getOCFExportService();
+    const { ocfPackage, stats } = await exportToOCF(companyId);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="ocf-export-${companyId}.json"`);
+
+    return res.status(200).json({ success: true, jobId, ocfPackage, stats });
+  } catch (err) {
+    console.error('[reconstruct] exportOCF error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 };

@@ -11,6 +11,7 @@ const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 const dataRoomController = require('../../controllers/dataRoomController');
+const { analyzeDataRoom } = require('../../controllers/dataRoomAnalyzeController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -35,6 +36,16 @@ router.get('/:id/diff', hasRole(['super_admin', 'admin', 'founder', 'manager', '
 // Issue #657: Access audit log and link access tracking
 router.get('/:id/access-log', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.getAccessLog);
 router.post('/:id/log-access', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), dataRoomController.logLinkAccess);
+
+// Issue #615: AI gap analysis on data room documents
+router.post('/:id/analyze', hasRole(['super_admin', 'admin', 'founder', 'manager']), analyzeDataRoom);
+
+// Issue #616: Structured extraction from data room PDFs into draft OpenCap records
+const dataRoomExtractController = require('../../controllers/dataRoomExtractController');
+router.post('/:id/extract', hasRole(['super_admin', 'admin', 'founder', 'manager']), dataRoomExtractController.extractRecords);
+router.get('/:id/extract', hasRole(['super_admin', 'admin', 'founder', 'manager']), dataRoomExtractController.listExtractions);
+router.post('/:id/extract/:extractionId/approve', hasRole(['super_admin', 'admin', 'founder', 'manager']), dataRoomExtractController.approveExtraction);
+router.post('/:id/extract/:extractionId/reject', hasRole(['super_admin', 'admin', 'founder', 'manager']), dataRoomExtractController.rejectExtraction);
 
 // Issue #659: AI deal room Q&A
 const dealRoomChatService = require('../../services/dealRoomChatService');
