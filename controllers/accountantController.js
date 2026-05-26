@@ -8,7 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const AccountantQueue = require('../models/AccountantQueue');
 const Valuation409A = require('../models/Valuation409A');
 const User = require('../models/User');
-const emailService = require('../services/valuation409AEmailService');
+const emailService = require('../services/emailService');
 const stripeService = require('../services/stripeService');
 const { assertCompanyOwnership } = require('../middleware/companyScope');
 

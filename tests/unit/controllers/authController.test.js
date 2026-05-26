@@ -252,9 +252,7 @@ describe('AuthController', () => {
 
   describe('resendVerification', () => {
     it('should return 200 and send email when user exists with pending status', async () => {
-      process.env.EMAIL_HOST = 'smtp.example.com';
-      process.env.EMAIL_USER = 'user@example.com';
-      process.env.EMAIL_PASSWORD = 'secret';
+      process.env.RESEND_API_KEY = 'test-resend-key';
       req.body = { email: 'pending@example.com' };
       User.findOne.mockResolvedValue({
         _id: 'user_pending',

@@ -12,9 +12,9 @@ const User = require('../models/User');
 const { isValidObjectId } = require('../utils/inputSanitizer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const axios = require('axios');
+const emailService = require('../services/emailService');
 const { OAuth2Client } = require('google-auth-library');
 const { blacklistToken, isTokenBlacklisted, provisionAINativeUser } = require('../middleware/authMiddleware');
 const { sanitizeUser } = require('../utils/sanitizeUser');
@@ -26,26 +26,6 @@ const AINATIVE_API_URL = process.env.AINATIVE_API_URL || process.env.ZERODB_BASE
 const googleClient = process.env.GOOGLE_CLIENT_ID
   ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
   : null;
-
-/**
- * Create transporter for sending emails
- * @returns {Object} Nodemailer transporter object
- */
-const createEmailTransporter = () => {
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    throw new Error('EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD environment variables are required');
-  }
-  
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
-};
 
 /**
  * Register a new user
@@ -143,7 +123,7 @@ const registerUser = async (req, res) => {
     };
 
     // Only add verification token when SMTP is configured and can send the email
-    if (!isDevelopment && process.env.EMAIL_HOST) {
+    if (!isDevelopment && (process.env.EMAIL_PASS || process.env.RESEND_API_KEY)) {
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       userData.verificationToken = verificationToken;
@@ -153,9 +133,12 @@ const registerUser = async (req, res) => {
     // Create user using ZeroDB pattern
     const user = await User.create(userData);
 
-    // Send verification email in background (non-blocking — user is already active)
+    // Send verification and welcome emails in background (non-blocking — user is already active)
     sendVerificationEmailToUser(user).catch(err =>
       console.error('Failed to send verification email:', err.message)
+    );
+    emailService.sendWelcome({ to: user.email, firstName: user.firstName, role: user.role }).catch(err =>
+      console.error('Failed to send welcome email:', err.message)
     );
 
     // Generate auth token for immediate login
@@ -637,14 +620,6 @@ const requestPasswordReset = async (req, res) => {
     
     // Only generate token and send email if user exists
     if (user) {
-      // If SMTP is not configured, return graceful degradation instead of crashing
-      if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-        console.warn('Password reset requested but SMTP not configured — skipping email send');
-        return res.status(200).json({
-          message: 'If an account exists with that email, a password reset link has been sent'
-        });
-      }
-
       // Generate reset token
       const resetSecret = process.env.JWT_RESET_SECRET || process.env.JWT_SECRET;
       const resetToken = jwt.sign(
@@ -653,23 +628,9 @@ const requestPasswordReset = async (req, res) => {
         { expiresIn: '24h' }
       );
 
-      // Send reset email
-      const transporter = createEmailTransporter();
+      // Send reset email via unified email service (gracefully skips if no key configured)
       const resetUrl = `${process.env.FRONTEND_URL || 'https://opencapstack.com'}/reset-password?token=${resetToken}`;
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'noreply@news.ainative.studio',
-        to: user.email,
-        subject: 'OpenCap Stack — Password Reset',
-        html: `
-          <h1>Password Reset</h1>
-          <p>You requested a password reset for your OpenCap Stack account.</p>
-          <p>Click the link below to set a new password. This link expires in 1 hour.</p>
-          <p><a href="${resetUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Reset Password</a></p>
-          <p>If you didn't request this, you can safely ignore this email.</p>
-          <hr/>
-          <p style="font-size:12px;color:#6b7280;">OpenCap Stack — Cap Table Management</p>
-        `
-      });
+      await emailService.sendPasswordReset({ to: user.email, resetUrl });
     }
 
     // For security reasons, still return success even if user doesn't exist
@@ -1000,21 +961,12 @@ const sendVerificationEmailToUser = async (user) => {
     process.env.JWT_VERIFICATION_SECRET || process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
-  
-  // Send verification email
-  const transporter = createEmailTransporter();
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'support@opencap.com',
+
+  const verificationUrl = `${process.env.FRONTEND_URL || 'https://opencapstack.com'}/verify-email/${verificationToken}`;
+  await emailService.sendEmailVerification({
     to: user.email,
-    subject: 'OpenCap - Verify Your Email',
-    html: `
-      <h1>Email Verification</h1>
-      <p>Thank you for registering. Please click the link below to verify your email address:</p>
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${verificationToken}">
-        Verify Email
-      </a>
-      <p>This link will expire in 24 hours.</p>
-    `
+    firstName: user.firstName,
+    verificationUrl,
   });
 };
 
@@ -1046,7 +998,7 @@ const resendVerification = async (req, res) => {
     }
 
     // If SMTP is not configured, log warning and return graceful response
-    if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    if (!process.env.EMAIL_PASS && !process.env.RESEND_API_KEY) {
       console.warn('Resend verification requested but SMTP not configured');
       return res.status(200).json({ message: 'If that email is registered and unverified, a verification email has been sent.' });
     }

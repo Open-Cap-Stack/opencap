@@ -9,7 +9,7 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const Valuation409A = require('../models/Valuation409A');
 const AccountantQueue = require('../models/AccountantQueue');
-const emailService = require('./valuation409AEmailService');
+const emailService = require('./emailService');
 const User = require('../models/User');
 
 const AINATIVE_BASE = 'https://api.ainative.studio';
