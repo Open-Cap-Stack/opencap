@@ -4,6 +4,7 @@ const authController = require('../../controllers/authController');
 const { authenticateToken } = require('../../middleware/authMiddleware.js');
 const { debugTokenEndpoint } = require('../../middleware/authErrorLogger');
 const { createEndpointRateLimiter } = require('../../middleware/rateLimiter');
+const { auditAction } = require('../../middleware/auditLog');
 
 // Debug endpoint disabled in production (Issue #250)
 if (process.env.NODE_ENV !== 'production') {
@@ -12,19 +13,19 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Existing routes
 router.post('/register', createEndpointRateLimiter('/api/v1/auth/register'), authController.registerUser);
-router.post('/login', createEndpointRateLimiter('/api/v1/auth/login'), authController.loginUser);
-router.post('/oauth-login', authController.oauthLogin);
+router.post('/login', createEndpointRateLimiter('/api/v1/auth/login'), auditAction('login', 'auth'), authController.loginUser);
+router.post('/oauth-login', auditAction('login', 'auth'), authController.oauthLogin);
 
 // Token exchange: convert AINative token to fast local JWT (unprotected, rate-limited)
 router.post('/exchange-token', createEndpointRateLimiter('/api/v1/auth/login'), authController.exchangeAINativeToken);
 
 // AINative credential login: authenticate directly with AINative email/password (rate-limited)
-router.post('/ainative-login', createEndpointRateLimiter('/api/v1/auth/login'), authController.ainativeLogin);
+router.post('/ainative-login', createEndpointRateLimiter('/api/v1/auth/login'), auditAction('login', 'auth'), authController.ainativeLogin);
 
 // New routes for OCAE-203
 // Token management
 router.post('/token/refresh', createEndpointRateLimiter('/api/v1/auth/login'), authController.refreshToken);
-router.post('/logout', authenticateToken, authController.logout);
+router.post('/logout', authenticateToken, auditAction('logout', 'auth'), authController.logout);
 
 // Password reset flow
 router.post('/password/reset-request', authController.requestPasswordReset);
@@ -53,7 +54,7 @@ router.get('/me', authenticateToken, (req, res) => {
 });
 
 // Change password (authenticated)
-router.put('/change-password', authenticateToken, authController.changePassword);
+router.put('/change-password', authenticateToken, auditAction('change_password', 'auth'), authController.changePassword);
 
 // Email verification
 router.post('/verify/send', authenticateToken, authController.sendVerificationEmail);

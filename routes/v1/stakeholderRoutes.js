@@ -9,6 +9,7 @@ const stakeholderController = require('../../controllers/stakeholderController')
 const bulkReportsController = require('../../controllers/bulkReportsController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
+const { auditAction } = require('../../middleware/auditLog');
 const qsbsEligibilityService = require('../../services/qsbsEligibilityService');
 
 // Apply authentication to all stakeholder routes
@@ -62,18 +63,18 @@ router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'servi
  * POST /api/v1/stakeholders
  * Create a new stakeholder
  */
-router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.createStakeholder);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('create_stakeholder', 'stakeholder'), stakeholderController.createStakeholder);
 
 /**
  * PUT /api/v1/stakeholders/:id
  * Update a stakeholder
  */
-router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.updateStakeholderById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('update_stakeholder', 'stakeholder'), stakeholderController.updateStakeholderById);
 
 /**
  * DELETE /api/v1/stakeholders/:id
  * Delete a stakeholder
  */
-router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.deleteStakeholderById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('delete_stakeholder', 'stakeholder'), stakeholderController.deleteStakeholderById);
 
 module.exports = router;

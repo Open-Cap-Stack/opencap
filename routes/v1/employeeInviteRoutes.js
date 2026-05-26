@@ -13,6 +13,7 @@ const router = express.Router();
 
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
+const { auditAction } = require('../../middleware/auditLog');
 const {
   inviteEmployee,
   acceptInvite,
@@ -26,7 +27,7 @@ const LIST_ROLES  = ['super_admin', 'admin', 'founder', 'manager'];
 const VIEW_ROLES  = ['super_admin', 'admin', 'founder', 'manager', 'employee'];
 
 // POST /api/v1/employees/invite — must be before /:userId to avoid collision
-router.post('/invite', authenticateToken, hasRole(INVITE_ROLES), inviteEmployee);
+router.post('/invite', authenticateToken, hasRole(INVITE_ROLES), auditAction('invite_employee', 'employee'), inviteEmployee);
 
 // POST /api/v1/employees/accept-invite — public, no auth required (invite token is the credential)
 router.post('/accept-invite', acceptInvite);

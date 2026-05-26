@@ -9,6 +9,7 @@ const router = express.Router();
 const valuation409AController = require('../../controllers/valuation409AController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
+const { auditAction } = require('../../middleware/auditLog');
 const valuation409ATriggerService = require('../../services/valuation409ATriggerService');
 
 // Apply auth middleware to all routes
@@ -113,7 +114,7 @@ router.get('/latest', hasRole(['super_admin', 'admin', 'founder', 'accountant'])
  *       400:
  *         description: Invalid input
  */
-router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.createValuationRequest);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), auditAction('create_valuation_request', 'valuation'), valuation409AController.createValuationRequest);
 
 /**
  * @swagger
@@ -292,7 +293,7 @@ router.get('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'account
  *         description: Cannot update valuation in current status
  */
 router.put('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.updateValuation);
-router.delete('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.deleteValuation);
+router.delete('/:valuationId', hasRole(['super_admin', 'admin', 'founder', 'accountant']), auditAction('delete_valuation', 'valuation'), valuation409AController.deleteValuation);
 
 /**
  * @swagger
@@ -414,7 +415,7 @@ router.post('/:valuationId/start-review', hasRole(['super_admin', 'admin', 'foun
  *       200:
  *         description: Valuation approved
  */
-router.post('/:valuationId/approve', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.approveValuation);
+router.post('/:valuationId/approve', hasRole(['super_admin', 'admin', 'founder', 'accountant']), auditAction('approve_valuation', 'valuation'), valuation409AController.approveValuation);
 
 /**
  * @swagger

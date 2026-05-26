@@ -15,6 +15,7 @@ const os = require('os');
 const documentController = require('../../controllers/documentController');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
+const { auditAction } = require('../../middleware/auditLog');
 
 // Apply authentication to all document routes
 router.use(authenticateToken);
@@ -81,7 +82,7 @@ router.post('/bulk-index', hasRole(['super_admin', 'admin', 'founder', 'manager'
 router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocuments);
 
 // POST /api/v1/documents - Create a new document (with file upload)
-router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), upload.single('file'), documentController.createDocument);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), upload.single('file'), auditAction('create_document', 'document'), documentController.createDocument);
 
 // GET /api/v1/documents/:id - Get a document by ID
 router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocumentById);
@@ -90,7 +91,7 @@ router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'servi
 router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.updateDocumentById);
 
 // DELETE /api/v1/documents/:id - Delete a document by ID
-router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.deleteDocumentById);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('delete_document', 'document'), documentController.deleteDocumentById);
 
 // GET /api/v1/documents/:id/similar - Find similar documents
 router.get('/:id/similar', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.findSimilarDocuments);
