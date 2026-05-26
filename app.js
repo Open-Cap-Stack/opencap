@@ -302,6 +302,8 @@ const routes = {
   migrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/migrationRoutes')), // Issue #652: Carta migration score tool
   capTableHealthRoutes: safeRequire(path.join(__dirname, 'routes/v1/capTableHealthRoutes')), // Issue #660: Cap table health scorecard
   scenarioRoutes: safeRequire(path.join(__dirname, 'routes/v1/scenarioRoutes')), // Issue #661: Scenario modeling unified endpoint
+  employeeInviteRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeInviteRoutes')), // Phase 3: Employee invite flow
+  employeeSelfServiceRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeSelfServiceRoutes')), // Phase 3: Employee self-service equity API
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -485,6 +487,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/cap-table'; // Issue #660: Cap table health scorecard
     } else if (key === 'scenarioRoutes') {
       path = '/api/v1/scenarios'; // Issue #661: Scenario modeling unified endpoint
+    } else if (key === 'employeeInviteRoutes') {
+      path = '/api/v1/employees'; // Phase 3: Employee invite flow
+    } else if (key === 'employeeSelfServiceRoutes') {
+      path = '/api/v1/me'; // Phase 3: Employee self-service equity API
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
