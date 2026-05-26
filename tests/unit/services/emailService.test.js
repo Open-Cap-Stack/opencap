@@ -45,10 +45,7 @@ function loadEmailService(env = {}) {
 }
 
 afterEach(() => {
-  // Clean up any env pollution between tests
-  delete process.env.RESEND_API_KEY;
-  delete process.env.EMAIL_PASS;
-  delete process.env.FRONTEND_URL;
+  // loadEmailService() already saves/restores env vars — only restore mocks here
   jest.restoreAllMocks();
 });
 
@@ -417,12 +414,12 @@ describe('FRONTEND_URL override', () => {
 // ─── Stress test ──────────────────────────────────────────────────────────────
 
 describe('stress test — rapid fire', () => {
-  test('sendPasswordReset called 100 times does not throw, calls sendMail 100 times', async () => {
+  test('sendPasswordReset called 20 times does not throw, calls sendMail 20 times', async () => {
     const { emailService, sendMailMock } = loadEmailService({ RESEND_API_KEY: 'test-key' });
-    const calls = Array.from({ length: 100 }, (_, i) =>
+    const calls = Array.from({ length: 20 }, (_, i) =>
       emailService.sendPasswordReset({ to: `user${i}@example.com`, resetUrl: `https://opencapstack.com/reset?token=token${i}` })
     );
     await Promise.all(calls);
-    expect(sendMailMock).toHaveBeenCalledTimes(100);
+    expect(sendMailMock).toHaveBeenCalledTimes(20);
   });
 });

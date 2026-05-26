@@ -25,6 +25,7 @@ describe('browserAutomationService', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     // Re-require after reset so module picks up fresh mocks
     jest.mock('playwright', () => ({
