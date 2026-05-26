@@ -240,6 +240,25 @@ async function sendPaymentConfirmed({ to, companyId, valuationId, fmv }) {
   await send(to, 'Payment confirmed — your 409A analysis is starting', html);
 }
 
+// ─── 9. Clerky document sync notification ───────────────────────────────────
+
+async function sendClerkyDocumentNotification({ to, companyId, documentName, recordsQueued }) {
+  const url = `${APP_URL}/data-rooms`;
+  const count = recordsQueued || 0;
+  const html = layout(`
+    <p>Hi there,</p>
+    <p>A new document has been synced from Clerky to your OpenCap Stack data room.</p>
+    <div class="highlight">
+      <div>Document: <strong>${documentName || 'Unknown'}</strong></div>
+      <div class="big">${count} record${count !== 1 ? 's' : ''}</div>
+      <div style="font-size:12px;color:#374151;">ready for review</div>
+    </div>
+    <p>Please review the extracted records in your data room and approve or reject them.</p>
+    <a class="btn" href="${url}">Review Extracted Records →</a>
+  `, 'New Document Synced from Clerky');
+  await send(to, `New document synced from Clerky — ${count} record${count !== 1 ? 's' : ''} ready for review`, html);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -251,4 +270,5 @@ module.exports = {
   sendReportReleased,
   sendAccountantQueueNotification,
   sendPaymentConfirmed,
+  sendClerkyDocumentNotification,
 };

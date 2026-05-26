@@ -90,6 +90,23 @@ app.post(
   clerkWebhookController.handleClerkWebhook
 );
 
+// Issue #664: Clerky webhook — document signing events (raw body required for HMAC verification)
+const clerkyWebhookController = require('./controllers/clerkyWebhookController');
+app.post(
+  '/api/v1/webhooks/clerky',
+  webhookRateLimiter,
+  express.raw({ type: '*/*' }),
+  (req, res, next) => {
+    // Expose raw body string for HMAC signature verification
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString('utf8');
+      try { req.body = JSON.parse(req.rawBody); } catch { /* handled in controller */ }
+    }
+    next();
+  },
+  clerkyWebhookController.handleWebhook
+);
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -307,6 +324,7 @@ const routes = {
   serviceProviderRoutes: safeRequire(path.join(__dirname, 'routes/v1/serviceProviderRoutes')), // Phase 4: Service provider invite flow
   auditLogRoutes: safeRequire(path.join(__dirname, 'routes/v1/auditLogRoutes')), // Phase 5: Audit logging
   readinessRoutes: safeRequire(path.join(__dirname, 'routes/v1/readinessRoutes')), // Issue #651: Investor readiness score
+  clerkyIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/clerkyIntegrationRoutes')), // Issue #662: Clerky integration
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -500,6 +518,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/audit-logs'; // Phase 5: Audit logging
     } else if (key === 'readinessRoutes') {
       path = '/api/v1/readiness'; // Issue #651: Investor readiness score
+    } else if (key === 'clerkyIntegrationRoutes') {
+      path = '/api/v1/integrations/clerky'; // Issue #662: Clerky integration
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
