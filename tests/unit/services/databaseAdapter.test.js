@@ -15,12 +15,23 @@ jest.mock('../../../services/zerodbService');
 let databaseAdapter;
 
 describe('Database Adapter Service', () => {
+  let originalToken;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Remove AINATIVE_API_TOKEN so auto-init doesn't silently swallow the uninitialized error
+    originalToken = process.env.AINATIVE_API_TOKEN;
+    delete process.env.AINATIVE_API_TOKEN;
     // Get a fresh instance for each test
     jest.isolateModules(() => {
       databaseAdapter = require('../../../services/databaseAdapter');
     });
+  });
+
+  afterEach(() => {
+    if (originalToken !== undefined) {
+      process.env.AINATIVE_API_TOKEN = originalToken;
+    }
   });
 
   describe('Initialization and Configuration', () => {
