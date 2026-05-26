@@ -304,6 +304,8 @@ const routes = {
   scenarioRoutes: safeRequire(path.join(__dirname, 'routes/v1/scenarioRoutes')), // Issue #661: Scenario modeling unified endpoint
   employeeInviteRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeInviteRoutes')), // Phase 3: Employee invite flow
   employeeSelfServiceRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeSelfServiceRoutes')), // Phase 3: Employee self-service equity API
+  serviceProviderRoutes: safeRequire(path.join(__dirname, 'routes/v1/serviceProviderRoutes')), // Phase 4: Service provider invite flow
+  auditLogRoutes: safeRequire(path.join(__dirname, 'routes/v1/auditLogRoutes')), // Phase 5: Audit logging
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -491,6 +493,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/employees'; // Phase 3: Employee invite flow
     } else if (key === 'employeeSelfServiceRoutes') {
       path = '/api/v1/me'; // Phase 3: Employee self-service equity API
+    } else if (key === 'serviceProviderRoutes') {
+      path = '/api/v1/service-providers'; // Phase 4: Service provider invite flow
+    } else if (key === 'auditLogRoutes') {
+      path = '/api/v1/audit-logs'; // Phase 5: Audit logging
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
