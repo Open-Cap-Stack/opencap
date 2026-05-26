@@ -17,6 +17,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sendServiceProviderInvite } = require('../services/inviteEmailService');
 
 const INVITE_TOKEN_TTL_HOURS = 72;
 
@@ -98,9 +99,17 @@ exports.inviteServiceProvider = async (req, res) => {
       },
     });
 
-    console.log(
-      `[ServiceProviderInvite] Invite sent to ${email} — engagementType: ${engagementType} (expires: ${inviteTokenExpires})`
-    );
+    // Send invite email via Resend
+    await sendServiceProviderInvite({
+      to: email,
+      firstName,
+      companyName: req.user?.companyName || null,
+      engagementType,
+      inviteToken,
+    }).catch(err => {
+      // Email failure is non-fatal — the invite record is already created
+      console.error('[ServiceProviderInvite] Email send failed:', err.message);
+    });
 
     return res.status(201).json({
       success: true,

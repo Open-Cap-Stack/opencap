@@ -15,6 +15,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sendEmployeeInvite } = require('../services/inviteEmailService');
 
 const INVITE_TOKEN_TTL_HOURS = 72;
 
@@ -69,10 +70,16 @@ exports.inviteEmployee = async (req, res) => {
       ...(equityGrantId ? { equityGrantId } : {})
     });
 
-    // Log invite email (use nodemailer in production when EMAIL_HOST is set)
-    console.log(
-      `[EmployeeInvite] Invite sent to ${email} — token: ${inviteToken} (expires: ${inviteTokenExpires})`
-    );
+    // Send invite email via Resend
+    await sendEmployeeInvite({
+      to: email,
+      firstName,
+      companyName: req.user?.companyName || null,
+      inviteToken,
+    }).catch(err => {
+      // Email failure is non-fatal — the invite record is already created
+      console.error('[EmployeeInvite] Email send failed:', err.message);
+    });
 
     return res.status(201).json({
       success: true,
