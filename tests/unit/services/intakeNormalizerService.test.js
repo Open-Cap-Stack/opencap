@@ -8,13 +8,13 @@
 // pdf-parse exports a function (not an object) — factory must return a jest.fn()
 jest.mock('pdf-parse', () => jest.fn());
 
-jest.mock('xlsx');
+jest.mock('exceljs');
 jest.mock('mammoth');
 jest.mock('csv-parse/sync');
 jest.mock('../../../services/zipExtractionService');
 
 const pdfParse   = require('pdf-parse');
-const XLSX       = require('xlsx');
+const ExcelJS    = require('exceljs');
 const mammoth    = require('mammoth');
 const { parse: csvParse } = require('csv-parse/sync');
 const { extractZip } = require('../../../services/zipExtractionService');
@@ -57,22 +57,25 @@ describe('extractTextFromBuffer()', () => {
   });
 
   it('extracts text from an XLSX buffer with sheet names and rows', async () => {
-    XLSX.read.mockReturnValue({
-      SheetNames: ['Sheet1'],
-      Sheets: {
-        Sheet1: {}
-      }
-    });
-    XLSX.utils = {
-      sheet_to_json: jest.fn().mockReturnValue([['Col1', 'Col2'], ['a', 'b']])
+    const mockWorksheet = {
+      name: 'Sheet1',
+      eachRow: jest.fn((opts, cb) => {
+        cb({ values: [null, 'Col1', 'Col2'] }, 1);
+        cb({ values: [null, 'a', 'b'] }, 2);
+      })
     };
+    const mockWorkbook = {
+      xlsx: { load: jest.fn().mockResolvedValue(undefined) },
+      worksheets: [mockWorksheet]
+    };
+    ExcelJS.Workbook = jest.fn().mockReturnValue(mockWorkbook);
     const result = await extractTextFromBuffer(
       Buffer.from(''),
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'data.xlsx'
     );
     expect(result).toContain('Sheet1');
-    expect(XLSX.read).toHaveBeenCalledTimes(1);
+    expect(mockWorkbook.xlsx.load).toHaveBeenCalledTimes(1);
   });
 
   it('extracts text from a CSV buffer (first 50 rows)', async () => {
@@ -160,8 +163,17 @@ describe('normalizeUploadedFiles()', () => {
   });
 
   it('normalizes an XLSX file and sets source to upload_xlsx', async () => {
-    XLSX.read.mockReturnValue({ SheetNames: ['Summary'], Sheets: { Summary: {} } });
-    XLSX.utils = { sheet_to_json: jest.fn().mockReturnValue([['A', 'B']]) };
+    const mockWorksheet = {
+      name: 'Summary',
+      eachRow: jest.fn((opts, cb) => {
+        cb({ values: [null, 'A', 'B'] }, 1);
+      })
+    };
+    const mockWorkbook = {
+      xlsx: { load: jest.fn().mockResolvedValue(undefined) },
+      worksheets: [mockWorksheet]
+    };
+    ExcelJS.Workbook = jest.fn().mockReturnValue(mockWorkbook);
 
     const files = [multerFile({
       originalname: 'model.xlsx',

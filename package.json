@@ -29,9 +29,9 @@
     "quick-start": "node scripts/quick-start.js"
   },
   "dependencies": {
-    "@langchain/anthropic": "^0.3.8",
-    "@langchain/core": "^0.3.18",
-    "@langchain/langgraph": "^0.2.22",
+    "@langchain/anthropic": "^1.4.0",
+    "@langchain/core": "^1.1.48",
+    "@langchain/langgraph": "^1.3.2",
     "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.17",
     "argon2": "^0.40.3",
@@ -46,6 +46,7 @@
     "data-forge": "^1.10.2",
     "data-forge-fs": "^0.0.9",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^7.5.0",
@@ -73,8 +74,7 @@
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^6.0.1",
     "uuid": "^11.1.0",
-    "ws": "^8.18.3",
-    "xlsx": "^0.18.5"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.2",

@@ -73,18 +73,20 @@ async function extractTextFromBuffer(buffer, mimeType, filename = '') {
       ext === '.xlsx' ||
       ext === '.xls'
     ) {
-      const XLSX = require('xlsx');
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      const sheetNames = workbook.SheetNames;
+      const ExcelJS = require('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const sheetNames = workbook.worksheets.map(ws => ws.name);
       const lines = [`Sheets: ${sheetNames.join(', ')}`];
-      for (const name of sheetNames) {
-        const sheet = workbook.Sheets[name];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-        lines.push(`\n[Sheet: ${name}]`);
-        const subset = rows.slice(0, MAX_XLSX_ROWS_PER_SHEET);
-        for (const row of subset) {
-          lines.push(row.join('\t'));
-        }
+      for (const worksheet of workbook.worksheets) {
+        lines.push(`\n[Sheet: ${worksheet.name}]`);
+        let rowCount = 0;
+        worksheet.eachRow({ includeEmpty: false }, (row) => {
+          if (rowCount >= MAX_XLSX_ROWS_PER_SHEET) return;
+          const values = row.values.slice(1).map(v => (v === null || v === undefined ? '' : String(v)));
+          lines.push(values.join('\t'));
+          rowCount++;
+        });
       }
       return lines.join('\n').slice(0, MAX_TEXT_CHARS);
     }
