@@ -1020,31 +1020,70 @@ const resendVerification = async (req, res) => {
  */
 const exchangeAINativeToken = async (req, res) => {
   try {
-    const { ainativeToken } = req.body;
+    const { ainativeToken, code, code_verifier, redirect_uri } = req.body;
 
-    if (!ainativeToken) {
-      return res.status(400).json({ message: 'ainativeToken is required' });
+    let accessToken;
+
+    if (code) {
+      // OAuth authorization code flow — exchange code for token server-side
+      const tokenRes = await axios.post(
+        `${AINATIVE_API_URL}/v1/oauth/token`,
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirect_uri || 'https://opencapstack.com/auth/ainative/callback',
+          client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
+          client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET || 'aeX7k6kbqCZ43DVkv7bp8MGoVYg4_t2vx2MwfGZc7V4',
+          ...(code_verifier ? { code_verifier } : {}),
+        }).toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 10000,
+        }
+      );
+      accessToken = tokenRes.data.access_token;
+      if (!accessToken) {
+        return res.status(502).json({ message: 'AINative token exchange returned no access_token' });
+      }
+    } else if (ainativeToken) {
+      // Legacy direct token flow
+      accessToken = ainativeToken;
+    } else {
+      return res.status(400).json({ message: 'code or ainativeToken is required' });
     }
 
-    // Validate token against AINative /api/v1/auth/me
+    // Fetch user profile from AINative
     let ainativeUser;
     try {
-      const response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${ainativeToken}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
-
-      ainativeUser = {
-        userId: response.data.id,
-        email: (response.data.email || '').trim().toLowerCase(),
-        name: response.data.name,
-        role: 'employee',
-        permissions: [],
-        isAINativeUser: true
-      };
+      // Try the OAuth userinfo endpoint first, fall back to /api/v1/auth/me
+      let response;
+      try {
+        response = await axios.get(`${AINATIVE_API_URL}/oauth/userinfo`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+          timeout: 10000,
+        });
+        ainativeUser = {
+          userId: response.data.sub || response.data.id,
+          email: (response.data.email || '').trim().toLowerCase(),
+          name: response.data.name || [response.data.given_name, response.data.family_name].filter(Boolean).join(' '),
+          role: 'employee',
+          permissions: [],
+          isAINativeUser: true,
+        };
+      } catch (_) {
+        response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+          timeout: 10000,
+        });
+        ainativeUser = {
+          userId: response.data.id,
+          email: (response.data.email || '').trim().toLowerCase(),
+          name: response.data.name,
+          role: 'employee',
+          permissions: [],
+          isAINativeUser: true,
+        };
+      }
     } catch (error) {
       return res.status(401).json({ message: 'Invalid AINative token' });
     }
