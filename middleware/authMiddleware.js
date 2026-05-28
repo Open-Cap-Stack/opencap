@@ -130,16 +130,17 @@ try {
  */
 const authenticateToken = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    // Get token from Authorization header or query param (for iframe/embed use)
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'No token provided' });
+    let token;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query && req.query.token) {
+      // Support ?token=JWT for document viewer iframes that cannot set headers
+      token = req.query.token;
     }
-    
-    // Extract token from "Bearer TOKEN" format
-    const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
     }
