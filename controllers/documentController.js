@@ -10,6 +10,7 @@ const vectorService = require('../services/vectorService');
 const websocketService = require('../services/websocketService');
 const fileStorageService = require('../services/fileStorageService');
 const eventStreamingService = require('../services/eventStreamingService');
+const documentGeneratorService = require('../services/documentGeneratorService');
 const DocumentFolder = require('../models/DocumentFolder');
 const { errorResponse } = require('../middleware/errorResponse');
 const { assertCompanyOwnership } = require('../middleware/companyScope');
@@ -1448,5 +1449,106 @@ exports.getFolderContents = async (req, res) => {
         } else {
             errorResponse(res, 500, error.message, error);
         }
+    }
+};
+
+/**
+ * Generate a legal document PDF (RSPA, Stock Certificate, or 83(b) Election)
+ * and store it as a document record in ZeroDB.
+ *
+ * Issue #666
+ *
+ * POST /api/v1/documents/generate
+ * Body: { templateType: 'rspa' | 'stock_certificate' | '83b_election', params: { ... } }
+ */
+exports.generateDocument = async (req, res) => {
+    try {
+        const { templateType, params } = req.body;
+
+        if (!templateType || !params) {
+            return errorResponse(res, 400, 'templateType and params are required');
+        }
+
+        // Map template types to generators and required-field lists
+        const generators = {
+            rspa: {
+                fn: documentGeneratorService.generateRSPA,
+                required: documentGeneratorService.REQUIRED_RSPA_FIELDS,
+                title: 'Restricted Stock Purchase Agreement',
+            },
+            stock_certificate: {
+                fn: documentGeneratorService.generateStockCertificate,
+                required: documentGeneratorService.REQUIRED_CERT_FIELDS,
+                title: 'Stock Certificate',
+            },
+            '83b_election': {
+                fn: documentGeneratorService.generate83bElection,
+                required: documentGeneratorService.REQUIRED_83B_FIELDS,
+                title: 'Section 83(b) Election',
+            },
+        };
+
+        const generator = generators[templateType];
+        if (!generator) {
+            return errorResponse(
+                res,
+                400,
+                `Invalid templateType "${templateType}". Must be one of: ${Object.keys(generators).join(', ')}`
+            );
+        }
+
+        // Validate required fields
+        const missing = documentGeneratorService.validateRequired(generator.required, params);
+        if (missing.length > 0) {
+            return errorResponse(res, 400, `Missing required fields: ${missing.join(', ')}`);
+        }
+
+        // Generate the PDF
+        const pdfBuffer = await generator.fn(params);
+
+        // Build a document record and persist to ZeroDB
+        const now = new Date().toISOString();
+        const documentId = generateUUID();
+
+        const documentData = {
+            id: documentId,
+            _id: documentId,
+            title: `${generator.title} - ${params.companyName || params.taxpayerName || ''}`.trim(),
+            name: `${templateType}_${documentId}.pdf`,
+            category: 'legal',
+            templateType,
+            contentType: 'application/pdf',
+            mimeType: 'application/pdf',
+            fileContentBase64: pdfBuffer.toString('base64'),
+            fileSize: pdfBuffer.length,
+            size: pdfBuffer.length,
+            generatedParams: params,
+            companyId: req.user?.companyId || req.body.companyId || null,
+            uploadedBy: req.user?.userId,
+            uploadedAt: now,
+            createdAt: now,
+            updatedAt: now,
+            status: 'active',
+        };
+
+        const result = await zerodbService.insertRow(TABLE_NAME, documentData);
+
+        const insertedRow = result.data?.[0] || result.rows?.[0] || result;
+        const savedDocument = {
+            ...documentData,
+            ...insertedRow.row_data,
+            id: documentData.id,
+            _id: documentData.id,
+            row_id: insertedRow.row_id,
+        };
+
+        // Strip the potentially large base64 payload from the response to keep it lean
+        const responseDoc = { ...savedDocument };
+        delete responseDoc.fileContentBase64;
+
+        res.status(201).json({ success: true, data: responseDoc });
+    } catch (error) {
+        console.error('Document generation error:', error.message);
+        errorResponse(res, 500, 'Failed to generate document', error);
     }
 };

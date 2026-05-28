@@ -77,6 +77,10 @@ router.post('/search', hasRole(['super_admin', 'admin', 'founder', 'manager', 's
 // POST /api/v1/documents/bulk-index - Bulk index documents for vector search
 router.post('/bulk-index', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.bulkIndexDocuments);
 
+// POST /api/v1/documents/generate - Generate a legal document PDF (RSPA, Stock Certificate, 83(b) Election)
+// Issue #666
+router.post('/generate', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.generateDocument);
+
 // CRUD Operations
 // GET /api/v1/documents - Get all documents with search and filtering
 router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentController.getDocuments);
