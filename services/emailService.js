@@ -259,6 +259,62 @@ async function sendClerkyDocumentNotification({ to, companyId, documentName, rec
   await send(to, `New document synced from Clerky — ${count} record${count !== 1 ? 's' : ''} ready for review`, html);
 }
 
+// ─── 10. 83(b) election deadline reminder ───────────────────────────────────
+
+async function send83bDeadlineReminder(email, name, grantDetails, daysRemaining, deadline) {
+  const deadlineStr = new Date(deadline).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const grantDateStr = new Date(grantDetails.grantDate).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const companyName = grantDetails.companyName || 'your company';
+  const shares = Number(grantDetails.shares || 0).toLocaleString();
+  const isUrgent = daysRemaining <= 7;
+
+  const urgencyBanner = isUrgent
+    ? `<div style="background:#dc2626;color:#fff;padding:12px 16px;border-radius:4px;margin:16px 0;font-weight:700;text-align:center;">
+        URGENT: Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining to file your 83(b) election
+      </div>`
+    : '';
+
+  const html = layout(`
+    <p>Hi ${name || 'there'},</p>
+    <p>This is a reminder that your <strong>83(b) election deadline</strong> is approaching for your equity grant at <strong>${companyName}</strong>.</p>
+    ${urgencyBanner}
+    <div class="highlight">
+      <div>Shares: <strong>${shares}</strong></div>
+      <div>Grant Date: <strong>${grantDateStr}</strong></div>
+      <div style="margin-top:8px;">Filing Deadline:</div>
+      <div class="big">${deadlineStr}</div>
+      <div style="font-size:12px;color:#374151;margin-top:4px;">${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining</div>
+    </div>
+    <p><strong>What is an 83(b) election?</strong></p>
+    <p>An 83(b) election lets you pay taxes on your equity at its current fair market value rather than at vesting, which can result in significant tax savings if the value increases.</p>
+    <p><strong>Steps to file:</strong></p>
+    <ol style="font-size:14px;line-height:1.8;">
+      <li>Complete the 83(b) election form</li>
+      <li>Mail the signed form to the IRS via certified mail within 30 days of your grant date</li>
+      <li>Keep the certified mail receipt as proof of timely filing</li>
+      <li>Attach a copy of the election to your federal income tax return for the year</li>
+      <li>Send a copy of the filed election to ${companyName}</li>
+    </ol>
+    <a class="btn" href="${APP_URL}/equity-grants">View Your Equity Grants &rarr;</a>
+    <p style="font-size:12px;color:#6b7280;margin-top:16px;">This deadline is critical and cannot be extended. Failure to file within 30 days of the grant date means you lose the right to make this election permanently.</p>
+  `, `83(b) Election Deadline — ${daysRemaining} Days Remaining`);
+
+  await send(
+    email,
+    `Action Required: 83(b) Election Due in ${daysRemaining} Day${daysRemaining !== 1 ? 's' : ''} — ${companyName}`,
+    html
+  );
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -271,4 +327,5 @@ module.exports = {
   sendAccountantQueueNotification,
   sendPaymentConfirmed,
   sendClerkyDocumentNotification,
+  send83bDeadlineReminder,
 };

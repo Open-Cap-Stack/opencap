@@ -325,6 +325,7 @@ const routes = {
   auditLogRoutes: safeRequire(path.join(__dirname, 'routes/v1/auditLogRoutes')), // Phase 5: Audit logging
   readinessRoutes: safeRequire(path.join(__dirname, 'routes/v1/readinessRoutes')), // Issue #651: Investor readiness score
   clerkyIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/clerkyIntegrationRoutes')), // Issue #662: Clerky integration
+  eightythreeBRoutes: safeRequire(path.join(__dirname, 'routes/v1/eightythreeBRoutes')), // Issue #667: 83(b) deadline tracking
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -520,6 +521,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/readiness'; // Issue #651: Investor readiness score
     } else if (key === 'clerkyIntegrationRoutes') {
       path = '/api/v1/integrations/clerky'; // Issue #662: Clerky integration
+    } else if (key === 'eightythreeBRoutes') {
+      path = '/api/v1/compliance'; // Issue #667: 83(b) deadline tracking
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
