@@ -986,6 +986,12 @@ exports.downloadDocument = async (req, res) => {
             disposition = attachment === 'true' ? 'attachment' : 'inline';
         }
 
+        // Allow same-origin framing for inline document viewing (overrides helmet's deny)
+        if (disposition === 'inline') {
+            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+        }
+
         // Get document from ZeroDB using findDocumentById helper
         const document = await findDocumentById(id);
 
