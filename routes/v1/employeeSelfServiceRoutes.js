@@ -20,6 +20,7 @@ const {
   getMyValuation,
   getMyProfile
 } = require('../../controllers/employeeSelfServiceController');
+const documentController = require('../../controllers/documentController');
 
 // Roles that may access the /me/* endpoints:
 // employee (primary audience) + admin/founder/manager (can preview their own data)
@@ -31,5 +32,9 @@ router.get('/equity',    hasRole(SELF_SERVICE_ROLES), getMyEquity);
 router.get('/documents', hasRole(SELF_SERVICE_ROLES), getMyDocuments);
 router.get('/valuation', hasRole(SELF_SERVICE_ROLES), getMyValuation);
 router.get('/profile',   hasRole(SELF_SERVICE_ROLES), getMyProfile);
+
+// Document download — delegates to the shared documentController.downloadDocument handler
+// which checks per-document access permissions internally
+router.get('/documents/:id/download', hasRole(SELF_SERVICE_ROLES), documentController.downloadDocument);
 
 module.exports = router;

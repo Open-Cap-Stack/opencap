@@ -852,8 +852,8 @@ exports.bulkIndexDocuments = async (req, res) => {
  * @returns {boolean} - Whether the user has access
  */
 const checkDocumentAccess = (document, user) => {
-    // Admin users have access to all documents
-    if (user?.role === 'admin') {
+    // Admin and super_admin users have access to all documents
+    if (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'founder') {
         return true;
     }
 
@@ -918,14 +918,72 @@ const getPreviewInfo = (contentType) => {
 };
 
 /**
+ * Authenticate a download request via query-string token.
+ * Iframe src URLs cannot set Authorization headers, so the frontend may pass
+ * ?token=<jwt> instead. This helper validates the token and populates req.user
+ * exactly like the normal authenticateToken middleware would.
+ *
+ * Returns true if authentication succeeded (or was already present), false on failure.
+ */
+async function authenticateDownloadToken(req, res) {
+    // If req.user is already populated by the normal auth middleware, nothing to do
+    if (req.user) return true;
+
+    const token = req.query.token;
+    if (!token) {
+        errorResponse(res, 401, 'Authentication required. Provide Authorization header or ?token query param.');
+        return false;
+    }
+
+    try {
+        const jwt = require('jsonwebtoken');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET environment variable is required');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const tokenUserId = decoded.userId || decoded.sub;
+        req.user = {
+            userId: tokenUserId,
+            _id: tokenUserId,
+            email: decoded.email,
+            role: decoded.role || 'employee',
+            permissions: decoded.permissions || [],
+            companyId: decoded.companyId || null
+        };
+        return true;
+    } catch (err) {
+        console.warn('Download token authentication failed:', err.message);
+        errorResponse(res, 401, 'Invalid or expired token');
+        return false;
+    }
+}
+
+/**
  * Download a document file
  * Issue #122: Document download endpoint
  * Issue #235: Fixed ephemeral storage issue on Railway
+ *
+ * Query params:
+ *   ?disposition=inline|attachment  (default: attachment) - controls Content-Disposition
+ *   ?attachment=true|false          (legacy alias, kept for backward compat)
+ *   ?token=<jwt>                    (auth token for iframe/src URLs that cannot set headers)
  */
 exports.downloadDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const { attachment = 'true' } = req.query;
+
+        // Support token-based auth for iframe src URLs
+        const authenticated = await authenticateDownloadToken(req, res);
+        if (!authenticated) return; // response already sent
+
+        // Resolve disposition: prefer explicit ?disposition= param, fall back to legacy ?attachment= param
+        let disposition;
+        if (req.query.disposition) {
+            disposition = req.query.disposition === 'inline' ? 'inline' : 'attachment';
+        } else {
+            const attachment = req.query.attachment !== undefined ? req.query.attachment : 'true';
+            disposition = attachment === 'true' ? 'attachment' : 'inline';
+        }
 
         // Get document from ZeroDB using findDocumentById helper
         const document = await findDocumentById(id);
@@ -940,6 +998,9 @@ exports.downloadDocument = async (req, res) => {
             return errorResponse(res, 403, 'Access denied');
         }
 
+        // Check if document has embedded base64 content (ZeroDB-native storage)
+        const hasBase64Content = !!document.fileContentBase64;
+
         // Check if document has a file attached (local path or fileId)
         const localFilePath = document.storagePath || document.filePath;
         const hasLocalFile = localFilePath && require('fs').existsSync(localFilePath);
@@ -947,31 +1008,23 @@ exports.downloadDocument = async (req, res) => {
 
         // Log file location details for debugging
         console.log(`Download request for document ${id}:`, {
+            hasBase64Content,
             hasLocalFile,
             localFilePath: localFilePath || 'none',
             hasRemoteFile: !!hasRemoteFile,
             fileId: document.fileId || 'none'
         });
 
-        if (!hasLocalFile && !hasRemoteFile) {
+        if (!hasBase64Content && !hasLocalFile && !hasRemoteFile) {
             console.error(`No file attached to document ${id}. Local path: ${localFilePath}, FileId: ${document.fileId}`);
             return errorResponse(res, 404, 'File not available. The file may have been deleted or failed to upload.');
         }
 
         const contentType = document.contentType || document.mimeType || 'application/octet-stream';
         const fileName = document.fileName || document.originalFilename || document.name || 'document';
-        const disposition = attachment === 'true' ? 'attachment' : 'inline';
 
-        // If file is stored locally (via multer), serve it directly
-        if (hasLocalFile) {
-            const fs = require('fs');
-            const stat = fs.statSync(localFilePath);
-
-            res.setHeader('Content-Type', contentType);
-            res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
-            res.setHeader('Content-Length', stat.size);
-
-            // Log download in audit trail
+        // Helper: log the download event in the audit trail (non-blocking)
+        const logDownloadAudit = async () => {
             try {
                 await eventStreamingService.publishEvent({
                     topic: 'document.downloaded',
@@ -989,12 +1042,36 @@ exports.downloadDocument = async (req, res) => {
             } catch (auditError) {
                 console.warn('Audit logging failed:', auditError.message);
             }
+        };
+
+        // --- Serve from embedded base64 content (preferred for ZeroDB-native docs) ---
+        if (hasBase64Content) {
+            const fileBuffer = Buffer.from(document.fileContentBase64, 'base64');
+
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+            res.setHeader('Content-Length', fileBuffer.length);
+
+            await logDownloadAudit();
+            return res.status(200).send(fileBuffer);
+        }
+
+        // --- Serve from local filesystem (multer uploads) ---
+        if (hasLocalFile) {
+            const fs = require('fs');
+            const stat = fs.statSync(localFilePath);
+
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+            res.setHeader('Content-Length', stat.size);
+
+            await logDownloadAudit();
 
             const fileStream = fs.createReadStream(localFilePath);
             return fileStream.pipe(res);
         }
 
-        // Download file from persistent storage service (ZeroDB)
+        // --- Download from persistent storage service (ZeroDB file storage) ---
         let fileData;
         try {
             console.log(`Downloading file from storage: ${document.fileId}`);
@@ -1011,7 +1088,6 @@ exports.downloadDocument = async (req, res) => {
         }
 
         // Set response headers
-
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
 
@@ -1019,25 +1095,7 @@ exports.downloadDocument = async (req, res) => {
             res.setHeader('Content-Length', fileData.size);
         }
 
-        // Log download in audit trail
-        try {
-            await eventStreamingService.publishEvent({
-                topic: 'document.downloaded',
-                payload: {
-                    documentId: document.id || document._id,
-                    fileName: document.fileName,
-                    userId: req.user?.userId,
-                    timestamp: new Date().toISOString()
-                },
-                metadata: {
-                    actorId: req.user?.userId,
-                    action: 'download'
-                }
-            });
-        } catch (auditError) {
-            console.warn('Audit logging failed:', auditError.message);
-            // Don't fail the download if audit logging fails
-        }
+        await logDownloadAudit();
 
         // Send the file data
         res.status(200).send(fileData.data);
