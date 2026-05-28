@@ -1055,34 +1055,68 @@ const exchangeAINativeToken = async (req, res) => {
     // Fetch user profile from AINative
     let ainativeUser;
     try {
-      // Try the OAuth userinfo endpoint first, fall back to /api/v1/auth/me
-      let response;
+      let resolved = false;
+
+      // Try /oauth/userinfo first
       try {
-        response = await axios.get(`${AINATIVE_API_URL}/oauth/userinfo`, {
+        const response = await axios.get(`${AINATIVE_API_URL}/oauth/userinfo`, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
           timeout: 10000,
         });
-        ainativeUser = {
-          userId: response.data.sub || response.data.id,
-          email: (response.data.email || '').trim().toLowerCase(),
-          name: response.data.name || [response.data.given_name, response.data.family_name].filter(Boolean).join(' '),
-          role: 'employee',
-          permissions: [],
-          isAINativeUser: true,
-        };
-      } catch (_) {
-        response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
-          headers: { 'Authorization': `Bearer ${accessToken}` },
-          timeout: 10000,
-        });
-        ainativeUser = {
-          userId: response.data.id,
-          email: (response.data.email || '').trim().toLowerCase(),
-          name: response.data.name,
-          role: 'employee',
-          permissions: [],
-          isAINativeUser: true,
-        };
+        if (response.data && (response.data.email || response.data.sub)) {
+          ainativeUser = {
+            userId: response.data.sub || response.data.id,
+            email: (response.data.email || response.data.sub || '').trim().toLowerCase(),
+            name: response.data.name || [response.data.given_name, response.data.family_name].filter(Boolean).join(' '),
+            role: 'employee',
+            permissions: [],
+            isAINativeUser: true,
+          };
+          resolved = true;
+        }
+      } catch (_) { /* fall through */ }
+
+      // Try /api/v1/auth/me
+      if (!resolved) {
+        try {
+          const response = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            timeout: 10000,
+          });
+          if (response.data && response.data.email) {
+            ainativeUser = {
+              userId: response.data.id,
+              email: (response.data.email || '').trim().toLowerCase(),
+              name: response.data.name,
+              role: 'employee',
+              permissions: [],
+              isAINativeUser: true,
+            };
+            resolved = true;
+          }
+        } catch (_) { /* fall through */ }
+      }
+
+      // Fallback: decode the JWT payload to get sub (email)
+      if (!resolved) {
+        try {
+          const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
+          if (payload.sub) {
+            ainativeUser = {
+              userId: payload.sub,
+              email: payload.sub.trim().toLowerCase(),
+              name: payload.sub.split('@')[0],
+              role: 'employee',
+              permissions: [],
+              isAINativeUser: true,
+            };
+            resolved = true;
+          }
+        } catch (_) { /* not a JWT or malformed */ }
+      }
+
+      if (!resolved) {
+        return res.status(401).json({ message: 'Could not resolve AINative user profile' });
       }
     } catch (error) {
       return res.status(401).json({ message: 'Invalid AINative token' });
