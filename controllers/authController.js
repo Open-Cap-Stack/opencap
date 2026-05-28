@@ -1129,7 +1129,7 @@ const exchangeAINativeToken = async (req, res) => {
     const displayName = localUser.displayName || localUser.name || ainativeUser.name;
 
     // Generate local JWT (same claim shape as login)
-    const accessToken = jwt.sign(
+    const localAccessToken = jwt.sign(
       {
         userId,
         email: localUser.email,
@@ -1149,7 +1149,7 @@ const exchangeAINativeToken = async (req, res) => {
 
     return res.status(200).json({
       message: 'Token exchanged successfully',
-      accessToken,
+      accessToken: localAccessToken,
       refreshToken: localRefreshToken,
       user: {
         userId,
