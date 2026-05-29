@@ -76,8 +76,11 @@ async function get83bStatus(companyId) {
   const stakeholderMap = {};
   if (stakeholders && stakeholders.length > 0) {
     for (const s of stakeholders) {
-      const id = s._id || s.row_id || s.id;
-      stakeholderMap[id] = s;
+      // Map by all possible ID fields so grant.stakeholderId or grant.employeeId matches
+      if (s._id) stakeholderMap[s._id] = s;
+      if (s.row_id) stakeholderMap[s.row_id] = s;
+      if (s.id) stakeholderMap[s.id] = s;
+      if (s.stakeholderId) stakeholderMap[s.stakeholderId] = s;
     }
   }
 
@@ -96,15 +99,15 @@ async function get83bStatus(companyId) {
     const status = determineStatus(grant, deadline, daysRemaining);
 
     const grantId = grant._id || grant.row_id || grant.id;
-    const stakeholderId = grant.stakeholderId;
+    const stakeholderId = grant.stakeholderId || grant.employeeId;
     const stakeholder = stakeholderMap[stakeholderId] || {};
 
     results.push({
       grantId,
       stakeholderId,
-      stakeholderName: stakeholder.name || stakeholder.firstName
-        ? `${stakeholder.firstName || ''} ${stakeholder.lastName || ''}`.trim()
-        : 'Unknown',
+      stakeholderName: stakeholder.name
+        || (stakeholder.firstName ? `${stakeholder.firstName} ${stakeholder.lastName || ''}`.trim() : null)
+        || 'Unknown',
       stakeholderEmail: stakeholder.email || null,
       grantDate: new Date(grantDate).toISOString(),
       shares: grant.numberOfShares || grant.quantity || 0,
