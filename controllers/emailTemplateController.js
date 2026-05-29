@@ -2,27 +2,39 @@
  * Email Template Controller
  *
  * CRUD operations for custom email templates.
- * Templates are scoped per company via req.user.companyId.
+ * Templates are stored in the 'notifications' ZeroDB table with type='email_template'.
+ * Scoped per company via req.user.companyId.
  */
 
-const databaseAdapter = require('../services/databaseAdapter');
 const zerodbService = require('../services/zerodbService');
 
-const MODEL_NAME = 'EmailTemplate';
+const TABLE = 'notifications';
+const TYPE_FILTER = 'email_template';
+
+// Helper: extract flat record from ZeroDB row
+function flattenRow(row) {
+  if (!row) return null;
+  if (row.row_data) {
+    return { ...row.row_data, id: row.row_id, row_id: row.row_id };
+  }
+  return { ...row, id: row.row_id || row._id || row.id };
+}
 
 /**
  * List all email templates for the authenticated user's company.
- * GET /api/v1/email-templates
  */
 exports.listTemplates = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company context required' });
-    }
+    if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    const templates = await databaseAdapter.find(MODEL_NAME, { companyId });
-    res.status(200).json(templates || []);
+    const result = await zerodbService.queryRows(TABLE, {
+      filters: { companyId, type: TYPE_FILTER }
+    });
+
+    const rows = result?.data || result?.rows || [];
+    const templates = rows.map(flattenRow).filter(Boolean);
+    res.status(200).json(templates);
   } catch (error) {
     console.error('Error listing email templates:', error);
     res.status(500).json({ error: 'Failed to list email templates' });
@@ -31,46 +43,31 @@ exports.listTemplates = async (req, res) => {
 
 /**
  * Create a new email template.
- * POST /api/v1/email-templates
  */
 exports.createTemplate = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company context required' });
-    }
+    if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
     const { name, subject, body } = req.body;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Template name is required' });
-    }
-    if (!subject || !subject.trim()) {
-      return res.status(400).json({ error: 'Template subject is required' });
-    }
-    if (!body || !body.trim()) {
-      return res.status(400).json({ error: 'Template body is required' });
-    }
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Template name is required' });
+    if (!subject || !subject.trim()) return res.status(400).json({ error: 'Template subject is required' });
+    if (!body || !body.trim()) return res.status(400).json({ error: 'Template body is required' });
 
     const now = new Date().toISOString();
-    const result = await zerodbService.insertRow('email_templates', {
+    const result = await zerodbService.insertRow(TABLE, {
       companyId,
+      type: TYPE_FILTER,
       name: name.trim(),
       subject: subject.trim(),
       body: body.trim(),
-      type: 'email_template',
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     });
 
-    // Extract the created record
     const rows = result?.data || [];
-    const created = rows[0];
-    const template = created?.row_data
-      ? { ...created.row_data, row_id: created.row_id, id: created.row_id }
-      : created;
-
-    res.status(201).json(template);
+    const template = flattenRow(rows[0]);
+    res.status(201).json(template || { name, subject, body, companyId });
   } catch (error) {
     console.error('Error creating email template:', error);
     res.status(500).json({ error: 'Failed to create email template' });
@@ -79,25 +76,18 @@ exports.createTemplate = async (req, res) => {
 
 /**
  * Get a single email template by ID.
- * GET /api/v1/email-templates/:id
  */
 exports.getTemplate = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company context required' });
-    }
+    if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    const template = await databaseAdapter.findById(MODEL_NAME, req.params.id);
-    if (!template) {
-      return res.status(404).json({ error: 'Email template not found' });
-    }
+    const result = await zerodbService.getRow(TABLE, req.params.id);
+    const template = flattenRow(result?.data || result);
+    if (!template) return res.status(404).json({ error: 'Email template not found' });
+    if (template.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
 
-    if (template.companyId !== companyId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    res.status(200).json(template);
+    res.status(200).json({ template });
   } catch (error) {
     console.error('Error fetching email template:', error);
     res.status(500).json({ error: 'Failed to fetch email template' });
@@ -106,34 +96,26 @@ exports.getTemplate = async (req, res) => {
 
 /**
  * Update an email template by ID.
- * PUT /api/v1/email-templates/:id
  */
 exports.updateTemplate = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company context required' });
-    }
+    if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    // Verify template exists and belongs to the user's company
-    const existing = await databaseAdapter.findById(MODEL_NAME, req.params.id);
-    if (!existing) {
-      return res.status(404).json({ error: 'Email template not found' });
-    }
-
-    if (existing.companyId !== companyId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
+    // Verify ownership
+    const existing = await zerodbService.getRow(TABLE, req.params.id);
+    const tpl = flattenRow(existing?.data || existing);
+    if (!tpl) return res.status(404).json({ error: 'Email template not found' });
+    if (tpl.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
 
     const { name, subject, body } = req.body;
-    const updates = { updatedAt: new Date().toISOString() };
-
+    const updates = { ...tpl, updatedAt: new Date().toISOString() };
     if (name !== undefined) updates.name = name.trim();
     if (subject !== undefined) updates.subject = subject.trim();
     if (body !== undefined) updates.body = body.trim();
 
-    const result = await databaseAdapter.findByIdAndUpdate(MODEL_NAME, req.params.id, updates);
-    res.status(200).json(result || { ...existing, ...updates });
+    await zerodbService.updateRow(TABLE, req.params.id, updates);
+    res.status(200).json({ template: updates });
   } catch (error) {
     console.error('Error updating email template:', error);
     res.status(500).json({ error: 'Failed to update email template' });
@@ -142,26 +124,18 @@ exports.updateTemplate = async (req, res) => {
 
 /**
  * Delete an email template by ID.
- * DELETE /api/v1/email-templates/:id
  */
 exports.deleteTemplate = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company context required' });
-    }
+    if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    // Verify template exists and belongs to the user's company
-    const existing = await databaseAdapter.findById(MODEL_NAME, req.params.id);
-    if (!existing) {
-      return res.status(404).json({ error: 'Email template not found' });
-    }
+    const existing = await zerodbService.getRow(TABLE, req.params.id);
+    const tpl = flattenRow(existing?.data || existing);
+    if (!tpl) return res.status(404).json({ error: 'Email template not found' });
+    if (tpl.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
 
-    if (existing.companyId !== companyId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    await databaseAdapter.findByIdAndDelete(MODEL_NAME, req.params.id);
+    await zerodbService.deleteRow(TABLE, req.params.id);
     res.status(200).json({ message: 'Email template deleted' });
   } catch (error) {
     console.error('Error deleting email template:', error);
