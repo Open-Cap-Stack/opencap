@@ -6,7 +6,7 @@
  */
 
 const databaseAdapter = require('../services/databaseAdapter');
-const { v4: uuidv4 } = require('uuid');
+const zerodbService = require('../services/zerodbService');
 
 const MODEL_NAME = 'EmailTemplate';
 
@@ -53,14 +53,22 @@ exports.createTemplate = async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const template = await databaseAdapter.create(MODEL_NAME, {
+    const result = await zerodbService.insertRow('email_templates', {
       companyId,
       name: name.trim(),
       subject: subject.trim(),
       body: body.trim(),
+      type: 'email_template',
       createdAt: now,
       updatedAt: now
     });
+
+    // Extract the created record
+    const rows = result?.data || [];
+    const created = rows[0];
+    const template = created?.row_data
+      ? { ...created.row_data, row_id: created.row_id, id: created.row_id }
+      : created;
 
     res.status(201).json(template);
   } catch (error) {
