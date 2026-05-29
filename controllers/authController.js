@@ -1292,6 +1292,54 @@ const changePassword = async (req, res) => {
   }
 };
 
+/**
+ * Upload user avatar.
+ * POST /auth/profile/avatar
+ * Accepts multipart/form-data with 'avatar' field, or JSON with base64 image.
+ */
+const uploadAvatar = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    let avatarData;
+
+    // Handle multipart file upload
+    if (req.file) {
+      const base64 = req.file.buffer.toString('base64');
+      avatarData = `data:${req.file.mimetype};base64,${base64}`;
+    } else if (req.body?.avatar) {
+      // Handle base64 JSON upload
+      avatarData = req.body.avatar;
+    } else {
+      return res.status(400).json({ message: 'No avatar file provided' });
+    }
+
+    // Validate size (base64 is ~33% larger, so 5MB file ≈ 6.7MB base64)
+    if (avatarData.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ message: 'Avatar must be under 5 MB' });
+    }
+
+    // Update user record with avatar
+    let user = await User.findOne({ userId });
+    if (!user && isValidObjectId(userId)) {
+      user = await User.findById(userId);
+    }
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await User.findOneAndUpdate(
+      { userId },
+      { avatarUrl: avatarData, updatedAt: new Date() }
+    );
+
+    res.status(200).json({ message: 'Avatar updated', avatarUrl: avatarData });
+  } catch (error) {
+    console.error('Avatar upload error:', error.message);
+    res.status(500).json({ message: 'Failed to upload avatar' });
+  }
+};
+
 // Export all controller functions
 module.exports = {
   registerUser,
@@ -1311,7 +1359,8 @@ module.exports = {
   ainativeLogin,
   adminToken,
   adminForcePassword,
-  changePassword
+  changePassword,
+  uploadAvatar
 };
 
 async function adminForcePassword(req, res) {

@@ -1,7 +1,18 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const authController = require('../../controllers/authController');
 const { authenticateToken } = require('../../middleware/authMiddleware.js');
+
+// Multer config for avatar uploads (memory storage, 5MB limit)
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 const { debugTokenEndpoint } = require('../../middleware/authErrorLogger');
 const { createEndpointRateLimiter } = require('../../middleware/rateLimiter');
 const { auditAction } = require('../../middleware/auditLog');
@@ -35,6 +46,7 @@ router.post('/password/reset', authController.resetPassword);
 // User profile
 router.get('/profile', authenticateToken, authController.getUserProfile);
 router.put('/profile', authenticateToken, authController.updateUserProfile);
+router.post('/profile/avatar', authenticateToken, avatarUpload.single('avatar'), authController.uploadAvatar);
 
 // GET /api/v1/auth/me - Get current user (provisions on first call)
 // Frontend should call this immediately after AINative login
