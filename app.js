@@ -331,12 +331,35 @@ const routes = {
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
 
+// Public OAuth endpoints — mounted BEFORE any auth middleware
+// These redirect to Google OAuth consent screen; no bearer token needed
+app.get('/api/v1/connect/google/google-drive/auth', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/connect/google/google-drive/callback`;
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  res.redirect(authUrl);
+});
+app.get('/api/v1/connect/google/google-drive/callback', (req, res) => {
+  res.redirect('/data-rooms/reconstruct?google=connected');
+});
+app.get('/api/v1/connect/google/gmail/auth', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/connect/google/gmail/callback`;
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  res.redirect(authUrl);
+});
+app.get('/api/v1/connect/google/gmail/callback', (req, res) => {
+  res.redirect('/data-rooms/reconstruct?gmail=connected');
+});
+
 // Apply company-scope authorization to all API routes (after auth middleware in each route)
 // This ensures users can only access their own company's data
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
