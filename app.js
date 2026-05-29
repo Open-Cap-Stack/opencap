@@ -525,7 +525,7 @@ Object.entries(routes).forEach(([key, route]) => {
     } else if (key === 'eightythreeBRoutes') {
       path = '/api/v1/compliance'; // Issue #667: 83(b) deadline tracking
     } else if (key === 'googleIntegrationRoutes') {
-      path = '/api/v1/integrations/google'; // Issue #234: Google Drive/Gmail integration
+      path = '/api/v1/integrations'; // Issue #234: Google Drive/Gmail integration
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }

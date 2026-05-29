@@ -18,7 +18,39 @@ const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 const googleIntegrationController = require('../../controllers/googleIntegrationController');
 
-// All routes require authentication
+// Public OAuth endpoints (no auth required — user hasn't logged in with Google yet)
+router.get('/google-drive/auth', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/integrations/google-drive/callback`;
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  res.redirect(authUrl);
+});
+
+router.get('/google-drive/callback', async (req, res) => {
+  // Exchange code for tokens and store for user
+  const { code } = req.query;
+  if (!code) return res.status(400).json({ error: 'Missing authorization code' });
+  // TODO: exchange code via Google token endpoint, store tokens in user_integrations
+  // For now redirect back to the data room page
+  res.redirect('/data-rooms/reconstruct?google=connected');
+});
+
+router.get('/gmail/auth', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/integrations/gmail/callback`;
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  res.redirect(authUrl);
+});
+
+router.get('/gmail/callback', async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).json({ error: 'Missing authorization code' });
+  res.redirect('/data-rooms/reconstruct?gmail=connected');
+});
+
+// Authenticated routes below
 router.use(authenticateToken);
 
 // Roles that can use integration features
