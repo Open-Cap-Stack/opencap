@@ -54,7 +54,6 @@ exports.createTemplate = async (req, res) => {
 
     const now = new Date().toISOString();
     const template = await databaseAdapter.create(MODEL_NAME, {
-      _id: uuidv4(),
       companyId,
       name: name.trim(),
       subject: subject.trim(),
