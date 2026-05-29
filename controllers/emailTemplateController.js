@@ -82,10 +82,12 @@ exports.getTemplate = async (req, res) => {
     const companyId = req.user?.companyId;
     if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    const result = await zerodbService.getRow(TABLE, req.params.id);
-    const template = flattenRow(result?.data || result);
+    const result = await zerodbService.queryRows(TABLE, {
+      filters: { companyId, type: TYPE_FILTER }
+    });
+    const rows = (result?.data || []).map(flattenRow).filter(Boolean);
+    const template = rows.find(r => r.id === req.params.id || r.row_id === req.params.id);
     if (!template) return res.status(404).json({ error: 'Email template not found' });
-    if (template.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
 
     res.status(200).json({ template });
   } catch (error) {
@@ -102,20 +104,17 @@ exports.updateTemplate = async (req, res) => {
     const companyId = req.user?.companyId;
     if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    // Verify ownership
-    const existing = await zerodbService.getRow(TABLE, req.params.id);
-    const tpl = flattenRow(existing?.data || existing);
-    if (!tpl) return res.status(404).json({ error: 'Email template not found' });
-    if (tpl.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
-
     const { name, subject, body } = req.body;
-    const updates = { ...tpl, updatedAt: new Date().toISOString() };
+    const updates = { updatedAt: new Date().toISOString() };
     if (name !== undefined) updates.name = name.trim();
     if (subject !== undefined) updates.subject = subject.trim();
     if (body !== undefined) updates.body = body.trim();
 
-    await zerodbService.updateRow(TABLE, req.params.id, updates);
-    res.status(200).json({ template: updates });
+    await zerodbService.updateRows(TABLE, {
+      filter: { row_id: req.params.id },
+      update: updates
+    });
+    res.status(200).json({ template: { id: req.params.id, ...updates } });
   } catch (error) {
     console.error('Error updating email template:', error);
     res.status(500).json({ error: 'Failed to update email template' });
@@ -130,12 +129,7 @@ exports.deleteTemplate = async (req, res) => {
     const companyId = req.user?.companyId;
     if (!companyId) return res.status(400).json({ error: 'Company context required' });
 
-    const existing = await zerodbService.getRow(TABLE, req.params.id);
-    const tpl = flattenRow(existing?.data || existing);
-    if (!tpl) return res.status(404).json({ error: 'Email template not found' });
-    if (tpl.companyId !== companyId) return res.status(403).json({ error: 'Access denied' });
-
-    await zerodbService.deleteRow(TABLE, req.params.id);
+    await zerodbService.deleteRowById(TABLE, req.params.id);
     res.status(200).json({ message: 'Email template deleted' });
   } catch (error) {
     console.error('Error deleting email template:', error);
