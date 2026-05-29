@@ -328,6 +328,7 @@ const routes = {
   clerkyIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/clerkyIntegrationRoutes')), // Issue #662: Clerky integration
   eightythreeBRoutes: safeRequire(path.join(__dirname, 'routes/v1/eightythreeBRoutes')), // Issue #667: 83(b) deadline tracking
   googleIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/googleIntegrationRoutes')), // Issue #234: Google Drive/Gmail integration
+  emailTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/emailTemplateRoutes')), // Email template CRUD
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -552,6 +553,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/compliance'; // Issue #667: 83(b) deadline tracking
     } else if (key === 'googleIntegrationRoutes') {
       path = '/api/v1/connect/google'; // Issue #234: Google Drive/Gmail integration (separate from /integrations to avoid auth conflict)
+    } else if (key === 'emailTemplateRoutes') {
+      path = '/api/v1/email-templates'; // Email template CRUD
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
@@ -596,9 +599,7 @@ app.get('/api/v1/assets', _stub);
 app.post('/api/v1/assets', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
 app.get('/api/v1/board-resolutions', _stub);
 app.post('/api/v1/board-resolutions', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
-app.get('/api/v1/email-templates', _stub);
 app.get('/api/v1/email-templates/history', _stub);
-app.post('/api/v1/email-templates', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
 app.get('/api/v1/exports', _stub);
 app.post('/api/v1/exports', (req, res) => res.status(202).json({ status: 'queued', id: Date.now().toString() }));
 // document-access (frontend) → document-accesses (backend)
