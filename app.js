@@ -317,6 +317,7 @@ const routes = {
   investorDatabaseRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorDatabaseRoutes')), // System-wide VC investor directory
   dataRoomReconstructRoutes: safeRequire(path.join(__dirname, 'routes/v1/dataRoomReconstructRoutes')), // Issue #631: AI Data Room Reconstruction
   migrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/migrationRoutes')), // Issue #652: Carta migration score tool
+  exportRoutes: safeRequire(path.join(__dirname, 'routes/v1/exportRoutes')), // CSV/XLSX export endpoints
   capTableHealthRoutes: safeRequire(path.join(__dirname, 'routes/v1/capTableHealthRoutes')), // Issue #660: Cap table health scorecard
   scenarioRoutes: safeRequire(path.join(__dirname, 'routes/v1/scenarioRoutes')), // Issue #661: Scenario modeling unified endpoint
   employeeInviteRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeInviteRoutes')), // Phase 3: Employee invite flow
@@ -529,6 +530,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/reconstruct'; // Issue #631: AI Data Room Reconstruction
     } else if (key === 'migrationRoutes') {
       path = '/api/v1/migration'; // Issue #652: Carta migration score tool
+    } else if (key === 'exportRoutes') {
+      path = '/api/v1/exports'; // CSV/XLSX export endpoints
     } else if (key === 'capTableHealthRoutes') {
       path = '/api/v1/cap-table'; // Issue #660: Cap table health scorecard
     } else if (key === 'scenarioRoutes') {
