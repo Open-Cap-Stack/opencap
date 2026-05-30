@@ -101,13 +101,16 @@ class EquityGrantService {
     }
 
     const {
-      vestingStartDate,
       vestingPeriodMonths,
+      totalMonths,
       cliffMonths,
       vestingFrequency
     } = vestingSchedule;
 
-    const startDate = new Date(vestingStartDate);
+    // vestingStartDate may be top-level on the grant or nested in vestingSchedule
+    const startDate = new Date(grant.vestingStartDate || vestingSchedule.vestingStartDate || grant.grantDate);
+    // Support both vestingPeriodMonths and totalMonths field names
+    const effectiveVestingMonths = vestingPeriodMonths || totalMonths;
     const checkDate = new Date(asOfDate);
 
     // Calculate months elapsed
@@ -125,7 +128,7 @@ class EquityGrantService {
     }
 
     // After full vesting period
-    if (monthsElapsed >= vestingPeriodMonths) {
+    if (monthsElapsed >= effectiveVestingMonths) {
       return {
         vestedShares: numberOfShares,
         vestedPercentage: 100,
@@ -149,15 +152,15 @@ class EquityGrantService {
         vestedMonths = monthsElapsed;
     }
 
-    const vestedPercentage = (vestedMonths / vestingPeriodMonths) * 100;
-    const vestedShares = Math.floor((vestedMonths / vestingPeriodMonths) * numberOfShares);
+    const vestedPercentage = (vestedMonths / effectiveVestingMonths) * 100;
+    const vestedShares = Math.floor((vestedMonths / effectiveVestingMonths) * numberOfShares);
 
     return {
       vestedShares,
       vestedPercentage: Math.round(vestedPercentage * 100) / 100,
       unvestedShares: numberOfShares - vestedShares,
       monthsElapsed,
-      monthsUntilFullVesting: vestingPeriodMonths - monthsElapsed
+      monthsUntilFullVesting: effectiveVestingMonths - monthsElapsed
     };
   }
 
