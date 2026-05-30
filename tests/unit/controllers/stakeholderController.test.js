@@ -111,7 +111,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(parsePagination).toHaveBeenCalledWith({});
-      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 20, skip: 0 });
+      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 500, skip: 0 });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(expect.arrayContaining([
         expect.objectContaining({ stakeholderId: 'STK-001' }),
@@ -128,7 +128,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
         { companyId: 'COMP-001' },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
@@ -141,7 +141,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
         { companyId: 'company_123', projectId: 'PRJ-001' },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
@@ -154,7 +154,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
         { companyId: 'company_123', role: 'investor' },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
@@ -167,7 +167,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
         { companyId: 'company_123', status: 'active' },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
@@ -197,7 +197,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
       await stakeholderController.getAllStakeholders(mockReq, mockRes);
 
       expect(parsePagination).toHaveBeenCalledWith({ limit: '10', skip: '5' });
-      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 10, skip: 5 });
+      expect(Stakeholder.find).toHaveBeenCalledWith({ companyId: 'company_123' }, { limit: 500, skip: 5 });
     });
   });
 
@@ -465,7 +465,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
           role: 'investor',
           status: 'active'
         },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
@@ -513,7 +513,7 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.find).toHaveBeenCalledWith(
         { companyId: 'company_123', role: 'board_member' },
-        expect.objectContaining({ limit: 20, skip: 0 })
+        expect.objectContaining({ limit: 500, skip: 0 })
       );
     });
 
