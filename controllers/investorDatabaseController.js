@@ -86,8 +86,9 @@ exports.listInvestors = async (req, res) => {
     const sectorFilter = (req.query.sector || '').trim().toLowerCase();
     const stageFilter = (req.query.stage || '').trim().toLowerCase();
 
-    // Investor directory rows are in the stakeholders table with role=Investor.
-    const queryOptions = { filter: { role: 'Investor' }, limit, skip };
+    // Investor directory rows are in the stakeholders table. Query by companyId
+    // (ZeroDB's filter works best with indexed fields), then post-filter by role.
+    const queryOptions = { filter: { companyId: 'ainative-studio', role: 'Investor' }, limit, skip };
 
     const result = await zerodbService.queryTable('stakeholders', queryOptions);
     let rows = Array.isArray(result) ? result : (result.data || []);
@@ -154,7 +155,7 @@ exports.listInvestors = async (req, res) => {
  */
 exports.countInvestors = async (req, res) => {
   try {
-    const result = await zerodbService.queryTable('stakeholders', { filter: { role: 'Investor' }, limit: 1 });
+    const result = await zerodbService.queryTable('stakeholders', { filter: { companyId: 'ainative-studio', role: 'Investor' }, limit: 1 });
     const total = result.total ?? (Array.isArray(result) ? result.length : (result.data?.length ?? 0));
     return res.status(200).json({ count: total });
   } catch (error) {
