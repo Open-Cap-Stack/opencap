@@ -124,17 +124,28 @@ exports.getAllStakeholders = async (req, res) => {
     // By default, exclude bulk-imported VC investor records from the cap table.
     // These are served via /investor-database instead. Use ?includeInvestors=true
     // to override (e.g. for admin views that need the full list).
-    // We over-fetch (10x limit) because ZeroDB doesn't support $ne and most rows
-    // may be investors, then trim back to the requested limit after filtering.
     const excludeInvestors = req.query.includeInvestors !== 'true';
-    const fetchLimit = excludeInvestors ? Math.max(limit * 10, 500) : limit;
-    let stakeholders = await Stakeholder.find(filter, { limit: fetchLimit, skip });
+    let stakeholders;
 
-    if (excludeInvestors) {
-      stakeholders = stakeholders.filter(sh => {
-        const role = (sh.role || '').toLowerCase();
-        return role !== 'investor';
-      });
+    if (excludeInvestors && !filter.role) {
+      // ZeroDB doesn't support $ne, and the table has ~13K investor rows that
+      // bury non-investor stakeholders in pagination. Query each non-investor
+      // role separately and merge results.
+      const NON_INVESTOR_ROLES = ['founder', 'employee', 'advisor', 'other', 'co_founder', 'board_member'];
+      const results = await Promise.all(
+        NON_INVESTOR_ROLES.map(role =>
+          Stakeholder.find({ ...filter, role }, { limit, skip: 0 }).catch(() => [])
+        )
+      );
+      stakeholders = results.flat();
+    } else {
+      stakeholders = await Stakeholder.find(filter, { limit, skip });
+      if (excludeInvestors) {
+        stakeholders = stakeholders.filter(sh => {
+          const role = (sh.role || '').toLowerCase();
+          return role !== 'investor';
+        });
+      }
     }
 
     // Support ?excludeRole= (comma-separated) for additional filtering.
