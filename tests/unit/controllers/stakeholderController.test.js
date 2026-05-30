@@ -102,8 +102,8 @@ describe('Stakeholder Controller (ZeroDB)', () => {
   describe('getAllStakeholders', () => {
     it('should return all stakeholders with pagination', async () => {
       const mockStakeholders = [
-        { _id: '1', stakeholderId: 'STK-001', name: 'John Doe', role: 'Investor', projectId: 'PRJ-001' },
-        { _id: '2', stakeholderId: 'STK-002', name: 'Jane Smith', role: 'Founder', projectId: 'PRJ-001' }
+        { _id: '1', stakeholderId: 'STK-001', name: 'John Doe', role: 'founder', projectId: 'PRJ-001' },
+        { _id: '2', stakeholderId: 'STK-002', name: 'Jane Smith', role: 'employee', projectId: 'PRJ-001' }
       ];
 
       Stakeholder.find.mockResolvedValue(mockStakeholders);

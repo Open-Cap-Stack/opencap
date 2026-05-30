@@ -1,14 +1,10 @@
 /**
  * Investor Database Controller
  *
- * Serves system-wide VC investor records stored in the `stakeholders` table
- * with email domain @vc-import.local. No company scoping — platform-wide directory.
- * Access is gated to paid roles: admin, founder, accountant.
- *
- * Architecture note: VC investor records live in the stakeholders table identified
- * by their @vc-import.local email. The stakeholderController excludes these rows
- * so they never appear on a company cap table. This avoids a costly data migration
- * given ZeroDB's per-row API rate limits.
+ * Platform-wide VC/angel investor directory accessible to all authenticated users.
+ * Investor records live in the stakeholders table with role=Investor and
+ * companyId=ainative-studio. The stakeholderController excludes these from
+ * per-company cap tables automatically.
  */
 
 'use strict';
@@ -16,18 +12,64 @@
 const zerodbService = require('../services/zerodbService');
 const logger = require('../utils/logger');
 
-const ALLOWED_ROLES = ['admin', 'founder', 'accountant'];
+/**
+ * Parse structured fields from the notes string.
+ * Notes format: "Firm Name — Type | Stage1, Stage2 | Sector1, Sector2"
+ * or simpler: "Firm Name — VC/Investor"
+ */
+function enrichInvestorRecord(inv) {
+  const enriched = { ...inv };
+  const notes = (inv.notes || '').trim();
 
-function checkRole(req, res) {
-  const role = req.user?.role;
-  if (!role || !ALLOWED_ROLES.includes(role)) {
-    res.status(403).json({
-      error: 'Access denied',
-      message: 'The investor database requires a paid account (founder, accountant, or admin).',
-    });
-    return false;
+  // Parse firm from notes if not already set
+  if (!enriched.firm && notes) {
+    const dashIdx = notes.indexOf('—');
+    const hyphenIdx = notes.indexOf(' - ');
+    if (dashIdx > 0) {
+      enriched.firm = notes.substring(0, dashIdx).trim();
+    } else if (hyphenIdx > 0) {
+      enriched.firm = notes.substring(0, hyphenIdx).trim();
+    }
   }
-  return true;
+
+  // Parse investor type from notes if not already set
+  if (!enriched.investorType && notes) {
+    const lower = notes.toLowerCase();
+    if (lower.includes('angel')) enriched.investorType = 'Angel';
+    else if (lower.includes('vc') || lower.includes('venture')) enriched.investorType = 'VC';
+    else if (lower.includes('pe') || lower.includes('private equity')) enriched.investorType = 'PE';
+    else if (lower.includes('family office')) enriched.investorType = 'Family Office';
+    else if (lower.includes('corporate') || lower.includes('cvc')) enriched.investorType = 'Corporate';
+    else if (lower.includes('accelerator') || lower.includes('incubator')) enriched.investorType = 'Accelerator';
+    else enriched.investorType = 'Investor';
+  }
+
+  // Parse stages from notes (Pre-Seed, Seed, Series A, etc.)
+  if (!enriched.stages && notes) {
+    const stagePatterns = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Growth', 'Late Stage'];
+    const found = stagePatterns.filter(s => notes.includes(s));
+    if (found.length > 0) enriched.stages = found;
+  }
+
+  // Parse sectors from notes
+  if (!enriched.sectors && notes) {
+    const sectorPatterns = ['AI', 'Fintech', 'Enterprise', 'SaaS', 'Consumer', 'Health', 'Biotech',
+      'Climate', 'Hardware', 'Web3', 'Crypto', 'Deeptech', 'CPG', 'D2C', 'Future of Work',
+      'Generalist', 'Developer Tools', 'Security', 'Infrastructure', 'Marketplace', 'EdTech'];
+    const found = sectorPatterns.filter(s => notes.toLowerCase().includes(s.toLowerCase()));
+    if (found.length > 0) enriched.sectors = found;
+  }
+
+  // Extract name parts for display
+  if (enriched.name && enriched.name.startsWith('/fund/')) {
+    enriched.displayName = enriched.name.replace('/fund/', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  } else if (enriched.name && enriched.name.startsWith('/angel/')) {
+    enriched.displayName = enriched.name.replace('/angel/', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  } else {
+    enriched.displayName = enriched.name;
+  }
+
+  return enriched;
 }
 
 /**
@@ -36,8 +78,6 @@ function checkRole(req, res) {
  * Query params: search, type, sector, stage, limit, skip
  */
 exports.listInvestors = async (req, res) => {
-  if (!checkRole(req, res)) return;
-
   try {
     const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 50), 200);
     const skip = Math.max(0, parseInt(req.query.skip) || 0);
@@ -46,9 +86,8 @@ exports.listInvestors = async (req, res) => {
     const sectorFilter = (req.query.sector || '').trim().toLowerCase();
     const stageFilter = (req.query.stage || '').trim().toLowerCase();
 
-    // VC investor rows are in the stakeholders table with companyId: ainative-studio.
-    // skip/limit are passed to ZeroDB so pagination happens at the DB level.
-    const queryOptions = { filter: { companyId: 'ainative-studio' }, limit, skip };
+    // Investor directory rows are in the stakeholders table with role=Investor.
+    const queryOptions = { filter: { role: 'Investor' }, limit, skip };
 
     const result = await zerodbService.queryTable('stakeholders', queryOptions);
     let rows = Array.isArray(result) ? result : (result.data || []);
@@ -56,19 +95,21 @@ exports.listInvestors = async (req, res) => {
     // Extract row_data from ZeroDB envelope if present
     rows = rows.map((r) => (r.row_data ? { ...r.row_data, _rowId: r.row_id } : r));
 
-    // Only return VC import rows — real stakeholders share this companyId but
-    // must not leak into the investor directory. VC imports use role=Investor.
+    // Only return investor-role rows (guard against filter fallback)
     rows = rows.filter((r) => {
       const role = (r.role || '').toLowerCase();
       return role === 'investor';
     });
 
-    // Apply text search across name, email, firm, notes
+    // Enrich each record with parsed firm, type, stages, sectors
+    rows = rows.map(enrichInvestorRecord);
+
+    // Apply text search across name, email, firm, notes, displayName
     if (search) {
       rows = rows.filter((inv) => {
-        const name = (inv.name || `${inv.firstName || ''} ${inv.lastName || ''}`).toLowerCase();
+        const name = (inv.displayName || inv.name || '').toLowerCase();
         const email = (inv.email || '').toLowerCase();
-        const firm = (inv.firm || inv.company || inv.organization || '').toLowerCase();
+        const firm = (inv.firm || '').toLowerCase();
         const notes = (inv.notes || '').toLowerCase();
         return name.includes(search) || email.includes(search) || firm.includes(search) || notes.includes(search);
       });
@@ -77,7 +118,7 @@ exports.listInvestors = async (req, res) => {
     // Apply type filter
     if (typeFilter) {
       rows = rows.filter((inv) => {
-        const t = (inv.investorType || inv.type || '').toLowerCase();
+        const t = (inv.investorType || '').toLowerCase();
         return t === typeFilter;
       });
     }
@@ -85,16 +126,16 @@ exports.listInvestors = async (req, res) => {
     // Apply sector filter
     if (sectorFilter) {
       rows = rows.filter((inv) => {
-        const s = (inv.sector || inv.industry || '').toLowerCase();
-        return s.includes(sectorFilter);
+        const sectors = (inv.sectors || []).map(s => s.toLowerCase());
+        return sectors.some(s => s.includes(sectorFilter));
       });
     }
 
     // Apply stage filter
     if (stageFilter) {
       rows = rows.filter((inv) => {
-        const s = (inv.stage || inv.investorStage || inv.investmentStage || '').toLowerCase();
-        return s.includes(stageFilter);
+        const stages = (inv.stages || []).map(s => s.toLowerCase());
+        return stages.some(s => s.includes(stageFilter));
       });
     }
 
@@ -109,13 +150,11 @@ exports.listInvestors = async (req, res) => {
 
 /**
  * GET /api/v1/investor-database/count
- * Return total count of investors in the table.
+ * Return total count of investors in the directory.
  */
 exports.countInvestors = async (req, res) => {
-  if (!checkRole(req, res)) return;
-
   try {
-    const result = await zerodbService.queryTable('stakeholders', { filter: { companyId: 'ainative-studio' }, limit: 1 });
+    const result = await zerodbService.queryTable('stakeholders', { filter: { role: 'Investor' }, limit: 1 });
     const total = result.total ?? (Array.isArray(result) ? result.length : (result.data?.length ?? 0));
     return res.status(200).json({ count: total });
   } catch (error) {
@@ -129,8 +168,6 @@ exports.countInvestors = async (req, res) => {
  * Get a single investor by investorId or row id.
  */
 exports.getInvestorById = async (req, res) => {
-  if (!checkRole(req, res)) return;
-
   try {
     const { id } = req.params;
 
@@ -154,10 +191,10 @@ exports.getInvestorById = async (req, res) => {
       if (rows2.length === 0) {
         return res.status(404).json({ error: 'Investor not found' });
       }
-      return res.status(200).json({ investor: rows2[0] });
+      return res.status(200).json({ investor: enrichInvestorRecord(rows2[0]) });
     }
 
-    return res.status(200).json({ investor: rows[0] });
+    return res.status(200).json({ investor: enrichInvestorRecord(rows[0]) });
   } catch (error) {
     logger.error('Error fetching investor by id', { error: error.message });
     return res.status(500).json({ error: 'Error fetching investor' });

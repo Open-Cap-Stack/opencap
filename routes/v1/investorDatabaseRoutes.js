@@ -3,20 +3,20 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../../middleware/authMiddleware');
-const { hasRole } = require('../../middleware/rbacMiddleware');
 const { auditAction } = require('../../middleware/auditLog');
 const investorDatabaseController = require('../../controllers/investorDatabaseController');
 
-// All routes require authentication
+// All routes require authentication but no role restriction —
+// the investor database is a platform-wide directory for all users.
 router.use(authenticateToken);
 
 // Count must be before /:id to avoid being treated as an id param
-router.get('/count', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), investorDatabaseController.countInvestors);
+router.get('/count', investorDatabaseController.countInvestors);
 
 // List with filtering and pagination
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('view_investor_db', 'investor_database'), investorDatabaseController.listInvestors);
+router.get('/', auditAction('view_investor_db', 'investor_database'), investorDatabaseController.listInvestors);
 
 // Single investor by id
-router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), auditAction('view_investor_db', 'investor_database'), investorDatabaseController.getInvestorById);
+router.get('/:id', auditAction('view_investor_db', 'investor_database'), investorDatabaseController.getInvestorById);
 
 module.exports = router;
