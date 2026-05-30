@@ -14,7 +14,7 @@ const createShareClass = async (req, res) => {
   const body = { ...req.body };
   if (body.type && !body.classType) body.classType = body.type;
 
-  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, pricePerShare, liquidationPreference, votingRights, antiDilutionRights, conversionRatio } = body;
+  const { name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares, authorizedShares, conversionRate, classType, parValue, pricePerShare, liquidationPreference, votingRights, antiDilutionRights, conversionRatio, votesPerShare, conversionRights, subType, antidilutionProtection, seniorityRank, pariPassuGroup } = body;
 
   if (!name) {
     return errorResponse(res, 400, 'Name is required');
@@ -27,6 +27,7 @@ const createShareClass = async (req, res) => {
       name, description, shareClassId, amountRaised, ownershipPercentage, dilutedShares,
       authorizedShares, conversionRate, classType, parValue, pricePerShare,
       liquidationPreference, votingRights, antiDilutionRights, conversionRatio,
+      votesPerShare, conversionRights, subType, antidilutionProtection, seniorityRank, pariPassuGroup,
       // Also store `type` for frontend compatibility
       type: classType || body.type,
       ...(companyId ? { companyId } : {})

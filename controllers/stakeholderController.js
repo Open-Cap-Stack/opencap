@@ -122,8 +122,17 @@ exports.getAllStakeholders = async (req, res) => {
     const { limit, skip } = parsePagination(req.query);
     let stakeholders = await Stakeholder.find(filter, { limit, skip });
 
-    // Support ?excludeRole=investor (or comma-separated list) to let the
-    // frontend hide platform-wide investor directory entries from the cap table.
+    // By default, exclude bulk-imported VC investor records from the cap table.
+    // These are served via /investor-database instead. Use ?includeInvestors=true
+    // to override (e.g. for admin views that need the full list).
+    if (req.query.includeInvestors !== 'true') {
+      stakeholders = stakeholders.filter(sh => {
+        const role = (sh.role || '').toLowerCase();
+        return role !== 'investor';
+      });
+    }
+
+    // Support ?excludeRole= (comma-separated) for additional filtering.
     // Filtering is done in JS because ZeroDB's $nin support is unreliable.
     if (req.query.excludeRole) {
       const excludedRoles = req.query.excludeRole

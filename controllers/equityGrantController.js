@@ -13,6 +13,18 @@ const { assertCompanyOwnership, assertUserOwnership } = require('../middleware/c
 const VALID_STATUSES = ['pending', 'approved', 'active', 'exercised', 'cancelled', 'expired'];
 
 /**
+ * Resolve a grant lookup ID — if it looks like a grantId (GRANT-...), find the
+ * internal _id first. Otherwise assume it's already an _id or row_id.
+ */
+async function resolveGrantId(id) {
+  if (id && id.startsWith('GRANT-')) {
+    const results = await databaseAdapter.find('EquityGrant', { grantId: id });
+    if (results && results.length > 0) return results[0]._id;
+  }
+  return id;
+}
+
+/**
  * Create a new equity grant
  */
 exports.createEquityGrant = async (req, res) => {
@@ -73,7 +85,8 @@ exports.getEquityGrants = async (req, res) => {
  */
 exports.getEquityGrantById = async (req, res) => {
   try {
-    const grant = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const lookupId = await resolveGrantId(req.params.id);
+    const grant = await databaseAdapter.findById('EquityGrant', lookupId);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }
@@ -96,13 +109,14 @@ exports.getEquityGrantById = async (req, res) => {
  */
 exports.updateEquityGrant = async (req, res) => {
   try {
+    const resolvedId = await resolveGrantId(req.params.id);
     // Fetch first to verify ownership before mutating
-    const existing = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const existing = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (existing && !assertCompanyOwnership(req, res, existing)) return;
 
     const grant = await databaseAdapter.findByIdAndUpdate(
       'EquityGrant',
-      req.params.id,
+      resolvedId,
       req.body,
       { new: true }
     );
@@ -120,11 +134,12 @@ exports.updateEquityGrant = async (req, res) => {
  */
 exports.deleteEquityGrant = async (req, res) => {
   try {
+    const resolvedId = await resolveGrantId(req.params.id);
     // Fetch first to verify ownership before deleting
-    const existing = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const existing = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (existing && !assertCompanyOwnership(req, res, existing)) return;
 
-    const grant = await databaseAdapter.findByIdAndDelete('EquityGrant', req.params.id);
+    const grant = await databaseAdapter.findByIdAndDelete('EquityGrant', resolvedId);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }
@@ -159,9 +174,11 @@ exports.updateGrantStatus = async (req, res) => {
       updateData.cancellationReason = cancellationReason;
     }
 
+    const lookupId = await resolveGrantId(req.params.id);
+
     const grant = await databaseAdapter.findByIdAndUpdate(
       'EquityGrant',
-      req.params.id,
+      lookupId,
       updateData,
       { new: true }
     );
@@ -189,7 +206,8 @@ exports.exerciseGrant = async (req, res) => {
     }
 
     // Get the grant
-    const grant = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const resolvedId = await resolveGrantId(req.params.id);
+    const grant = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }
@@ -325,7 +343,8 @@ exports.createGrantFromTemplate = async (req, res) => {
  */
 exports.getVestingSchedule = async (req, res) => {
   try {
-    const grant = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const lookupId = await resolveGrantId(req.params.id);
+    const grant = await databaseAdapter.findById('EquityGrant', lookupId);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }
@@ -369,7 +388,8 @@ exports.calculateEquityValue = async (req, res) => {
       return res.status(400).json({ error: 'Current price is required' });
     }
 
-    const grant = await databaseAdapter.findById('EquityGrant', req.params.id);
+    const resolvedId = await resolveGrantId(req.params.id);
+    const grant = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (!grant) {
       return res.status(404).json({ message: 'Equity grant not found' });
     }

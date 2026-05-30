@@ -56,6 +56,13 @@ exports.listInvestors = async (req, res) => {
     // Extract row_data from ZeroDB envelope if present
     rows = rows.map((r) => (r.row_data ? { ...r.row_data, _rowId: r.row_id } : r));
 
+    // Only return VC import rows — real stakeholders share this companyId but
+    // must not leak into the investor directory. VC imports use role=Investor.
+    rows = rows.filter((r) => {
+      const role = (r.role || '').toLowerCase();
+      return role === 'investor';
+    });
+
     // Apply text search across name, email, firm, notes
     if (search) {
       rows = rows.filter((inv) => {
