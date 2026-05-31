@@ -122,6 +122,8 @@ exports.createDocument = async (req, res) => {
             createdAt: now,
             updatedAt: now,
             status: req.body.status || 'active',
+            type: req.body.type || req.body.documentType || req.body.category || null,
+            documentType: req.body.documentType || req.body.category || req.body.type || null,
             folderId: req.body.folderId || null
         };
 
