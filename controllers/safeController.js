@@ -104,13 +104,15 @@ exports.getCompanySAFEs = async (req, res) => {
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
 
-    const safes = await SAFE.find(query, {
+    const allResults = await SAFE.find(query, {
       sort: { createdAt: -1 },
       skip: (pageNum - 1) * limitNum,
-      limit: limitNum
+      limit: limitNum * 3  // over-fetch to account for non-SAFE records
     });
 
-    const total = await SAFE.countDocuments(query);
+    // Only return records that are actual SAFEs (have a safeId field)
+    const safes = allResults.filter(s => s.safeId);
+    const total = safes.length;
 
     res.json({
       success: true,
