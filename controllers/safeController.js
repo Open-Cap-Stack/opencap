@@ -48,6 +48,7 @@ exports.createSAFE = async (req, res) => {
       discountRate,
       proRataRights,
       expiresAt,
+      issueDate,
       notes,
       tags,
       metadata
@@ -67,6 +68,7 @@ exports.createSAFE = async (req, res) => {
       discountRate,
       proRataRights,
       expiresAt,
+      issueDate: issueDate || new Date().toISOString(),
       notes,
       tags,
       metadata,
@@ -114,9 +116,18 @@ exports.getCompanySAFEs = async (req, res) => {
     const safes = allResults.filter(s => s.safeId);
     const total = safes.length;
 
+    // Normalize each SAFE: ensure issueDate is present (fallback to createdAt)
+    const normalizedSafes = safes.map(s => {
+      const normalized = normalizeSafeType(s);
+      if (!normalized.issueDate && normalized.createdAt) {
+        normalized.issueDate = normalized.createdAt;
+      }
+      return normalized;
+    });
+
     res.json({
       success: true,
-      data: safes.map(normalizeSafeType),
+      data: normalizedSafes,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -592,11 +603,14 @@ exports.getCompanySummary = async (req, res) => {
   try {
     const { companyId } = req.params;
 
-    const [safes, totalFunded, pendingConversion] = await Promise.all([
+    const [allResults, totalFunded, pendingConversion] = await Promise.all([
       SAFE.find({ companyId }),
       SAFE.getTotalFundedAmount(companyId),
       SAFE.getPendingConversion(companyId)
     ]);
+
+    // Only count records that are actual SAFEs (have a safeId field)
+    const safes = allResults.filter(s => s.safeId);
 
     const summary = {
       total: safes.length,

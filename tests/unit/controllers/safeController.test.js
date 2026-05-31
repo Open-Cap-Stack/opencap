@@ -36,13 +36,22 @@ describe('SAFE Controller', () => {
   });
 
   describe('createSAFE', () => {
-    it('should create successfully', async () => {
+    it('should create successfully with issueDate', async () => {
+      req.body = { companyId: 'c1', investorId: 'i1', investorName: 'J', investorEmail: 'j@i.com', investmentAmount: 100000, safeType: 'post-money', valuationCap: 5000000, issueDate: '2026-03-15' };
+      const createdSafe = { ...req.body, safeId: 'safe_123', status: 'draft' };
+      SAFE.create.mockResolvedValue(createdSafe);
+      await ctrl.createSAFE(req, res);
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(SAFE.create).toHaveBeenCalledWith(expect.objectContaining({ issueDate: '2026-03-15' }));
+    });
+    it('should default issueDate to current date if not provided', async () => {
       req.body = { companyId: 'c1', investorId: 'i1', investorName: 'J', investorEmail: 'j@i.com', investmentAmount: 100000, safeType: 'post-money', valuationCap: 5000000 };
       const createdSafe = { ...req.body, safeId: 'safe_123', status: 'draft' };
       SAFE.create.mockResolvedValue(createdSafe);
       await ctrl.createSAFE(req, res);
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(SAFE.create).toHaveBeenCalled();
+      const createArg = SAFE.create.mock.calls[0][0];
+      expect(createArg.issueDate).toBeDefined();
     });
     it('should return 400 for invalid data', async () => {
       req.body = {};
@@ -53,13 +62,20 @@ describe('SAFE Controller', () => {
   });
 
   describe('getCompanySAFEs', () => {
-    it('should return paginated SAFEs', async () => {
+    it('should return paginated SAFEs with issueDate normalized', async () => {
       req.params.companyId = 'c1'; req.query = { page: '1', limit: '20' };
-      const safes = [{ safeId: 's1' }, { safeId: 's2' }];
+      const safes = [{ safeId: 's1', createdAt: '2026-01-01' }, { safeId: 's2', issueDate: '2026-02-01' }];
       SAFE.find.mockResolvedValue(safes);
       SAFE.countDocuments.mockResolvedValue(2);
       await ctrl.getCompanySAFEs(req, res);
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: safes, pagination: { page: 1, limit: 20, total: 2, pages: 1 } });
+      const call = res.json.mock.calls[0][0];
+      expect(call.success).toBe(true);
+      expect(call.data).toHaveLength(2);
+      // First SAFE should have issueDate filled from createdAt
+      expect(call.data[0].issueDate).toBe('2026-01-01');
+      // Second SAFE already had issueDate
+      expect(call.data[1].issueDate).toBe('2026-02-01');
+      expect(call.pagination).toEqual({ page: 1, limit: 20, total: 2, pages: 1 });
     });
     it('should filter by status', async () => {
       req.params.companyId = 'c1'; req.query = { status: 'funded' };
@@ -199,13 +215,24 @@ describe('SAFE Controller', () => {
   });
 
   describe('getCompanySummary', () => {
-    it('should return summary', async () => {
+    it('should return summary counting only records with safeId', async () => {
       req.params.companyId = 'c1';
-      SAFE.find.mockResolvedValue([{ status: 'draft', investmentAmount: 50000 }, { status: 'funded', investmentAmount: 100000 }, { status: 'funded', investmentAmount: 150000 }]);
+      // Mix of SAFE records (have safeId) and non-SAFE securities (no safeId)
+      SAFE.find.mockResolvedValue([
+        { safeId: 'safe_1', status: 'draft', investmentAmount: 50000 },
+        { safeId: 'safe_2', status: 'funded', investmentAmount: 100000 },
+        { safeId: 'safe_3', status: 'funded', investmentAmount: 150000 },
+        { status: 'active', investmentAmount: 200000 }  // stock issuance, no safeId
+      ]);
       SAFE.getTotalFundedAmount.mockResolvedValue(250000);
       SAFE.getPendingConversion.mockResolvedValue([{ investmentAmount: 100000 }, { investmentAmount: 150000 }]);
       await ctrl.getCompanySummary(req, res);
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: expect.objectContaining({ total: 3, totalFunded: 250000, pendingConversionCount: 2 }) });
+      const data = res.json.mock.calls[0][0].data;
+      // Should only count the 3 records with safeId, not the stock issuance
+      expect(data.total).toBe(3);
+      expect(data.totalInvestment).toBe(300000);
+      expect(data.totalFunded).toBe(250000);
+      expect(data.pendingConversionCount).toBe(2);
     });
   });
 });
