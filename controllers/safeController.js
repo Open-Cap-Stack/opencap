@@ -8,6 +8,15 @@ const SAFEConversion = require('../models/SAFEConversion');
 const SAFEConversionService = require('../services/safeConversionService');
 
 /**
+ * Resolve a SAFE lookup ID — tries safeId first, falls back to _id/row_id.
+ */
+async function resolveSafe(id) {
+  let safe = await SAFE.findOne({ safeId: id });
+  if (!safe) safe = await SAFE.findOne({ _id: id });
+  return safe;
+}
+
+/**
  * Normalize safeType to use hyphen-format regardless of how it was stored in DB.
  * Handles legacy underscore variants (e.g. "post_money" -> "post-money").
  */
@@ -136,7 +145,7 @@ exports.getSAFE = async (req, res) => {
   try {
     const { safeId } = req.params;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
 
     if (!safe) {
       return res.status(404).json({
@@ -163,7 +172,7 @@ exports.updateSAFE = async (req, res) => {
     const { safeId } = req.params;
     const updates = { ...req.body };
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
@@ -192,7 +201,7 @@ exports.updateSAFE = async (req, res) => {
     updates.updatedBy = req.user?._id || req.user?.userId;
 
     await SAFE.updateOne({ safeId }, { $set: updates });
-    const updatedSafe = await SAFE.findOne({ safeId });
+    const updatedSafe = await resolveSafe(safeId);
 
     res.json({
       success: true,
@@ -219,11 +228,7 @@ exports.updateStatus = async (req, res) => {
       });
     }
 
-    // Look up by safeId first, then fall back to row_id
-    let safe = await SAFE.findOne({ safeId });
-    if (!safe) {
-      safe = await SAFE.findById(safeId);
-    }
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
@@ -280,7 +285,7 @@ exports.sendSAFE = async (req, res) => {
     const { safeId } = req.params;
     const { message } = req.body;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
 
     if (!safe) {
       return res.status(404).json({
@@ -349,7 +354,7 @@ exports.recordInvestorSignature = async (req, res) => {
     const { safeId } = req.params;
     const { signatureData, signerName, signerEmail, signerTitle } = req.body;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
@@ -384,7 +389,7 @@ exports.recordCompanySignature = async (req, res) => {
     const { safeId } = req.params;
     const { signatureData, signerName, signerEmail, signerTitle } = req.body;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
@@ -420,7 +425,7 @@ exports.markFunded = async (req, res) => {
     const { safeId } = req.params;
     const { fundedAmount, fundedDate, notes } = req.body;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
@@ -457,7 +462,7 @@ exports.deleteSAFE = async (req, res) => {
   try {
     const { safeId } = req.params;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({ success: false, error: 'SAFE not found' });
     }
@@ -476,7 +481,7 @@ exports.cancelSAFE = async (req, res) => {
     const { safeId } = req.params;
     const { reason } = req.body;
 
-    const safe = await SAFE.findOne({ safeId });
+    const safe = await resolveSafe(safeId);
     if (!safe) {
       return res.status(404).json({
         success: false,
