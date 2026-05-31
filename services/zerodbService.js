@@ -42,7 +42,11 @@ class ZeroDBService {
       (response) => response,
       (error) => {
         if (!this.useLocalFallback) {
-          console.error('ZeroDB API Error:', error.response?.data || error.message);
+          // Suppress noisy logs for expected errors (table already exists)
+          const detail = error.response?.data?.detail || '';
+          if (!detail.includes('UniqueViolation') && !detail.includes('already exists')) {
+            console.error('ZeroDB API Error:', error.response?.data || error.message);
+          }
         }
         return Promise.reject(error);
       }
@@ -184,6 +188,12 @@ class ZeroDBService {
       });
       return response.data;
     } catch (error) {
+      // Suppress noise for tables that already exist (UniqueViolation)
+      const detail = error.response?.data?.detail || error.message || '';
+      if (detail.includes('UniqueViolation') || detail.includes('already exists') || error.response?.status === 409) {
+        // Table exists — not an error
+        return { table_name: tableName, exists: true };
+      }
       console.error('Error creating table:', error.message);
       throw error;
     }
