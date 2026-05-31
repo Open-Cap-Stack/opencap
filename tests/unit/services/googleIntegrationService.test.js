@@ -47,7 +47,7 @@ describe('GoogleIntegrationService', () => {
       const result = await checkGoogleConnection('user_123');
 
       expect(result.connected).toBe(false);
-      expect(zerodbService.queryTable).toHaveBeenCalledWith('user_integrations', {
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('integrations', {
         filter: { userId: 'user_123', provider: 'google' },
         limit: 1,
       });

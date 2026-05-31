@@ -33,12 +33,54 @@ const MIME_TYPE_MAP = {
 
 /**
  * Check whether a user has a stored Google OAuth token.
- * For MVP this always returns false — the frontend will show a
- * "Connect Google Account" call-to-action.
- *
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<{ connected: boolean, email: string|null }>}
  */
+async function getStoredToken(userId, provider = 'google') {
+  try {
+    const result = await zerodbService.queryTable('integrations', {
+      filter: { userId, provider },
+      limit: 1,
+    });
+    const rows = result.data || result.rows || [];
+    const integration = rows[0]?.row_data || rows[0];
+    if (integration && integration.accessToken) {
+      // Check if token is expired
+      if (integration.tokenExpiry && new Date(integration.tokenExpiry) < new Date()) {
+        // Try to refresh
+        if (integration.refreshToken) {
+          try {
+            const axios = require('axios');
+            const { data: refreshed } = await axios.post('https://oauth2.googleapis.com/token', {
+              client_id: process.env.GOOGLE_CLIENT_ID,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET,
+              refresh_token: integration.refreshToken,
+              grant_type: 'refresh_token',
+            });
+            // Update stored token
+            await zerodbService.updateRows('integrations', {
+              filter: { userId, provider },
+              update: {
+                accessToken: refreshed.access_token,
+                tokenExpiry: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+              },
+            });
+            return refreshed.access_token;
+          } catch (refreshErr) {
+            console.error('Token refresh failed:', refreshErr.message);
+            return null;
+          }
+        }
+        return null;
+      }
+      return integration.accessToken;
+    }
+  } catch (err) {
+    // Table may not exist
+  }
+  return null;
+}
+
 async function checkGoogleConnection(userId) {
   if (!userId) {
     return { connected: false, email: null };
@@ -46,7 +88,8 @@ async function checkGoogleConnection(userId) {
 
   try {
     // Look for a stored Google OAuth token in the integrations table
-    const result = await zerodbService.queryTable('user_integrations', {
+    // Check both 'google' and 'gmail' providers
+    const result = await zerodbService.queryTable('integrations', {
       filter: { userId, provider: 'google' },
       limit: 1,
     });
@@ -135,28 +178,29 @@ async function searchDriveFiles(userId, { query, types, limit = 20 } = {}) {
     };
   }
 
-  // When connected — future implementation will call Google Drive API here.
-  // For now, return the connected status so the frontend knows the link is active.
-  // The googleapis SDK call would look like:
-  //
-  //   const { google } = require('googleapis');
-  //   const oauth2Client = new google.auth.OAuth2();
-  //   oauth2Client.setCredentials({ access_token: token });
-  //   const drive = google.drive({ version: 'v3', auth: oauth2Client });
-  //   const typeArray = types ? types.split(',').map(t => t.trim()) : [];
-  //   const q = buildDriveQuery(query, typeArray);
-  //   const res = await drive.files.list({
-  //     q,
-  //     pageSize: limit,
-  //     fields: 'files(id,name,mimeType,size,modifiedTime,thumbnailLink)',
-  //   });
-  //   return { connected: true, files: res.data.files };
+  // Get the stored access token
+  const token = await getStoredToken(userId, 'google');
+  if (!token) {
+    return { connected: true, message: 'Token expired — reconnect Google account', files: [] };
+  }
 
-  return {
-    connected: true,
-    message: 'Google Drive search is available. Direct API search will be implemented with googleapis SDK.',
-    files: [],
-  };
+  try {
+    const typeArray = types ? types.split(',').map(t => t.trim()) : [];
+    const q = buildDriveQuery(query, typeArray);
+    const axios = require('axios');
+    const { data } = await axios.get('https://www.googleapis.com/drive/v3/files', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        q,
+        pageSize: limit,
+        fields: 'files(id,name,mimeType,size,modifiedTime,webViewLink,iconLink)',
+      },
+    });
+    return { connected: true, files: data.files || [] };
+  } catch (err) {
+    console.error('Google Drive API error:', err.response?.data?.error?.message || err.message);
+    return { connected: true, error: err.response?.data?.error?.message || err.message, files: [] };
+  }
 }
 
 /**
@@ -180,21 +224,54 @@ async function searchGmailAttachments(userId, { query, newerThan, limit = 20 } =
     };
   }
 
-  // When connected — future implementation will call Gmail API here.
-  // The googleapis SDK call would look like:
-  //
-  //   const { google } = require('googleapis');
-  //   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-  //   let gmailQuery = `has:attachment ${query || ''}`;
-  //   if (newerThan) gmailQuery += ` newer_than:${newerThan}`;
-  //   const list = await gmail.users.messages.list({ userId: 'me', q: gmailQuery, maxResults: limit });
-  //   // Then fetch each message to extract attachment metadata
+  const token = await getStoredToken(userId, 'google') || await getStoredToken(userId, 'gmail');
+  if (!token) {
+    return { connected: true, message: 'Token expired — reconnect Google account', attachments: [] };
+  }
 
-  return {
-    connected: true,
-    message: 'Gmail attachment search is available. Direct API search will be implemented with googleapis SDK.',
-    attachments: [],
-  };
+  try {
+    const axios = require('axios');
+    let gmailQuery = `has:attachment ${query || ''}`.trim();
+    if (newerThan) gmailQuery += ` newer_than:${newerThan}`;
+
+    const { data: list } = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { q: gmailQuery, maxResults: limit },
+    });
+
+    const messages = list.messages || [];
+    const attachments = [];
+
+    for (const msg of messages.slice(0, 10)) {
+      try {
+        const { data: msgData } = await axios.get(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] },
+        });
+        const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || 'No subject';
+        const from = msgData.payload?.headers?.find(h => h.name === 'From')?.value || '';
+        const date = msgData.payload?.headers?.find(h => h.name === 'Date')?.value || '';
+        const parts = msgData.payload?.parts || [];
+        for (const part of parts) {
+          if (part.filename && part.body?.attachmentId) {
+            attachments.push({
+              messageId: msg.id,
+              attachmentId: part.body.attachmentId,
+              fileName: part.filename,
+              mimeType: part.mimeType,
+              size: part.body.size || 0,
+              subject, from, date,
+            });
+          }
+        }
+      } catch { /* skip individual message errors */ }
+    }
+
+    return { connected: true, attachments };
+  } catch (err) {
+    console.error('Gmail API error:', err.response?.data?.error?.message || err.message);
+    return { connected: true, error: err.response?.data?.error?.message || err.message, attachments: [] };
+  }
 }
 
 /**

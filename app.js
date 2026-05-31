@@ -335,25 +335,108 @@ const routes = {
 
 // Public OAuth endpoints — mounted BEFORE any auth middleware
 // These redirect to Google OAuth consent screen; no bearer token needed
+const axios = require('axios');
+
+const GOOGLE_DRIVE_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/google/google-drive/callback`;
+const GMAIL_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/google/gmail/callback`;
+
 app.get('/api/v1/connect/google/google-drive/auth', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/connect/google/google-drive/callback`;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly');
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  // Pass userId in state so we know who to store the token for
+  const state = encodeURIComponent(req.query.userId || 'anonymous');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GOOGLE_DRIVE_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
   res.redirect(authUrl);
 });
-app.get('/api/v1/connect/google/google-drive/callback', (req, res) => {
-  res.redirect('/data-rooms/reconstruct?google=connected');
+
+app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError || !code) {
+    console.error('Google OAuth error:', oauthError || 'no code');
+    return res.redirect('/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+  }
+  try {
+    // Exchange auth code for tokens
+    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: GOOGLE_DRIVE_REDIRECT,
+      grant_type: 'authorization_code',
+    });
+
+    // Get user's email from Google
+    const { data: userInfo } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    // Store tokens in ZeroDB
+    const userId = decodeURIComponent(state || 'anonymous');
+    const zerodbService = require('./services/zerodbService');
+    await zerodbService.insertRow('integrations', {
+      userId,
+      provider: 'google',
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token || null,
+      tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
+      email: userInfo.email,
+      scopes: 'drive.readonly,gmail.readonly',
+      connectedAt: new Date().toISOString(),
+    });
+
+    console.log(`Google connected for ${userInfo.email} (user: ${userId})`);
+    res.redirect('/data-rooms/reconstruct?google=connected&email=' + encodeURIComponent(userInfo.email));
+  } catch (err) {
+    console.error('Google token exchange failed:', err.response?.data || err.message);
+    res.redirect('/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(err.message));
+  }
 });
+
 app.get('/api/v1/connect/google/gmail/auth', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://opencapstack.com'}/api/v1/connect/google/gmail/callback`;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly');
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  const state = encodeURIComponent(req.query.userId || 'anonymous');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
   res.redirect(authUrl);
 });
-app.get('/api/v1/connect/google/gmail/callback', (req, res) => {
-  res.redirect('/data-rooms/reconstruct?gmail=connected');
+
+app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError || !code) {
+    return res.redirect('/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+  }
+  try {
+    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: GMAIL_REDIRECT,
+      grant_type: 'authorization_code',
+    });
+
+    const { data: userInfo } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    const userId = decodeURIComponent(state || 'anonymous');
+    const zerodbService = require('./services/zerodbService');
+    await zerodbService.insertRow('integrations', {
+      userId,
+      provider: 'gmail',
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token || null,
+      tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
+      email: userInfo.email,
+      scopes: 'gmail.readonly',
+      connectedAt: new Date().toISOString(),
+    });
+
+    console.log(`Gmail connected for ${userInfo.email} (user: ${userId})`);
+    res.redirect('/data-rooms/reconstruct?gmail=connected&email=' + encodeURIComponent(userInfo.email));
+  } catch (err) {
+    console.error('Gmail token exchange failed:', err.response?.data || err.message);
+    res.redirect('/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(err.message));
+  }
 });
 
 // Apply company-scope authorization to all API routes (after auth middleware in each route)
