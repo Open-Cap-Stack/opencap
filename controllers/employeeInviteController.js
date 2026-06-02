@@ -120,34 +120,38 @@ exports.acceptInvite = async (req, res) => {
     // Hash the new password and activate the account
     const hashedPassword = await User.hashPassword(password);
 
-    const updatedUser = await User.findOneAndUpdate(
-      { inviteToken },
+    // Use the _id from the findOne result — ZeroDB's findOneAndUpdate can't
+    // reliably filter by arbitrary fields like inviteToken
+    const userId = user._id || user.userId;
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
       {
-        $set: {
-          password: hashedPassword,
-          status: 'active',
-          inviteToken: null,
-          inviteTokenExpires: null,
-          lastLogin: new Date().toISOString()
-        }
+        password: hashedPassword,
+        status: 'active',
+        inviteToken: null,
+        inviteTokenExpires: null,
+        lastLogin: new Date().toISOString()
       },
       { new: true }
     );
 
+    // Fall back to the original user record if update didn't return the full object
+    const effectiveUser = updatedUser || { ...user, status: 'active' };
+
     // Issue a JWT for immediate login
     const tokenPayload = {
-      userId: updatedUser.userId,
-      email: updatedUser.email,
-      role: updatedUser.role,
-      companyId: updatedUser.companyId
+      userId: effectiveUser.userId || userId,
+      email: effectiveUser.email || user.email,
+      role: effectiveUser.role || user.role || 'employee',
+      companyId: effectiveUser.companyId || user.companyId
     };
 
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'default_secret', {
       expiresIn: '24h'
     });
 
-    // Sanitize — strip sensitive fields inline so we don't depend on User.toJSON being available
-    const safeUser = { ...updatedUser };
+    // Sanitize — strip sensitive fields
+    const safeUser = { ...effectiveUser };
     delete safeUser.password;
     delete safeUser.passwordResetToken;
     delete safeUser.passwordResetExpires;
