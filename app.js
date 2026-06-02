@@ -341,6 +341,9 @@ const routes = {
 const { acceptInvite } = require('./controllers/employeeInviteController');
 app.post('/api/v1/employees/accept-invite', acceptInvite);
 
+// Frontend URL for OAuth redirects (backend is api.opencapstack.com, frontend is opencapstack.com)
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://opencapstack.com';
+
 // These redirect to Google OAuth consent screen; no bearer token needed
 const axios = require('axios');
 
@@ -360,7 +363,7 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
   const { code, state, error: oauthError } = req.query;
   if (oauthError || !code) {
     console.error('Google OAuth error:', oauthError || 'no code');
-    return res.redirect('/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+    return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
   }
   try {
     // Exchange auth code for tokens
@@ -404,10 +407,10 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
     });
 
     console.log(`Google connected for ${userInfo.email} (user: ${userId})`);
-    res.redirect('/data-rooms/reconstruct?google=connected&email=' + encodeURIComponent(userInfo.email));
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=connected&email=' + encodeURIComponent(userInfo.email));
   } catch (err) {
     console.error('Google token exchange failed:', err.response?.data || err.message);
-    res.redirect('/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(err.message));
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(err.message));
   }
 });
 
@@ -422,7 +425,7 @@ app.get('/api/v1/connect/google/gmail/auth', (req, res) => {
 app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
   const { code, state, error: oauthError } = req.query;
   if (oauthError || !code) {
-    return res.redirect('/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+    return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
   }
   try {
     const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
@@ -463,10 +466,10 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
     });
 
     console.log(`Gmail connected for ${userInfo.email} (user: ${userId})`);
-    res.redirect('/data-rooms/reconstruct?gmail=connected&email=' + encodeURIComponent(userInfo.email));
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=connected&email=' + encodeURIComponent(userInfo.email));
   } catch (err) {
     console.error('Gmail token exchange failed:', err.response?.data || err.message);
-    res.redirect('/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(err.message));
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(err.message));
   }
 });
 
@@ -487,7 +490,7 @@ app.get('/api/v1/connect/mercury/callback', async (req, res) => {
   const { code, state, error: oauthError } = req.query;
   if (oauthError || !code) {
     console.error('Mercury OAuth error:', oauthError || 'no code');
-    return res.redirect('/settings/integrations?mercury=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+    return res.redirect(FRONTEND_URL + '/settings/integrations?mercury=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
   }
   try {
     const { data: tokens } = await axios.post('https://api.mercury.com/oauth/token', {
@@ -510,10 +513,10 @@ app.get('/api/v1/connect/mercury/callback', async (req, res) => {
     });
 
     console.log(`Mercury connected for user: ${userId}`);
-    res.redirect('/settings/integrations?mercury=connected');
+    res.redirect(FRONTEND_URL + '/settings/integrations?mercury=connected');
   } catch (err) {
     console.error('Mercury token exchange failed:', err.response?.data || err.message);
-    res.redirect('/settings/integrations?mercury=error&reason=' + encodeURIComponent(err.message));
+    res.redirect(FRONTEND_URL + '/settings/integrations?mercury=error&reason=' + encodeURIComponent(err.message));
   }
 });
 
