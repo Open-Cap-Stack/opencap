@@ -314,6 +314,8 @@ const routes = {
   pluginAuthRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginAuthRoutes')), // Issue #505: Plugin OAuth
   pluginRoutes: safeRequire(path.join(__dirname, 'routes/v1/pluginRoutes')), // Issue #506: Plugin tools
   boardMeetingRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardMeetingRoutes')), // Board meeting management
+  boardMemberRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardMemberRoutes')), // Board member management
+  boardResolutionRoutes: safeRequire(path.join(__dirname, 'routes/v1/boardResolutionRoutes')), // Board resolutions with persistence
   messageRoutes: safeRequire(path.join(__dirname, 'routes/v1/messageRoutes')), // Messaging / conversations
   accountantRoutes: safeRequire(path.join(__dirname, 'routes/v1/accountantRoutes')), // AI 409A accountant review workflow
   investorDatabaseRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorDatabaseRoutes')), // System-wide VC investor directory
@@ -721,6 +723,10 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/activities';
     } else if (key === 'boardMeetingRoutes') {
       path = '/api/v1/board-meetings';
+    } else if (key === 'boardMemberRoutes') {
+      path = '/api/v1/board-members';
+    } else if (key === 'boardResolutionRoutes') {
+      path = '/api/v1/board-resolutions';
     } else if (key === 'messageRoutes') {
       path = '/api/v1/messages';
     } else if (key === 'accountantRoutes') {
@@ -800,8 +806,7 @@ const _stub = (req, res) => res.json([]);
 const _stubObj = (req, res) => res.json({});
 app.get('/api/v1/assets', _stub);
 app.post('/api/v1/assets', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
-app.get('/api/v1/board-resolutions', _stub);
-app.post('/api/v1/board-resolutions', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+// board-resolutions stubs removed — now served by boardResolutionRoutes
 app.get('/api/v1/email-templates/history', _stub);
 app.get('/api/v1/exports', _stub);
 app.post('/api/v1/exports', (req, res) => res.status(202).json({ status: 'queued', id: Date.now().toString() }));
