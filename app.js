@@ -182,7 +182,7 @@ const zerodbReady = (async () => {
     console.log('✅ DatabaseAdapter initialized');
 
     // Seed any new tables that don't auto-create on first insert
-    const newTables = ['reconstruction_jobs'];
+    const newTables = ['reconstruction_jobs', 'mercury_snapshots'];
     for (const tbl of newTables) {
       try {
         await zerodbService.createTable(tbl, { fields: {} });
@@ -329,6 +329,7 @@ const routes = {
   eightythreeBRoutes: safeRequire(path.join(__dirname, 'routes/v1/eightythreeBRoutes')), // Issue #667: 83(b) deadline tracking
   googleIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/googleIntegrationRoutes')), // Issue #234: Google Drive/Gmail integration
   emailTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/emailTemplateRoutes')), // Email template CRUD
+  mercuryRoutes: safeRequire(path.join(__dirname, 'routes/v1/mercuryRoutes')), // Issue #671: Mercury banking integration
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -370,14 +371,26 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
-    // Store tokens in ZeroDB
+    // Encrypt tokens before storing (Issue #680)
     const userId = decodeURIComponent(state || 'anonymous');
     const zerodbService = require('./services/zerodbService');
+    let encAccessToken = tokens.access_token;
+    let encRefreshToken = tokens.refresh_token || null;
+    try {
+      const { encrypt } = require('./utils/tokenEncryption');
+      encAccessToken = encrypt(tokens.access_token);
+      if (tokens.refresh_token) {
+        encRefreshToken = encrypt(tokens.refresh_token);
+      }
+    } catch (e) {
+      // Encryption not configured — store plaintext as fallback
+      console.warn('Token encryption unavailable, storing plaintext:', e.message);
+    }
     await zerodbService.insertRow('integrations', {
       userId,
       provider: 'google',
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || null,
+      accessToken: encAccessToken,
+      refreshToken: encRefreshToken,
       tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
       email: userInfo.email,
       scopes: 'drive.readonly,gmail.readonly',
@@ -420,11 +433,23 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
 
     const userId = decodeURIComponent(state || 'anonymous');
     const zerodbService = require('./services/zerodbService');
+    // Encrypt tokens before storing (Issue #680)
+    let encAccessToken = tokens.access_token;
+    let encRefreshToken = tokens.refresh_token || null;
+    try {
+      const { encrypt } = require('./utils/tokenEncryption');
+      encAccessToken = encrypt(tokens.access_token);
+      if (tokens.refresh_token) {
+        encRefreshToken = encrypt(tokens.refresh_token);
+      }
+    } catch (e) {
+      console.warn('Token encryption unavailable, storing plaintext:', e.message);
+    }
     await zerodbService.insertRow('integrations', {
       userId,
       provider: 'gmail',
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || null,
+      accessToken: encAccessToken,
+      refreshToken: encRefreshToken,
       tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
       email: userInfo.email,
       scopes: 'gmail.readonly',
@@ -436,6 +461,89 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
   } catch (err) {
     console.error('Gmail token exchange failed:', err.response?.data || err.message);
     res.redirect('/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(err.message));
+  }
+});
+
+// ── Mercury OAuth endpoints (Issue #671) ──
+const MERCURY_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/mercury/callback`;
+
+app.get('/api/v1/connect/mercury/auth', (req, res) => {
+  const clientId = process.env.MERCURY_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).json({ error: 'Mercury integration not configured' });
+  }
+  const state = encodeURIComponent(req.query.userId || 'anonymous');
+  const authUrl = `https://app.mercury.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(MERCURY_REDIRECT)}&response_type=code&state=${state}`;
+  res.redirect(authUrl);
+});
+
+app.get('/api/v1/connect/mercury/callback', async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError || !code) {
+    console.error('Mercury OAuth error:', oauthError || 'no code');
+    return res.redirect('/settings/integrations?mercury=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
+  }
+  try {
+    const { data: tokens } = await axios.post('https://api.mercury.com/oauth/token', {
+      code,
+      client_id: process.env.MERCURY_CLIENT_ID,
+      client_secret: process.env.MERCURY_CLIENT_SECRET,
+      redirect_uri: MERCURY_REDIRECT,
+      grant_type: 'authorization_code',
+    });
+
+    const userId = decodeURIComponent(state || 'anonymous');
+    const zerodbSvc = require('./services/zerodbService');
+    await zerodbSvc.insertRow('integrations', {
+      userId,
+      provider: 'mercury',
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token || null,
+      tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
+      connectedAt: new Date().toISOString(),
+    });
+
+    console.log(`Mercury connected for user: ${userId}`);
+    res.redirect('/settings/integrations?mercury=connected');
+  } catch (err) {
+    console.error('Mercury token exchange failed:', err.response?.data || err.message);
+    res.redirect('/settings/integrations?mercury=error&reason=' + encodeURIComponent(err.message));
+  }
+});
+
+app.delete('/api/v1/connect/mercury/disconnect', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId query parameter is required' });
+    }
+
+    const zerodbSvc = require('./services/zerodbService');
+
+    // Look up the integration to attempt token revocation
+    const result = await zerodbSvc.queryRows('integrations', { userId, provider: 'mercury' }, { limit: 1 });
+    const rows = result?.data || [];
+
+    if (rows.length > 0) {
+      const record = rows[0].row_data;
+      // Best-effort revocation — Mercury may not support explicit revocation
+      try {
+        await axios.post('https://api.mercury.com/oauth/revoke', {
+          token: record.accessToken,
+          client_id: process.env.MERCURY_CLIENT_ID,
+          client_secret: process.env.MERCURY_CLIENT_SECRET,
+        });
+      } catch (_revokeErr) {
+        // Revocation is best-effort; continue with local cleanup
+      }
+
+      await zerodbSvc.deleteRowById('integrations', rows[0].row_id);
+    }
+
+    res.status(200).json({ success: true, message: 'Mercury disconnected' });
+  } catch (err) {
+    console.error('Mercury disconnect failed:', err.message);
+    res.status(500).json({ error: 'Failed to disconnect Mercury' });
   }
 });
 
@@ -638,6 +746,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/connect/google'; // Issue #234: Google Drive/Gmail integration (separate from /integrations to avoid auth conflict)
     } else if (key === 'emailTemplateRoutes') {
       path = '/api/v1/email-templates'; // Email template CRUD
+    } else if (key === 'mercuryRoutes') {
+      path = '/api/v1/integrations/mercury'; // Issue #671: Mercury banking integration
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
