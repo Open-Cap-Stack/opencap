@@ -63,7 +63,20 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const result = await zerodbService.insertRow(tableName, data);
+      let result;
+      try {
+        result = await zerodbService.insertRow(tableName, data);
+      } catch (insertErr) {
+        // If table doesn't exist, create it and retry
+        if (insertErr.message && (insertErr.message.includes('404') || insertErr.message.includes('not found') || insertErr.message.includes('500'))) {
+          try {
+            await zerodbService.createTable(tableName, {});
+          } catch { /* table may already exist */ }
+          result = await zerodbService.insertRow(tableName, data);
+        } else {
+          throw insertErr;
+        }
+      }
       this._recordMetric(Date.now() - startTime, true);
 
       // Unwrap: { data: [{ row_id, row_data }] } → flat object

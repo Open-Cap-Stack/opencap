@@ -9,6 +9,51 @@ require('dotenv').config();
 const zerodbService = require('../services/zerodbService');
 
 const TABLES = {
+  board_member: {
+    fields: [
+      { name: 'firstName',     type: 'TEXT', notNull: true },
+      { name: 'lastName',      type: 'TEXT', notNull: true },
+      { name: 'name',          type: 'TEXT' },
+      { name: 'email',         type: 'TEXT' },
+      { name: 'role',          type: 'TEXT' },
+      { name: 'companyId',     type: 'TEXT', notNull: true },
+      { name: 'status',        type: 'TEXT' },
+      { name: 'appointedDate', type: 'TEXT' },
+      { name: 'addedBy',       type: 'TEXT' },
+      { name: 'createdAt',     type: 'TIMESTAMP' },
+      { name: 'updatedAt',     type: 'TIMESTAMP' },
+    ],
+  },
+  board_meeting: {
+    fields: [
+      { name: 'title',      type: 'TEXT', notNull: true },
+      { name: 'date',       type: 'TEXT', notNull: true },
+      { name: 'type',       type: 'TEXT' },
+      { name: 'location',   type: 'TEXT' },
+      { name: 'agenda',     type: 'TEXT' },
+      { name: 'companyId',  type: 'TEXT', notNull: true },
+      { name: 'status',     type: 'TEXT' },
+      { name: 'createdBy',  type: 'TEXT' },
+      { name: 'createdAt',  type: 'TIMESTAMP' },
+      { name: 'updatedAt',  type: 'TIMESTAMP' },
+    ],
+  },
+  board_resolution: {
+    fields: [
+      { name: 'title',         type: 'TEXT', notNull: true },
+      { name: 'type',          type: 'TEXT' },
+      { name: 'status',        type: 'TEXT' },
+      { name: 'date',          type: 'TEXT' },
+      { name: 'description',   type: 'TEXT' },
+      { name: 'votesFor',      type: 'INTEGER' },
+      { name: 'votesAgainst',  type: 'INTEGER' },
+      { name: 'votesAbstained',type: 'INTEGER' },
+      { name: 'companyId',     type: 'TEXT', notNull: true },
+      { name: 'createdBy',     type: 'TEXT' },
+      { name: 'createdAt',     type: 'TIMESTAMP' },
+      { name: 'updatedAt',     type: 'TIMESTAMP' },
+    ],
+  },
   api_keys: {
     fields: [
       { name: 'keyId',       type: 'TEXT', notNull: true, unique: true },
