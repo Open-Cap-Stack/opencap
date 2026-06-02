@@ -25,7 +25,7 @@ router.post('/reports/bulk', hasRole(['super_admin', 'admin', 'founder', 'manage
  * GET /api/v1/stakeholders
  * Get all stakeholders (supports companyId, projectId, role, status filters + pagination)
  */
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.getAllStakeholders);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee', 'service_provider']), stakeholderController.getAllStakeholders);
 
 /**
  * GET /api/v1/stakeholders/:id/qsbs-eligibility
@@ -57,7 +57,7 @@ router.get('/:id/qsbs-eligibility', hasRole(['super_admin', 'admin', 'founder', 
  * GET /api/v1/stakeholders/:id
  * Get stakeholder by ID (_id or stakeholderId)
  */
-router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), stakeholderController.getStakeholderById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee', 'service_provider']), stakeholderController.getStakeholderById);
 
 /**
  * POST /api/v1/stakeholders

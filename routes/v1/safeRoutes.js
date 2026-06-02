@@ -22,15 +22,15 @@ router.use(authenticateToken);
 // SAFE CRUD operations
 router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.createSAFE);
 // Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), (req, res, next) => {
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), (req, res, next) => {
   // Always delegate to getCompanySAFEs — it handles null/default companyId by returning all
   const companyId = req.user?.companyId || 'default';
   req.params = { ...req.params, companyId };
   return safeController.getCompanySAFEs(req, res, next);
 });
-router.get('/company/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getCompanySAFEs);
-router.get('/company/:companyId/summary', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getCompanySummary);
-router.get('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.getSAFE);
+router.get('/company/:companyId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), safeController.getCompanySAFEs);
+router.get('/company/:companyId/summary', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), safeController.getCompanySummary);
+router.get('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), safeController.getSAFE);
 router.put('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.updateSAFE);
 router.patch('/:safeId/status', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.updateStatus);
 router.delete('/:safeId', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.deleteSAFE);

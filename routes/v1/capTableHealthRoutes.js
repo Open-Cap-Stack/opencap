@@ -17,7 +17,7 @@ router.use(authenticateToken);
  * Query: companyId (required), and optionally lastValuationDate
  * Body can also contain full data payload for richer scoring
  */
-router.get('/health-score', hasRole(['super_admin', 'admin', 'founder', 'manager']), async (req, res) => {
+router.get('/health-score', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), async (req, res) => {
   try {
     const { companyId, lastValuationDate } = req.query;
 

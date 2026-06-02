@@ -23,7 +23,7 @@ router.use(authenticateToken);
  */
 
 // Get all valuations
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getAllValuations);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'employee']), valuation409AController.getAllValuations);
 
 // Get valuation analytics
 router.get('/analytics', hasRole(['super_admin', 'admin', 'founder', 'accountant']), valuation409AController.getValuationAnalytics);

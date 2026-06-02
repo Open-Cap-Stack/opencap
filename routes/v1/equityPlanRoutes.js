@@ -8,8 +8,8 @@ const equityPlanController = require('../../controllers/equityPlanController');
 router.use(authenticateToken);
 
 router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanController.createEquityPlan);
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanController.getEquityPlans);
-router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanController.getEquityPlanById);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), equityPlanController.getEquityPlans);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), equityPlanController.getEquityPlanById);
 router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanController.updateEquityPlan);
 router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), equityPlanController.deleteEquityPlan);
 

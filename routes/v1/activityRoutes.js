@@ -31,7 +31,7 @@ router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service
  * - limit: Number of results (default: 100)
  * - offset: Number to skip (default: 0)
  */
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), activityController.getActivities);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee', 'service_provider']), activityController.getActivities);
 
 /**
  * GET /api/v1/activities/:id

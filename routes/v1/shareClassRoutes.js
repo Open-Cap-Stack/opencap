@@ -14,9 +14,9 @@ const {
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), getAllShareClasses);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), getAllShareClasses);
 router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), auditAction('create_share_class', 'share_class'), createShareClass);
-router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), getShareClassById);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), getShareClassById);
 router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager']), auditAction('update_share_class', 'share_class'), updateShareClassById);
 router.delete('/:id', hasRole(['super_admin', 'admin', 'founder']), auditAction('delete_share_class', 'share_class'), deleteShareClassById);
 
