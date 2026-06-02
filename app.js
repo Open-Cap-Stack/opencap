@@ -336,7 +336,11 @@ const routes = {
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
 
-// Public OAuth endpoints — mounted BEFORE any auth middleware
+// ── Public endpoints — mounted BEFORE any auth middleware ──
+// Accept-invite is public (invite token IS the credential, no JWT needed)
+const { acceptInvite } = require('./controllers/employeeInviteController');
+app.post('/api/v1/employees/accept-invite', acceptInvite);
+
 // These redirect to Google OAuth consent screen; no bearer token needed
 const axios = require('axios');
 

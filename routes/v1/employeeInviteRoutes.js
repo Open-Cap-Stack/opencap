@@ -30,10 +30,7 @@ const VIEW_ROLES  = ['super_admin', 'admin', 'founder', 'manager', 'employee'];
 router.post('/invite', authenticateToken, hasRole(INVITE_ROLES), auditAction('invite_employee', 'employee'), inviteEmployee);
 
 // POST /api/v1/employees/accept-invite — public, no auth required (invite token is the credential)
-router.post('/accept-invite', (req, res, next) => {
-  console.log('[DEBUG] accept-invite route handler reached');
-  next();
-}, acceptInvite);
+router.post('/accept-invite', acceptInvite);
 
 // GET /api/v1/employees
 router.get('/', authenticateToken, hasRole(LIST_ROLES), listEmployees);
