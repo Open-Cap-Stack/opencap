@@ -769,9 +769,10 @@ const safeRouteModule = safeRequire(path.join(__dirname, 'routes/v1/safeRoutes')
 if (stakeholderRouteModule) app.use('/api/v1/shareholders', stakeholderRouteModule);
 if (securityIssuanceRouteModule) app.use('/api/v1/securities', securityIssuanceRouteModule);
 if (safeRouteModule) app.use('/api/v1/safe-agreements', safeRouteModule);
-// employees — generic key mapper registers at /api/v1/employee (singular); alias the plural form
-const employeeRouteModule = safeRequire(path.join(__dirname, 'routes/v1/employeeRoutes'));
-if (employeeRouteModule) app.use('/api/v1/employees', employeeRouteModule);
+// employees — employeeInviteRoutes (registered above as employeeInviteRoutes at /api/v1/employees)
+// handles all employee endpoints including the public accept-invite route.
+// Do NOT mount employeeRoutes here — it has router.use(authenticateToken) which
+// blocks the public accept-invite endpoint with a 401.
 // spv — frontend calls /spv but backend registered at /spvs; alias /spv → /spvs
 const spvRouteModule = safeRequire(path.join(__dirname, 'routes/v1/spvRoutes'));
 if (spvRouteModule) app.use('/api/v1/spv', spvRouteModule);
