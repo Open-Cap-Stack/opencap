@@ -15,6 +15,8 @@ const SUPPORTED_INTEGRATIONS = [
   'github',
   'slack',
   'google-drive',
+  'mercury',
+  'clerk',
   'jira',
   'quickbooks',
   'xero',
@@ -34,11 +36,35 @@ async function getConnectedIntegrations(req, res) {
     }
 
     const user = await User.findOne({ userId });
-    const integrations = user?.connectedIntegrations || [];
-    return res.json({ integrations });
+    const userIntegrations = user?.connectedIntegrations || [];
+
+    // Also check the OAuth integrations table for real connections (Google, Mercury)
+    try {
+      const zerodbService = require('../services/zerodbService');
+      const result = await zerodbService.queryTable('integrations', {
+        filter: { userId },
+        limit: 20,
+      });
+      const oauthRows = (result.data || result || []).map(r => r.row_data || r);
+      for (const row of oauthRows) {
+        const provider = row.provider;
+        const id = provider === 'google' ? 'google-drive' : provider;
+        if (id && !userIntegrations.some(i => i.id === id)) {
+          userIntegrations.push({
+            id,
+            name: (id).split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            connectedAt: row.connectedAt,
+            email: row.email,
+          });
+        }
+      }
+    } catch {
+      // integrations table may not exist — ignore
+    }
+
+    return res.json({ integrations: userIntegrations });
   } catch (err) {
     console.error('[integrations] getConnected error:', err.message);
-    // Non-fatal: return empty list so frontend renders gracefully
     return res.json({ integrations: [] });
   }
 }
@@ -77,8 +103,27 @@ async function connectIntegration(req, res) {
       return res.status(409).json({ error: 'Integration already connected' });
     }
 
-    // For OAuth-based integrations a real implementation would generate a
-    // redirectUrl here. For now we record the connection directly.
+    // OAuth-based integrations return a redirectUrl for the consent screen.
+    // The frontend does window.location.href = redirectUrl to start the flow.
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://opencapstack.com';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com';
+
+    const oauthUrls = {
+      'google-drive': `${API_URL}/api/v1/connect/google/google-drive/auth?userId=${userId}`,
+      'slack': null, // TODO: Slack OAuth when SLACK_CLIENT_ID is configured
+      'github': null, // TODO: GitHub OAuth
+      'mercury': `${API_URL}/api/v1/connect/mercury/auth?userId=${userId}`,
+    };
+
+    if (oauthUrls[integrationId] !== undefined) {
+      const redirectUrl = oauthUrls[integrationId];
+      if (redirectUrl) {
+        return res.json({ success: true, redirectUrl });
+      }
+      // No OAuth URL configured — fall through to direct connection
+    }
+
+    // For non-OAuth integrations, record the connection directly
     const newIntegration = {
       id: integrationId,
       name: integrationId
