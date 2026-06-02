@@ -244,7 +244,9 @@ const routes = {
   fundraisingRoundRoutes: safeRequire(path.join(__dirname, 'routes/v1/fundraisingRoundRoutes')),
   equityPlanRoutes: safeRequire(path.join(__dirname, 'routes/v1/equityPlanRoutes')),
   documentEmbeddingRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentEmbeddingRoutes')),
-  employeeRoutes: safeRequire(path.join(__dirname, 'routes/v1/employeeRoutes')),
+  // employeeRoutes removed — employeeInviteRoutes handles /employees with per-route auth.
+  // employeeRoutes has router.use(authenticateToken) which blocks the public accept-invite endpoint.
+  // The generic mapper would mount it at /api/v1/employee which prefix-matches /api/v1/employees/*.
   activityRoutes: safeRequire(path.join(__dirname, 'routes/v1/activityRoutes')),
   investmentTrackerRoutes: safeRequire(path.join(__dirname, 'routes/v1/investmentTrackerRoutes')),
   adminRoutes: safeRequire(path.join(__dirname, 'routes/v1/adminRoutes')),
