@@ -554,7 +554,7 @@ app.delete('/api/v1/connect/mercury/disconnect', async (req, res) => {
 // Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
 app.use('/api/v1', (req, res, next) => {
   // Skip company check for auth, health, and public routes
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
