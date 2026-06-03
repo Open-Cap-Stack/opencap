@@ -89,14 +89,28 @@ exports.createApiKey = async (req, res) => {
 exports.listApiKeys = async (req, res) => {
   try {
     const { userId, companyId, role } = req.user;
-
-    // Admins see all keys for their company; others see only their own
     const isAdmin = ['admin', 'super_admin', 'founder'].includes(role);
-    const filter = isAdmin && companyId ? { companyId } : { userId };
 
-    const result = await zerodbService.queryTable(TABLE, { filter });
-    const keys = unwrap(result).map(sanitize);
-    return res.status(200).json(keys);
+    // Always include user's own keys
+    const userResult = await zerodbService.queryTable(TABLE, { filter: { userId } });
+    const userKeys = unwrap(userResult);
+
+    // Admins also see all keys for their company
+    let allKeys = userKeys;
+    if (isAdmin && companyId) {
+      const companyResult = await zerodbService.queryTable(TABLE, { filter: { companyId } });
+      const companyKeys = unwrap(companyResult);
+      // Merge and deduplicate by keyId
+      const seen = new Set(userKeys.map(k => k.keyId));
+      for (const k of companyKeys) {
+        if (!seen.has(k.keyId)) {
+          allKeys.push(k);
+          seen.add(k.keyId);
+        }
+      }
+    }
+
+    return res.status(200).json(allKeys.map(sanitize));
   } catch (err) {
     console.error('listApiKeys error:', err.message);
     return res.status(500).json({ message: 'Server error' });
