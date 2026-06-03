@@ -334,6 +334,7 @@ const routes = {
   googleIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/googleIntegrationRoutes')), // Issue #234: Google Drive/Gmail integration
   emailTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/emailTemplateRoutes')), // Email template CRUD
   mercuryRoutes: safeRequire(path.join(__dirname, 'routes/v1/mercuryRoutes')), // Issue #671: Mercury banking integration
+  investorPortalRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorPortalRoutes')), // Issue #684: Investor portal summary, invite, access
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
 };
@@ -763,6 +764,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/email-templates'; // Email template CRUD
     } else if (key === 'mercuryRoutes') {
       path = '/api/v1/integrations/mercury'; // Issue #671: Mercury banking integration
+    } else if (key === 'investorPortalRoutes') {
+      path = '/api/v1/investor-portal'; // Issue #684: Investor portal summary, invite, access
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
