@@ -88,8 +88,13 @@ exports.createApiKey = async (req, res) => {
  */
 exports.listApiKeys = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const result = await zerodbService.queryTable(TABLE, { filter: { userId } });
+    const { userId, companyId, role } = req.user;
+
+    // Admins see all keys for their company; others see only their own
+    const isAdmin = ['admin', 'super_admin', 'founder'].includes(role);
+    const filter = isAdmin && companyId ? { companyId } : { userId };
+
+    const result = await zerodbService.queryTable(TABLE, { filter });
     const keys = unwrap(result).map(sanitize);
     return res.status(200).json(keys);
   } catch (err) {
