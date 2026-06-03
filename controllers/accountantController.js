@@ -487,6 +487,27 @@ exports.getTransferHistory = async (req, res) => {
 
 // ─── Admin: Manual Queue Assignment ─────────────────────────────────────────
 
+exports.adminCreateQueueItem = async (req, res) => {
+  try {
+    const { valuationId, companyId, priority } = req.body;
+    if (!valuationId) {
+      return res.status(400).json({ success: false, error: 'valuationId is required' });
+    }
+
+    const item = await AccountantQueue.create({
+      valuationId,
+      companyId: companyId || req.user.companyId,
+      priority: priority || 'normal',
+      status: 'unassigned',
+      createdBy: req.user.userId
+    });
+
+    res.status(201).json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.adminAssignQueueItem = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {

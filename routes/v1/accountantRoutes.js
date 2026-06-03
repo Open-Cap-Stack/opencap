@@ -36,6 +36,7 @@ router.get('/transfers', hasRole(['super_admin', 'admin', 'founder', 'accountant
 
 // Admin: accountant management
 router.get('/accountants', hasRole(['super_admin', 'admin']), accountantController.listAccountants);
+router.post('/queue', hasRole(['super_admin', 'admin']), accountantController.adminCreateQueueItem);
 router.patch('/queue/:queueId/assign', hasRole(['super_admin', 'admin']), accountantController.adminAssignQueueItem);
 
 module.exports = router;
