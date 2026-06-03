@@ -55,8 +55,9 @@ exports.createSAFE = async (req, res) => {
     } = req.body;
 
     const userId = req.user?._id || req.user?.userId;
+    const resolvedCompanyId = companyId || req.user?.companyId;
     const safe = await SAFE.create({
-      companyId,
+      companyId: resolvedCompanyId,
       investorId,
       investorName,
       investorEmail,
