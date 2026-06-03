@@ -88,7 +88,7 @@ class ZeroDBModel {
         } catch (error) {
             logger.error(`[ZeroDBModel] Error creating document in ${this.tableName}: ${error.message}`);
             // If table doesn't exist, try to create it and retry
-            if (error.response?.status === 404 || error.message?.includes('not found')) {
+            if (error.response?.status === 404 || error.response?.status === 500 || error.message?.includes('not found') || error.message?.includes('500')) {
                 logger.info(`[ZeroDBModel] Table ${this.tableName} not found, attempting to create...`);
                 try {
                     await zerodbService.createTable(this.tableName, { fields: {} });
