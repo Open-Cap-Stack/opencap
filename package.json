@@ -35,7 +35,7 @@
     "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.17",
     "argon2": "^0.40.3",
-    "axios": "^1.16.1",
+    "axios": "^1.17.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
