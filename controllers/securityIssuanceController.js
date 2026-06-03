@@ -19,6 +19,19 @@ const {
 
 const TABLE_NAME = 'security_issuances';
 
+/**
+ * Unwrap ZeroDB query results into flat objects.
+ * ZeroDB may return { data: [{ row_data, row_id }] } or a plain array.
+ */
+const unwrapRows = (rawResult) => {
+  const items = Array.isArray(rawResult)
+    ? rawResult
+    : (rawResult?.data || rawResult?.rows || []);
+  return items.map(item =>
+    item.row_data ? { ...item.row_data, row_id: item.row_id } : item
+  );
+};
+
 // Required fields for creating a security issuance
 const REQUIRED_FIELDS = [
   'issuanceId',
@@ -173,7 +186,8 @@ const getAllSecurityIssuances = async (req, res) => {
     if (status) filter.status = status;
 
     const queryOptions = Object.keys(filter).length > 0 ? { filter } : {};
-    const issuances = await zerodbService.queryTable(TABLE_NAME, queryOptions);
+    const rawResult = await zerodbService.queryTable(TABLE_NAME, queryOptions);
+    const issuances = unwrapRows(rawResult);
 
     return res.status(200).json({
       success: true,
@@ -203,9 +217,10 @@ const getSecurityIssuanceById = async (req, res) => {
       });
     }
 
-    const results = await zerodbService.queryTable(TABLE_NAME, {
+    const rawResults = await zerodbService.queryTable(TABLE_NAME, {
       filter: { id }
     });
+    const results = unwrapRows(rawResults);
 
     if (!results || results.length === 0) {
       return res.status(404).json({
@@ -326,9 +341,10 @@ const getComplianceStatus = async (req, res) => {
       });
     }
 
-    const issuances = await zerodbService.queryTable(TABLE_NAME, {
+    const rawIssuances = await zerodbService.queryTable(TABLE_NAME, {
       filter: { companyId }
     });
+    const issuances = unwrapRows(rawIssuances);
 
     // Aggregate compliance statistics
     const stats = {
@@ -402,7 +418,8 @@ const getOverdueFilings = async (req, res) => {
       filter.companyId = companyId;
     }
 
-    const issuances = await zerodbService.queryTable(TABLE_NAME, { filter });
+    const rawIssuances = await zerodbService.queryTable(TABLE_NAME, { filter });
+    const issuances = unwrapRows(rawIssuances);
 
     return res.status(200).json({
       success: true,
@@ -445,9 +462,10 @@ const addStateFiling = async (req, res) => {
     stateFilingData.stateCode = stateFilingData.stateCode.toUpperCase();
 
     // ZeroDB: Use read-modify-write pattern instead of MongoDB $push operator
-    const currentResults = await zerodbService.queryTable(TABLE_NAME, {
+    const rawResults = await zerodbService.queryTable(TABLE_NAME, {
       filter: { id }
     });
+    const currentResults = unwrapRows(rawResults);
 
     if (!currentResults || currentResults.length === 0) {
       return res.status(404).json({
@@ -490,9 +508,10 @@ const updateStateFiling = async (req, res) => {
     const updateData = req.body;
 
     // Get current issuance
-    const results = await zerodbService.queryTable(TABLE_NAME, {
+    const rawResults = await zerodbService.queryTable(TABLE_NAME, {
       filter: { id }
     });
+    const results = unwrapRows(rawResults);
 
     if (!results || results.length === 0) {
       return res.status(404).json({
@@ -599,9 +618,10 @@ const getUpcomingDeadlines = async (req, res) => {
     const now = new Date();
     const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
-    const issuances = await zerodbService.queryTable(TABLE_NAME, {
+    const rawIssuances = await zerodbService.queryTable(TABLE_NAME, {
       filter: { companyId }
     });
+    const issuances = unwrapRows(rawIssuances);
 
     const deadlines = [];
 
@@ -683,7 +703,8 @@ const getByExemptionType = async (req, res) => {
       filter.companyId = companyId;
     }
 
-    const issuances = await zerodbService.queryTable(TABLE_NAME, { filter });
+    const rawIssuances = await zerodbService.queryTable(TABLE_NAME, { filter });
+    const issuances = unwrapRows(rawIssuances);
 
     return res.status(200).json({
       success: true,
