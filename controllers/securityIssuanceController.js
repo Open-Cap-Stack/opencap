@@ -126,8 +126,25 @@ const createSecurityIssuance = async (req, res) => {
       );
     }
 
-    const result = await zerodbService.insertRow(TABLE_NAME, issuanceData);
-    const createdIssuance = result.rows ? result.rows[0] : result;
+    let result;
+    try {
+      result = await zerodbService.insertRow(TABLE_NAME, issuanceData);
+    } catch (insertErr) {
+      // Auto-create table if it doesn't exist, then retry
+      if (insertErr.message && (insertErr.message.includes('404') || insertErr.message.includes('not found') || insertErr.message.includes('500'))) {
+        try { await zerodbService.createTable(TABLE_NAME, {}); } catch { /* table may already exist */ }
+        result = await zerodbService.insertRow(TABLE_NAME, issuanceData);
+      } else {
+        throw insertErr;
+      }
+    }
+    // Unwrap ZeroDB response: { data: [{ row_id, row_data }] } or { data: [flat_obj] }
+    const rows = result?.data || result?.rows || [];
+    let createdIssuance = result;
+    if (Array.isArray(rows) && rows.length > 0) {
+      const item = rows[0];
+      createdIssuance = item.row_data ? { ...item.row_data, row_id: item.row_id } : item;
+    }
 
     return res.status(201).json({
       success: true,
