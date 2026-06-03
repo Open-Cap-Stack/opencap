@@ -541,3 +541,50 @@ exports.adminAssignQueueItem = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ─── Payment Intent for 409A Review (Stripe Link / Payment Element) ──────────
+
+exports.createReviewPaymentIntent = async (req, res) => {
+  try {
+    const { valuationId, amount } = req.body;
+    if (!valuationId) {
+      return res.status(400).json({ success: false, error: 'valuationId is required' });
+    }
+
+    const reviewAmount = amount || 99900; // Default $999.00
+
+    // Find the assigned accountant's Stripe Connect account for split payments
+    let connectedAccountId = null;
+    try {
+      const queueItems = await AccountantQueue.find({ valuationId });
+      const assignedItem = queueItems.find(q => q.assignedAccountantId);
+      if (assignedItem) {
+        const accountant = await User.findOne({ userId: assignedItem.assignedAccountantId });
+        if (accountant?.stripeAccountId) {
+          connectedAccountId = accountant.stripeAccountId;
+        }
+      }
+    } catch { /* proceed without connected account */ }
+
+    const paymentIntent = await stripeService.createPaymentIntent({
+      amount: reviewAmount,
+      currency: 'usd',
+      description: `409A Valuation Review — ${valuationId}`,
+      metadata: {
+        valuationId,
+        companyId: req.user.companyId,
+        type: '409a_review'
+      },
+      connectedAccountId
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      amount: reviewAmount,
+      paymentIntentId: paymentIntent.id
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

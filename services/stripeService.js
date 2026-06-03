@@ -62,6 +62,28 @@ class StripeService {
     return stripe.checkout.sessions.create(params);
   }
 
+  // --- PaymentIntent Operations (for Stripe Payment Element / Link) ---
+
+  async createPaymentIntent({ amount, currency = 'usd', description, metadata = {}, connectedAccountId }) {
+    const stripe = this.getStripe();
+    const params = {
+      amount,
+      currency,
+      automatic_payment_methods: { enabled: true },
+      description,
+      metadata
+    };
+    if (connectedAccountId) {
+      params.transfer_data = { destination: connectedAccountId };
+    }
+    return stripe.paymentIntents.create(params);
+  }
+
+  async retrievePaymentIntent(paymentIntentId) {
+    const stripe = this.getStripe();
+    return stripe.paymentIntents.retrieve(paymentIntentId);
+  }
+
   async retrieveCheckoutSession(sessionId) {
     const stripe = this.getStripe();
     return stripe.checkout.sessions.retrieve(sessionId, {

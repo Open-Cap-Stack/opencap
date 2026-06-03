@@ -34,6 +34,9 @@ router.get('/connect/status', hasRole(['super_admin', 'admin', 'accountant']), a
 // Transfer history
 router.get('/transfers', hasRole(['super_admin', 'admin', 'founder', 'accountant']), accountantController.getTransferHistory);
 
+// Payment for 409A review (Stripe Payment Element / Link)
+router.post('/pay', hasRole(['super_admin', 'admin', 'founder']), accountantController.createReviewPaymentIntent);
+
 // Admin: accountant management
 router.get('/accountants', hasRole(['super_admin', 'admin']), accountantController.listAccountants);
 router.post('/queue', hasRole(['super_admin', 'admin']), accountantController.adminCreateQueueItem);
