@@ -24,12 +24,37 @@ const User = require('../models/User');
 // ---------------------------------------------------------------------------
 exports.getMyEquity = async (req, res) => {
   try {
-    const { userId, companyId } = req.user;
+    const { userId, companyId, email } = req.user;
+
+    // Try multiple lookup strategies to find the employee's grants:
+    // 1. By userId directly (ideal case)
+    // 2. By email → stakeholderId → employeeId (common case when grant uses stakeholder ID)
+    let grants = [];
 
     const query = { userId };
     if (companyId) query.companyId = companyId;
+    grants = await databaseAdapter.find('EquityGrant', query);
 
-    const grants = await databaseAdapter.find('EquityGrant', query);
+    // If no grants found by userId, try matching via stakeholder email
+    if (grants.length === 0 && email) {
+      const stakeholders = await databaseAdapter.find('Stakeholder', { email });
+      for (const stk of stakeholders) {
+        const stkId = stk._id || stk.row_id || stk.stakeholderId;
+        if (stkId) {
+          const stkGrants = await databaseAdapter.find('EquityGrant', { employeeId: stkId });
+          grants.push(...stkGrants);
+        }
+      }
+    }
+
+    // Deduplicate by grantId
+    const seen = new Set();
+    grants = grants.filter(g => {
+      const id = g.grantId || g._id || g.row_id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 
     // Attach vesting schedule computation to each grant
     const enrichedGrants = grants.map(grant => {
@@ -53,9 +78,31 @@ exports.getMyEquity = async (req, res) => {
 // ---------------------------------------------------------------------------
 exports.getMyDocuments = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const { userId, email } = req.user;
 
-    const documents = await databaseAdapter.find('Document', { userId });
+    // Try by userId first, then by stakeholderId (resolved from email), then by uploadedBy
+    let documents = await databaseAdapter.find('Document', { userId });
+
+    if (documents.length === 0 && email) {
+      // Find stakeholder by email and look for docs by stakeholderId
+      const stakeholders = await databaseAdapter.find('Stakeholder', { email });
+      for (const stk of stakeholders) {
+        const stkId = stk._id || stk.row_id || stk.stakeholderId;
+        if (stkId) {
+          const stkDocs = await databaseAdapter.find('Document', { stakeholderId: stkId });
+          documents.push(...stkDocs);
+        }
+      }
+    }
+
+    // Deduplicate
+    const seen = new Set();
+    documents = documents.filter(d => {
+      const id = d._id || d.row_id || d.id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 
     return res.status(200).json(documents);
   } catch (error) {
@@ -87,7 +134,18 @@ exports.getMyValuation = async (req, res) => {
         : 0);
 
     // Calculate the employee's vested share value
-    const grants = await databaseAdapter.find('EquityGrant', { userId, companyId });
+    // Find grants using same multi-strategy lookup as getMyEquity
+    let grants = await databaseAdapter.find('EquityGrant', { userId, companyId });
+    if (grants.length === 0 && req.user.email) {
+      const stakeholders = await databaseAdapter.find('Stakeholder', { email: req.user.email });
+      for (const stk of stakeholders) {
+        const stkId = stk._id || stk.row_id || stk.stakeholderId;
+        if (stkId) {
+          const stkGrants = await databaseAdapter.find('EquityGrant', { employeeId: stkId });
+          grants.push(...stkGrants);
+        }
+      }
+    }
     let totalVestedShares = 0;
     for (const grant of grants) {
       try {
