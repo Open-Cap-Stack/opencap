@@ -97,6 +97,12 @@ async function submitSelfCertification(investorId, companyId, certData) {
   if (!certData || !certData.investorType) {
     throw new Error('Self-certification requires investorType');
   }
+  if (!certData.legalName) {
+    throw new Error('legalName is required for self-certification');
+  }
+  if (certData.attestationAgreed !== true) {
+    throw new Error('attestationAgreed must be true to self-certify');
+  }
 
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ACCREDITATION_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
