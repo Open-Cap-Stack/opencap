@@ -55,10 +55,8 @@ async function _getToken(userId) {
     // Fallback to MERCURY_API_KEY env var if set (direct API key auth)
     const apiKey = process.env.MERCURY_API_KEY;
     if (apiKey) {
-        // Extract the token portion after "secret-token:mercury_" prefix if present
-        return apiKey.startsWith('secret-token:mercury_')
-            ? apiKey.replace('secret-token:mercury_', '')
-            : apiKey;
+        // Return the full API key as-is — _mercuryGet uses it directly
+        return apiKey;
     }
 
     const result = await zerodbService.queryRows(
@@ -132,10 +130,10 @@ async function _mercuryGet(token, path, params) {
 
     try {
         const config = {
-            headers: {
-                Authorization: `Bearer secret-token:mercury_${token}`,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
+            // Mercury supports Basic Auth (token as username, empty password)
+            // and Bearer auth. Basic Auth is recommended per their docs.
+            auth: { username: token, password: '' },
         };
         if (params) config.params = params;
 
@@ -198,9 +196,7 @@ async function getStatements(userId, accountId, startDate, endDate) {
 async function downloadStatementPdf(userId, url) {
     const token = await _getToken(userId);
     const response = await axios.get(url, {
-        headers: {
-            Authorization: `Bearer secret-token:mercury_${token}`,
-        },
+        auth: { username: token, password: '' },
         responseType: 'arraybuffer',
     });
     return Buffer.from(response.data);
