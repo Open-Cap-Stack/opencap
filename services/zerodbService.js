@@ -350,7 +350,19 @@ class ZeroDBService {
 
       // First, find matching rows to get their row_ids
       const queryResult = await this.queryTable(tableName, { filter });
-      const rows = queryResult.data || queryResult || [];
+      let rows = queryResult.data || queryResult || [];
+
+      // ZeroDB may do substring matching on JSON fields. Post-filter for exact match
+      // to prevent updating unrelated rows.
+      if (filter && typeof filter === 'object' && rows.length > 1) {
+        rows = rows.filter(row => {
+          const data = row.row_data || row;
+          return Object.entries(filter).every(([key, val]) => {
+            if (val && typeof val === 'object') return true; // skip complex filters
+            return data[key] === val;
+          });
+        });
+      }
 
       if (rows.length === 0) {
         return { modified_count: 0, matched_count: 0 };
@@ -396,7 +408,18 @@ class ZeroDBService {
 
       // First, find matching rows to get their row_ids
       const queryResult = await this.queryTable(tableName, { filter });
-      const rows = queryResult.data || queryResult || [];
+      let rows = queryResult.data || queryResult || [];
+
+      // Post-filter for exact match to prevent deleting unrelated rows
+      if (filter && typeof filter === 'object' && rows.length > 1) {
+        rows = rows.filter(row => {
+          const data = row.row_data || row;
+          return Object.entries(filter).every(([key, val]) => {
+            if (val && typeof val === 'object') return true;
+            return data[key] === val;
+          });
+        });
+      }
 
       if (rows.length === 0) {
         return { deleted_count: 0 };
