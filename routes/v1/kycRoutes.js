@@ -30,14 +30,30 @@ router.post(
   kycController.submitDocuments
 );
 
-// Check verification status for an investor
+// Check own verification status (logged-in user)
+router.get(
+  '/status',
+  hasRole(['super_admin', 'admin', 'founder', 'manager', 'investor']),
+  (req, res, next) => { req.params.investorId = req.user?.userId || req.user?.id; next(); },
+  kycController.getVerificationStatus
+);
+
+// Check verification status for a specific investor
 router.get(
   '/status/:investorId',
   hasRole(['super_admin', 'admin', 'founder', 'manager', 'investor']),
   kycController.getVerificationStatus
 );
 
-// Get verification history for an investor
+// Get own verification history
+router.get(
+  '/history',
+  hasRole(['super_admin', 'admin', 'founder', 'manager', 'investor']),
+  (req, res, next) => { req.params.investorId = req.user?.userId || req.user?.id; next(); },
+  kycController.getVerificationHistory
+);
+
+// Get verification history for a specific investor
 router.get(
   '/history/:investorId',
   hasRole(['super_admin', 'admin', 'founder', 'manager', 'investor']),

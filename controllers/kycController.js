@@ -15,7 +15,8 @@ const KYCAuditLog = require('../models/KYCAuditLog');
  */
 exports.submitSelfCertification = async (req, res) => {
   try {
-    const { investorId, companyId, investorType, attestations } = req.body;
+    const { investorId: bodyInvestorId, companyId, investorType, attestations } = req.body;
+    const investorId = bodyInvestorId || req.user?.userId || req.user?.id;
     if (!investorId) {
       return res.status(400).json({ success: false, error: 'investorId is required' });
     }
@@ -44,7 +45,8 @@ exports.submitSelfCertification = async (req, res) => {
  */
 exports.submitDocuments = async (req, res) => {
   try {
-    const { investorId, companyId, documents, offeringType } = req.body;
+    const { investorId: bodyInvestorId, companyId, documents, offeringType } = req.body;
+    const investorId = bodyInvestorId || req.user?.userId || req.user?.id;
     if (!investorId) {
       return res.status(400).json({ success: false, error: 'investorId is required' });
     }
