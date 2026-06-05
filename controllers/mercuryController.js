@@ -114,6 +114,147 @@ exports.getBalance = async (req, res) => {
   }
 };
 
+// ── GET /activity — transaction activity feed (#677) ──────────────────────
+
+/**
+ * GET /activity
+ * Returns recent transactions formatted as activity feed items.
+ * Query params: limit (default 25), offset (default 0), startDate, endDate
+ */
+exports.getActivityFeed = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const limit = parseInt(req.query.limit, 10) || 25;
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const { startDate, endDate } = req.query;
+
+    // Fetch all accounts
+    const { accounts } = await mercuryService.getAccounts(userId);
+
+    let allTransactions = [];
+    for (const account of (accounts || [])) {
+      try {
+        const queryParams = {};
+        if (startDate) queryParams.start = startDate;
+        if (endDate) queryParams.end = endDate;
+
+        const { transactions } = await mercuryService.getTransactions(userId, {
+          accountId: account.id,
+          ...queryParams,
+        });
+
+        // Tag each transaction with account info
+        for (const txn of (transactions || [])) {
+          allTransactions.push({
+            ...txn,
+            _accountId: account.id,
+            _accountName: account.name,
+          });
+        }
+      } catch (txnErr) {
+        console.error(`Failed to fetch transactions for account ${account.id}:`, txnErr.message);
+      }
+    }
+
+    // Sort by date descending
+    allTransactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Apply pagination
+    const paginated = allTransactions.slice(offset, offset + limit);
+
+    // Format as activity feed items
+    const items = paginated.map((txn) => ({
+      id: txn.id,
+      type: txn.kind || 'transaction',
+      amount: txn.amount,
+      direction: txn.amount >= 0 ? 'credit' : 'debit',
+      description: txn.note || txn.bankDescription || txn.counterpartyName || 'Transaction',
+      counterparty: txn.counterpartyName || null,
+      date: txn.createdAt,
+      status: txn.status || 'completed',
+      accountId: txn._accountId,
+      accountName: txn._accountName,
+    }));
+
+    res.status(200).json({
+      items,
+      total: allTransactions.length,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    if (error.message.includes('not connected')) {
+      return errorResponse(res, 401, 'Mercury not connected');
+    }
+    console.error('Mercury activity feed failed:', error.message);
+    errorResponse(res, 500, 'Failed to fetch Mercury activity feed', error);
+  }
+};
+
+// ── GET /financial-summary — auto-populate investor update template (#676) ─
+
+/**
+ * GET /financial-summary
+ * Returns financial metrics for investor update templates.
+ * Calculates burn rate, runway, revenue, expenses from Mercury data.
+ */
+exports.getFinancialSummary = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    // Fetch all accounts
+    const { accounts } = await mercuryService.getAccounts(userId);
+    const totalBalance = accounts.reduce((sum, a) => sum + (a.currentBalance || 0), 0);
+
+    // Calculate 30-day metrics across all accounts
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    let totalInflows = 0;
+    let totalOutflows = 0;
+
+    for (const account of accounts) {
+      try {
+        const { transactions } = await mercuryService.getTransactions(userId, {
+          accountId: account.id,
+          start: thirtyDaysAgo,
+        });
+
+        for (const txn of (transactions || [])) {
+          if (txn.amount >= 0) {
+            totalInflows += txn.amount;
+          } else {
+            totalOutflows += Math.abs(txn.amount);
+          }
+        }
+      } catch (txnErr) {
+        console.error(`Failed to fetch transactions for account ${account.id}:`, txnErr.message);
+      }
+    }
+
+    const burnRate30d = totalOutflows;
+    const monthlyRevenue = totalInflows;
+    const monthlyExpenses = totalOutflows;
+    const runwayMonths = burnRate30d > 0
+      ? Math.round((totalBalance / burnRate30d) * 10) / 10
+      : null;
+
+    res.status(200).json({
+      totalBalance,
+      burnRate30d,
+      runwayMonths,
+      monthlyRevenue,
+      monthlyExpenses,
+      cashOnHand: totalBalance,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error) {
+    if (error.message.includes('not connected')) {
+      return errorResponse(res, 401, 'Mercury not connected');
+    }
+    console.error('Mercury financial summary failed:', error.message);
+    errorResponse(res, 500, 'Failed to generate financial summary', error);
+  }
+};
+
 // ── mercury_snapshots table seeding (#679) ─────────────────────────────────
 
 /**

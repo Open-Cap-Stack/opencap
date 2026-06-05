@@ -150,6 +150,37 @@ async function _mercuryGet(token, path, params) {
     }
 }
 
+/**
+ * Make an authenticated POST request to Mercury API.
+ */
+async function _mercuryPost(token, path, body) {
+    // Rate limit check
+    const now = Date.now();
+    if (now - _rateLimitState.windowStart > _rateLimitState.windowMs) {
+        _rateLimitState.count = 0;
+        _rateLimitState.windowStart = now;
+    }
+    _rateLimitState.count++;
+
+    try {
+        const config = {
+            headers: { 'Content-Type': 'application/json' },
+            auth: { username: token, password: '' },
+        };
+
+        const { data } = await axios.post(`${MERCURY_API_BASE}${path}`, body, config);
+        return data;
+    } catch (err) {
+        if (err.response?.status === 401) {
+            throw new Error('Mercury API authentication failed');
+        }
+        if (err.response?.status === 429) {
+            throw new Error('Mercury API rate limit exceeded');
+        }
+        throw err;
+    }
+}
+
 // --- Public methods ---
 
 async function getAccounts(userId) {
@@ -227,6 +258,61 @@ async function verifyPayment(userId, amount, sinceDate) {
     }
 
     return { found: false, transaction: null };
+}
+
+/**
+ * Add a payment recipient.
+ * POST /recipients
+ */
+async function addRecipient(userId, recipientData) {
+    if (!recipientData || !recipientData.name) {
+        throw new Error('recipientData with name is required');
+    }
+    const token = await _getToken(userId);
+    return _mercuryPost(token, '/recipients', recipientData);
+}
+
+/**
+ * List all payment recipients.
+ * GET /recipients
+ */
+async function getRecipients(userId) {
+    const token = await _getToken(userId);
+    return _mercuryGet(token, '/recipients');
+}
+
+/**
+ * Send a payment (wire or ACH).
+ * POST /payments
+ */
+async function sendPayment(userId, paymentData) {
+    if (!paymentData || !paymentData.recipientId || !paymentData.amount) {
+        throw new Error('paymentData with recipientId and amount is required');
+    }
+    const token = await _getToken(userId);
+    return _mercuryPost(token, '/payments', paymentData);
+}
+
+/**
+ * Create an internal transfer between Mercury accounts.
+ * POST /internal-transfers
+ */
+async function createInternalTransfer(userId, transferData) {
+    if (!transferData || !transferData.amount) {
+        throw new Error('transferData with amount is required');
+    }
+    const token = await _getToken(userId);
+    return _mercuryPost(token, '/internal-transfers', transferData);
+}
+
+/**
+ * Get a single transaction by ID.
+ * GET /transactions/{id}
+ */
+async function getTransactionById(userId, transactionId) {
+    if (!transactionId) throw new Error('transactionId is required');
+    const token = await _getToken(userId);
+    return _mercuryGet(token, `/transactions/${transactionId}`);
 }
 
 // --- Rate limiter helpers for tests ---
@@ -327,8 +413,14 @@ module.exports = {
     verifyPayment,
     searchTransactions,
     getConnectionStatus,
+    addRecipient,
+    getRecipients,
+    sendPayment,
+    createInternalTransfer,
+    getTransactionById,
     _getToken,
     _mercuryGet,
+    _mercuryPost,
     _resetRateLimiter,
     _getRateLimitRemaining,
     _getRateLimitStatus,

@@ -182,7 +182,7 @@ const zerodbReady = (async () => {
     console.log('✅ DatabaseAdapter initialized');
 
     // Seed any new tables that don't auto-create on first insert
-    const newTables = ['reconstruction_jobs', 'mercury_snapshots'];
+    const newTables = ['reconstruction_jobs', 'mercury_snapshots', 'mercury_events'];
     for (const tbl of newTables) {
       try {
         await zerodbService.createTable(tbl, { fields: {} });
@@ -334,6 +334,7 @@ const routes = {
   googleIntegrationRoutes: safeRequire(path.join(__dirname, 'routes/v1/googleIntegrationRoutes')), // Issue #234: Google Drive/Gmail integration
   emailTemplateRoutes: safeRequire(path.join(__dirname, 'routes/v1/emailTemplateRoutes')), // Email template CRUD
   mercuryRoutes: safeRequire(path.join(__dirname, 'routes/v1/mercuryRoutes')), // Issue #671: Mercury banking integration
+  mercuryWebhookRoutes: safeRequire(path.join(__dirname, 'routes/v1/mercuryWebhookRoutes')), // Issue #678: Mercury webhooks
   investorPortalRoutes: safeRequire(path.join(__dirname, 'routes/v1/investorPortalRoutes')), // Issue #684: Investor portal summary, invite, access
   kycRoutes: safeRequire(path.join(__dirname, 'routes/v1/kycRoutes')), // KYC/Accredited Investor Verification
   // Optional routes that may not exist in all environments
@@ -765,6 +766,8 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/email-templates'; // Email template CRUD
     } else if (key === 'mercuryRoutes') {
       path = '/api/v1/integrations/mercury'; // Issue #671: Mercury banking integration
+    } else if (key === 'mercuryWebhookRoutes') {
+      path = '/api/v1/webhooks/mercury'; // Issue #678: Mercury webhooks
     } else if (key === 'investorPortalRoutes') {
       path = '/api/v1/investor-portal'; // Issue #684: Investor portal summary, invite, access
     } else if (key === 'kycRoutes') {
