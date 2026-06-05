@@ -206,7 +206,11 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const result = await this._updateInZeroDB(tableName, { _id: id }, update);
+      // Try _id first, fall back to row_id for ZeroDB compatibility
+      let result = await this._updateInZeroDB(tableName, { _id: id }, update);
+      if ((!result || result.modified_count === 0) && id) {
+        result = await this._updateInZeroDB(tableName, { row_id: id }, update);
+      }
       this._recordMetric(Date.now() - startTime, true);
       return result;
     } catch (error) {
