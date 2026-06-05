@@ -19,9 +19,9 @@ const VALID_STATUSES = ['pending', 'approved', 'active', 'exercised', 'cancelled
 async function resolveGrantId(id) {
   if (id && id.startsWith('GRANT-')) {
     const results = await databaseAdapter.find('EquityGrant', { grantId: id });
-    // ZeroDB may do substring matching, so post-filter for exact match
+    // ZeroDB does substring matching — post-filter for exact grantId match
     const exact = (results || []).find(r => r.grantId === id);
-    if (exact) return exact._id;
+    if (exact) return exact._id || exact.row_id || exact.id;
   }
   return id;
 }
