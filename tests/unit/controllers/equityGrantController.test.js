@@ -20,9 +20,14 @@ jest.mock('../../../services/databaseAdapter', () => ({
   count: jest.fn()
 }));
 
+jest.mock('../../../services/documentTemplateService', () => ({
+  generateDocument: jest.fn().mockResolvedValue({ content: 'Generated content', htmlContent: '<p>Generated content</p>' })
+}));
+
 const httpMocks = require('node-mocks-http');
 const equityGrantController = require('../../../controllers/equityGrantController');
 const databaseAdapter = require('../../../services/databaseAdapter');
+const documentTemplateService = require('../../../services/documentTemplateService');
 
 describe('EquityGrant Controller', () => {
   let req, res;
@@ -84,6 +89,98 @@ describe('EquityGrant Controller', () => {
 
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res._getData())).toHaveProperty('error');
+    });
+  });
+
+  describe('createEquityGrant - auto-generate document', () => {
+    const validGrantData = {
+      grantId: 'GRANT-DOC-001',
+      employeeId: 'EMP-001',
+      companyId: 'COMP-001',
+      grantType: 'NSO',
+      numberOfShares: 10000,
+      strikePrice: 1.50,
+      grantDate: '2024-01-15',
+      vestingSchedule: {
+        vestingStartDate: '2024-01-15',
+        vestingPeriodMonths: 48,
+        cliffMonths: 12,
+        vestingFrequency: 'monthly'
+      }
+    };
+
+    it('should trigger document generation after grant creation', async () => {
+      req.body = validGrantData;
+      const mockSavedGrant = { _id: 'grant-doc-1', ...validGrantData, status: 'pending' };
+      databaseAdapter.create.mockResolvedValue(mockSavedGrant);
+      databaseAdapter.find.mockResolvedValue([{ stakeholderId: 'EMP-001', name: 'Jane Doe' }]);
+      documentTemplateService.generateDocument.mockResolvedValue({
+        content: 'Agreement text',
+        htmlContent: '<p>Agreement text</p>'
+      });
+
+      await equityGrantController.createEquityGrant(req, res);
+
+      expect(res.statusCode).toBe(201);
+
+      // Wait for the non-blocking promise to resolve
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Verify document was created with correct fields
+      expect(databaseAdapter.create).toHaveBeenCalledWith('Document', expect.objectContaining({
+        name: 'Stock Option Agreement — Jane Doe',
+        type: 'agreement',
+        category: 'legal',
+        status: 'pending_signature',
+        stakeholderId: 'EMP-001',
+        companyId: 'COMP-001',
+        generatedFrom: 'TMPL-MPZ0NKFV-41ABB149',
+        grantId: 'GRANT-DOC-001'
+      }));
+    });
+
+    it('should use stakeholder name from lookup', async () => {
+      req.body = { ...validGrantData, grantType: 'ISO' };
+      const mockSavedGrant = { _id: 'grant-doc-2', ...validGrantData, grantType: 'ISO', status: 'pending' };
+      databaseAdapter.create.mockResolvedValue(mockSavedGrant);
+      databaseAdapter.find.mockResolvedValue([{ stakeholderId: 'EMP-001', name: 'John Smith' }]);
+
+      await equityGrantController.createEquityGrant(req, res);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(databaseAdapter.create).toHaveBeenCalledWith('Document', expect.objectContaining({
+        name: 'Stock Option Agreement — John Smith'
+      }));
+    });
+
+    it('should still create grant when document generation fails', async () => {
+      req.body = validGrantData;
+      const mockSavedGrant = { _id: 'grant-doc-3', ...validGrantData, status: 'pending' };
+      // First call for EquityGrant, second for Document
+      databaseAdapter.create
+        .mockResolvedValueOnce(mockSavedGrant)
+        .mockRejectedValueOnce(new Error('Document creation failed'));
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await equityGrantController.createEquityGrant(req, res);
+
+      // Grant creation should still succeed
+      expect(res.statusCode).toBe(201);
+      expect(JSON.parse(res._getData())).toEqual(mockSavedGrant);
+    });
+
+    it('should use Unknown when stakeholder lookup fails', async () => {
+      req.body = validGrantData;
+      const mockSavedGrant = { _id: 'grant-doc-4', ...validGrantData, status: 'pending' };
+      databaseAdapter.create.mockResolvedValue(mockSavedGrant);
+      databaseAdapter.find.mockRejectedValue(new Error('Stakeholder lookup failed'));
+
+      await equityGrantController.createEquityGrant(req, res);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(databaseAdapter.create).toHaveBeenCalledWith('Document', expect.objectContaining({
+        name: 'Stock Option Agreement — Unknown'
+      }));
     });
   });
 

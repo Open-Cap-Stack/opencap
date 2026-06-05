@@ -7,10 +7,71 @@
 
 const databaseAdapter = require('../services/databaseAdapter');
 const equityGrantService = require('../services/equityGrantService');
+const documentTemplateService = require('../services/documentTemplateService');
 const { assertCompanyOwnership, assertUserOwnership } = require('../middleware/companyScope');
 
 // Valid status values
 const VALID_STATUSES = ['pending', 'approved', 'active', 'exercised', 'cancelled', 'expired'];
+
+// Grant type to document template mapping
+const GRANT_TYPE_TEMPLATE_MAP = {
+  NSO: { templateId: 'TMPL-MPZ0NKFV-41ABB149', docName: 'Stock Option Agreement (NSO)' },
+  ISO: { templateId: 'TMPL-MPZ0NKFV-41ABB149', docName: 'Stock Option Agreement (ISO)' },
+  RSU: { templateId: 'TMPL-MPZ0NKFV-41ABB149', docName: 'Restricted Stock Unit Agreement' }
+};
+
+/**
+ * Auto-generate a stock option agreement document after equity grant creation.
+ * Runs asynchronously so it does not block the grant creation response.
+ */
+async function autoGenerateGrantDocument(savedGrant) {
+  const grantType = savedGrant.grantType || 'NSO';
+  const templateMapping = GRANT_TYPE_TEMPLATE_MAP[grantType];
+  if (!templateMapping) return;
+
+  // Look up stakeholder to get name/email
+  let stakeholderName = 'Unknown';
+  try {
+    const stakeholders = await databaseAdapter.find('Stakeholder', { stakeholderId: savedGrant.employeeId });
+    const stakeholder = (stakeholders || []).find(s => s.stakeholderId === savedGrant.employeeId);
+    if (stakeholder) {
+      stakeholderName = stakeholder.name || stakeholder.legalName || stakeholderName;
+    }
+  } catch (_) {
+    // Continue with default name if lookup fails
+  }
+
+  // Generate document content from template
+  const variables = {
+    companyName: savedGrant.companyId,
+    optioneeName: stakeholderName,
+    numberOfShares: savedGrant.numberOfShares,
+    strikePrice: savedGrant.strikePrice,
+    grantDate: savedGrant.grantDate,
+    vestingSchedule: savedGrant.vestingSchedule
+  };
+
+  let generatedContent = {};
+  try {
+    generatedContent = await documentTemplateService.generateDocument(templateMapping.templateId, variables);
+  } catch (_) {
+    // Template may not exist in DB yet; proceed with empty content
+  }
+
+  // Create the document record
+  await databaseAdapter.create('Document', {
+    name: `Stock Option Agreement — ${stakeholderName}`,
+    type: 'agreement',
+    category: 'legal',
+    status: 'pending_signature',
+    stakeholderId: savedGrant.employeeId,
+    companyId: savedGrant.companyId,
+    generatedFrom: templateMapping.templateId,
+    grantId: savedGrant.grantId,
+    content: generatedContent.content || '',
+    htmlContent: generatedContent.htmlContent || ''
+  });
+}
 
 /**
  * Resolve a grant lookup ID — if it looks like a grantId (GRANT-...), find the
@@ -46,6 +107,12 @@ exports.createEquityGrant = async (req, res) => {
     }
 
     const savedGrant = await databaseAdapter.create('EquityGrant', grantData);
+
+    // Non-blocking: auto-generate stock option agreement document
+    Promise.resolve().then(async () => {
+      await autoGenerateGrantDocument(savedGrant);
+    }).catch(console.error);
+
     res.status(201).json(savedGrant);
   } catch (error) {
     res.status(400).json({ error: error.message });
