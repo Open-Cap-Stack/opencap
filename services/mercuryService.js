@@ -52,6 +52,15 @@ function _maybeDecryptToken(token) {
  * @returns {string} Valid access token
  */
 async function _getToken(userId) {
+    // Fallback to MERCURY_API_KEY env var if set (direct API key auth)
+    const apiKey = process.env.MERCURY_API_KEY;
+    if (apiKey) {
+        // Extract the token portion after "secret-token:mercury_" prefix if present
+        return apiKey.startsWith('secret-token:mercury_')
+            ? apiKey.replace('secret-token:mercury_', '')
+            : apiKey;
+    }
+
     const result = await zerodbService.queryRows(
         'integrations',
         { userId, provider: 'mercury' },
@@ -60,7 +69,7 @@ async function _getToken(userId) {
 
     const rows = result?.data || [];
     if (rows.length === 0) {
-        throw new Error('Mercury not connected for this user');
+        throw new Error('Mercury not connected for this user. Set MERCURY_API_KEY or connect via OAuth.');
     }
 
     const integration = rows[0].row_data;
