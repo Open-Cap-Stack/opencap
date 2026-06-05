@@ -361,7 +361,8 @@ class ZeroDBService {
           return Object.entries(filter).every(([key, val]) => {
             if (val === null || val === undefined) return true;
             if (val && typeof val === 'object') return true; // skip $operators
-            const rowVal = data[key];
+            // Check both row_data fields AND top-level row fields (row_id is top-level)
+            const rowVal = data[key] !== undefined ? data[key] : row[key];
             return String(rowVal) === String(val);
           });
         });
