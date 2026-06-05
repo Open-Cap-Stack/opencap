@@ -13,6 +13,7 @@ const { hasRole } = require('../../middleware/rbacMiddleware');
 const SPVController = require('../../controllers/SPV');
 const SPVNestedController = require('../../controllers/SPVNested');
 const SPVInvestorController = require('../../controllers/SPVInvestor');
+const { requireAccreditation, requireSPVRoleEligibility } = require('../../middleware/kycVerification');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -22,7 +23,7 @@ router.use(authenticateToken);
  * @desc Create a new SPV
  * @access Private
  */
-router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.createSPV);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), requireSPVRoleEligibility, SPVController.createSPV);
 
 /**
  * @route GET /api/spvs
@@ -84,7 +85,7 @@ router.get('/:id/investors', hasRole(['super_admin', 'admin', 'founder', 'manage
  * @desc Invite LPs to an SPV by email
  * @access Private
  */
-router.post('/:id/invite', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.inviteInvestors);
+router.post('/:id/invite', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), requireAccreditation('spv'), SPVInvestorController.inviteInvestors);
 
 /**
  * @route GET /api/v1/spv/:id/invite-link

@@ -8,6 +8,7 @@ const safeController = require('../../controllers/safeController');
 const SAFE = require('../../models/SAFE');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
+const { requireAccreditation } = require('../../middleware/kycVerification');
 
 // Local helper (mirrors the one in safeController)
 function normalizeSafeType(safe) {
@@ -20,7 +21,7 @@ function normalizeSafeType(safe) {
 router.use(authenticateToken);
 
 // SAFE CRUD operations
-router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), safeController.createSAFE);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), requireAccreditation('safe'), safeController.createSAFE);
 // Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
 router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), (req, res, next) => {
   // Always delegate to getCompanySAFEs — it handles null/default companyId by returning all
