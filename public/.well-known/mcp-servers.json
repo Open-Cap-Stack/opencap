@@ -1,0 +1,18 @@
+{
+  "servers": [
+    {
+      "name": "opencap-mcp",
+      "description": "OpenCap Stack MCP server — manage cap tables, equity grants, SAFEs, valuations, and more via Claude Code or any MCP client",
+      "url": "https://opencapstack.com/api/v1/mcp",
+      "transport": "streamable-http",
+      "install": "npm install -g opencap-mcp",
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization",
+        "instructions": "Generate an API key at https://opencapstack.com/settings → API Keys tab"
+      },
+      "tools": 29,
+      "categories": ["finance", "equity", "cap-table", "compliance"]
+    }
+  ]
+}

@@ -33,9 +33,22 @@ router.get('/openapi.json', sendFile('openapi.json', 'application/json'));
 // Logo for plugin store
 router.get('/logo.png', sendFile('logo.png', 'image/png'));
 
+// Root route — API identity for api.opencapstack.com
+router.get('/', (req, res) => {
+  res.json({
+    name: 'OpenCap Stack API',
+    version: '1.0.0',
+    docs: 'https://opencapstack.com/developers',
+    openapi: 'https://opencapstack.com/openapi.json',
+    health: '/api/v1/health'
+  });
+});
+
 // .well-known paths
 router.get('/.well-known/security.txt', sendFile('.well-known/security.txt', 'text/plain; charset=utf-8'));
 router.get('/.well-known/ai-plugin.json', sendFile('.well-known/ai-plugin.json', 'application/json'));
 router.get('/.well-known/agent.json', sendFile('.well-known/agent.json', 'application/json'));
+router.get('/.well-known/mcp-servers.json', sendFile('.well-known/mcp-servers.json', 'application/json'));
+router.get('/.well-known/openapi.json', sendFile('openapi.json', 'application/json'));
 
 module.exports = router;
