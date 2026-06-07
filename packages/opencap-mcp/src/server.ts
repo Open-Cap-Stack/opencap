@@ -27,6 +27,9 @@ import { metaTools } from './tools/meta.js';
 import { portfolioTools } from './tools/portfolio.js';
 import { complianceTools } from './tools/compliance.js';
 import { exportTools } from './tools/export.js';
+import { kycTools } from './tools/kyc.js';
+import { mercuryTools } from './tools/mercury.js';
+import { boardTools } from './tools/board.js';
 import { type ToolDefinition } from './types.js';
 import { formatMcpError } from './errors.js';
 
@@ -45,13 +48,16 @@ const ALL_TOOLS: ToolDefinition[] = [
   ...portfolioTools,
   ...complianceTools,
   ...exportTools,
+  ...kycTools,
+  ...mercuryTools,
+  ...boardTools,
 ];
 
 export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '1.8.0',
+      version: '1.9.0',
     },
     {
       capabilities: {

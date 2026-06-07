@@ -18,6 +18,9 @@ import { metaTools } from './tools/meta.js';
 import { portfolioTools } from './tools/portfolio.js';
 import { complianceTools } from './tools/compliance.js';
 import { exportTools } from './tools/export.js';
+import { kycTools } from './tools/kyc.js';
+import { mercuryTools } from './tools/mercury.js';
+import { boardTools } from './tools/board.js';
 import { formatMcpError } from './errors.js';
 const ALL_TOOLS = [
     ...metaTools,
@@ -34,11 +37,14 @@ const ALL_TOOLS = [
     ...portfolioTools,
     ...complianceTools,
     ...exportTools,
+    ...kycTools,
+    ...mercuryTools,
+    ...boardTools,
 ];
 export function createServer(client) {
     const server = new Server({
         name: 'opencap-mcp',
-        version: '1.8.0',
+        version: '1.9.0',
     }, {
         capabilities: {
             tools: {},
