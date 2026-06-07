@@ -87,7 +87,15 @@ async function get83bStatus(companyId) {
   const now = new Date();
   const results = [];
 
-  for (const grant of grants) {
+  // 83(b) elections only apply to restricted stock (RSA/RSU) — not to stock options (NSO/ISO)
+  // unless they are early-exercised. Filter to RSA/RSU grants only.
+  const STOCK_GRANT_TYPES = ['RSA', 'RSU', 'rsa', 'rsu', 'restricted_stock', 'common'];
+  const eligibleGrants = grants.filter(g => {
+    const type = (g.grantType || g.type || '').toUpperCase();
+    return STOCK_GRANT_TYPES.includes(type) || STOCK_GRANT_TYPES.includes(type.toLowerCase());
+  });
+
+  for (const grant of eligibleGrants) {
     const grantDate = grant.grantDate || grant.issueDate;
     if (!grantDate) {
       continue; // Skip grants without a date
