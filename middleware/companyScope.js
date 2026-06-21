@@ -71,4 +71,26 @@ const assertUserOwnership = (req, res, resource, userIdField = 'userId') => {
   return true;
 };
 
-module.exports = { requireCompanyScope, assertCompanyOwnership, assertUserOwnership };
+/**
+ * Resolves the target companyId for create/write operations.
+ * Admin/super_admin users can specify a companyId in the request body to
+ * target a different company (multi-company management, MCP operations).
+ * Regular users always get their JWT companyId enforced.
+ *
+ * @param {Object} req - Express request
+ * @returns {string|null} The resolved companyId
+ */
+const resolveTargetCompanyId = (req) => {
+  const userRole = (req.user?.role || '').toLowerCase();
+  const isAdmin = ADMIN_ROLES.has(userRole);
+
+  // Admins can specify a target company in body or query
+  if (isAdmin) {
+    return req.body?.companyId || req.query?.companyId || req.user?.companyId || null;
+  }
+
+  // Regular users: always use JWT companyId (prevents spoofing)
+  return req.user?.companyId || null;
+};
+
+module.exports = { requireCompanyScope, assertCompanyOwnership, assertUserOwnership, resolveTargetCompanyId };

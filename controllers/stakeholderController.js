@@ -8,6 +8,7 @@
 
 const Stakeholder = require('../models/Stakeholder');
 const { parsePagination } = require('../middleware/pagination');
+const { resolveTargetCompanyId, assertCompanyOwnership } = require('../middleware/companyScope');
 const logger = require('../utils/logger');
 
 /**
@@ -70,15 +71,8 @@ exports.createStakeholder = async (req, res) => {
     if (data.role) data.role = data.role.toLowerCase().replace(/[\s-]+/g, '_');
     if (data.status) data.status = data.status.toLowerCase();
 
-    // For admin/super_admin users, allow explicit companyId in body (multi-company management).
-    // For regular users, enforce the JWT companyId to prevent spoofing.
-    const userRole = (req.user?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-    if (isAdmin && data.companyId) {
-      // Admin specified a target company — use it
-    } else {
-      data.companyId = req.user?.companyId || data.companyId;
-    }
+    // Resolve target companyId: admins can specify in body, regular users get JWT enforced
+    data.companyId = resolveTargetCompanyId(req);
     if (!data.companyId) {
       return res.status(400).json({ error: 'companyId is required' });
     }
@@ -201,11 +195,7 @@ exports.getStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
-    const userRole = (req.user?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-    if (!isAdmin && stakeholder.companyId && req.user?.companyId && stakeholder.companyId !== req.user.companyId) {
-      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
-    }
+    if (!assertCompanyOwnership(req, res, stakeholder)) return;
 
     res.status(200).json({ stakeholder: normalizeForDisplay(stakeholder) });
   } catch (error) {
@@ -234,11 +224,7 @@ exports.updateStakeholderById = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    const userRole = (req.user?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-    if (!isAdmin && existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
-      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
-    }
+    if (!assertCompanyOwnership(req, res, existing)) return;
 
     let stakeholder = await Stakeholder.findByIdAndUpdate(
       req.params.id,
@@ -283,12 +269,7 @@ exports.deleteStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
-    // Admins can delete cross-company; regular users can only delete their own
-    const userRole = (req.user?.role || '').toLowerCase();
-    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-    if (!isAdmin && existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
-      return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
-    }
+    if (!assertCompanyOwnership(req, res, existing)) return;
 
     let stakeholder = await Stakeholder.findByIdAndDelete(req.params.id);
     if (!stakeholder) {

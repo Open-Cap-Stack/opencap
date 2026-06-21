@@ -13,7 +13,7 @@ const eventStreamingService = require('../services/eventStreamingService');
 const documentGeneratorService = require('../services/documentGeneratorService');
 const DocumentFolder = require('../models/DocumentFolder');
 const { errorResponse } = require('../middleware/errorResponse');
-const { assertCompanyOwnership } = require('../middleware/companyScope');
+const { assertCompanyOwnership, resolveTargetCompanyId } = require('../middleware/companyScope');
 
 const crypto = require('crypto');
 
@@ -116,7 +116,7 @@ exports.createDocument = async (req, res) => {
             id: documentId,
             _id: documentId,
             fileId: persistentFileId,
-            companyId: req.user?.companyId || req.body.companyId || null,
+            companyId: resolveTargetCompanyId(req),
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
@@ -1531,7 +1531,7 @@ exports.generateDocument = async (req, res) => {
             fileSize: pdfBuffer.length,
             size: pdfBuffer.length,
             generatedParams: params,
-            companyId: req.user?.companyId || req.body.companyId || null,
+            companyId: resolveTargetCompanyId(req),
             uploadedBy: req.user?.userId,
             uploadedAt: now,
             createdAt: now,
