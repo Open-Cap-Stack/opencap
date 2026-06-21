@@ -254,7 +254,11 @@ class DatabaseAdapter {
     try {
       const startTime = Date.now();
       const tableName = this._modelToTableName(modelName);
-      const result = await this._deleteInZeroDB(tableName, { _id: id });
+      // Try _id first, then fall back to row_id (ZeroDB uses row_id as primary key)
+      let result = await this._deleteInZeroDB(tableName, { _id: id });
+      if (!result || result.deleted_count === 0) {
+        result = await this._deleteInZeroDB(tableName, { row_id: id });
+      }
       this._recordMetric(Date.now() - startTime, true);
       return result;
     } catch (error) {

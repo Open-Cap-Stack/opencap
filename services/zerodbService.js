@@ -413,19 +413,31 @@ class ZeroDBService {
     try {
       const { filter } = options;
 
+      // Fast path: if filtering by row_id directly, skip query and delete immediately
+      // row_id is a top-level ZeroDB column, not inside row_data, so queryTable won't find it
+      if (filter && filter.row_id && Object.keys(filter).length === 1) {
+        await this.client.delete(
+          `/api/v1/projects/${this.projectId}/database/tables/${tableName}/rows/${filter.row_id}`
+        );
+        return { deleted_count: 1 };
+      }
+
       // First, find matching rows to get their row_ids
       const queryResult = await this.queryTable(tableName, { filter });
       let rows = queryResult.data || queryResult || [];
 
       // ALWAYS post-filter for exact match to prevent deleting unrelated rows
+      // ZeroDB does substring matching on JSON fields, so we must verify exact equality
       if (filter && typeof filter === 'object') {
         const beforeCount = rows.length;
         rows = rows.filter(row => {
           const data = row.row_data || row;
           return Object.entries(filter).every(([key, val]) => {
             if (val === null || val === undefined) return true;
-            if (val && typeof val === 'object') return true;
-            return String(data[key]) === String(val);
+            if (val && typeof val === 'object') return true; // skip $operators
+            // Check both row_data fields AND top-level row fields (row_id, _id are top-level)
+            const rowVal = data[key] !== undefined ? data[key] : row[key];
+            return String(rowVal) === String(val);
           });
         });
         if (rows.length !== beforeCount) {

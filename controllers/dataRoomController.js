@@ -58,7 +58,9 @@ exports.getDataRooms = async (req, res) => {
     // Use companyId from query or fall back to user's companyId
     const targetCompanyId = companyId || req.user?.companyId;
     let dataRooms = await DataRoom.findByCompany(targetCompanyId, { skip, limit: parseInt(limit), sort: { createdAt: -1 } });
+    // Filter by status if provided, otherwise exclude soft-deleted data rooms
     if (status) dataRooms = dataRooms.filter(dr => dr.status === status);
+    else dataRooms = dataRooms.filter(dr => dr.status !== 'deleted');
     if (search) { const searchLower = search.toLowerCase(); dataRooms = dataRooms.filter(dr => dr.name.toLowerCase().includes(searchLower) || dr.description?.toLowerCase().includes(searchLower)); }
     // Transform to frontend format
     const transformedRooms = dataRooms.map(transformDataRoom);
