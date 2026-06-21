@@ -70,8 +70,15 @@ exports.createStakeholder = async (req, res) => {
     if (data.role) data.role = data.role.toLowerCase().replace(/[\s-]+/g, '_');
     if (data.status) data.status = data.status.toLowerCase();
 
-    // Use authenticated user's companyId (prevents spoofing)
-    data.companyId = req.user?.companyId || data.companyId;
+    // For admin/super_admin users, allow explicit companyId in body (multi-company management).
+    // For regular users, enforce the JWT companyId to prevent spoofing.
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    if (isAdmin && data.companyId) {
+      // Admin specified a target company — use it
+    } else {
+      data.companyId = req.user?.companyId || data.companyId;
+    }
     if (!data.companyId) {
       return res.status(400).json({ error: 'companyId is required' });
     }
@@ -194,7 +201,9 @@ exports.getStakeholderById = async (req, res) => {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
 
-    if (stakeholder.companyId && req.user?.companyId && stakeholder.companyId !== req.user.companyId) {
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    if (!isAdmin && stakeholder.companyId && req.user?.companyId && stakeholder.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
     }
 
@@ -225,7 +234,9 @@ exports.updateStakeholderById = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    if (!isAdmin && existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
     }
 
@@ -260,15 +271,22 @@ exports.updateStakeholderById = async (req, res) => {
  */
 exports.deleteStakeholderById = async (req, res) => {
   try {
-    // Verify ownership before delete
+    // Look up by _id, stakeholderId, or row_id
     let existing = await Stakeholder.findById(req.params.id);
     if (!existing) {
       existing = await Stakeholder.findOne({ stakeholderId: req.params.id });
     }
     if (!existing) {
+      existing = await Stakeholder.findOne({ row_id: req.params.id });
+    }
+    if (!existing) {
       return res.status(404).json({ error: 'Stakeholder not found' });
     }
-    if (existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
+
+    // Admins can delete cross-company; regular users can only delete their own
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    if (!isAdmin && existing.companyId && req.user?.companyId && existing.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Access denied: stakeholder belongs to another company' });
     }
 
