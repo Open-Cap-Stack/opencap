@@ -66,12 +66,13 @@ class ZeroDBService {
         return await fn();
       } catch (err) {
         const status = err.response?.status;
-        const isTransient = status === 502 || status === 503 || status === 504 ||
+        const isTransient = status === 429 || status === 502 || status === 503 || status === 504 ||
           err.code === 'ECONNRESET' || err.code === 'ECONNABORTED' ||
           (err.message && err.message.includes('timeout'));
         if (!isTransient || attempt === maxAttempts) throw err;
         lastError = err;
-        const delay = 500 * attempt;
+        // Back off longer on 429 rate limits
+        const delay = status === 429 ? 2000 * attempt : 500 * attempt;
         await new Promise(r => setTimeout(r, delay));
       }
     }
