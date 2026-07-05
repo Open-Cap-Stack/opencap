@@ -287,7 +287,9 @@
       ],
       "cta": "signup",
       "estimated_volume": "300-600",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 28,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 12,
@@ -310,7 +312,9 @@
       ],
       "cta": "dilution_calculator",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 26,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 13,
@@ -333,7 +337,9 @@
       ],
       "cta": "waterfall_analysis",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 24,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 14,
@@ -356,7 +362,9 @@
       ],
       "cta": "signup",
       "estimated_volume": "200-500",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 22,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 15,
@@ -380,7 +388,9 @@
       ],
       "cta": "signup",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 32,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 16,
@@ -403,7 +413,9 @@
       ],
       "cta": "vesting_calculator",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 30,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 17,
@@ -426,7 +438,9 @@
       ],
       "cta": "409a_quiz",
       "estimated_volume": "300-600",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 34,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 18,
@@ -449,7 +463,9 @@
       ],
       "cta": "mcp_install",
       "estimated_volume": "50-200",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 36,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 19,
@@ -472,7 +488,9 @@
       ],
       "cta": "signup",
       "estimated_volume": "100-300",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 40,
+      "published_at": "2026-07-05T09:00:00.000Z"
     },
     {
       "id": 20,
@@ -495,7 +513,9 @@
       ],
       "cta": "github",
       "estimated_volume": "100-300",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 38,
+      "published_at": "2026-07-05T09:00:00.000Z"
     }
   ]
 }

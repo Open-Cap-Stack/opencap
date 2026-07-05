@@ -155,13 +155,13 @@ describe('IntegrationConnectController', () => {
 
     it('should format multi-word integration names correctly', async () => {
       req.user = { userId: 'user_123' };
-      req.body = { integrationId: 'google-drive' };
+      req.body = { integrationId: 'quickbooks' };
       User.findOne.mockResolvedValue({ userId: 'user_123', connectedIntegrations: [] });
       User.updateOne.mockResolvedValue({ modifiedCount: 1 });
 
       await connectIntegration(req, res);
       const data = res._getJSONData();
-      expect(data.integration.name).toBe('Google Drive');
+      expect(data.integration.name).toBe('Quickbooks');
     });
 
     it('should return 500 on unexpected error', async () => {

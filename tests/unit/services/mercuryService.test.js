@@ -153,9 +153,7 @@ describe('MercuryService', () => {
       expect(mockAxiosGet).toHaveBeenCalledWith(
         'https://api.mercury.com/api/v1/accounts',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer secret-token:mercury_mercury_tok_abc',
-          }),
+          auth: { username: 'mercury_tok_abc', password: '' },
         })
       );
     });
@@ -327,9 +325,7 @@ describe('MercuryService', () => {
       expect(mockAxiosGet).toHaveBeenCalledWith(
         'https://api.mercury.com/api/v1/accounts',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer secret-token:mercury_mercury_tok_abc',
-          }),
+          auth: { username: 'mercury_tok_abc', password: '' },
         })
       );
       expect(result).toEqual({ accounts: [] });

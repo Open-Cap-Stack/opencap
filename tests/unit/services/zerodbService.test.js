@@ -316,11 +316,12 @@ describe('ZeroDB Service', () => {
         );
       });
 
-      it('should handle table creation errors', async () => {
+      it('should handle table already exists gracefully', async () => {
         const error = new Error('Table already exists');
         mockAxiosInstance.post.mockRejectedValueOnce(error);
 
-        await expect(zerodbService.createTable('test_table', {})).rejects.toThrow('Table already exists');
+        const result = await zerodbService.createTable('test_table', {});
+        expect(result).toEqual({ table_name: 'test_table', exists: true });
       });
     });
 

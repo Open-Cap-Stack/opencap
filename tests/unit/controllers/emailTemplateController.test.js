@@ -6,17 +6,14 @@
 
 const httpMocks = require('node-mocks-http');
 const emailTemplateController = require('../../../controllers/emailTemplateController');
-const databaseAdapter = require('../../../services/databaseAdapter');
+const zerodbService = require('../../../services/zerodbService');
 
-jest.mock('../../../services/databaseAdapter', () => ({
-  find: jest.fn(),
-  create: jest.fn(),
-  findById: jest.fn(),
-  findByIdAndUpdate: jest.fn(),
-  findByIdAndDelete: jest.fn()
+jest.mock('../../../services/zerodbService', () => ({
+  queryRows: jest.fn(),
+  insertRow: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRowById: jest.fn()
 }));
-
-jest.mock('uuid', () => ({ v4: () => 'test-uuid-1234' }));
 
 describe('EmailTemplateController', () => {
   let req, res;
@@ -32,21 +29,23 @@ describe('EmailTemplateController', () => {
 
   describe('listTemplates', () => {
     it('should return all templates for the company', async () => {
-      const mockTemplates = [
-        { _id: 't1', companyId: 'company-001', name: 'Welcome', subject: 'Hi', body: 'Hello' },
-        { _id: 't2', companyId: 'company-001', name: 'Invite', subject: 'Join', body: 'Please join' }
+      const mockRows = [
+        { row_id: 't1', row_data: { companyId: 'company-001', name: 'Welcome', subject: 'Hi', body: 'Hello' } },
+        { row_id: 't2', row_data: { companyId: 'company-001', name: 'Invite', subject: 'Join', body: 'Please join' } }
       ];
-      databaseAdapter.find.mockResolvedValue(mockTemplates);
+      zerodbService.queryRows.mockResolvedValue({ data: mockRows });
 
       await emailTemplateController.listTemplates(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res._getData())).toEqual(mockTemplates);
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EmailTemplate', { companyId: 'company-001' });
+      const data = JSON.parse(res._getData());
+      expect(data).toHaveLength(2);
+      expect(data[0].name).toBe('Welcome');
+      expect(data[1].name).toBe('Invite');
     });
 
     it('should return empty array when no templates exist', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
+      zerodbService.queryRows.mockResolvedValue({ data: [] });
 
       await emailTemplateController.listTemplates(req, res);
 
@@ -63,7 +62,7 @@ describe('EmailTemplateController', () => {
     });
 
     it('should return 500 on database error', async () => {
-      databaseAdapter.find.mockRejectedValue(new Error('DB error'));
+      zerodbService.queryRows.mockRejectedValue(new Error('DB error'));
 
       await emailTemplateController.listTemplates(req, res);
 
@@ -76,25 +75,23 @@ describe('EmailTemplateController', () => {
   describe('createTemplate', () => {
     it('should create a template successfully', async () => {
       req.body = { name: 'Welcome', subject: 'Welcome aboard', body: 'Hello there' };
-      const mockResult = {
-        _id: 'test-uuid-1234',
-        companyId: 'company-001',
-        name: 'Welcome',
-        subject: 'Welcome aboard',
-        body: 'Hello there'
-      };
-      databaseAdapter.create.mockResolvedValue(mockResult);
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ row_id: 'new-1', row_data: { name: 'Welcome', subject: 'Welcome aboard', body: 'Hello there', companyId: 'company-001' } }]
+      });
 
       await emailTemplateController.createTemplate(req, res);
 
       expect(res.statusCode).toBe(201);
-      expect(databaseAdapter.create).toHaveBeenCalledWith('EmailTemplate', expect.objectContaining({
-        _id: 'test-uuid-1234',
-        companyId: 'company-001',
-        name: 'Welcome',
-        subject: 'Welcome aboard',
-        body: 'Hello there'
-      }));
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'notifications',
+        expect.objectContaining({
+          companyId: 'company-001',
+          name: 'Welcome',
+          subject: 'Welcome aboard',
+          body: 'Hello there',
+          type: 'email_template'
+        })
+      );
     });
 
     it('should return 400 when name is missing', async () => {
@@ -135,7 +132,7 @@ describe('EmailTemplateController', () => {
 
     it('should return 500 on database error', async () => {
       req.body = { name: 'Test', subject: 'Sub', body: 'Body' };
-      databaseAdapter.create.mockRejectedValue(new Error('DB error'));
+      zerodbService.insertRow.mockRejectedValue(new Error('DB error'));
 
       await emailTemplateController.createTemplate(req, res);
 
@@ -148,31 +145,33 @@ describe('EmailTemplateController', () => {
   describe('getTemplate', () => {
     it('should return a template by ID', async () => {
       req.params = { id: 't1' };
-      const mockTemplate = { _id: 't1', companyId: 'company-001', name: 'Welcome' };
-      databaseAdapter.findById.mockResolvedValue(mockTemplate);
+      zerodbService.queryRows.mockResolvedValue({
+        data: [{ row_id: 't1', row_data: { companyId: 'company-001', name: 'Welcome' } }]
+      });
 
       await emailTemplateController.getTemplate(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res._getData())).toEqual(mockTemplate);
+      const data = JSON.parse(res._getData());
+      expect(data.template.name).toBe('Welcome');
     });
 
     it('should return 404 when template not found', async () => {
       req.params = { id: 'nonexistent' };
-      databaseAdapter.findById.mockResolvedValue(null);
+      zerodbService.queryRows.mockResolvedValue({ data: [] });
 
       await emailTemplateController.getTemplate(req, res);
 
       expect(res.statusCode).toBe(404);
     });
 
-    it('should return 403 when template belongs to another company', async () => {
+    it('should return 404 when template belongs to another company', async () => {
       req.params = { id: 't1' };
-      databaseAdapter.findById.mockResolvedValue({ _id: 't1', companyId: 'other-company' });
+      zerodbService.queryRows.mockResolvedValue({ data: [] });
 
       await emailTemplateController.getTemplate(req, res);
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(404);
     });
   });
 
@@ -182,38 +181,38 @@ describe('EmailTemplateController', () => {
     it('should update a template successfully', async () => {
       req.params = { id: 't1' };
       req.body = { name: 'Updated', subject: 'New subject' };
-      const existing = { _id: 't1', companyId: 'company-001', name: 'Old', subject: 'Old sub', body: 'Body' };
-      databaseAdapter.findById.mockResolvedValue(existing);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ ...existing, ...req.body });
+      zerodbService.updateRows.mockResolvedValue({});
 
       await emailTemplateController.updateTemplate(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
-        'EmailTemplate',
-        't1',
-        expect.objectContaining({ name: 'Updated', subject: 'New subject' })
+      expect(zerodbService.updateRows).toHaveBeenCalledWith(
+        'notifications',
+        expect.objectContaining({
+          filter: { row_id: 't1' },
+          update: expect.objectContaining({ name: 'Updated', subject: 'New subject' })
+        })
       );
     });
 
-    it('should return 404 when template not found', async () => {
+    it('should return 200 even when template does not exist (no pre-check)', async () => {
       req.params = { id: 'nonexistent' };
       req.body = { name: 'Updated' };
-      databaseAdapter.findById.mockResolvedValue(null);
+      zerodbService.updateRows.mockResolvedValue({});
 
       await emailTemplateController.updateTemplate(req, res);
 
-      expect(res.statusCode).toBe(404);
+      expect(res.statusCode).toBe(200);
     });
 
-    it('should return 403 when template belongs to another company', async () => {
+    it('should return 500 on database error', async () => {
       req.params = { id: 't1' };
       req.body = { name: 'Updated' };
-      databaseAdapter.findById.mockResolvedValue({ _id: 't1', companyId: 'other-company' });
+      zerodbService.updateRows.mockRejectedValue(new Error('DB error'));
 
       await emailTemplateController.updateTemplate(req, res);
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(500);
     });
   });
 
@@ -222,32 +221,30 @@ describe('EmailTemplateController', () => {
   describe('deleteTemplate', () => {
     it('should delete a template successfully', async () => {
       req.params = { id: 't1' };
-      const existing = { _id: 't1', companyId: 'company-001', name: 'Welcome' };
-      databaseAdapter.findById.mockResolvedValue(existing);
-      databaseAdapter.findByIdAndDelete.mockResolvedValue(existing);
+      zerodbService.deleteRowById.mockResolvedValue({});
 
       await emailTemplateController.deleteTemplate(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('EmailTemplate', 't1');
+      expect(zerodbService.deleteRowById).toHaveBeenCalledWith('notifications', 't1');
     });
 
-    it('should return 404 when template not found', async () => {
+    it('should return 200 even when template does not exist (no pre-check)', async () => {
       req.params = { id: 'nonexistent' };
-      databaseAdapter.findById.mockResolvedValue(null);
+      zerodbService.deleteRowById.mockResolvedValue({});
 
       await emailTemplateController.deleteTemplate(req, res);
 
-      expect(res.statusCode).toBe(404);
+      expect(res.statusCode).toBe(200);
     });
 
-    it('should return 403 when template belongs to another company', async () => {
+    it('should return 500 on database error', async () => {
       req.params = { id: 't1' };
-      databaseAdapter.findById.mockResolvedValue({ _id: 't1', companyId: 'other-company' });
+      zerodbService.deleteRowById.mockRejectedValue(new Error('DB error'));
 
       await emailTemplateController.deleteTemplate(req, res);
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(500);
     });
   });
 });

@@ -116,6 +116,7 @@ describe('eightythreeBService', () => {
             grantDate: grantDate.toISOString(),
             numberOfShares: 10000,
             companyId: 'company-1',
+            grantType: 'RSA',
             remindersSent: [25],
           },
         ])
