@@ -33,6 +33,7 @@ describe('Database Monitor Middleware', () => {
 
     process.env.NODE_ENV = 'test';
     process.env.ENABLE_DB_MONITORING = 'false';
+    process.env.JWT_SECRET = 'test-secret';
 
     const module = require('../../../middleware/databaseMonitor');
     databaseMonitor = module.databaseMonitor;
@@ -418,9 +419,45 @@ describe('Database Monitor Middleware', () => {
   });
 
   describe('metricsMiddleware', () => {
-    it('should respond with 503 when monitoring disabled', () => {
+    // Helper to create a valid admin JWT for testing
+    const jwt = require('jsonwebtoken');
+    const validAdminToken = () => {
+      return jwt.sign({ userId: 'admin-1', role: 'admin' }, process.env.JWT_SECRET || 'test-secret');
+    };
+
+    it('should return 403 when no auth header is provided', () => {
       req.path = '/api/v1/admin/db-metrics';
       req.method = 'GET';
+      req.headers = {};
+
+      metricsMiddleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Forbidden'
+      });
+    });
+
+    it('should return 403 when auth token has non-admin role', () => {
+      req.path = '/api/v1/admin/db-metrics';
+      req.method = 'GET';
+      const userToken = jwt.sign({ userId: 'user-1', role: 'employee' }, process.env.JWT_SECRET || 'test-secret');
+      req.headers = { authorization: `Bearer ${userToken}` };
+
+      metricsMiddleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Forbidden'
+      });
+    });
+
+    it('should respond with 503 when monitoring disabled and admin authenticated', () => {
+      req.path = '/api/v1/admin/db-metrics';
+      req.method = 'GET';
+      req.headers = { authorization: `Bearer ${validAdminToken()}` };
       databaseMonitor.enabled = false;
 
       metricsMiddleware(req, res, next);
@@ -432,9 +469,10 @@ describe('Database Monitor Middleware', () => {
       });
     });
 
-    it('should return metrics when enabled', () => {
+    it('should return metrics when enabled and admin authenticated', () => {
       req.path = '/api/v1/admin/db-metrics';
       req.method = 'GET';
+      req.headers = { authorization: `Bearer ${validAdminToken()}` };
       databaseMonitor.enabled = true;
 
       metricsMiddleware(req, res, next);

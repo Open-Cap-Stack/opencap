@@ -36,7 +36,7 @@ export const waterfallTools: ToolDefinition[] = [
         .describe('Run analysis as of a specific date (ISO 8601 YYYY-MM-DD). Defaults to today.'),
     }),
     handler: async (input, client) => {
-      const { data } = await client.post('/api/v1/waterfall/analyze', input);
+      const { data } = await client.post('/api/v1/waterfall-analyses', input);
       return {
         content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
       };

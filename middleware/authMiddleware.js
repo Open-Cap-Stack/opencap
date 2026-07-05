@@ -137,8 +137,10 @@ const authenticateToken = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
     } else if (req.query && req.query.token) {
-      // Support ?token=JWT for document viewer iframes that cannot set headers
-      token = req.query.token;
+      const path = req.path || req.url || '';
+      if (path.includes('/documents/') || path.includes('/files/') || path.includes('/download')) {
+        token = req.query.token;
+      }
     }
 
     if (!token) {
@@ -201,8 +203,10 @@ const authenticateToken = async (req, res, next) => {
       return next();
     }
 
-    // If still no user, check if token has role (test/admin tokens)
     if (!user && decoded.role) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(401).json({ message: 'User not found' });
+      }
       req.user = {
         userId: tokenUserId,
         _id: tokenUserId,
@@ -224,9 +228,7 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ message: 'Account is not active' });
     }
 
-    // Add user data to request
-    // Trust JWT role over stored role — tokens signed with JWT_SECRET are authoritative
-    const effectiveRole = decoded.role || user.role;
+    const effectiveRole = user.role || decoded.role;
     req.user = {
       userId: user.userId,
       _id: user._id || user.userId,

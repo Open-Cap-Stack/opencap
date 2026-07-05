@@ -154,6 +154,9 @@ dist
 .DS_Store
 .DS_Store
 
+# PII data files
+scripts/data/*.csv
+
 # OpenCap specific ignores
 __tests__/controllers/temp/
 *.test.js.bak

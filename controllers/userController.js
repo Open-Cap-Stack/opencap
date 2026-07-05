@@ -320,8 +320,7 @@ const cleanupUserData = async (user, adminUserId) => {
  */
 const hardDeleteUserById = async (req, res) => {
   try {
-    // Require admin role
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
@@ -330,7 +329,6 @@ const hardDeleteUserById = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Clean up related data before deleting the user record
     const cleanup = await cleanupUserData(user, req.user.userId);
 
     // Now hard-delete the user record
@@ -357,8 +355,7 @@ const hardDeleteUserById = async (req, res) => {
  */
 const bulkDeleteUsers = async (req, res) => {
   try {
-    // Require admin role
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 

@@ -39,7 +39,7 @@ export const stakeholderTools: ToolDefinition[] = [
       name: z.string().describe('Full name'),
       email: z.string().email().describe('Email address'),
       role: z
-        .enum(['founder', 'investor', 'employee', 'advisor', 'other'])
+        .enum(['founder', 'co_founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider', 'engineer', 'manager', 'venture_capitalist'])
         .describe('Stakeholder role'),
       companyId: z.string().describe('Company ID to add the stakeholder to'),
       title: z.string().optional().describe("Job title or role title, e.g. 'Director of Developer Relations', 'Lead Advisor'"),
@@ -79,7 +79,7 @@ export const stakeholderTools: ToolDefinition[] = [
       name: z.string().optional().describe('Full name'),
       email: z.string().email().optional().describe('Email address'),
       role: z
-        .enum(['founder', 'investor', 'employee', 'advisor', 'other'])
+        .enum(['founder', 'co_founder', 'employee', 'advisor', 'consultant', 'investor', 'board_member', 'service_provider', 'engineer', 'manager', 'venture_capitalist'])
         .optional()
         .describe('Stakeholder role'),
       title: z.string().optional().describe("Job title or role title, e.g. 'Director of Developer Relations', 'Lead Advisor'"),

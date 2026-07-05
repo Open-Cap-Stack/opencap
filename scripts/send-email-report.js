@@ -10,7 +10,7 @@ const https = require('https');
 
 const reportPath = process.argv[2];
 const recipientEmail = process.argv[3] || 'toby@ainative.studio';
-const apiToken = 'kLPiP0bzgKJ0CnNYVt1wq3qxbs2QgDeF2XwyUnxBEOM';
+const apiToken = process.env.EMAIL_API_TOKEN;
 
 if (!reportPath) {
   console.error('Usage: node send-email-report.js <report-file-path> [recipient-email]');

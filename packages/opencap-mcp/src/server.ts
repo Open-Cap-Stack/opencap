@@ -57,7 +57,7 @@ export function createServer(client: AxiosInstance): Server {
   const server = new Server(
     {
       name: 'opencap-mcp',
-      version: '1.9.0',
+      version: '1.10.0',
     },
     {
       capabilities: {

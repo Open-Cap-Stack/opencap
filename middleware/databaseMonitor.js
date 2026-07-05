@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 
 class DatabaseMonitor {
   constructor() {
@@ -362,6 +363,19 @@ const databaseMonitor = new DatabaseMonitor();
  */
 const metricsMiddleware = (req, res, next) => {
   if (req.path === '/api/v1/admin/db-metrics' && req.method === 'GET') {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    try {
+      const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+      if (!['super_admin', 'admin'].includes(decoded.role)) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    } catch (err) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
     if (!databaseMonitor.enabled) {
       return res.status(503).json({
         success: false,

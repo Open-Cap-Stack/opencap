@@ -82,12 +82,16 @@ describe('verifyCompanyAccess middleware', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('should skip check when no user is authenticated', () => {
+  it('should return 401 when no user is authenticated', () => {
     req.user = null;
 
     verifyCompanyAccess()(req, res, next);
 
-    expect(next).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'Authentication required' })
+    );
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('should block mutation for user without companyId', () => {

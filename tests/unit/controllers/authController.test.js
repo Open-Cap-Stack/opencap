@@ -493,16 +493,17 @@ describe('AuthController', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('should persist companyId when provided', async () => {
+    it('should not allow self-assigning companyId via profile update', async () => {
       req.user = { userId: 'user_123' };
       req.body = { companyId: 'company-abc-123' };
       const mockUser = { _id: 'user_123', userId: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com' };
       User.findOne.mockResolvedValue(mockUser);
-      User.findOneAndUpdate.mockResolvedValue({ ...mockUser, companyId: 'company-abc-123' });
+      User.findOneAndUpdate.mockResolvedValue({ ...mockUser });
       await authController.updateUserProfile(req, res);
+      // companyId should NOT be included in the update — users cannot self-assign company
       expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_123' },
-        expect.objectContaining({ companyId: 'company-abc-123' }),
+        expect.not.objectContaining({ companyId: 'company-abc-123' }),
         { new: true }
       );
       expect(res.statusCode).toBe(200);
@@ -515,7 +516,7 @@ describe('AuthController', () => {
       await authController.exchangeAINativeToken(req, res);
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.message).toBe('ainativeToken is required');
+      expect(data.message).toBe('code or ainativeToken is required');
     });
 
     it('should return 401 when AINative token is invalid', async () => {
@@ -524,14 +525,15 @@ describe('AuthController', () => {
       await authController.exchangeAINativeToken(req, res);
       expect(res.statusCode).toBe(401);
       const data = JSON.parse(res._getData());
-      expect(data.message).toBe('Invalid AINative token');
+      expect(data.message).toBe('Could not resolve AINative user profile');
     });
 
     it('should exchange valid AINative token for local JWT', async () => {
       req.body = { ainativeToken: 'valid-ainative-token' };
 
+      // Code now tries /oauth/userinfo first, then /api/v1/auth/me
       axios.get.mockResolvedValue({
-        data: { id: 'ainative-user-1', email: 'User@Example.COM', name: 'Test User' }
+        data: { sub: 'ainative-user-1', email: 'User@Example.COM', name: 'Test User' }
       });
 
       const mockLocalUser = {
@@ -559,9 +561,9 @@ describe('AuthController', () => {
       expect(data.user.userId).toBe('local-user-1');
       expect(data.user.companyId).toBe('company-1');
 
-      // Verify correct API path
+      // Verify correct API path — now tries /oauth/userinfo first
       expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/auth/me'),
+        expect.stringContaining('/oauth/userinfo'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer valid-ainative-token'

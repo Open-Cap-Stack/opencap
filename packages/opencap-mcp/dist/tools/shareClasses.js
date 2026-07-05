@@ -34,7 +34,7 @@ export const shareClassTools = [
         inputSchema: z.object({
             name: z.string().describe('Share class name, e.g. "Series A Preferred"'),
             classType: z
-                .enum(['common', 'preferred', 'warrant', 'option'])
+                .enum(['common', 'preferred', 'restricted_common', 'founders'])
                 .describe('Type of share class'),
             authorizedShares: coerceInt('Total number of authorized shares').refine((v) => v > 0, { message: 'authorizedShares must be a positive integer' }),
             parValue: coerceFloat('Par value per share in USD').optional(),

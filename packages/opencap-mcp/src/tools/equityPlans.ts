@@ -37,8 +37,8 @@ export const equityPlanTools: ToolDefinition[] = [
     description: 'Create a new equity incentive plan for employees or advisors.',
     inputSchema: z.object({
       name: z.string().describe('Plan name, e.g. "2024 Stock Option Plan"'),
-      planType: z
-        .enum(['ISO', 'NSO', 'RSA', 'RSU', 'SAR', 'other'])
+      PlanType: z
+        .enum(['Stock Option Plan', 'Restricted Stock Plan'])
         .describe('Type of equity plan'),
       sharesReserved: coerceInt('Number of shares reserved for this plan'),
       companyId: z.string().describe('Company ID this plan belongs to'),
@@ -64,7 +64,7 @@ export const equityPlanTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Equity plan created and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? input.name}\nplanType: ${record.planType ?? input.planType}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
+              text: `Equity plan created and confirmed:\nrow_id: ${record.row_id ?? id}\nname: ${record.name ?? input.name}\nPlanType: ${record.PlanType ?? input.PlanType}\ncompanyId: ${record.companyId ?? input.companyId}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };

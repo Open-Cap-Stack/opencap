@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { coerceInt, coerceBool } from '../schema.js';
+import { coerceInt, coerceFloat } from '../schema.js';
 export const dilutionTools = [
     {
         name: 'calculate_dilution',
@@ -7,13 +7,11 @@ export const dilutionTools = [
             'Returns pre- and post-dilution ownership percentages for each stakeholder.',
         inputSchema: z.object({
             companyId: z.string().describe('Company ID'),
-            newSharesIssued: coerceInt('Number of new shares to be issued in the scenario'),
-            includeOptionPool: coerceBool('Whether to include unissued option pool shares in the denominator')
-                .optional()
-                .default(false),
-            includeSafes: coerceBool('Whether to include SAFEs in conversion when calculating dilution')
-                .optional()
-                .default(true),
+            preMoney: coerceFloat('Pre-money valuation in USD'),
+            newInvestment: coerceFloat('New investment amount in USD'),
+            existingShares: coerceInt('Current number of existing shares'),
+            sharePrice: coerceFloat('Price per share in USD (defaults to preMoney / existingShares)')
+                .optional(),
         }),
         handler: async (input, client) => {
             const { data } = await client.post('/api/v1/dilution/calculate', input);
@@ -34,8 +32,9 @@ export const dilutionTools = [
                 .describe('Calculate as of a specific date (ISO 8601 YYYY-MM-DD). Defaults to today.'),
         }),
         handler: async (input, client) => {
-            const { data } = await client.get('/api/v1/dilution/fully-diluted', {
-                params: input,
+            const { companyId, ...params } = input;
+            const { data } = await client.get(`/api/v1/dilution/fully-diluted/${companyId}`, {
+                params,
             });
             return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
         },

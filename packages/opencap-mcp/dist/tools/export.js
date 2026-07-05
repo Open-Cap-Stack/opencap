@@ -15,7 +15,7 @@ export const exportTools = [
         handler: async (input, client) => {
             // Fetch all three data sources in parallel
             const [summaryRes, stakeholdersRes, shareClassesRes] = await Promise.all([
-                client.get('/api/v1/cap-table-summary', { params: { companyId: input.companyId } }),
+                client.get('/api/v1/exports/cap-table', { params: { companyId: input.companyId } }),
                 client.get('/api/v1/stakeholders', { params: { companyId: input.companyId } }),
                 client.get('/api/v1/share-classes', { params: { companyId: input.companyId } }),
             ]);

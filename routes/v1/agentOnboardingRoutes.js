@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createEndpointRateLimiter } = require('../../middleware/rateLimiter');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const zerodbService = require('../../services/zerodbService');
@@ -78,8 +79,20 @@ const VALID_CAPABILITIES = [
  */
 router.post(
   '/onboard',
+  authenticateToken,
   createEndpointRateLimiter('/api/v1/agents/onboard'),
   (req, res) => {
+    const allowedRoles = ['super_admin', 'admin'];
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only admin users can onboard agents',
+          status: 403,
+        },
+      });
+    }
+
     const { agent_id, agent_name, capabilities = [], company_context } = req.body;
 
     if (!agent_id || typeof agent_id !== 'string' || agent_id.trim().length === 0) {

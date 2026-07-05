@@ -86,7 +86,7 @@ const registerUser = async (req, res) => {
     }
 
     // Validate role matches User model schema
-    const allowedRoles = ['super_admin', 'admin', 'founder', 'investor', 'manager', 'employee', 'client', 'accountant', 'service_provider'];
+    const allowedRoles = ['founder', 'investor', 'employee', 'client', 'accountant', 'service_provider'];
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({
         message: `Role must be one of: ${allowedRoles.join(', ')}`
@@ -796,7 +796,7 @@ const updateUserProfile = async (req, res) => {
   try {
     // User ID is attached to req.user by the auth middleware
     const userId = req.user.userId;
-    const { firstName, lastName, email, currentPassword, newPassword, companyId } = req.body;
+    const { firstName, lastName, email, currentPassword, newPassword } = req.body;
 
     // Find user - first try by userId field, then by _id if it looks like an ObjectId
     let user = await User.findOne({ userId: userId });
@@ -814,7 +814,6 @@ const updateUserProfile = async (req, res) => {
     const updates = {};
     if (firstName) updates.firstName = firstName;
     if (lastName) updates.lastName = lastName;
-    if (companyId) updates.companyId = companyId;
 
     // Update email if provided and different
     if (email && email !== user.email) {
@@ -1033,7 +1032,7 @@ const exchangeAINativeToken = async (req, res) => {
           code,
           redirect_uri: redirect_uri || 'https://opencapstack.com/auth/ainative/callback',
           client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
-          client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET || 'aeX7k6kbqCZ43DVkv7bp8MGoVYg4_t2vx2MwfGZc7V4',
+          client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET,
           ...(code_verifier ? { code_verifier } : {}),
         }).toString(),
         {
@@ -1400,7 +1399,7 @@ async function adminToken(req, res) {
   const token = jwt.sign(
     { userId, email: email || 'admin@ainative.studio', role: 'admin', companyId: companyId || 'ainative-studio' },
     process.env.JWT_SECRET,
-    { expiresIn: '90d' }
+    { expiresIn: '24h' }
   );
 
   return res.status(200).json({ token });

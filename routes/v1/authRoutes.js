@@ -39,9 +39,9 @@ router.post('/token/refresh', createEndpointRateLimiter('/api/v1/auth/login'), a
 router.post('/logout', authenticateToken, auditAction('logout', 'auth'), authController.logout);
 
 // Password reset flow
-router.post('/password/reset-request', authController.requestPasswordReset);
-router.post('/password/verify-token', authController.verifyResetToken);
-router.post('/password/reset', authController.resetPassword);
+router.post('/password/reset-request', createEndpointRateLimiter('/api/v1/auth/password/reset-request'), authController.requestPasswordReset);
+router.post('/password/verify-token', createEndpointRateLimiter('/api/v1/auth/password/verify-token'), authController.verifyResetToken);
+router.post('/password/reset', createEndpointRateLimiter('/api/v1/auth/password/reset'), authController.resetPassword);
 
 // User profile
 router.get('/profile', authenticateToken, authController.getUserProfile);

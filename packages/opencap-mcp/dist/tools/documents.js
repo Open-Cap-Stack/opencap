@@ -48,20 +48,55 @@ export const documentTools = [
     },
     {
         name: 'get_document',
-        description: 'Get metadata and details for a specific document by ID. ' +
+        description: 'Get metadata and file content for a specific document by ID. ' +
+            'Returns base64-encoded file content for binary documents (PDF, images) and plain text for text documents. ' +
             'Use the `row_id` field from `list_documents`, not the `_id` field.',
         inputSchema: z.object({
             id: z.string().describe('Document ID — use the `row_id` field from list_documents, not `_id`'),
+            includeContent: z.boolean().optional().default(true).describe('Include file content (default true). Set false for metadata only.'),
         }),
         handler: async (input, client) => {
             const { data } = await client.get(`/api/v1/documents/${input.id}`);
             const doc = data?.data ?? data;
-            return { content: [{ type: 'text', text: JSON.stringify(stripFileContent(doc), null, 2) }] };
+            const meta = stripFileContent(doc);
+            if (!input.includeContent) {
+                return { content: [{ type: 'text', text: JSON.stringify(meta, null, 2) }] };
+            }
+            // Try to download the actual file content
+            try {
+                const downloadRes = await client.get(`/api/v1/documents/${input.id}/download`, {
+                    responseType: 'arraybuffer',
+                });
+                const buf = Buffer.from(downloadRes.data);
+                const contentType = (doc.mimeType ?? doc.contentType ?? 'application/octet-stream');
+                const isText = contentType.startsWith('text/') || contentType === 'application/json';
+                const sizeBytes = buf.length;
+                const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+                if (sizeBytes > MAX_SIZE) {
+                    return {
+                        content: [{
+                                type: 'text',
+                                text: JSON.stringify({ ...meta, fileContentTruncated: true, fileSizeBytes: sizeBytes, note: `File is ${(sizeBytes / 1024 / 1024).toFixed(1)} MB — too large to include inline. Use the download endpoint directly.` }, null, 2),
+                            }],
+                    };
+                }
+                const fileContent = isText ? buf.toString('utf-8') : buf.toString('base64');
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({ ...meta, fileContent, fileContentEncoding: isText ? 'utf-8' : 'base64', fileSizeBytes: sizeBytes }, null, 2),
+                        }],
+                };
+            }
+            catch {
+                // File content not available — return metadata only
+                return { content: [{ type: 'text', text: JSON.stringify({ ...meta, fileContentAvailable: false }, null, 2) }] };
+            }
         },
     },
     {
         name: 'search_documents',
-        description: 'Search documents by keyword or metadata across all company documents.',
+        description: 'Search documents by keyword or metadata across all company documents. Searches document name, title, description, tags, and category.',
         inputSchema: z.object({
             query: z.string().describe('Search query string'),
             companyId: z.string().optional().describe('Limit search to a specific company'),
@@ -79,8 +114,31 @@ export const documentTools = [
             limit: coerceInt('Max results to return').optional().default(20),
         }),
         handler: async (input, client) => {
-            const { data } = await client.post('/api/v1/documents/search', input);
-            const results = stripDocList(data?.results ?? data?.data ?? data);
+            // Use list endpoint with client-side text search instead of vector search
+            // (vector search endpoint requires embedding infrastructure and can fail)
+            const params = { limit: 200 };
+            if (input.companyId)
+                params.companyId = input.companyId;
+            if (input.documentType)
+                params.documentType = input.documentType;
+            const { data } = await client.get('/api/v1/documents', { params });
+            const allDocs = (data?.data?.documents ?? data?.documents ?? data);
+            const docs = Array.isArray(allDocs) ? allDocs : [];
+            // Client-side keyword search across metadata fields
+            const q = input.query.toLowerCase();
+            const keywords = q.split(/\s+/).filter(Boolean);
+            const matched = docs.filter((doc) => {
+                const searchable = [
+                    doc.name, doc.title, doc.description, doc.category, doc.documentType,
+                    ...(Array.isArray(doc.tags) ? doc.tags : []),
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                return keywords.every((kw) => searchable.includes(kw));
+            });
+            const limited = matched.slice(0, input.limit);
+            const results = stripDocList(limited);
             return {
                 content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
             };

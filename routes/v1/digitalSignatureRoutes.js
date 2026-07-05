@@ -6,11 +6,28 @@
  */
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { authenticateToken } = require('../../middleware/authMiddleware');
 const { hasRole } = require('../../middleware/rbacMiddleware');
 const digitalSignatureController = require('../../controllers/digitalSignatureController');
 
-// Apply authentication middleware to all routes
+router.post('/digital-signatures/webhook', (req, res, next) => {
+  const signature = req.headers['x-signature'];
+  const webhookSecret = process.env.DIGITAL_SIGNATURE_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    if (!signature) {
+      return res.status(401).json({ error: 'Missing X-Signature header' });
+    }
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
+  }
+  next();
+}, digitalSignatureController.handleProviderCallback);
+
+// Apply authentication middleware to all routes below
 router.use(authenticateToken);
 
 // CRUD operations
@@ -40,9 +57,6 @@ router.get('/digital-signatures/:id/signing-link', hasRole(['super_admin', 'admi
 
 // Document download
 router.get('/digital-signatures/:id/download', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), digitalSignatureController.downloadSignedDocument);
-
-// Webhook callback for external providers
-router.post('/digital-signatures/webhook', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), digitalSignatureController.handleProviderCallback);
 
 // Admin operations
 router.post('/digital-signatures/process-expired', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), digitalSignatureController.processExpiredRequests);

@@ -11,6 +11,7 @@
  * - payment.failed       — outgoing payment failed
  */
 
+const crypto = require('crypto');
 const zerodbService = require('../services/zerodbService');
 
 const MERCURY_EVENTS_TABLE = 'mercury_events';
@@ -53,6 +54,19 @@ async function ensureMercuryEventsTable() {
  */
 async function handleWebhook(req, res) {
   try {
+    const webhookSecret = process.env.MERCURY_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const signature = req.headers['x-mercury-signature'];
+      if (!signature) {
+        return res.status(401).json({ success: false, error: 'Missing X-Mercury-Signature header' });
+      }
+      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        return res.status(401).json({ success: false, error: 'Invalid webhook signature' });
+      }
+    }
+
     const event = req.body;
 
     if (!event || !event.type) {

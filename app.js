@@ -1,5 +1,6 @@
 // app.js
 const express = require("express");
+const crypto = require("crypto");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const zerodbService = require('./services/zerodbService');
@@ -20,6 +21,7 @@ const {
 const getLoggingMiddleware = require('./middleware/logging');
 const { securityLogger } = require('./middleware/securityAuditLogger'); // OCAE-306: Import security audit logging
 const { verifyCompanyAccess } = require('./middleware/companyAuth');
+const { enforceCompanyScope } = require('./middleware/companyScope');
 // testEndpoints removed - no longer needed
 const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 const { databaseMonitor, metricsMiddleware } = require('./middleware/databaseMonitor'); // GitHub Issue #8: Database monitoring
@@ -349,6 +351,28 @@ app.post('/api/v1/employees/accept-invite', acceptInvite);
 // Frontend URL for OAuth redirects (backend is api.opencapstack.com, frontend is opencapstack.com)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://opencapstack.com';
 
+const oauthStates = new Map();
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+
+function generateOAuthState(userId) {
+  const state = crypto.randomBytes(16).toString('hex');
+  oauthStates.set(state, { userId: userId || 'anonymous', createdAt: Date.now() });
+  for (const [key, val] of oauthStates) {
+    if (Date.now() - val.createdAt > OAUTH_STATE_TTL_MS) {
+      oauthStates.delete(key);
+    }
+  }
+  return state;
+}
+
+function consumeOAuthState(state) {
+  const entry = oauthStates.get(state);
+  if (!entry) return null;
+  oauthStates.delete(state);
+  if (Date.now() - entry.createdAt > OAUTH_STATE_TTL_MS) return null;
+  return entry.userId;
+}
+
 // These redirect to Google OAuth consent screen; no bearer token needed
 const axios = require('axios');
 
@@ -358,9 +382,8 @@ const GMAIL_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.openca
 app.get('/api/v1/connect/google/google-drive/auth', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly');
-  // Pass userId in state so we know who to store the token for
-  const state = encodeURIComponent(req.query.userId || 'anonymous');
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GOOGLE_DRIVE_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
+  const state = generateOAuthState(req.query.userId);
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GOOGLE_DRIVE_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
 
@@ -385,8 +408,10 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
-    // Encrypt tokens before storing (Issue #680)
-    const userId = decodeURIComponent(state || 'anonymous');
+    const userId = consumeOAuthState(decodeURIComponent(state || ''));
+    if (!userId) {
+      return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=invalid_state');
+    }
     const zerodbService = require('./services/zerodbService');
     let encAccessToken = tokens.access_token;
     let encRefreshToken = tokens.refresh_token || null;
@@ -397,7 +422,6 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
         encRefreshToken = encrypt(tokens.refresh_token);
       }
     } catch (e) {
-      // Encryption not configured — store plaintext as fallback
       console.warn('Token encryption unavailable, storing plaintext:', e.message);
     }
     await zerodbService.insertRow('integrations', {
@@ -422,8 +446,8 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
 app.get('/api/v1/connect/google/gmail/auth', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly');
-  const state = encodeURIComponent(req.query.userId || 'anonymous');
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
+  const state = generateOAuthState(req.query.userId);
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
 
@@ -445,9 +469,11 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
-    const userId = decodeURIComponent(state || 'anonymous');
+    const userId = consumeOAuthState(decodeURIComponent(state || ''));
+    if (!userId) {
+      return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=invalid_state');
+    }
     const zerodbService = require('./services/zerodbService');
-    // Encrypt tokens before storing (Issue #680)
     let encAccessToken = tokens.access_token;
     let encRefreshToken = tokens.refresh_token || null;
     try {
@@ -486,8 +512,8 @@ app.get('/api/v1/connect/mercury/auth', (req, res) => {
   if (!clientId) {
     return res.status(500).json({ error: 'Mercury integration not configured' });
   }
-  const state = encodeURIComponent(req.query.userId || 'anonymous');
-  const authUrl = `https://app.mercury.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(MERCURY_REDIRECT)}&response_type=code&state=${state}`;
+  const state = generateOAuthState(req.query.userId);
+  const authUrl = `https://app.mercury.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(MERCURY_REDIRECT)}&response_type=code&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
 
@@ -506,13 +532,27 @@ app.get('/api/v1/connect/mercury/callback', async (req, res) => {
       grant_type: 'authorization_code',
     });
 
-    const userId = decodeURIComponent(state || 'anonymous');
+    const userId = consumeOAuthState(decodeURIComponent(state || ''));
+    if (!userId) {
+      return res.redirect(FRONTEND_URL + '/settings/integrations?mercury=error&reason=invalid_state');
+    }
     const zerodbSvc = require('./services/zerodbService');
+    let encAccessToken = tokens.access_token;
+    let encRefreshToken = tokens.refresh_token || null;
+    try {
+      const { encrypt } = require('./utils/tokenEncryption');
+      encAccessToken = encrypt(tokens.access_token);
+      if (tokens.refresh_token) {
+        encRefreshToken = encrypt(tokens.refresh_token);
+      }
+    } catch (e) {
+      console.warn('Token encryption unavailable, storing plaintext:', e.message);
+    }
     await zerodbSvc.insertRow('integrations', {
       userId,
       provider: 'mercury',
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || null,
+      accessToken: encAccessToken,
+      refreshToken: encRefreshToken,
       tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
       connectedAt: new Date().toISOString(),
     });
@@ -525,11 +565,11 @@ app.get('/api/v1/connect/mercury/callback', async (req, res) => {
   }
 });
 
-app.delete('/api/v1/connect/mercury/disconnect', async (req, res) => {
+app.delete('/api/v1/connect/mercury/disconnect', require('./middleware/authMiddleware').authenticateToken, async (req, res) => {
   try {
-    const userId = req.query.userId;
+    const userId = req.user.userId;
     if (!userId) {
-      return res.status(400).json({ error: 'userId query parameter is required' });
+      return res.status(400).json({ error: 'Authenticated user has no userId' });
     }
 
     const zerodbSvc = require('./services/zerodbService');
@@ -571,6 +611,14 @@ app.use('/api/v1', (req, res, next) => {
     return next();
   }
   return verifyCompanyAccess()(req, res, next);
+});
+
+app.use('/api/v1', (req, res, next) => {
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
+  if (skipPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+  return enforceCompanyScope(req, res, next);
 });
 
 // Mount routes with correct paths

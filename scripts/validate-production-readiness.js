@@ -54,7 +54,7 @@ class ProductionReadinessValidator {
     // Required environment variables
     this.requiredEnvVars = [
       'ZERODB_API_KEY',
-      'ZERODB_API_URL',
+      'ZERODB_BASE_URL',
       'NODE_ENV',
       'JWT_SECRET'
     ];

@@ -9,7 +9,18 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
-// Hardcoded production credentials (same as local for consistency)
+// Generate secure passwords if not provided via environment
+const crypto = require('crypto');
+const generateSecurePassword = () => {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  const bytes = crypto.randomBytes(16);
+  for (let i = 0; i < 16; i++) {
+    password += charset[bytes[i] % charset.length];
+  }
+  return password;
+};
+
 const productionUsers = [
   {
     userId: 'admin-001',
@@ -19,17 +30,17 @@ const productionUsers = [
     role: 'admin',
     status: 'active',
     companyId: 'opencap-main-001',
-    password: 'MEok921$4sCP' // Same as local for consistency
+    password: process.env.ADMIN_PASSWORD || generateSecurePassword()
   },
   {
-    userId: 'test-user-001', 
+    userId: 'test-user-001',
     firstName: 'Test',
     lastName: 'User',
     email: 'test@opencapstack.com',
     role: 'employee',
     status: 'active',
     companyId: 'opencap-test-001',
-    password: 'nzNN6YtN#EA3' // Same as local for consistency
+    password: process.env.TEST_USER_PASSWORD || generateSecurePassword()
   }
 ];
 

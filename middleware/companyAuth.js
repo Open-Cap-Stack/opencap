@@ -40,9 +40,8 @@ function verifyCompanyAccess(options = {}) {
     const { allowMissing = false, injectCompanyId = true } = options;
 
     return (req, res, next) => {
-        // Skip if no authenticated user (auth middleware should have caught this)
         if (!req.user) {
-            return next();
+            return res.status(401).json({ error: 'Authentication required' });
         }
 
         // Admin users bypass company scope check

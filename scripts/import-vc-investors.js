@@ -23,7 +23,7 @@ const { parse } = require('csv-parse/sync');
 
 const BASE_DIR = process.env.VC_DATA_DIR || path.join(__dirname, 'data');
 const API_URL = process.env.OPENCAP_API_URL || 'https://api.opencapstack.com';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'ainative-opencap-admin-2026';
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const BATCH_SIZE = 10;
 
 const args = process.argv.slice(2);

@@ -38,7 +38,7 @@ export const shareClassTools: ToolDefinition[] = [
     inputSchema: z.object({
       name: z.string().describe('Share class name, e.g. "Series A Preferred"'),
       classType: z
-        .enum(['common', 'preferred', 'warrant', 'option'])
+        .enum(['common', 'preferred', 'restricted_common', 'founders'])
         .describe('Type of share class'),
       authorizedShares: coerceInt('Total number of authorized shares').refine(
         (v) => v > 0,

@@ -93,4 +93,27 @@ const resolveTargetCompanyId = (req) => {
   return req.user?.companyId || null;
 };
 
-module.exports = { requireCompanyScope, assertCompanyOwnership, assertUserOwnership, resolveTargetCompanyId };
+const enforceCompanyScope = (req, res, next) => {
+  if (!req.user) {
+    return next();
+  }
+
+  const resolved = resolveTargetCompanyId(req);
+
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+    if (req.body && typeof req.body === 'object') {
+      req.body.companyId = resolved;
+    }
+  }
+
+  if (req.method === 'GET' || req.method === 'DELETE') {
+    if (req.query && req.query.companyId) {
+      req.query.companyId = resolved;
+    }
+  }
+
+  req.resolvedCompanyId = resolved;
+  return next();
+};
+
+module.exports = { requireCompanyScope, assertCompanyOwnership, assertUserOwnership, resolveTargetCompanyId, enforceCompanyScope };

@@ -10,15 +10,26 @@
       "title": "What Is a Cap Table? The Founder's Complete Guide for 2026",
       "slug": "what-is-a-cap-table",
       "target_keyword": "what is a cap table",
-      "secondary_keywords": ["cap table definition", "capitalization table", "startup cap table", "cap table explained"],
+      "secondary_keywords": [
+        "cap table definition",
+        "capitalization table",
+        "startup cap table",
+        "cap table explained"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2500,
       "content_type": "pillar_guide",
-      "internal_links": ["/blog/how-to-create-a-cap-table", "/blog/carta-alternatives-2026", "/blog/startup-dilution-explained"],
+      "internal_links": [
+        "/blog/how-to-create-a-cap-table",
+        "/blog/carta-alternatives-2026",
+        "/blog/startup-dilution-explained"
+      ],
       "cta": "signup",
       "estimated_volume": "3000-5000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 12,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 2,
@@ -26,15 +37,25 @@
       "title": "Carta Alternatives in 2026: 7 Cap Table Tools That Won't Break the Bank",
       "slug": "carta-alternatives-2026",
       "target_keyword": "carta alternative",
-      "secondary_keywords": ["carta alternatives", "carta competitor", "cheaper than carta", "cap table software comparison"],
+      "secondary_keywords": [
+        "carta alternatives",
+        "carta competitor",
+        "cheaper than carta",
+        "cap table software comparison"
+      ],
       "cluster": "comparison",
       "funnel_stage": "middle",
       "word_count_target": 2000,
       "content_type": "comparison",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/best-cap-table-software-startups-2026"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/best-cap-table-software-startups-2026"
+      ],
       "cta": "signup",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 4,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 3,
@@ -42,15 +63,25 @@
       "title": "What Is a 409A Valuation? Why Every Startup Needs One Before Issuing Options",
       "slug": "what-is-a-409a-valuation",
       "target_keyword": "what is a 409a valuation",
-      "secondary_keywords": ["409a valuation explained", "409a valuation startup", "409a valuation cost", "irc section 409a"],
+      "secondary_keywords": [
+        "409a valuation explained",
+        "409a valuation startup",
+        "409a valuation cost",
+        "irc section 409a"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/83b-election-guide"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/83b-election-guide"
+      ],
       "cta": "409a_quiz",
       "estimated_volume": "1500-3000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 10,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 4,
@@ -58,15 +89,25 @@
       "title": "How to Create a Cap Table From Scratch (Step-by-Step with Free Template)",
       "slug": "how-to-create-a-cap-table",
       "target_keyword": "how to create a cap table",
-      "secondary_keywords": ["cap table template", "cap table spreadsheet", "make a cap table", "cap table example"],
+      "secondary_keywords": [
+        "cap table template",
+        "cap table spreadsheet",
+        "make a cap table",
+        "cap table example"
+      ],
       "cluster": "how_to",
       "funnel_stage": "bottom",
       "word_count_target": 2000,
       "content_type": "tutorial",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/startup-dilution-explained"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/startup-dilution-explained"
+      ],
       "cta": "signup",
       "estimated_volume": "1000-2000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 6,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 5,
@@ -74,15 +115,25 @@
       "title": "Startup Dilution Explained: What Happens to Your Equity From Seed to Series B",
       "slug": "startup-dilution-explained",
       "target_keyword": "what is dilution in startups",
-      "secondary_keywords": ["startup equity dilution", "dilution calculator", "equity dilution explained", "founder dilution"],
+      "secondary_keywords": [
+        "startup equity dilution",
+        "dilution calculator",
+        "equity dilution explained",
+        "founder dilution"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/what-is-a-safe-note"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/what-is-a-safe-note"
+      ],
       "cta": "dilution_calculator",
       "estimated_volume": "800-1500",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 8,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 6,
@@ -90,15 +141,26 @@
       "title": "What Is a SAFE Note? Simple Agreements for Future Equity Explained",
       "slug": "what-is-a-safe-note",
       "target_keyword": "what is a safe note",
-      "secondary_keywords": ["safe agreement", "safe note startup", "pre-money safe", "post-money safe", "safe vs convertible note"],
+      "secondary_keywords": [
+        "safe agreement",
+        "safe note startup",
+        "pre-money safe",
+        "post-money safe",
+        "safe vs convertible note"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/convertible-note-vs-safe", "/blog/startup-dilution-explained"],
+      "internal_links": [
+        "/blog/convertible-note-vs-safe",
+        "/blog/startup-dilution-explained"
+      ],
       "cta": "safe_calculator",
       "estimated_volume": "1500-3000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 14,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 7,
@@ -106,15 +168,25 @@
       "title": "Best Cap Table Software for Startups in 2026: Free and Paid Options Compared",
       "slug": "best-cap-table-software-startups-2026",
       "target_keyword": "best cap table software",
-      "secondary_keywords": ["free cap table software", "cap table management tools", "cap table software comparison", "equity management software"],
+      "secondary_keywords": [
+        "free cap table software",
+        "cap table management tools",
+        "cap table software comparison",
+        "equity management software"
+      ],
       "cluster": "comparison",
       "funnel_stage": "middle",
       "word_count_target": 2500,
       "content_type": "listicle",
-      "internal_links": ["/blog/carta-alternatives-2026", "/blog/what-is-a-cap-table"],
+      "internal_links": [
+        "/blog/carta-alternatives-2026",
+        "/blog/what-is-a-cap-table"
+      ],
       "cta": "signup",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 2,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 8,
@@ -122,15 +194,25 @@
       "title": "What Is Vesting? Cliff Vesting, Graded Vesting, and the 4-Year Schedule Explained",
       "slug": "what-is-vesting-startup-equity",
       "target_keyword": "what is vesting",
-      "secondary_keywords": ["vesting schedule", "cliff vesting", "4 year vesting", "equity vesting explained"],
+      "secondary_keywords": [
+        "vesting schedule",
+        "cliff vesting",
+        "4 year vesting",
+        "equity vesting explained"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/83b-election-guide"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/83b-election-guide"
+      ],
       "cta": "vesting_calculator",
       "estimated_volume": "2000-4000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 16,
+      "published_at": "2026-07-02T09:00:00.000Z"
     },
     {
       "id": 9,
@@ -138,15 +220,25 @@
       "title": "The 83(b) Election: When to File, How to File, and What Happens If You Miss the Deadline",
       "slug": "83b-election-guide",
       "target_keyword": "83b election",
-      "secondary_keywords": ["what is an 83b election", "83b election deadline", "83b election form", "83b election filing"],
+      "secondary_keywords": [
+        "what is an 83b election",
+        "83b election deadline",
+        "83b election form",
+        "83b election filing"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 1800,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-vesting-startup-equity", "/blog/what-is-a-409a-valuation"],
+      "internal_links": [
+        "/blog/what-is-vesting-startup-equity",
+        "/blog/what-is-a-409a-valuation"
+      ],
       "cta": "signup",
       "estimated_volume": "500-1000",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 18,
+      "published_at": "2026-07-04T09:00:00.000Z"
     },
     {
       "id": 10,
@@ -154,15 +246,25 @@
       "title": "Convertible Note vs SAFE: Which Is Better for Your Startup's First Round?",
       "slug": "convertible-note-vs-safe",
       "target_keyword": "convertible note vs safe",
-      "secondary_keywords": ["safe vs convertible note", "convertible note startup", "safe note comparison", "startup fundraising instruments"],
+      "secondary_keywords": [
+        "safe vs convertible note",
+        "convertible note startup",
+        "safe note comparison",
+        "startup fundraising instruments"
+      ],
       "cluster": "comparison",
       "funnel_stage": "middle",
       "word_count_target": 2000,
       "content_type": "comparison",
-      "internal_links": ["/blog/what-is-a-safe-note", "/blog/startup-dilution-explained"],
+      "internal_links": [
+        "/blog/what-is-a-safe-note",
+        "/blog/startup-dilution-explained"
+      ],
       "cta": "safe_calculator",
       "estimated_volume": "300-600",
-      "status": "scheduled"
+      "status": "published",
+      "strapi_id": 20,
+      "published_at": "2026-07-04T09:00:00.000Z"
     },
     {
       "id": 11,
@@ -170,12 +272,19 @@
       "title": "Carta vs Pulley vs OpenCap Stack: 2026 Feature and Pricing Comparison",
       "slug": "carta-vs-pulley-vs-opencapstack",
       "target_keyword": "carta vs pulley",
-      "secondary_keywords": ["carta pricing", "pulley pricing", "cap table software pricing"],
+      "secondary_keywords": [
+        "carta pricing",
+        "pulley pricing",
+        "cap table software pricing"
+      ],
       "cluster": "comparison",
       "funnel_stage": "middle",
       "word_count_target": 2500,
       "content_type": "comparison",
-      "internal_links": ["/blog/carta-alternatives-2026", "/blog/best-cap-table-software-startups-2026"],
+      "internal_links": [
+        "/blog/carta-alternatives-2026",
+        "/blog/best-cap-table-software-startups-2026"
+      ],
       "cta": "signup",
       "estimated_volume": "300-600",
       "status": "scheduled"
@@ -186,12 +295,19 @@
       "title": "How to Calculate Startup Equity Dilution (With Free Calculator)",
       "slug": "startup-equity-dilution-calculator",
       "target_keyword": "dilution calculator",
-      "secondary_keywords": ["equity dilution calculator", "startup dilution calculator", "calculate dilution"],
+      "secondary_keywords": [
+        "equity dilution calculator",
+        "startup dilution calculator",
+        "calculate dilution"
+      ],
       "cluster": "how_to",
       "funnel_stage": "bottom",
       "word_count_target": 1800,
       "content_type": "calculator_guide",
-      "internal_links": ["/blog/startup-dilution-explained", "/blog/what-is-a-cap-table"],
+      "internal_links": [
+        "/blog/startup-dilution-explained",
+        "/blog/what-is-a-cap-table"
+      ],
       "cta": "dilution_calculator",
       "estimated_volume": "500-1000",
       "status": "scheduled"
@@ -202,12 +318,19 @@
       "title": "What Is a Liquidation Preference? How It Affects Your Startup Exit Payout",
       "slug": "what-is-a-liquidation-preference",
       "target_keyword": "liquidation preference",
-      "secondary_keywords": ["liquidation preference explained", "1x liquidation preference", "participating preferred"],
+      "secondary_keywords": [
+        "liquidation preference explained",
+        "1x liquidation preference",
+        "participating preferred"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/startup-dilution-explained", "/blog/convertible-note-vs-safe"],
+      "internal_links": [
+        "/blog/startup-dilution-explained",
+        "/blog/convertible-note-vs-safe"
+      ],
       "cta": "waterfall_analysis",
       "estimated_volume": "500-1000",
       "status": "scheduled"
@@ -218,12 +341,19 @@
       "title": "Stock Option Agreement Template: What to Include and Common Mistakes",
       "slug": "stock-option-agreement-template",
       "target_keyword": "stock option agreement template",
-      "secondary_keywords": ["stock option agreement", "option grant template", "iso nso agreement"],
+      "secondary_keywords": [
+        "stock option agreement",
+        "option grant template",
+        "iso nso agreement"
+      ],
       "cluster": "how_to",
       "funnel_stage": "bottom",
       "word_count_target": 1800,
       "content_type": "template",
-      "internal_links": ["/blog/what-is-vesting-startup-equity", "/blog/what-is-a-409a-valuation"],
+      "internal_links": [
+        "/blog/what-is-vesting-startup-equity",
+        "/blog/what-is-a-409a-valuation"
+      ],
       "cta": "signup",
       "estimated_volume": "200-500",
       "status": "scheduled"
@@ -234,12 +364,20 @@
       "title": "What Is an Option Pool? How to Size It and What VCs Expect",
       "slug": "what-is-an-option-pool",
       "target_keyword": "what is an option pool",
-      "secondary_keywords": ["option pool size", "esop pool", "startup option pool", "vc option pool expectations"],
+      "secondary_keywords": [
+        "option pool size",
+        "esop pool",
+        "startup option pool",
+        "vc option pool expectations"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/startup-dilution-explained"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/startup-dilution-explained"
+      ],
       "cta": "signup",
       "estimated_volume": "500-1000",
       "status": "scheduled"
@@ -250,12 +388,19 @@
       "title": "Vesting Schedule Calculator: Model Your Equity Over 4 Years",
       "slug": "vesting-schedule-calculator",
       "target_keyword": "vesting schedule calculator",
-      "secondary_keywords": ["vesting calculator", "equity vesting calculator", "stock option vesting schedule"],
+      "secondary_keywords": [
+        "vesting calculator",
+        "equity vesting calculator",
+        "stock option vesting schedule"
+      ],
       "cluster": "how_to",
       "funnel_stage": "bottom",
       "word_count_target": 1500,
       "content_type": "calculator_guide",
-      "internal_links": ["/blog/what-is-vesting-startup-equity", "/blog/what-is-a-cap-table"],
+      "internal_links": [
+        "/blog/what-is-vesting-startup-equity",
+        "/blog/what-is-a-cap-table"
+      ],
       "cta": "vesting_calculator",
       "estimated_volume": "500-1000",
       "status": "scheduled"
@@ -266,12 +411,19 @@
       "title": "409A Valuation Cost in 2026: What to Expect and How to Save",
       "slug": "409a-valuation-cost-2026",
       "target_keyword": "409a valuation cost",
-      "secondary_keywords": ["how much does a 409a cost", "409a valuation pricing", "cheap 409a valuation"],
+      "secondary_keywords": [
+        "how much does a 409a cost",
+        "409a valuation pricing",
+        "cheap 409a valuation"
+      ],
       "cluster": "how_to",
       "funnel_stage": "bottom",
       "word_count_target": 1800,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-409a-valuation", "/blog/carta-alternatives-2026"],
+      "internal_links": [
+        "/blog/what-is-a-409a-valuation",
+        "/blog/carta-alternatives-2026"
+      ],
       "cta": "409a_quiz",
       "estimated_volume": "300-600",
       "status": "scheduled"
@@ -282,12 +434,19 @@
       "title": "The AI-Native Cap Table: How MCP and Agent Protocols Are Changing Equity Management",
       "slug": "ai-native-cap-table-mcp",
       "target_keyword": "ai cap table management",
-      "secondary_keywords": ["mcp server cap table", "ai equity management", "agent protocol financial data"],
+      "secondary_keywords": [
+        "mcp server cap table",
+        "ai equity management",
+        "agent protocol financial data"
+      ],
       "cluster": "thought_leadership",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "thought_leadership",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/best-cap-table-software-startups-2026"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/best-cap-table-software-startups-2026"
+      ],
       "cta": "mcp_install",
       "estimated_volume": "50-200",
       "status": "scheduled"
@@ -298,12 +457,19 @@
       "title": "Cap Table Red Flags That Kill Acquisition Deals: 5 Issues M&A Lawyers Find",
       "slug": "cap-table-red-flags-acquisition",
       "target_keyword": "cap table red flags",
-      "secondary_keywords": ["cap table due diligence", "cap table audit", "startup acquisition cap table"],
+      "secondary_keywords": [
+        "cap table due diligence",
+        "cap table audit",
+        "startup acquisition cap table"
+      ],
       "cluster": "educational",
       "funnel_stage": "top",
       "word_count_target": 2000,
       "content_type": "guide",
-      "internal_links": ["/blog/what-is-a-cap-table", "/blog/how-to-create-a-cap-table"],
+      "internal_links": [
+        "/blog/what-is-a-cap-table",
+        "/blog/how-to-create-a-cap-table"
+      ],
       "cta": "signup",
       "estimated_volume": "100-300",
       "status": "scheduled"
@@ -314,12 +480,19 @@
       "title": "Open Source Cap Table Software: Why Data Portability Matters for Startups",
       "slug": "open-source-cap-table-software",
       "target_keyword": "open source cap table",
-      "secondary_keywords": ["open source equity management", "cap table data portability", "octa schema"],
+      "secondary_keywords": [
+        "open source equity management",
+        "cap table data portability",
+        "octa schema"
+      ],
       "cluster": "thought_leadership",
       "funnel_stage": "middle",
       "word_count_target": 1800,
       "content_type": "thought_leadership",
-      "internal_links": ["/blog/carta-alternatives-2026", "/blog/what-is-a-cap-table"],
+      "internal_links": [
+        "/blog/carta-alternatives-2026",
+        "/blog/what-is-a-cap-table"
+      ],
       "cta": "github",
       "estimated_volume": "100-300",
       "status": "scheduled"

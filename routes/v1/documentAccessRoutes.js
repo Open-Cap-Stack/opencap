@@ -23,6 +23,7 @@ const { sanitizeBody } = require('../../middleware/inputValidation');
 // Create document access with validation
 router.post(
     '/',
+    hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']),
     sanitizeBody(),
     validateDocumentAccessCreation,
     documentAccessController.createDocumentAccess
@@ -37,6 +38,7 @@ router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'servi
 // Update document access with validation
 router.put(
     '/:id',
+    hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']),
     sanitizeBody(),
     validateDocumentAccessUpdate,
     documentAccessController.updateDocumentAccess

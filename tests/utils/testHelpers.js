@@ -41,7 +41,7 @@ async function createTestUser(userData = {}) {
     firstName: 'Test',
     lastName: 'User',
     email: `test-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`,
-    password: await bcrypt.hash('password123', 10),
+    password: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10),
     role: 'employee',
     status: 'active',
     companyId: generateObjectId(),

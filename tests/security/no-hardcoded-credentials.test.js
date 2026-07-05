@@ -13,11 +13,6 @@
  * - Common weak passwords
  */
 
-// Disable database connections for security scan
-jest.mock('../../db/mongoConnection', () => ({
-  connectToMongoDB: jest.fn().mockResolvedValue(true)
-}));
-
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -49,9 +44,9 @@ describe('Security: No Hardcoded Credentials', () => {
         'password = process.env'
       ]
     },
-    // Common weak passwords (excluding 'admin' as it's a valid role)
+    // Common weak passwords (excluding 'admin' as it's a valid role, 'root' as it's used for folder IDs)
     {
-      pattern: /['"](?:admin123|password123|test123|123456|qwerty|root|Password1)['"]/gi,
+      pattern: /['"](?:admin123|password123|test123|123456|qwerty|Password1)['"]/gi,
       description: 'Common weak password literal',
       allowlist: [
         'should reject weak password "admin123"',
@@ -96,10 +91,13 @@ describe('Security: No Hardcoded Credentials', () => {
   // Files that are allowed to have credential-like patterns (test fixtures, examples)
   const ALLOWLISTED_FILES = [
     'tests/fixtures/',
+    'tests/utils/', // Test utility helpers can have test-only credentials
     'tests/setup.js', // Test setup can have test-only secrets
     'tests/setup.migration.js', // Test setup can have test-only secrets
     'test-init-scripts/', // MongoDB init scripts for test containers
     'scripts/fix-migration-tests.js', // Script that manipulates test strings
+    'e2e/utils/', // E2E test fixtures can have test-only credentials
+    'e2e/fixtures/', // E2E test fixtures
     '.env.example',
     'docs/',
     'README.md',

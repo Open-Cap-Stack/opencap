@@ -48,8 +48,7 @@ const rolePermissions = {
     'read:equity', 'write:equity',
     'read:documents', 'write:documents',
     'read:valuations',
-    'financialReports.view',
-    'admin:all'
+    'financialReports.view'
   ],
   'accountant': [
     'read:users',

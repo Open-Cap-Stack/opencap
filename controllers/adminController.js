@@ -183,8 +183,7 @@ exports.changePassword = async (req, res) => {
  */
 exports.activatePendingUsers = async (req, res) => {
   try {
-    // Require admin role
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 

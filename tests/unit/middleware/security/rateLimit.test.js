@@ -81,7 +81,7 @@ describe('Rate Limit Middleware', () => {
       // Check the mock was called with expected options
       const calls = rateLimit.mock.calls;
       const defaultLimiterCall = calls.find(
-        call => call[0].max === 10000 && call[0].windowMs === 1 * 60 * 1000
+        call => call[0].max === 10000 && call[0].windowMs === 15 * 60 * 1000
       );
 
       expect(defaultLimiterCall).toBeDefined();
@@ -108,7 +108,7 @@ describe('Rate Limit Middleware', () => {
     it('should have stricter limits for auth endpoints', () => {
       const calls = rateLimit.mock.calls;
       const authLimiterCall = calls.find(
-        call => call[0].max === 1000 && call[0].windowMs === 1 * 60 * 1000
+        call => call[0].max === 1000 && call[0].windowMs === 15 * 60 * 1000
       );
 
       expect(authLimiterCall).toBeDefined();

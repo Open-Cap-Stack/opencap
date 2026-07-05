@@ -49,7 +49,7 @@ export const equityGrantTools: ToolDefinition[] = [
         .string()
         .describe('Equity plan ID — use the `row_id` from list_equity_plans'),
       grantType: z
-        .enum(['ISO', 'NSO', 'RSA', 'RSU', 'SAR', 'other'])
+        .enum(['ISO', 'NSO', 'RSA', 'RSU', 'SAR', 'phantom'])
         .describe('Type of equity grant'),
       numberOfShares: coerceInt('Number of shares in this grant'),
       grantDate: z.string().describe('Grant date in ISO 8601 format (YYYY-MM-DD)'),

@@ -43,7 +43,7 @@ export const safeTools: ToolDefinition[] = [
       discountRate: coerceFloat('Discount rate percentage (e.g. 20 for 20%)')
         .optional(),
       safeType: z
-        .enum(['valuation_cap', 'discount', 'mfn', 'valuation_cap_and_discount'])
+        .enum(['post-money', 'pre-money', 'mfn'])
         .describe('Type of SAFE'),
       investorId: z.string().describe('Stakeholder ID of the investor'),
       companyId: z.string().describe('Company ID'),
