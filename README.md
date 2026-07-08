@@ -1,6 +1,14 @@
 # OpenCap Stack 🚀
 
-**OpenCap Stack** is a comprehensive MERN stack application designed to manage stakeholders, share classes, documents, activities, notifications, equity simulations, tax calculations, and financial reporting. The project follows a Test-Driven Development (TDD) approach to ensure code quality and reliability and is fully aligned with the Open Cap Table Alliance (OCTA) schema.
+[![Website](https://img.shields.io/badge/Website-opencapstack.com-blue)](https://opencapstack.com)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/Open-Cap-Stack/opencap)](https://github.com/Open-Cap-Stack/opencap/stargazers)
+
+**Open-source cap table & equity management platform — a free Carta alternative for startups.**
+
+Manage stakeholders, share classes, SAFE notes, equity grants, 409A valuations, documents, data rooms, board management, and financial reporting. Built with Test-Driven Development (TDD) and fully aligned with the [Open Cap Table Alliance (OCTA)](https://www.opencaptablecoalition.com/) schema.
+
+🌐 **[opencapstack.com](https://opencapstack.com)** | 📖 **[Documentation](https://opencapstack.com/docs)** | 💬 **[Community](https://github.com/Open-Cap-Stack/opencap/discussions)**
 
 ## Development Workflow 📝
 
