@@ -3,12 +3,30 @@
 [![Website](https://img.shields.io/badge/Website-opencapstack.com-blue)](https://opencapstack.com)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Open-Cap-Stack/opencap)](https://github.com/Open-Cap-Stack/opencap/stargazers)
+[![Database](https://img.shields.io/badge/Database-ZeroDB-purple)](https://ainative.studio)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933)](https://nodejs.org)
 
 **Open-source cap table & equity management platform — a free Carta alternative for startups.**
 
-Manage stakeholders, share classes, SAFE notes, equity grants, 409A valuations, documents, data rooms, board management, and financial reporting. Built with Test-Driven Development (TDD) and fully aligned with the [Open Cap Table Alliance (OCTA)](https://www.opencaptablecoalition.com/) schema.
+Manage stakeholders, share classes, SAFE notes, equity grants, 409A valuations, documents, data rooms, board management, and financial reporting. Powered by [ZeroDB](https://ainative.studio) — a NoSQL cloud database with built-in vector search, quantum-ready indexing, and real-time sync. Built with Test-Driven Development (TDD) and fully aligned with the [Open Cap Table Alliance (OCTA)](https://www.opencaptablecoalition.com/) schema.
 
 🌐 **[opencapstack.com](https://opencapstack.com)** | 📖 **[Documentation](https://opencapstack.com/docs)** | 💬 **[Community](https://github.com/Open-Cap-Stack/opencap/discussions)**
+
+## Powered by ZeroDB 🗄️
+
+OpenCap Stack uses **[ZeroDB](https://ainative.studio)** as its primary database — a modern NoSQL cloud database that replaces MongoDB, PostgreSQL, and Pinecone with a single unified API.
+
+**Why ZeroDB?**
+- **NoSQL + Vector Search** — Document storage and semantic search in one database
+- **Zero Infrastructure** — Fully managed cloud database, no servers to maintain
+- **Built-in File Storage** — S3-compatible object storage included
+- **Quantum-Ready Indexing** — Future-proof vector ranking algorithms
+- **Real-Time Events** — Subscribe to data changes via WebSocket
+- **One API, One Bill** — Replaces your entire data stack
+
+OpenCap Stack migrated from MongoDB to ZeroDB in early 2026, eliminating 3 separate database dependencies while gaining vector search, file storage, and real-time capabilities out of the box.
+
+👉 **Get started with ZeroDB**: [ainative.studio](https://ainative.studio)
 
 ## Development Workflow 📝
 
@@ -28,8 +46,8 @@ Follow these steps to set up the project on your local machine:
 
 ### Prerequisites ✅
 
-- Node.js (v14 or higher)
-- MongoDB
+- Node.js (v18 or higher)
+- ZeroDB account ([ainative.studio](https://ainative.studio))
 - Docker and Docker Compose (for containerized development)
 - Git
 
@@ -53,11 +71,19 @@ npm install
 Create a `.env` file in the root directory and add the following:
 
 ```bash
-MONGODB_URI=mongodb://mongo:27017/opencap
+# ZeroDB (Primary Database)
+ENABLE_ZERODB=true
+ZERODB_API_KEY=your-zerodb-api-key
+ZERODB_BASE_URL=https://api.ainative.studio/api/v1
+AINATIVE_API_TOKEN=your-ainative-token
+
+# Server
 PORT=5000
+JWT_SECRET=your-secret-key
+NODE_ENV=development
 ```
 
-Replace `mongodb://mongo:27017/opencap` with your MongoDB connection string if it's different.
+Get your ZeroDB API key at [ainative.studio](https://ainative.studio).
 
 ## Running the Project ▶️
 
@@ -281,11 +307,12 @@ The project structure is organized as follows:
 ```bash
 opencap/
 ├── controllers/       # Controllers for handling API requests
-├── models/            # Mongoose models
+├── models/            # Data models (ZeroDB compatible)
 ├── routes/            # API routes
 ├── __tests__/         # Test cases (unit, integration)
 ├── docs/              # Project documentation
 ├── dags/              # Airflow DAGs for data pipelines
+├── services/          # Business logic (ZeroDB client, adapters)
 ├── .env               # Environment variables
 ├── .github/           # GitHub workflows for CI/CD
 ├── docker-compose.yml # Docker compose configuration
