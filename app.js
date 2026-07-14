@@ -22,6 +22,7 @@ const getLoggingMiddleware = require('./middleware/logging');
 const { securityLogger } = require('./middleware/securityAuditLogger'); // OCAE-306: Import security audit logging
 const { verifyCompanyAccess } = require('./middleware/companyAuth');
 const { enforceCompanyScope } = require('./middleware/companyScope');
+const { authenticateToken } = require('./middleware/authMiddleware');
 // testEndpoints removed - no longer needed
 const { setupSwagger } = require('./middleware/swaggerDocs'); // OCAE-210: Import Swagger middleware
 const { databaseMonitor, metricsMiddleware } = require('./middleware/databaseMonitor'); // GitHub Issue #8: Database monitoring
@@ -601,11 +602,17 @@ app.delete('/api/v1/connect/mercury/disconnect', require('./middleware/authMiddl
   }
 });
 
-// Apply company-scope authorization to all API routes (after auth middleware in each route)
-// This ensures users can only access their own company's data
-// Auth routes, health routes, and webhook routes are excluded (they handle auth differently)
+// Authenticate tokens at app level so req.user is set before company-scope checks
 app.use('/api/v1', (req, res, next) => {
-  // Skip company check for auth, health, and public routes
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
+  if (skipPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+  return authenticateToken(req, res, next);
+});
+
+// Apply company-scope authorization to all API routes (after auth above)
+app.use('/api/v1', (req, res, next) => {
   const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
