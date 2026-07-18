@@ -349,6 +349,9 @@ const routes = {
 const { acceptInvite } = require('./controllers/employeeInviteController');
 app.post('/api/v1/employees/accept-invite', acceptInvite);
 
+// Billing plans is public so pricing page works without login
+app.get('/api/v1/billing/plans', billingController.getPlans);
+
 // Frontend URL for OAuth redirects (backend is api.opencapstack.com, frontend is opencapstack.com)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://opencapstack.com';
 
