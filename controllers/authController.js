@@ -18,6 +18,7 @@ const emailService = require('../services/emailService');
 const { OAuth2Client } = require('google-auth-library');
 const { blacklistToken, isTokenBlacklisted, provisionAINativeUser } = require('../middleware/authMiddleware');
 const { sanitizeUser } = require('../utils/sanitizeUser');
+const analyticsService = require('../services/analyticsService');
 
 // AINative API URL for token validation
 const AINATIVE_API_URL = process.env.AINATIVE_API_URL || process.env.ZERODB_BASE_URL || 'https://api.ainative.studio';
@@ -154,6 +155,9 @@ const registerUser = async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // Track sign-up conversion (fire-and-forget)
+    analyticsService.trackSignup(user.userId || user._id, user.email).catch(() => {});
+
     // Return success response with token for immediate login
     return res.status(201).json({
       success: true,
@@ -237,6 +241,9 @@ const loginUser = async (req, res) => {
 
     // Update last login timestamp (fire-and-forget)
     User.updateLastLogin(userId).catch(() => {});
+
+    // Track login conversion (fire-and-forget)
+    analyticsService.trackLogin(userId).catch(() => {});
 
     // Remove sensitive fields from response
     const userResponse = sanitizeUser(user);

@@ -13,7 +13,8 @@
 
 const BillingService = require('../services/billingService');
 const stripeService = require('../services/stripeService');
-const { getAllPlans } = require('../config/stripe');
+const { getAllPlans, getPlanById } = require('../config/stripe');
+const analyticsService = require('../services/analyticsService');
 
 /**
  * Determine appropriate HTTP status code based on error message
@@ -478,6 +479,19 @@ async function createCheckoutSession(req, res) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
 
+    // Resolve plan name to Stripe price ID if needed
+    let resolvedPriceId = finalPriceId;
+    if (finalPriceId && !finalPriceId.startsWith('price_')) {
+      const plan = getPlanById(finalPriceId);
+      if (!plan) {
+        return res.status(400).json({ error: `Unknown plan: '${finalPriceId}'. Valid plans: free, starter, professional, enterprise` });
+      }
+      if (!plan.stripePriceId) {
+        return res.status(503).json({ error: `Stripe prices not configured for plan '${finalPriceId}'. Contact support.` });
+      }
+      resolvedPriceId = plan.stripePriceId;
+    }
+
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -486,7 +500,7 @@ async function createCheckoutSession(req, res) {
 
     const result = await BillingService.createCheckoutSession(
       companyId,
-      finalPriceId,
+      resolvedPriceId,
       finalSuccessUrl,
       finalCancelUrl,
       {
@@ -495,6 +509,10 @@ async function createCheckoutSession(req, res) {
         userId: req.user?.userId
       }
     );
+
+    // Track begin_checkout conversion (fire-and-forget)
+    const userId = req.user?.userId || companyId;
+    analyticsService.trackBeginCheckout(userId, finalPriceId, result.amount || 0).catch(() => {});
 
     return res.status(200).json(result);
   } catch (error) {
@@ -635,6 +653,17 @@ async function handleStripeWebhook(req, res) {
     }
 
     const result = await BillingService.handleWebhookEvent(event);
+
+    // Track purchase conversion for completed checkouts (fire-and-forget)
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const webhookUserId = session.metadata?.userId || session.metadata?.companyId || session.customer;
+      const planId = session.metadata?.planId || session.metadata?.priceId || 'unknown';
+      const amount = (session.amount_total || 0) / 100;
+      const transactionId = session.subscription || session.id;
+      analyticsService.trackPurchase(webhookUserId, planId, amount, transactionId).catch(() => {});
+    }
+
     return res.status(200).json({ received: true, ...result });
   } catch (error) {
     console.error('Webhook processing error:', error);

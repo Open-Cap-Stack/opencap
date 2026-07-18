@@ -604,7 +604,7 @@ app.delete('/api/v1/connect/mercury/disconnect', require('./middleware/authMiddl
 
 // Authenticate tokens at app level so req.user is set before company-scope checks
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -613,7 +613,7 @@ app.use('/api/v1', (req, res, next) => {
 
 // Apply company-scope authorization to all API routes (after auth above)
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -621,7 +621,7 @@ app.use('/api/v1', (req, res, next) => {
 });
 
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -880,12 +880,9 @@ if (documentAccessRouteModule) app.use('/api/v1/document-access', documentAccess
 
 const apiKeyRouteModule = safeRequire(path.join(__dirname, 'routes/v1/apiKeyRoutes'));
 if (apiKeyRouteModule) app.use('/api/v1/api-keys', apiKeyRouteModule);
-// billing sub-routes — /billing/current and /billing/invoices already exist under /api/v1/billing
-// frontend calls /billing/current but backend has /billing/current-plan
-app.get('/api/v1/billing/current', (req, res, next) => {
-  req.url = '/current-plan';
-  next('route');
-});
+// billing sub-routes — frontend calls /billing/current but backend has /billing/current-plan
+const { requireUserNotAgent } = require('./middleware/rbacMiddleware');
+app.get('/api/v1/billing/current', authenticateToken, requireUserNotAgent, billingController.getCurrentPlan);
 // integrations connect/disconnect — now served by integrationMarketplaceRoutes (#582)
 // fundraising-analytics — alias → /api/v1/fundraising
 const fundraisingAnalyticsRouteModule = safeRequire(path.join(__dirname, 'routes/v1/fundraisingAnalyticsRoutes'));
