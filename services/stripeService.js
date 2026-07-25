@@ -52,7 +52,7 @@ class StripeService {
     const stripe = this.getStripe();
     const params = {
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       success_url: successUrl,
@@ -133,7 +133,7 @@ class StripeService {
     const stripe = this.getStripe();
     return stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ['card']
+      payment_method_types: ['card', 'link']
     });
   }
 

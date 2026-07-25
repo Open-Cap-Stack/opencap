@@ -581,7 +581,7 @@ exports.createPaymentSession = async (req, res) => {
     const stripe = stripeService.getStripe();
     const resolvedId = valuation.valuationId || valuation.row_id;
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [{
         price_data: {
           currency: 'usd',
