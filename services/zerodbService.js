@@ -125,12 +125,12 @@ class ZeroDBService {
    */
   async initializeProject() {
     try {
-      // Use project ID from environment if available
+      // Use project ID from environment if available — skip the GET call
+      // since the key may not have project-level read access
       const envProjectId = process.env.ZERODB_PROJECT_ID;
       if (envProjectId) {
         console.log('Using project ID from environment:', envProjectId);
-        const response = await this.client.get(`/api/v1/projects/${envProjectId}`);
-        return response.data;
+        return { id: envProjectId, name: 'OpenCap' };
       }
 
       // Check if OpenCap project already exists
