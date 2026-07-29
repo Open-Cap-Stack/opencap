@@ -398,16 +398,22 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
     return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
   }
   try {
-    // Exchange auth code for tokens
-    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
+    const tokenParams = new URLSearchParams({
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
       redirect_uri: GOOGLE_DRIVE_REDIRECT,
       grant_type: 'authorization_code',
     });
+    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', tokenParams.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
 
-    // Get user's email from Google
+    if (!tokens.access_token) {
+      console.error('Google token response missing access_token:', tokens);
+      return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=no_access_token');
+    }
+
     const { data: userInfo } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
@@ -442,8 +448,9 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
     console.log(`Google connected for ${userInfo.email} (user: ${userId})`);
     res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=connected&email=' + encodeURIComponent(userInfo.email));
   } catch (err) {
-    console.error('Google token exchange failed:', err.response?.data || err.message);
-    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(err.message));
+    const detail = err.response?.data?.error_description || err.response?.data?.error || err.response?.data?.message || err.message;
+    console.error('Google Drive connect failed:', { status: err.response?.status, detail, url: err.config?.url });
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?google=error&reason=' + encodeURIComponent(detail));
   }
 });
 
@@ -461,13 +468,21 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
     return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(oauthError || 'no_code'));
   }
   try {
-    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
+    const tokenParams = new URLSearchParams({
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
       redirect_uri: GMAIL_REDIRECT,
       grant_type: 'authorization_code',
     });
+    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', tokenParams.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (!tokens.access_token) {
+      console.error('Gmail token response missing access_token:', tokens);
+      return res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=no_access_token');
+    }
 
     const { data: userInfo } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -503,8 +518,9 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
     console.log(`Gmail connected for ${userInfo.email} (user: ${userId})`);
     res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=connected&email=' + encodeURIComponent(userInfo.email));
   } catch (err) {
-    console.error('Gmail token exchange failed:', err.response?.data || err.message);
-    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(err.message));
+    const detail = err.response?.data?.error_description || err.response?.data?.error || err.response?.data?.message || err.message;
+    console.error('Gmail connect failed:', { status: err.response?.status, detail, url: err.config?.url });
+    res.redirect(FRONTEND_URL + '/data-rooms/reconstruct?gmail=error&reason=' + encodeURIComponent(detail));
   }
 });
 
