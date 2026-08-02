@@ -1469,7 +1469,7 @@ const ainativeOAuthCallback = async (req, res) => {
       role: localUser.role || 'employee', companyId: localUser.companyId || null,
     }));
 
-    return res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&refreshToken=${refreshToken}&user=${userPayload}`);
+    return res.redirect(`${frontendUrl}/auth/ainative/callback?token=${accessToken}&refreshToken=${refreshToken}&user=${userPayload}`);
   } catch (error) {
     const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
     console.error('AINative OAuth callback error:', detail, '| status:', error.response?.status);
