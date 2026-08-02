@@ -1167,8 +1167,13 @@ const exchangeAINativeToken = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Token exchange error:', error.message);
-    return res.status(500).json({ message: 'Internal server error' });
+    const detail = error.response?.data || error.message;
+    console.error('Token exchange error:', JSON.stringify(detail));
+    const status = error.response?.status || 500;
+    return res.status(status >= 400 && status < 500 ? 502 : 500).json({
+      message: 'Token exchange failed',
+      detail: typeof detail === 'string' ? detail : detail.error_description || detail.error || detail.message || 'unknown',
+    });
   }
 };
 
