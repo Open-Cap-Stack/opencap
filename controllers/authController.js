@@ -821,6 +821,9 @@ const updateUserProfile = async (req, res) => {
     const updates = {};
     if (firstName) updates.firstName = firstName;
     if (lastName) updates.lastName = lastName;
+    if (req.body.companyId) updates.companyId = req.body.companyId;
+    if (req.body.profileCompleted !== undefined) updates.profileCompleted = req.body.profileCompleted;
+    if (req.body.onboardingCompleted !== undefined) updates.onboardingCompleted = req.body.onboardingCompleted;
 
     // Update email if provided and different
     if (email && email !== user.email) {
