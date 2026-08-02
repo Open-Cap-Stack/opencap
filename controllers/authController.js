@@ -1388,20 +1388,64 @@ const ainativeOAuthCallback = async (req, res) => {
     }
 
     let ainativeUser;
+    let profileResolved = false;
+
     try {
-      const { data } = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+      const { data } = await axios.get(`${AINATIVE_API_URL}/oauth/userinfo`, {
         headers: { Authorization: `Bearer ${ainativeAccessToken}` },
         timeout: 10000,
       });
-      ainativeUser = {
-        userId: data.id,
-        email: (data.email || '').trim().toLowerCase(),
-        name: data.name || data.full_name || data.email.split('@')[0],
-        role: 'employee',
-        permissions: [],
-        isAINativeUser: true,
-      };
-    } catch {
+      if (data && (data.email || data.sub)) {
+        ainativeUser = {
+          userId: data.sub || data.id,
+          email: (data.email || data.sub || '').trim().toLowerCase(),
+          name: data.name || [data.given_name, data.family_name].filter(Boolean).join(' '),
+          role: 'employee',
+          permissions: [],
+          isAINativeUser: true,
+        };
+        profileResolved = true;
+      }
+    } catch (_) { /* fall through to next method */ }
+
+    if (!profileResolved) {
+      try {
+        const { data } = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${ainativeAccessToken}` },
+          timeout: 10000,
+        });
+        if (data && data.email) {
+          ainativeUser = {
+            userId: data.id,
+            email: (data.email || '').trim().toLowerCase(),
+            name: data.name || data.full_name || data.email.split('@')[0],
+            role: 'employee',
+            permissions: [],
+            isAINativeUser: true,
+          };
+          profileResolved = true;
+        }
+      } catch (_) { /* fall through to JWT decode */ }
+    }
+
+    if (!profileResolved) {
+      try {
+        const payload = JSON.parse(Buffer.from(ainativeAccessToken.split('.')[1], 'base64').toString());
+        if (payload.sub) {
+          ainativeUser = {
+            userId: payload.sub,
+            email: payload.sub.trim().toLowerCase(),
+            name: payload.sub.split('@')[0],
+            role: 'employee',
+            permissions: [],
+            isAINativeUser: true,
+          };
+          profileResolved = true;
+        }
+      } catch (_) { /* not a JWT */ }
+    }
+
+    if (!profileResolved) {
       return res.redirect(`${frontendUrl}/login?error=profile_fetch_failed`);
     }
 
