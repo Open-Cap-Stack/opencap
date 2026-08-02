@@ -1360,16 +1360,21 @@ const ainativeOAuthCallback = async (req, res) => {
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(oauthError || 'no_code')}`);
     }
 
+    const codeVerifier = state && state.includes(':') ? state.split(':').slice(1).join(':') : null;
+
     const callbackUri = `https://${req.get('host')}/api/v1/auth/callback/ainative`;
+    const tokenParams = {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: callbackUri,
+      client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
+      client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET,
+    };
+    if (codeVerifier) tokenParams.code_verifier = codeVerifier;
+
     const tokenRes = await axios.post(
       `${AINATIVE_API_URL}/v1/oauth/token`,
-      new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: callbackUri,
-        client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
-        client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET,
-      }).toString(),
+      new URLSearchParams(tokenParams).toString(),
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         timeout: 10000,
