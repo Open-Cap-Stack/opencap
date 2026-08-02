@@ -632,7 +632,7 @@ app.use('/api/v1', (req, res, next) => {
 
 // Apply company-scope authorization to all API routes (after auth above)
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -640,7 +640,7 @@ app.use('/api/v1', (req, res, next) => {
 });
 
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
