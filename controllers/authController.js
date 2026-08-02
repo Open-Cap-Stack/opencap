@@ -1346,36 +1346,6 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-// Export all controller functions
-module.exports = {
-  registerUser,
-  loginUser,
-  oauthLogin,
-  refreshToken,
-  logout,
-  requestPasswordReset,
-  verifyResetToken,
-  resetPassword,
-  getUserProfile,
-  updateUserProfile,
-  sendVerificationEmail,
-  verifyEmail,
-  resendVerification,
-  exchangeAINativeToken,
-  ainativeLogin,
-  ainativeOAuthCallback,
-  adminToken,
-  adminForcePassword,
-  changePassword,
-  uploadAvatar
-};
-
-/**
- * GET /api/v1/auth/callback/ainative
- * OAuth callback handler — AINative redirects here after user authorizes.
- * Exchanges the authorization code for a token, provisions the user,
- * and redirects to the frontend with session credentials.
- */
 const ainativeOAuthCallback = async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
   try {
@@ -1449,6 +1419,30 @@ const ainativeOAuthCallback = async (req, res) => {
     console.error('AINative OAuth callback error:', error.message);
     return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
   }
+};
+
+// Export all controller functions
+module.exports = {
+  registerUser,
+  loginUser,
+  oauthLogin,
+  refreshToken,
+  logout,
+  requestPasswordReset,
+  verifyResetToken,
+  resetPassword,
+  getUserProfile,
+  updateUserProfile,
+  sendVerificationEmail,
+  verifyEmail,
+  resendVerification,
+  exchangeAINativeToken,
+  ainativeLogin,
+  ainativeOAuthCallback,
+  adminToken,
+  adminForcePassword,
+  changePassword,
+  uploadAvatar
 };
 
 async function adminForcePassword(req, res) {
