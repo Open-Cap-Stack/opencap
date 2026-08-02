@@ -1360,7 +1360,8 @@ const ainativeOAuthCallback = async (req, res) => {
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(oauthError || 'no_code')}`);
     }
 
-    const codeVerifier = state && state.includes(':') ? state.split(':').slice(1).join(':') : null;
+    const decodedState = state ? decodeURIComponent(state) : '';
+    const codeVerifier = decodedState.includes(':') ? decodedState.split(':').slice(1).join(':') : null;
 
     const callbackUri = `https://${req.get('host')}/api/v1/auth/callback/ainative`;
     const tokenParams = {
@@ -1426,7 +1427,8 @@ const ainativeOAuthCallback = async (req, res) => {
 
     return res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&refreshToken=${refreshToken}&user=${userPayload}`);
   } catch (error) {
-    console.error('AINative OAuth callback error:', error.message);
+    const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    console.error('AINative OAuth callback error:', detail, '| status:', error.response?.status);
     return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
   }
 };
