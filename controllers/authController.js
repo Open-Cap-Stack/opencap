@@ -1037,7 +1037,7 @@ const exchangeAINativeToken = async (req, res) => {
         new URLSearchParams({
           grant_type: 'authorization_code',
           code,
-          redirect_uri: redirect_uri || 'https://opencapstack.com/auth/ainative/callback',
+          redirect_uri: redirect_uri || `https://${process.env.API_HOST || 'api.opencapstack.com'}/api/v1/auth/callback/ainative`,
           client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
           client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET,
           ...(code_verifier ? { code_verifier } : {}),
@@ -1363,10 +1363,92 @@ module.exports = {
   resendVerification,
   exchangeAINativeToken,
   ainativeLogin,
+  ainativeOAuthCallback,
   adminToken,
   adminForcePassword,
   changePassword,
   uploadAvatar
+};
+
+/**
+ * GET /api/v1/auth/callback/ainative
+ * OAuth callback handler — AINative redirects here after user authorizes.
+ * Exchanges the authorization code for a token, provisions the user,
+ * and redirects to the frontend with session credentials.
+ */
+const ainativeOAuthCallback = async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
+  try {
+    const { code, state, error: oauthError } = req.query;
+
+    if (oauthError || !code) {
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(oauthError || 'no_code')}`);
+    }
+
+    const callbackUri = `https://${req.get('host')}/api/v1/auth/callback/ainative`;
+    const tokenRes = await axios.post(
+      `${AINATIVE_API_URL}/v1/oauth/token`,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUri,
+        client_id: process.env.AINATIVE_OAUTH_CLIENT_ID || 'f064e124-9a9e-4ccd-92dc-f7c3b62c9190',
+        client_secret: process.env.AINATIVE_OAUTH_CLIENT_SECRET,
+      }).toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 10000,
+      }
+    );
+
+    const ainativeAccessToken = tokenRes.data.access_token;
+    if (!ainativeAccessToken) {
+      return res.redirect(`${frontendUrl}/login?error=token_exchange_failed`);
+    }
+
+    let ainativeUser;
+    try {
+      const { data } = await axios.get(`${AINATIVE_API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${ainativeAccessToken}` },
+        timeout: 10000,
+      });
+      ainativeUser = {
+        userId: data.id,
+        email: (data.email || '').trim().toLowerCase(),
+        name: data.name || data.full_name || data.email.split('@')[0],
+        role: 'employee',
+        permissions: [],
+        isAINativeUser: true,
+      };
+    } catch {
+      return res.redirect(`${frontendUrl}/login?error=profile_fetch_failed`);
+    }
+
+    const localUser = await provisionAINativeUser(ainativeUser);
+    const userId = localUser.userId;
+
+    const accessToken = jwt.sign(
+      { userId, email: localUser.email, role: localUser.role || 'employee', permissions: localUser.permissions || [], companyId: localUser.companyId || null },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    const refreshToken = jwt.sign(
+      { userId },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    const userName = localUser.displayName || localUser.name || ainativeUser.name;
+    const userPayload = encodeURIComponent(JSON.stringify({
+      userId, email: localUser.email, name: userName,
+      role: localUser.role || 'employee', companyId: localUser.companyId || null,
+    }));
+
+    return res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&refreshToken=${refreshToken}&user=${userPayload}`);
+  } catch (error) {
+    console.error('AINative OAuth callback error:', error.message);
+    return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
+  }
 };
 
 async function adminForcePassword(req, res) {

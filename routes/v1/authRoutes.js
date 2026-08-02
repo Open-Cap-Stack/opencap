@@ -33,6 +33,9 @@ router.post('/exchange-token', createEndpointRateLimiter('/api/v1/auth/login'), 
 // AINative credential login: authenticate directly with AINative email/password (rate-limited)
 router.post('/ainative-login', createEndpointRateLimiter('/api/v1/auth/login'), auditAction('login', 'auth'), authController.ainativeLogin);
 
+// AINative OAuth callback: handles redirect from AINative after user authorizes
+router.get('/callback/ainative', authController.ainativeOAuthCallback);
+
 // New routes for OCAE-203
 // Token management
 router.post('/token/refresh', createEndpointRateLimiter('/api/v1/auth/login'), authController.refreshToken);
