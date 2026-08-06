@@ -197,9 +197,34 @@ const getProfile = async (req, res) => {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
+const ADMIN_ROLES = ['founder', 'admin', 'super_admin'];
+
 const updateUserById = async (req, res) => {
   try {
     const updateData = { ...req.body };
+
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent role demotion if user is the last admin/founder in their company
+    if (updateData.role && ADMIN_ROLES.includes(existingUser.role) && !ADMIN_ROLES.includes(updateData.role)) {
+      const companyAdmins = await User.find({
+        companyId: existingUser.companyId,
+        role: { $in: ADMIN_ROLES },
+        _id: { $ne: existingUser._id },
+        status: 'active'
+      });
+      if (!companyAdmins || companyAdmins.length === 0) {
+        return res.status(400).json({
+          error: 'Cannot change role — this is the only admin/founder in the company. Promote another user first.'
+        });
+      }
+    }
+
+    // Never overwrite companyId from the request body — it must stay with the original company
+    delete updateData.companyId;
 
     // Hash password if it's being updated and not already hashed
     if (updateData.password && !updateData.password.startsWith('$2')) {
