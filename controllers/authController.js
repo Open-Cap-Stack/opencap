@@ -36,7 +36,7 @@ const googleClient = process.env.GOOGLE_CLIENT_ID
  */
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, password, confirmPassword, role = 'employee', companyId } = req.body;
+    const { firstName, lastName, password, confirmPassword, role = 'founder', companyId } = req.body;
     const email = req.body.email ? req.body.email.trim().toLowerCase() : null;
 
     // Validate required fields
