@@ -822,6 +822,8 @@ const updateUserProfile = async (req, res) => {
     if (firstName) updates.firstName = firstName;
     if (lastName) updates.lastName = lastName;
     if (req.body.companyId) updates.companyId = req.body.companyId;
+    if (req.body.role) updates.role = req.body.role;
+    if (req.body.permissions) updates.permissions = req.body.permissions;
     if (req.body.profileCompleted !== undefined) updates.profileCompleted = req.body.profileCompleted;
     if (req.body.onboardingCompleted !== undefined) updates.onboardingCompleted = req.body.onboardingCompleted;
 
