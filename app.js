@@ -356,6 +356,10 @@ app.get('/api/v1/billing/plans', billingController.getPlans);
 const newsletterRoutes = require('./routes/v1/newsletterRoutes');
 app.use('/api/v1/newsletter', newsletterRoutes);
 
+// Support widget → ServiceOS (public, no auth — widget is on public pages)
+const supportRoutes = require('./routes/v1/supportRoutes');
+app.use('/api/v1/support', supportRoutes);
+
 // Frontend URL for OAuth redirects (backend is api.opencapstack.com, frontend is opencapstack.com)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://opencapstack.com';
 
@@ -627,7 +631,7 @@ app.delete('/api/v1/connect/mercury/disconnect', require('./middleware/authMiddl
 
 // Authenticate tokens at app level so req.user is set before company-scope checks
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/newsletter'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/newsletter', '/support'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -636,7 +640,7 @@ app.use('/api/v1', (req, res, next) => {
 
 // Apply company-scope authorization to all API routes (after auth above)
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -644,7 +648,7 @@ app.use('/api/v1', (req, res, next) => {
 });
 
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
