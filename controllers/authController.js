@@ -131,8 +131,17 @@ const registerUser = async (req, res) => {
       userData.verificationTokenExpires = verificationTokenExpires;
     }
 
-    // Create user using ZeroDB pattern
-    const user = await User.create(userData);
+    // Create user using ZeroDB pattern (race condition guard — mirrors OAuth flow)
+    let user;
+    try {
+      user = await User.create(userData);
+    } catch (createError) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User already exists' });
+      }
+      throw createError;
+    }
 
     // Send verification and welcome emails in background (non-blocking — user is already active)
     sendVerificationEmailToUser(user).catch(err =>

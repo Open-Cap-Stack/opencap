@@ -315,6 +315,46 @@ async function send83bDeadlineReminder(email, name, grantDetails, daysRemaining,
   );
 }
 
+// ─── 11. Onboarding completion ──────────────────────────────────────────────
+
+async function sendOnboardingComplete({ to, firstName, companyName }) {
+  const name = firstName || 'there';
+  const company = companyName || 'your company';
+  const html = layout(`
+    <p>Hi ${name},</p>
+    <p>You're all set! <strong>${company}</strong> is now live on OpenCap Stack.</p>
+    <div class="highlight">
+      <div>Here's what you can do next:</div>
+    </div>
+    <ol style="font-size:14px;line-height:1.8;">
+      <li><strong>Add stakeholders</strong> — founders, investors, employees</li>
+      <li><strong>Create share classes</strong> — Common, Preferred, SAFEs</li>
+      <li><strong>Upload documents</strong> — bylaws, stock purchase agreements</li>
+      <li><strong>Run a 409A valuation</strong> — AI-powered, accountant-reviewed</li>
+    </ol>
+    <a class="btn" href="${APP_URL}/dashboard">Open Your Dashboard →</a>
+    <p>Questions? Reply to this email or use the chat widget on the site.</p>
+  `, 'Onboarding Complete — You\'re Live');
+  await send(to, `${company} is live on OpenCap Stack — here's what to do next`, html);
+}
+
+// ─── 12. Onboarding abandonment reminder ────────────────────────────────────
+
+async function sendOnboardingReminder({ to, firstName, daysAgo }) {
+  const name = firstName || 'there';
+  const html = layout(`
+    <p>Hi ${name},</p>
+    <p>You signed up for OpenCap Stack ${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago but haven't finished setting up your company yet.</p>
+    <div class="highlight">
+      <div>It only takes 30 seconds to get started — just add your company name and type.</div>
+    </div>
+    <a class="btn" href="${APP_URL}/company-setup">Finish Setup →</a>
+    <p>Once you're set up, you'll have access to cap table management, equity grants, 409A valuations, and more.</p>
+    <p>If you need help, reply to this email or use the chat widget on our site.</p>
+  `, 'Complete Your OpenCap Stack Setup');
+  await send(to, `${name}, finish setting up your OpenCap Stack account`, html);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -328,4 +368,6 @@ module.exports = {
   sendPaymentConfirmed,
   sendClerkyDocumentNotification,
   send83bDeadlineReminder,
+  sendOnboardingComplete,
+  sendOnboardingReminder,
 };

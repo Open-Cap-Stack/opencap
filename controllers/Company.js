@@ -3,6 +3,7 @@
 // Issue #16: Migrate Company controller to ZeroDB
 
 const zerodbService = require('../services/zerodbService');
+const emailService = require('../services/emailService');
 
 const TABLE_NAME = 'companies';
 const VALID_COMPANY_TYPES = ['startup', 'corporation', 'non-profit', 'government'];
@@ -134,17 +135,26 @@ exports.createCompany = async (req, res) => {
       ? { ...savedCompany.row_data, _id: savedCompany.row_id || savedCompany.row_data._id, row_id: savedCompany.row_id }
       : savedCompany;
 
-    // If the user has no companyId yet (onboarding), link them to the new company
+    // If the user has no companyId yet (onboarding), link them to the new company and promote to founder
     if (req.user && !req.user.companyId) {
       const newCompanyId = company.companyId || resolvedCompanyId;
+      const ADMIN_ROLES = ['founder', 'admin', 'super_admin'];
+      const userUpdate = { companyId: newCompanyId, updatedAt: new Date().toISOString() };
+      if (!ADMIN_ROLES.includes(req.user.role)) {
+        userUpdate.role = 'founder';
+      }
       try {
         await zerodbService.updateRows('users', {
           filter: { _id: req.user.userId },
-          update: { companyId: newCompanyId, updatedAt: new Date().toISOString() }
+          update: userUpdate
         });
+        emailService.sendOnboardingComplete({
+          to: req.user.email,
+          firstName: req.user.name?.split(' ')[0],
+          companyName: CompanyName
+        }).catch(err => console.error('Failed to send onboarding complete email:', err.message));
       } catch (userUpdateError) {
-        // Non-blocking: company was created successfully, log but don't fail
-        console.error('Failed to update user companyId after company creation:', userUpdateError.message);
+        console.error('Failed to update user after company creation:', userUpdateError.message);
       }
     }
 

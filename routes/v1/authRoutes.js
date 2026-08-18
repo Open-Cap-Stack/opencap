@@ -53,19 +53,45 @@ router.post('/profile/avatar', authenticateToken, avatarUpload.single('avatar'),
 
 // GET /api/v1/auth/me - Get current user (provisions on first call)
 // Frontend should call this immediately after AINative login
-router.get('/me', authenticateToken, (req, res) => {
-  // User is already provisioned by authenticateToken middleware
-  res.status(200).json({
-    user: {
-      userId: req.user.userId,
-      email: req.user.email,
-      name: req.user.name,
-      role: req.user.role,
-      permissions: req.user.permissions,
-      companyId: req.user.companyId
-    },
-    provisioned: true
-  });
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const User = require('../../models/User');
+    const userId = req.user.userId;
+    let fullUser = await User.findOne({ userId });
+    if (!fullUser) {
+      const { isValidObjectId } = require('../../services/zerodbService');
+      if (isValidObjectId && isValidObjectId(userId)) {
+        fullUser = await User.findById(userId);
+      }
+    }
+    res.status(200).json({
+      user: {
+        userId: req.user.userId,
+        email: req.user.email,
+        name: req.user.name || (fullUser ? `${fullUser.firstName || ''} ${fullUser.lastName || ''}`.trim() : ''),
+        role: fullUser?.role || req.user.role,
+        permissions: fullUser?.permissions || req.user.permissions,
+        companyId: fullUser?.companyId || req.user.companyId,
+        onboardingCompleted: fullUser?.onboardingCompleted || false,
+        profileCompleted: fullUser?.profileCompleted || false
+      },
+      provisioned: true
+    });
+  } catch (err) {
+    res.status(200).json({
+      user: {
+        userId: req.user.userId,
+        email: req.user.email,
+        name: req.user.name,
+        role: req.user.role,
+        permissions: req.user.permissions,
+        companyId: req.user.companyId,
+        onboardingCompleted: false,
+        profileCompleted: false
+      },
+      provisioned: true
+    });
+  }
 });
 
 // Change password (authenticated)
