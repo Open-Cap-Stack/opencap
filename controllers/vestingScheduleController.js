@@ -11,12 +11,58 @@
 const databaseAdapter = require('../services/databaseAdapter');
 const VestingCalculatorService = require('../services/vestingCalculatorService');
 const { v4: uuidv4 } = require('uuid');
+const { sendError } = require('../middleware/errorResponse');
 
 /**
  * Create a new vesting schedule
  */
 exports.createVestingSchedule = async (req, res) => {
   try {
+    // Validate required fields
+    const requiredFields = {
+      totalShares: 'totalShares is required',
+      vestingPeriod: 'vestingPeriod is required',
+      cliffPeriod: 'cliffPeriod is required',
+      startDate: 'startDate is required'
+    };
+
+    const missingFields = [];
+    for (const [field, message] of Object.entries(requiredFields)) {
+      if (req.body[field] === undefined || req.body[field] === null || req.body[field] === '') {
+        missingFields.push(message);
+      }
+    }
+
+    if (missingFields.length > 0) {
+      return sendError(res, 400, missingFields.join(', '));
+    }
+
+    // Validate totalShares is a positive number
+    if (typeof req.body.totalShares !== 'number' || req.body.totalShares <= 0) {
+      return sendError(res, 400, 'totalShares must be a positive number');
+    }
+
+    // Validate vestingPeriod is a positive number
+    if (typeof req.body.vestingPeriod !== 'number' || req.body.vestingPeriod <= 0) {
+      return sendError(res, 400, 'vestingPeriod must be a positive number');
+    }
+
+    // Validate cliffPeriod is a non-negative number
+    if (typeof req.body.cliffPeriod !== 'number' || req.body.cliffPeriod < 0) {
+      return sendError(res, 400, 'cliffPeriod must be a non-negative number');
+    }
+
+    // Validate cliffPeriod does not exceed vestingPeriod
+    if (req.body.cliffPeriod > req.body.vestingPeriod) {
+      return sendError(res, 400, 'cliffPeriod cannot exceed vestingPeriod');
+    }
+
+    // Validate startDate is a valid date
+    const parsedStartDate = new Date(req.body.startDate);
+    if (isNaN(parsedStartDate.getTime())) {
+      return sendError(res, 400, 'startDate must be a valid date');
+    }
+
     const scheduleData = {
       ...req.body,
       scheduleId: req.body.scheduleId || `VS-${uuidv4().slice(0, 8).toUpperCase()}`,
@@ -34,7 +80,7 @@ exports.createVestingSchedule = async (req, res) => {
     const savedSchedule = await databaseAdapter.create('VestingSchedule', scheduleData);
     res.status(201).json(savedSchedule);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -55,7 +101,7 @@ exports.getVestingSchedules = async (req, res) => {
     const schedules = await databaseAdapter.find('VestingSchedule', query);
     res.status(200).json(schedules);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -66,11 +112,11 @@ exports.getVestingScheduleById = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
     res.status(200).json(schedule);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -86,11 +132,11 @@ exports.updateVestingSchedule = async (req, res) => {
       { new: true }
     );
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
     res.status(200).json(schedule);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -101,11 +147,11 @@ exports.deleteVestingSchedule = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findByIdAndDelete('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
-    res.status(200).json({ message: 'Vesting schedule deleted' });
+    res.status(200).json({ success: true, message: 'Vesting schedule deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -116,7 +162,7 @@ exports.calculateVesting = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     const calculationDate = req.query.date ? new Date(req.query.date) : new Date();
@@ -132,7 +178,7 @@ exports.calculateVesting = async (req, res) => {
       nextVestingEvent: nextEvent
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -143,7 +189,7 @@ exports.applyAcceleration = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     const accelerationEvent = {
@@ -162,7 +208,7 @@ exports.applyAcceleration = async (req, res) => {
 
     // Check if acceleration is applicable
     if (accelerationResult.acceleratedShares === 0 || !accelerationResult.accelerationType) {
-      return res.status(400).json({ message: 'Acceleration not applicable' });
+      return sendError(res, 400, 'Acceleration not applicable');
     }
 
     // Update the schedule with acceleration
@@ -187,7 +233,7 @@ exports.applyAcceleration = async (req, res) => {
       accelerationDetails: accelerationResult
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -198,7 +244,7 @@ exports.getVestingTimeline = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     const timeline = VestingCalculatorService.generateVestingTimeline(schedule);
@@ -208,7 +254,7 @@ exports.getVestingTimeline = async (req, res) => {
       timeline
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -219,14 +265,14 @@ exports.getVisualizationData = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     const visualData = VestingCalculatorService.getVisualizationData(schedule);
 
     res.status(200).json(visualData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -237,11 +283,11 @@ exports.pauseVestingSchedule = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     if (schedule.status !== 'active') {
-      return res.status(400).json({ message: 'Cannot pause a non-active schedule' });
+      return sendError(res, 400, 'Cannot pause a non-active schedule');
     }
 
     const updatedSchedule = await databaseAdapter.findByIdAndUpdate(
@@ -256,7 +302,7 @@ exports.pauseVestingSchedule = async (req, res) => {
 
     res.status(200).json(updatedSchedule);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -267,11 +313,11 @@ exports.resumeVestingSchedule = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     if (schedule.status !== 'paused') {
-      return res.status(400).json({ message: 'Cannot resume a non-paused schedule' });
+      return sendError(res, 400, 'Cannot resume a non-paused schedule');
     }
 
     // Calculate paused duration
@@ -292,7 +338,7 @@ exports.resumeVestingSchedule = async (req, res) => {
 
     res.status(200).json(updatedSchedule);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -303,11 +349,11 @@ exports.terminateVestingSchedule = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     if (schedule.status === 'terminated' || schedule.status === 'completed') {
-      return res.status(400).json({ message: 'Schedule is already terminated or completed' });
+      return sendError(res, 400, 'Schedule is already terminated or completed');
     }
 
     // Calculate final vesting as of termination date
@@ -333,7 +379,7 @@ exports.terminateVestingSchedule = async (req, res) => {
       finalVesting
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -354,7 +400,7 @@ exports.getSchedulesDueForVesting = async (req, res) => {
 
     res.status(200).json(schedules);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -365,7 +411,7 @@ exports.getUpcomingVestingEvents = async (req, res) => {
   try {
     const schedule = await databaseAdapter.findById('VestingSchedule', req.params.id);
     if (!schedule) {
-      return res.status(404).json({ message: 'Vesting schedule not found' });
+      return sendError(res, 404, 'Vesting schedule not found');
     }
 
     const count = req.query.count ? parseInt(req.query.count, 10) : 10;
@@ -384,6 +430,6 @@ exports.getUpcomingVestingEvents = async (req, res) => {
       upcomingEvents
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };

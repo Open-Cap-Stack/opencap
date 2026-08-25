@@ -57,10 +57,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.uploadProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'No photo file provided'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'No photo file provided' }) });
     });
 
     it('should return 401 if user is not authenticated', async () => {
@@ -74,10 +71,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.uploadProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'User not authenticated'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'User not authenticated' }) });
     });
 
     it('should return 404 if user is not found', async () => {
@@ -93,10 +87,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.uploadProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'User not found'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'User not found' }) });
     });
 
     it('should successfully upload profile photo with thumbnail', async () => {
@@ -235,10 +226,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.uploadProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'File size exceeds maximum allowed size'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'File size exceeds maximum allowed size' }) });
     });
 
     it('should handle invalid file type error', async () => {
@@ -260,10 +248,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.uploadProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Invalid file type. Only image files are allowed'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'Invalid file type. Only image files are allowed' }) });
     });
 
     it('should handle general upload errors', async () => {
@@ -288,7 +273,7 @@ describe('User Controller - Profile Photo Upload', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
-          message: 'Failed to upload profile photo'
+          error: expect.objectContaining({ message: 'Failed to upload profile photo' })
         })
       );
     });
@@ -301,10 +286,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.deleteProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'User not authenticated'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'User not authenticated' }) });
     });
 
     it('should return 404 if user is not found', async () => {
@@ -314,10 +296,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.deleteProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'User not found'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'User not found' }) });
     });
 
     it('should return 404 if user has no profile photo', async () => {
@@ -334,10 +313,7 @@ describe('User Controller - Profile Photo Upload', () => {
       await userController.deleteProfilePhoto(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'No profile photo to delete'
-      });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'No profile photo to delete' }) });
     });
 
     it('should successfully delete profile photo', async () => {
@@ -446,7 +422,7 @@ describe('User Controller - Profile Photo Upload', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
-          message: 'Failed to delete profile photo'
+          error: expect.objectContaining({ message: 'Failed to delete profile photo' })
         })
       );
     });

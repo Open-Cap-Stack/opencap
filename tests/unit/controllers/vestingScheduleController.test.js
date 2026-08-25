@@ -48,8 +48,11 @@ describe('VestingSchedule Controller', () => {
       totalShares: 10000,
       grantDate: '2023-01-01',
       vestingStartDate: '2023-01-01',
+      startDate: '2023-01-01',
       cliffPeriodMonths: 12,
+      cliffPeriod: 12,
       vestingPeriodMonths: 48,
+      vestingPeriod: 48,
       vestingFrequency: 'monthly'
     };
 
@@ -167,7 +170,7 @@ describe('VestingSchedule Controller', () => {
       await vestingScheduleController.getVestingScheduleById(req, res);
 
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Vesting schedule not found');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Vesting schedule not found');
     });
   });
 
@@ -322,7 +325,7 @@ describe('VestingSchedule Controller', () => {
       await vestingScheduleController.applyAcceleration(req, res);
 
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Acceleration not applicable');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Acceleration not applicable');
     });
   });
 
@@ -396,7 +399,7 @@ describe('VestingSchedule Controller', () => {
       await vestingScheduleController.pauseVestingSchedule(req, res);
 
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Cannot pause a non-active schedule');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Cannot pause a non-active schedule');
     });
   });
 
@@ -470,7 +473,7 @@ describe('VestingSchedule Controller', () => {
       await vestingScheduleController.getUpcomingVestingEvents(req, res);
 
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Vesting schedule not found');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Vesting schedule not found');
     });
   });
 

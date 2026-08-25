@@ -16,6 +16,7 @@ const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
 const { sanitizeUser, sanitizeUsers } = require('../utils/sanitizeUser');
 const { getPlanById } = require('../config/stripe');
+const { sendError } = require('../middleware/errorResponse');
 
 const SALT_ROUNDS = 10;
 
@@ -71,7 +72,7 @@ const createUser = async (req, res) => {
   const { userId, name, username, email, password, role } = req.body;
 
   if (!userId || !name || !username || !email || !password || !role) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return sendError(res, 400, 'All fields are required');
   }
 
   try {
@@ -81,19 +82,14 @@ const createUser = async (req, res) => {
       const planId = await getCompanyPlanId(companyId);
       const seatCheck = await checkUserSeatLimit(companyId, planId);
       if (!seatCheck.allowed) {
-        return res.status(403).json({
-          error: `User limit reached. Your ${planId} plan allows up to ${seatCheck.limit} team members (currently ${seatCheck.current}). Upgrade to add more.`,
-          code: 'USER_SEAT_LIMIT_REACHED',
-          limit: seatCheck.limit,
-          current: seatCheck.current
-        });
+        return sendError(res, 403, `User limit reached. Your ${planId} plan allows up to ${seatCheck.limit} team members (currently ${seatCheck.current}). Upgrade to add more.`);
       }
     }
 
     // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: 'Email already exists' });
+      return sendError(res, 400, 'Email already exists');
     }
 
     // Create user
@@ -110,7 +106,7 @@ const createUser = async (req, res) => {
     res.status(201).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error creating user:', error);
-    res.status(500).json({ error: 'Server error while creating user' });
+    return sendError(res, 500, 'Server error while creating user');
   }
 };
 
@@ -138,7 +134,7 @@ const getAllUsers = async (req, res) => {
     res.status(200).json({ users: sanitizeUsers(users || []) });
   } catch (error) {
     console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Error fetching users' });
+    return sendError(res, 500, 'Error fetching users');
   }
 };
 
@@ -151,13 +147,13 @@ const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
     // Issue #386: Remove password from response
     res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error fetching user by ID:', error);
-    res.status(500).json({ error: 'Error fetching user' });
+    return sendError(res, 500, 'Error fetching user');
   }
 };
 
@@ -181,14 +177,14 @@ const getProfile = async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     // Issue #386: Use sanitizeUser utility
     res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error fetching user profile:', error);
-    res.status(500).json({ error: 'Error fetching user profile' });
+    return sendError(res, 500, 'Error fetching user profile');
   }
 };
 
@@ -205,7 +201,7 @@ const updateUserById = async (req, res) => {
 
     const existingUser = await User.findById(req.params.id);
     if (!existingUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     // Prevent role demotion if user is the last admin/founder in their company
@@ -217,9 +213,7 @@ const updateUserById = async (req, res) => {
         status: 'active'
       });
       if (!companyAdmins || companyAdmins.length === 0) {
-        return res.status(400).json({
-          error: 'Cannot change role — this is the only admin/founder in the company. Promote another user first.'
-        });
+        return sendError(res, 400, 'Cannot change role — this is the only admin/founder in the company. Promote another user first.');
       }
     }
 
@@ -237,13 +231,13 @@ const updateUserById = async (req, res) => {
       { new: true }
     );
     if (!updatedUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
     // Issue #386: Remove password from response
     res.status(200).json(sanitizeUser(updatedUser));
   } catch (error) {
     console.error('Error updating user:', error);
-    res.status(500).json({ error: 'Error updating user' });
+    return sendError(res, 500, 'Error updating user');
   }
 };
 
@@ -255,14 +249,25 @@ const updateUserById = async (req, res) => {
  */
 const deleteUserById = async (req, res) => {
   try {
+    // Issue #165: Prevent users from deleting themselves
+    const requesterId = req.user?.userId || req.user?._id;
+    if (requesterId && (requesterId === req.params.id || requesterId === req.params.id.toString())) {
+      return sendError(res, 403, 'You cannot delete your own account');
+    }
+
     const user = await User.findById(req.params.id);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
+    }
+
+    // Also check against the target user's userId field
+    if (requesterId && user.userId && requesterId === user.userId) {
+      return sendError(res, 403, 'You cannot delete your own account');
     }
 
     // Already soft-deleted
     if (user.deletedAt) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     const now = new Date().toISOString();
@@ -273,10 +278,10 @@ const deleteUserById = async (req, res) => {
     );
 
     console.log(`[UserDelete] Soft-deleted user ${user.userId || req.params.id} by ${req.user?.userId || 'unknown'}`);
-    res.status(200).json({ message: 'User deleted successfully' });
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Error deleting user' });
+    return sendError(res, 500, 'Error deleting user');
   }
 };
 
@@ -346,12 +351,12 @@ const cleanupUserData = async (user, adminUserId) => {
 const hardDeleteUserById = async (req, res) => {
   try {
     if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return sendError(res, 403, 'Admin access required');
     }
 
     const user = await User.findById(req.params.id);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     const cleanup = await cleanupUserData(user, req.user.userId);
@@ -362,12 +367,13 @@ const hardDeleteUserById = async (req, res) => {
     console.log(`[UserHardDelete] Hard-deleted user ${user.userId || req.params.id} by admin ${req.user.userId}`);
 
     res.status(200).json({
+      success: true,
       message: 'User permanently deleted',
       cleanup
     });
   } catch (error) {
     console.error('Error hard-deleting user:', error);
-    res.status(500).json({ error: 'Error deleting user' });
+    return sendError(res, 500, 'Error deleting user');
   }
 };
 
@@ -381,28 +387,24 @@ const hardDeleteUserById = async (req, res) => {
 const bulkDeleteUsers = async (req, res) => {
   try {
     if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
-      return res.status(403).json({ error: 'Admin access required' });
+      return sendError(res, 403, 'Admin access required');
     }
 
     const { userIds, confirm, hard } = req.body;
 
     // Validate userIds array
     if (!Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({ error: 'userIds must be a non-empty array' });
+      return sendError(res, 400, 'userIds must be a non-empty array');
     }
 
     // Guard: require explicit confirmation
     if (confirm !== true) {
-      return res.status(400).json({ error: 'Bulk delete requires explicit confirmation' });
+      return sendError(res, 400, 'Bulk delete requires explicit confirmation');
     }
 
     // Guard: enforce maximum batch size
     if (userIds.length > BULK_DELETE_MAX) {
-      return res.status(400).json({
-        error: `Bulk delete limited to ${BULK_DELETE_MAX} users at a time`,
-        requested: userIds.length,
-        max: BULK_DELETE_MAX
-      });
+      return sendError(res, 400, `Bulk delete limited to ${BULK_DELETE_MAX} users at a time`);
     }
 
     console.log(`[BulkDelete] Admin ${req.user.userId} initiating bulk delete of ${userIds.length} users: ${JSON.stringify(userIds)}, hard=${!!hard}`);
@@ -440,7 +442,7 @@ const bulkDeleteUsers = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in bulk delete:', error);
-    res.status(500).json({ error: 'Error processing bulk delete' });
+    return sendError(res, 500, 'Error processing bulk delete');
   }
 };
 
@@ -453,19 +455,13 @@ const uploadProfilePhoto = async (req, res) => {
   try {
     // Check if file was uploaded
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No photo file provided'
-      });
+      return sendError(res, 400, 'No photo file provided');
     }
 
     // Get authenticated user ID
     const userId = req.user.userId;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not authenticated'
-      });
+      return sendError(res, 401, 'User not authenticated');
     }
 
     // Verify user exists
@@ -475,10 +471,7 @@ const uploadProfilePhoto = async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return sendError(res, 404, 'User not found');
     }
 
     // Generate thumbnail (200x200px) using sharp
@@ -569,24 +562,14 @@ const uploadProfilePhoto = async (req, res) => {
 
     // Handle specific errors
     if (error.message && error.message.includes('size exceeds')) {
-      return res.status(400).json({
-        success: false,
-        message: 'File size exceeds maximum allowed size'
-      });
+      return sendError(res, 400, 'File size exceeds maximum allowed size');
     }
 
     if (error.message && error.message.includes('not allowed')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid file type. Only image files are allowed'
-      });
+      return sendError(res, 400, 'Invalid file type. Only image files are allowed');
     }
 
-    res.status(500).json({
-      success: false,
-      message: 'Failed to upload profile photo',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    return sendError(res, 500, 'Failed to upload profile photo', error.message);
   }
 };
 
@@ -600,10 +583,7 @@ const deleteProfilePhoto = async (req, res) => {
     // Get authenticated user ID
     const userId = req.user.userId;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not authenticated'
-      });
+      return sendError(res, 401, 'User not authenticated');
     }
 
     // Verify user exists
@@ -613,10 +593,7 @@ const deleteProfilePhoto = async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return sendError(res, 404, 'User not found');
     }
 
     // Check if user has a profile photo
@@ -624,10 +601,7 @@ const deleteProfilePhoto = async (req, res) => {
     const avatarThumbnailFileId = user.profile?.avatarThumbnailFileId;
 
     if (!avatarFileId) {
-      return res.status(404).json({
-        success: false,
-        message: 'No profile photo to delete'
-      });
+      return sendError(res, 404, 'No profile photo to delete');
     }
 
     // Delete files from ZeroDB storage
@@ -662,11 +636,7 @@ const deleteProfilePhoto = async (req, res) => {
     });
   } catch (error) {
     console.error('Error deleting profile photo:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete profile photo',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    return sendError(res, 500, 'Failed to delete profile photo', error.message);
   }
 };
 

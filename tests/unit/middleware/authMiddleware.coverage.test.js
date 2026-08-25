@@ -202,9 +202,9 @@ describe('AuthMiddleware - Coverage', () => {
     });
   });
 
-  // ---- User with role but not in DB (non-production) ----
+  // ---- User with role but not in DB — always returns 401 (issue #172) ----
   describe('authenticateToken - role fallback', () => {
-    it('should use decoded role when user not found in non-production', async () => {
+    it('should return 401 in non-production when user not found (issue #172)', async () => {
       const origEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
 
@@ -213,8 +213,8 @@ describe('AuthMiddleware - Coverage', () => {
       User.findOne.mockResolvedValue(null);
 
       await authMiddleware.authenticateToken(req, res, next);
-      expect(next).toHaveBeenCalled();
-      expect(req.user.role).toBe('admin');
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
 
       process.env.NODE_ENV = origEnv;
     });

@@ -114,7 +114,7 @@ describe('SAFE Controller - Coverage', () => {
 
       await ctrl.updateSAFE(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json.mock.calls[0][0].error).toContain('Status cannot be changed via PUT');
+      expect(res.json.mock.calls[0][0].error.message).toContain('Status cannot be changed via PUT');
     });
 
     it('should return 404 if SAFE not found', async () => {
@@ -142,7 +142,7 @@ describe('SAFE Controller - Coverage', () => {
       SAFE.findOneAndDelete = jest.fn().mockResolvedValue({});
 
       await ctrl.deleteSAFE(req, res);
-      expect(SAFE.findOneAndDelete).toHaveBeenCalledWith({ safeId: 's1' });
+      expect(SAFE.findOneAndDelete).toHaveBeenCalledWith({ _id: 's1' });
       expect(res.json).toHaveBeenCalledWith({ success: true, message: 'SAFE deleted' });
     });
 

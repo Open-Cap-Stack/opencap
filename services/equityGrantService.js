@@ -257,10 +257,15 @@ class EquityGrantService {
   /**
    * Get summary of all grants for an employee
    * @param {string} employeeId - Employee ID
+   * @param {string} [companyId] - Company ID for scoping
    * @returns {Object} Grant summary
    */
-  async getGrantSummary(employeeId) {
-    const grants = await databaseAdapter.find('EquityGrant', { employeeId });
+  async getGrantSummary(employeeId, companyId) {
+    const query = { employeeId };
+    if (companyId) {
+      query.companyId = companyId;
+    }
+    const grants = await databaseAdapter.find('EquityGrant', query);
 
     if (!grants || grants.length === 0) {
       return {

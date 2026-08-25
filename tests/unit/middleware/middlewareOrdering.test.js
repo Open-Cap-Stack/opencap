@@ -33,6 +33,12 @@ describe('Middleware Ordering - authenticateToken before verifyCompanyAccess', (
   beforeAll(() => {
     process.env.JWT_SECRET = JWT_SECRET;
     process.env.NODE_ENV = 'test';
+    // Enable MOCK_AUTH so authenticateToken accepts JWT claims without a DB user record
+    process.env.MOCK_AUTH = 'true';
+  });
+
+  afterAll(() => {
+    delete process.env.MOCK_AUTH;
   });
 
   beforeEach(() => {

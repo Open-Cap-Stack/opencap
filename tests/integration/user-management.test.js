@@ -282,7 +282,8 @@ describe('User Management Integration Tests', () => {
           .expect('Content-Type', /json/);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('required');
+        const errMsg = response.body.message || (response.body.error && response.body.error.message) || '';
+        expect(errMsg).toContain('required');
       });
 
       it('should reject duplicate email', async () => {
@@ -302,7 +303,8 @@ describe('User Management Integration Tests', () => {
           .expect('Content-Type', /json/);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('already exists');
+        const dupMsg = response.body.message || (response.body.error && response.body.error.message) || '';
+        expect(dupMsg).toContain('already exists');
       });
     });
 
@@ -376,7 +378,8 @@ describe('User Management Integration Tests', () => {
           .expect('Content-Type', /json/);
 
         expect(response.status).toBe(404);
-        expect(response.body.error).toContain('not found');
+        const notFoundMsg = response.body.message || (response.body.error && response.body.error.message) || '';
+        expect(notFoundMsg).toContain('not found');
       });
     });
 

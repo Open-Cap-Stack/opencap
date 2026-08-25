@@ -6,6 +6,7 @@ const SAFE = require('../models/SAFE');
 const SignatureRequest = require('../models/SignatureRequest');
 const SAFEConversion = require('../models/SAFEConversion');
 const SAFEConversionService = require('../services/safeConversionService');
+const { sendError } = require('../middleware/errorResponse');
 
 /**
  * Resolve a SAFE lookup ID — tries safeId first, falls back to _id/row_id.
@@ -35,6 +36,13 @@ function normalizeSafeType(safe) {
 // Create a new SAFE
 exports.createSAFE = async (req, res) => {
   try {
+    // Validate required fields (Issue #164)
+    const requiredFields = ['investmentAmount', 'safeType', 'investorName', 'investorEmail'];
+    const missing = requiredFields.filter(f => !req.body[f]);
+    if (missing.length > 0) {
+      return sendError(res, 400, 'Missing required fields: ' + missing.join(', '));
+    }
+
     const {
       companyId,
       investorId,
@@ -55,7 +63,7 @@ exports.createSAFE = async (req, res) => {
     } = req.body;
 
     const userId = req.user?._id || req.user?.userId;
-    const resolvedCompanyId = companyId || req.user?.companyId;
+    const resolvedCompanyId = req.user?.companyId || companyId;
     const safe = await SAFE.create({
       companyId: resolvedCompanyId,
       investorId,
@@ -87,10 +95,7 @@ exports.createSAFE = async (req, res) => {
       data: safe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -147,10 +152,7 @@ exports.getCompanySAFEs = async (req, res) => {
         pagination: { page: 1, limit: 20, total: 0, pages: 0 }
       });
     }
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -162,10 +164,11 @@ exports.getSAFE = async (req, res) => {
     const safe = await resolveSafe(safeId);
 
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     res.json({
@@ -173,10 +176,7 @@ exports.getSAFE = async (req, res) => {
       data: normalizeSafeType(safe)
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -188,27 +188,22 @@ exports.updateSAFE = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     // Only allow updates in draft status
     if (safe.status !== 'draft') {
-      return res.status(400).json({
-        success: false,
-        error: 'Can only update SAFEs in draft status'
-      });
+      return sendError(res, 400, 'Can only update SAFEs in draft status');
     }
 
     // Prevent status changes through this endpoint — return an explicit error
     // instead of silently dropping the field (fixes #554)
     if (updates.status !== undefined) {
-      return res.status(400).json({
-        success: false,
-        error: 'Status cannot be changed via PUT. Use PATCH /api/v1/safes/:id/status for status transitions.'
-      });
+      return sendError(res, 400, 'Status cannot be changed via PUT. Use PATCH /api/v1/safes/:id/status for status transitions.');
     }
     delete updates.statusHistory;
 
@@ -222,10 +217,7 @@ exports.updateSAFE = async (req, res) => {
       data: updatedSafe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -236,18 +228,16 @@ exports.updateStatus = async (req, res) => {
     const { status, reason } = req.body;
 
     if (!status) {
-      return res.status(400).json({
-        success: false,
-        error: 'status is required'
-      });
+      return sendError(res, 400, 'status is required');
     }
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     const currentSafeId = safe.safeId || safeId;
@@ -265,12 +255,9 @@ exports.updateStatus = async (req, res) => {
 
     if (!SAFE.canTransitionTo(safe.status, status)) {
       const allowed = validTransitions[safe.status] || [];
-      return res.status(400).json({
-        success: false,
-        error: `Cannot transition from '${safe.status}' to '${status}'. Allowed transitions: ${
-          allowed.length ? allowed.join(', ') : 'none (terminal state)'
-        }`
-      });
+      return sendError(res, 400, `Cannot transition from '${safe.status}' to '${status}'. Allowed transitions: ${
+        allowed.length ? allowed.join(', ') : 'none (terminal state)'
+      }`);
     }
 
     const userId = req.user?._id || req.user?.userId;
@@ -286,10 +273,7 @@ exports.updateStatus = async (req, res) => {
       data: normalizeSafeType(updatedSafe)
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -302,17 +286,15 @@ exports.sendSAFE = async (req, res) => {
     const safe = await resolveSafe(safeId);
 
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     if (!SAFE.canTransitionTo(safe.status, 'sent')) {
-      return res.status(400).json({
-        success: false,
-        error: `Cannot send SAFE in ${safe.status} status`
-      });
+      return sendError(res, 400, `Cannot send SAFE in ${safe.status} status`);
     }
 
     // Create signature request
@@ -355,10 +337,7 @@ exports.sendSAFE = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -370,10 +349,11 @@ exports.recordInvestorSignature = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     const updatedSafe = await SAFE.addInvestorSignature(safeId, {
@@ -390,10 +370,7 @@ exports.recordInvestorSignature = async (req, res) => {
       data: updatedSafe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -405,10 +382,11 @@ exports.recordCompanySignature = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     const updatedSafe = await SAFE.addCompanySignature(safeId, {
@@ -426,10 +404,7 @@ exports.recordCompanySignature = async (req, res) => {
       data: updatedSafe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -441,17 +416,15 @@ exports.markFunded = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     if (!SAFE.canTransitionTo(safe.status, 'funded')) {
-      return res.status(400).json({
-        success: false,
-        error: `Cannot mark as funded from ${safe.status} status`
-      });
+      return sendError(res, 400, `Cannot mark as funded from ${safe.status} status`);
     }
 
     const updatedSafe = await SAFE.transitionTo(safeId, 'funded', req.user._id, notes || 'Investment received', {
@@ -464,10 +437,7 @@ exports.markFunded = async (req, res) => {
       data: updatedSafe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -478,14 +448,21 @@ exports.deleteSAFE = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({ success: false, error: 'SAFE not found' });
+      return sendError(res, 404, 'SAFE not found');
     }
 
-    await SAFE.findOneAndDelete({ safeId });
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
+    }
+
+    // Use the resolved record's _id so deletion works regardless of
+    // whether resolveSafe matched by safeId or by _id (fixes #179).
+    const deleteKey = safe._id || safe.row_id || safe.safeId;
+    await SAFE.findOneAndDelete({ _id: deleteKey });
 
     res.json({ success: true, message: 'SAFE deleted' });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -497,17 +474,15 @@ exports.cancelSAFE = async (req, res) => {
 
     const safe = await resolveSafe(safeId);
     if (!safe) {
-      return res.status(404).json({
-        success: false,
-        error: 'SAFE not found'
-      });
+      return sendError(res, 404, 'SAFE not found');
+    }
+
+    if (safe.companyId && req.user?.companyId && safe.companyId !== req.user.companyId) {
+      return sendError(res, 403, 'Access denied');
     }
 
     if (!SAFE.canTransitionTo(safe.status, 'cancelled')) {
-      return res.status(400).json({
-        success: false,
-        error: `Cannot cancel SAFE in ${safe.status} status`
-      });
+      return sendError(res, 400, `Cannot cancel SAFE in ${safe.status} status`);
     }
 
     const updatedSafe = await SAFE.transitionTo(safeId, 'cancelled', req.user._id, reason || 'Cancelled');
@@ -517,10 +492,7 @@ exports.cancelSAFE = async (req, res) => {
       data: updatedSafe
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -531,10 +503,7 @@ exports.previewConversion = async (req, res) => {
     const { roundTerms } = req.body;
 
     if (!roundTerms || !roundTerms.pricePerShare || !roundTerms.fullyDilutedShares) {
-      return res.status(400).json({
-        success: false,
-        error: 'Round terms with pricePerShare and fullyDilutedShares required'
-      });
+      return sendError(res, 400, 'Round terms with pricePerShare and fullyDilutedShares required');
     }
 
     const preview = await SAFEConversionService.previewRoundConversions(companyId, roundTerms);
@@ -544,10 +513,7 @@ exports.previewConversion = async (req, res) => {
       data: preview
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -570,10 +536,7 @@ exports.createConversions = async (req, res) => {
       data: result
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -592,10 +555,7 @@ exports.executeConversion = async (req, res) => {
       data: conversion
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -632,9 +592,6 @@ exports.getCompanySummary = async (req, res) => {
       data: summary
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };

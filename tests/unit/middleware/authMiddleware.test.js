@@ -121,7 +121,7 @@ describe('AuthMiddleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should call next() for valid token with role in payload', async () => {
+    it('should return 401 for valid token with role in payload but no DB user (issue #172)', async () => {
       const validToken = jwt.sign(
         {
           userId: 'user123',
@@ -137,16 +137,10 @@ describe('AuthMiddleware', () => {
 
       await authMiddleware.authenticateToken(req, res, next);
 
-      expect(next).toHaveBeenCalled();
-      expect(req.user).toEqual({
-        userId: 'user123',
-        _id: 'user123',
-        email: 'test@example.com',
-        role: 'admin',
-        permissions: ['read:users', 'write:users'],
-        companyId: 'company123'
-      });
-      expect(req.token).toBe(validToken);
+      // Issue #172: JWT role claims must not be trusted without DB validation
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ message: 'User not found' });
     });
 
     it('should lookup user from database when role not in token', async () => {

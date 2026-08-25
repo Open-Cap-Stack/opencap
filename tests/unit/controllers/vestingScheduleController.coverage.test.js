@@ -340,7 +340,7 @@ describe('VestingScheduleController - Coverage', () => {
 
   describe('createVestingSchedule - with next vesting event', () => {
     it('should set nextVestingDate when event exists', async () => {
-      req.body = { totalShares: 10000, vestingStartDate: '2023-01-01' };
+      req.body = { totalShares: 10000, vestingPeriod: 48, cliffPeriod: 12, startDate: '2023-01-01' };
       VestingCalculatorService.getNextVestingEvent.mockReturnValue({ eventDate: '2024-01-01' });
       databaseAdapter.create.mockResolvedValue({ _id: 's1', totalShares: 10000 });
 
@@ -352,7 +352,7 @@ describe('VestingScheduleController - Coverage', () => {
     });
 
     it('should use provided scheduleId', async () => {
-      req.body = { totalShares: 10000, scheduleId: 'VS-CUSTOM' };
+      req.body = { totalShares: 10000, vestingPeriod: 48, cliffPeriod: 12, startDate: '2023-01-01', scheduleId: 'VS-CUSTOM' };
       VestingCalculatorService.getNextVestingEvent.mockReturnValue(null);
       databaseAdapter.create.mockResolvedValue({ _id: 's1', scheduleId: 'VS-CUSTOM' });
 

@@ -9,6 +9,7 @@ const databaseAdapter = require('../services/databaseAdapter');
 const equityGrantService = require('../services/equityGrantService');
 const documentTemplateService = require('../services/documentTemplateService');
 const { assertCompanyOwnership, assertUserOwnership } = require('../middleware/companyScope');
+const { sendError } = require('../middleware/errorResponse');
 
 // Valid status values
 const VALID_STATUSES = ['pending', 'approved', 'active', 'exercised', 'cancelled', 'expired'];
@@ -103,7 +104,7 @@ exports.createEquityGrant = async (req, res) => {
     // so the frontend can work without companyId in JWT
 
     if (grantData.numberOfShares !== undefined && grantData.numberOfShares <= 0) {
-      return res.status(400).json({ error: 'numberOfShares must be a positive number' });
+      return sendError(res, 400, 'numberOfShares must be a positive number');
     }
 
     const savedGrant = await databaseAdapter.create('EquityGrant', grantData);
@@ -115,7 +116,7 @@ exports.createEquityGrant = async (req, res) => {
 
     res.status(201).json(savedGrant);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -145,7 +146,7 @@ exports.getEquityGrants = async (req, res) => {
     const grants = await databaseAdapter.find('EquityGrant', query);
     res.status(200).json(grants);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -157,7 +158,7 @@ exports.getEquityGrantById = async (req, res) => {
     const lookupId = await resolveGrantId(req.params.id);
     const grant = await databaseAdapter.findById('EquityGrant', lookupId);
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
     if (!assertCompanyOwnership(req, res, grant)) return;
 
@@ -169,7 +170,7 @@ exports.getEquityGrantById = async (req, res) => {
 
     res.status(200).json(grant);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -190,11 +191,11 @@ exports.updateEquityGrant = async (req, res) => {
       { new: true }
     );
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
     res.status(200).json(grant);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -210,11 +211,11 @@ exports.deleteEquityGrant = async (req, res) => {
 
     const grant = await databaseAdapter.findByIdAndDelete('EquityGrant', resolvedId);
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
-    res.status(200).json({ message: 'Equity grant deleted' });
+    res.status(200).json({ success: true, message: 'Equity grant deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -227,9 +228,7 @@ exports.updateGrantStatus = async (req, res) => {
 
     // Validate status
     if (!VALID_STATUSES.includes(status)) {
-      return res.status(400).json({
-        error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`
-      });
+      return sendError(res, 400, `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
     }
 
     const updateData = { status };
@@ -253,12 +252,12 @@ exports.updateGrantStatus = async (req, res) => {
     );
 
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
 
     res.status(200).json(grant);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -271,14 +270,14 @@ exports.exerciseGrant = async (req, res) => {
     const { sharesToExercise, exercisePrice, paymentMethod, notes } = req.body;
 
     if (!sharesToExercise || sharesToExercise <= 0) {
-      return res.status(400).json({ error: 'sharesToExercise must be a positive number' });
+      return sendError(res, 400, 'sharesToExercise must be a positive number');
     }
 
     // Get the grant
     const resolvedId = await resolveGrantId(req.params.id);
     const grant = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
 
     // T1-3: Enforce exercisedShares <= grantedShares invariant
@@ -287,11 +286,7 @@ exports.exerciseGrant = async (req, res) => {
     const newExercisedShares = currentExercised + sharesToExercise;
 
     if (newExercisedShares > grantedShares) {
-      return res.status(400).json({
-        error: `Cannot exercise ${sharesToExercise} shares. Only ${grantedShares - currentExercised} shares available for exercise.`,
-        available: grantedShares - currentExercised,
-        requested: sharesToExercise
-      });
+      return sendError(res, 400, `Cannot exercise ${sharesToExercise} shares. Only ${grantedShares - currentExercised} shares available for exercise.`);
     }
 
     // Validate exercise
@@ -302,10 +297,7 @@ exports.exerciseGrant = async (req, res) => {
     );
 
     if (!validation.valid) {
-      return res.status(400).json({
-        error: validation.errors.join('; '),
-        details: validation
-      });
+      return sendError(res, 400, validation.errors.join('; '));
     }
 
     // Create exercise record
@@ -330,7 +322,7 @@ exports.exerciseGrant = async (req, res) => {
 
     const updatedGrant = await databaseAdapter.findByIdAndUpdate(
       'EquityGrant',
-      req.params.id,
+      resolvedId,
       {
         exercisedShares: newExercisedShares,
         exerciseHistory: updatedHistory,
@@ -343,12 +335,9 @@ exports.exerciseGrant = async (req, res) => {
   } catch (error) {
     // T1-3: Handle version conflict from optimistic locking
     if (error.code === 'VERSION_CONFLICT') {
-      return res.status(409).json({
-        error: 'Concurrent modification detected. Please retry the exercise.',
-        code: 'VERSION_CONFLICT'
-      });
+      return sendError(res, 409, 'Concurrent modification detected. Please retry the exercise.');
     }
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -357,12 +346,14 @@ exports.exerciseGrant = async (req, res) => {
  */
 exports.getGrantsByEmployee = async (req, res) => {
   try {
-    const grants = await databaseAdapter.find('EquityGrant', {
-      employeeId: req.params.employeeId
-    });
+    const query = { employeeId: req.params.employeeId };
+    if (req.user?.companyId) {
+      query.companyId = req.user.companyId;
+    }
+    const grants = await databaseAdapter.find('EquityGrant', query);
     res.status(200).json(grants);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -374,7 +365,7 @@ exports.getGrantTemplates = async (req, res) => {
     const templates = equityGrantService.getGrantTemplates();
     res.status(200).json(templates);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -390,10 +381,7 @@ exports.createGrantFromTemplate = async (req, res) => {
     const template = templates.find(t => t.name === templateName);
 
     if (!template) {
-      return res.status(400).json({
-        error: 'Template not found',
-        availableTemplates: templates.map(t => t.name)
-      });
+      return sendError(res, 400, 'Template not found');
     }
 
     // Apply template to grant data
@@ -403,7 +391,7 @@ exports.createGrantFromTemplate = async (req, res) => {
     const savedGrant = await databaseAdapter.create('EquityGrant', fullGrantData);
     res.status(201).json(savedGrant);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -415,7 +403,7 @@ exports.getVestingSchedule = async (req, res) => {
     const lookupId = await resolveGrantId(req.params.id);
     const grant = await databaseAdapter.findById('EquityGrant', lookupId);
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
 
     const asOfDate = req.query.asOfDate ? new Date(req.query.asOfDate) : new Date();
@@ -430,7 +418,7 @@ exports.getVestingSchedule = async (req, res) => {
       vestingSchedule: grant.vestingSchedule
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -439,10 +427,11 @@ exports.getVestingSchedule = async (req, res) => {
  */
 exports.getEmployeeGrantSummary = async (req, res) => {
   try {
-    const summary = await equityGrantService.getGrantSummary(req.params.employeeId);
+    const companyId = req.user?.companyId;
+    const summary = await equityGrantService.getGrantSummary(req.params.employeeId, companyId);
     res.status(200).json(summary);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -454,13 +443,13 @@ exports.calculateEquityValue = async (req, res) => {
     const { currentPrice } = req.query;
 
     if (!currentPrice) {
-      return res.status(400).json({ error: 'Current price is required' });
+      return sendError(res, 400, 'Current price is required');
     }
 
     const resolvedId = await resolveGrantId(req.params.id);
     const grant = await databaseAdapter.findById('EquityGrant', resolvedId);
     if (!grant) {
-      return res.status(404).json({ message: 'Equity grant not found' });
+      return sendError(res, 404, 'Equity grant not found');
     }
 
     const valueInfo = equityGrantService.calculateTotalEquityValue(
@@ -473,6 +462,6 @@ exports.calculateEquityValue = async (req, res) => {
       ...valueInfo
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 };

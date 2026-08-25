@@ -203,20 +203,25 @@ const authenticateToken = async (req, res, next) => {
       return next();
     }
 
+    // Issue #172: Never trust JWT role claims without DB validation.
+    // Previously, non-production environments would fall through here and
+    // set req.user directly from JWT claims, allowing any valid JWT holder
+    // to claim any role. Now we always require a DB user record, except
+    // when MOCK_AUTH=true is explicitly set for test harnesses.
     if (!user && decoded.role) {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(401).json({ message: 'User not found' });
+      if (process.env.MOCK_AUTH === 'true' && process.env.NODE_ENV === 'test') {
+        req.user = {
+          userId: tokenUserId,
+          _id: tokenUserId,
+          email: decoded.email,
+          role: decoded.role,
+          permissions: decoded.permissions || [],
+          companyId: decoded.companyId
+        };
+        req.token = token;
+        return next();
       }
-      req.user = {
-        userId: tokenUserId,
-        _id: tokenUserId,
-        email: decoded.email,
-        role: decoded.role,
-        permissions: decoded.permissions || [],
-        companyId: decoded.companyId
-      };
-      req.token = token;
-      return next();
+      return res.status(401).json({ message: 'User not found' });
     }
 
     if (!user) {

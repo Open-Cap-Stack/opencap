@@ -283,7 +283,7 @@ describe('EquityGrant Controller', () => {
       await equityGrantController.getEquityGrantById(req, res);
 
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Equity grant not found');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Equity grant not found');
     });
 
     it('should return 500 on database error', async () => {
@@ -331,7 +331,7 @@ describe('EquityGrant Controller', () => {
       await equityGrantController.updateEquityGrant(req, res);
 
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Equity grant not found');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Equity grant not found');
     });
 
     it('should return 400 on validation error', async () => {
@@ -369,7 +369,7 @@ describe('EquityGrant Controller', () => {
       await equityGrantController.deleteEquityGrant(req, res);
 
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData())).toHaveProperty('message', 'Equity grant not found');
+      expect(JSON.parse(res._getData())).toHaveProperty('error.message', 'Equity grant not found');
     });
 
     it('should return 500 on database error', async () => {
@@ -543,7 +543,7 @@ describe('EquityGrant Controller', () => {
 
       await equityGrantController.getGrantsByEmployee(req, res);
 
-      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { employeeId: 'EMP-001' });
+      expect(databaseAdapter.find).toHaveBeenCalledWith('EquityGrant', { employeeId: 'EMP-001', companyId: 'COMP-001' });
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res._getData())).toHaveLength(2);
     });

@@ -342,6 +342,21 @@ const routes = {
   kycRoutes: safeRequire(path.join(__dirname, 'routes/v1/kycRoutes')), // KYC/Accredited Investor Verification
   // Optional routes that may not exist in all environments
   financialMetricsRoutes: safeRequire(path.join(__dirname, 'routes/v1/financialMetricsRoutes')),
+  tenderOfferRoutes: safeRequire(path.join(__dirname, 'routes/v1/tenderOfferRoutes')), // Issue #167: Tender offer management
+  paymentRoutes: safeRequire(path.join(__dirname, 'routes/v1/paymentRoutes')), // Issue #167: Payment processing
+  subscriptionRoutes: safeRequire(path.join(__dirname, 'routes/v1/subscriptionRoutes')), // Issue #167: Subscription management
+  subscriptionTierRoutes: safeRequire(path.join(__dirname, 'routes/v1/subscriptionTierRoutes')), // Issue #167: Subscription tiers
+  webhookRoutes: safeRequire(path.join(__dirname, 'routes/v1/webhookRoutes')), // Issue #167: Application webhooks
+  digitalSignatureRoutes: safeRequire(path.join(__dirname, 'routes/v1/digitalSignatureRoutes')), // Issue #167: Digital signatures
+  documentFolderRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentFolderRoutes')), // Issue #167: Document folders
+  documentVersionRoutes: safeRequire(path.join(__dirname, 'routes/v1/documentVersionRoutes')), // Issue #167: Document versioning
+  secondaryMarketRoutes: safeRequire(path.join(__dirname, 'routes/v1/secondaryMarketRoutes')), // Issue #167: Secondary market
+  secondaryTransactionRoutes: safeRequire(path.join(__dirname, 'routes/v1/secondaryTransactionRoutes')), // Issue #167: Secondary transactions
+  transferApprovalRoutes: safeRequire(path.join(__dirname, 'routes/v1/transferApprovalRoutes')), // Issue #167: Transfer approvals
+  transferRequestRoutes: safeRequire(path.join(__dirname, 'routes/v1/transferRequestRoutes')), // Issue #167: Transfer requests
+  scheduledTriggerRoutes: safeRequire(path.join(__dirname, 'routes/v1/scheduledTriggerRoutes')), // Issue #167: Scheduled triggers
+  reportSchedulingRoutes: safeRequire(path.join(__dirname, 'routes/v1/reportSchedulingRoutes')), // Issue #167: Report scheduling
+  reportAggregationRoutes: safeRequire(path.join(__dirname, 'routes/v1/reportAggregationRoutes')), // Issue #167: Report aggregation
 };
 
 // ── Public endpoints — mounted BEFORE any auth middleware ──
@@ -385,16 +400,16 @@ function consumeOAuthState(state) {
   return entry.userId;
 }
 
-// These redirect to Google OAuth consent screen; no bearer token needed
+// OAuth auth endpoints require authentication to prevent userId hijack (Issues #174, #169)
 const axios = require('axios');
 
 const GOOGLE_DRIVE_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/google/google-drive/callback`;
 const GMAIL_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/google/gmail/callback`;
 
-app.get('/api/v1/connect/google/google-drive/auth', (req, res) => {
+app.get('/api/v1/connect/google/google-drive/auth', authenticateToken, (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly');
-  const state = generateOAuthState(req.query.userId);
+  const state = generateOAuthState(req.user.userId);
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GOOGLE_DRIVE_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
@@ -462,10 +477,10 @@ app.get('/api/v1/connect/google/google-drive/callback', async (req, res) => {
   }
 });
 
-app.get('/api/v1/connect/google/gmail/auth', (req, res) => {
+app.get('/api/v1/connect/google/gmail/auth', authenticateToken, (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly');
-  const state = generateOAuthState(req.query.userId);
+  const state = generateOAuthState(req.user.userId);
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
@@ -535,12 +550,12 @@ app.get('/api/v1/connect/google/gmail/callback', async (req, res) => {
 // ── Mercury OAuth endpoints (Issue #671) ──
 const MERCURY_REDIRECT = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.opencapstack.com'}/api/v1/connect/mercury/callback`;
 
-app.get('/api/v1/connect/mercury/auth', (req, res) => {
+app.get('/api/v1/connect/mercury/auth', authenticateToken, (req, res) => {
   const clientId = process.env.MERCURY_CLIENT_ID;
   if (!clientId) {
     return res.status(500).json({ error: 'Mercury integration not configured' });
   }
-  const state = generateOAuthState(req.query.userId);
+  const state = generateOAuthState(req.user.userId);
   const authUrl = `https://app.mercury.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(MERCURY_REDIRECT)}&response_type=code&state=${encodeURIComponent(state)}`;
   res.redirect(authUrl);
 });
@@ -631,7 +646,7 @@ app.delete('/api/v1/connect/mercury/disconnect', require('./middleware/authMiddl
 
 // Authenticate tokens at app level so req.user is set before company-scope checks
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/newsletter', '/support'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/newsletter', '/support', '/service-providers/accept-invite'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -640,7 +655,7 @@ app.use('/api/v1', (req, res, next) => {
 
 // Apply company-scope authorization to all API routes (after auth above)
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support', '/service-providers/accept-invite'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -648,7 +663,7 @@ app.use('/api/v1', (req, res, next) => {
 });
 
 app.use('/api/v1', (req, res, next) => {
-  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support'];
+  const skipPaths = ['/auth', '/health', '/agents', '/mcp', '/plugin', '/webhooks', '/reconstruct', '/readiness', '/connect', '/employees/accept-invite', '/billing/plans', '/billing/webhook', '/companies', '/newsletter', '/support', '/service-providers/accept-invite'];
   if (skipPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
@@ -779,7 +794,7 @@ Object.entries(routes).forEach(([key, route]) => {
     } else if (key === 'billingRoutes') {
       path = '/api/v1/billing'; // Issue #201: Billing Dashboard APIs
     } else if (key === 'stakeholderReportRoutes') {
-      path = '/api/v1/stakeholders'; // Issue #198: Stakeholder Report Generation
+      path = '/api/v1/stakeholder-reports'; // Issue #198: Stakeholder Report Generation
     } else if (key === 'userRoutes') {
       path = '/api/v1/users';
     } else if (key === 'accessPolicyRoutes') {
@@ -854,6 +869,36 @@ Object.entries(routes).forEach(([key, route]) => {
       path = '/api/v1/investor-portal'; // Issue #684: Investor portal summary, invite, access
     } else if (key === 'kycRoutes') {
       path = '/api/v1/kyc'; // KYC/Accredited Investor Verification
+    } else if (key === 'tenderOfferRoutes') {
+      path = '/api/v1/tender-offers';
+    } else if (key === 'paymentRoutes') {
+      path = '/api/v1/payments';
+    } else if (key === 'subscriptionRoutes') {
+      path = '/api/v1/subscriptions';
+    } else if (key === 'subscriptionTierRoutes') {
+      path = '/api/v1/subscription-tiers';
+    } else if (key === 'webhookRoutes') {
+      path = '/api/v1/webhooks/app';
+    } else if (key === 'digitalSignatureRoutes') {
+      path = '/api/v1/digital-signatures';
+    } else if (key === 'documentFolderRoutes') {
+      path = '/api/v1/document-folders';
+    } else if (key === 'documentVersionRoutes') {
+      path = '/api/v1/document-versions';
+    } else if (key === 'secondaryMarketRoutes') {
+      path = '/api/v1/secondary-market';
+    } else if (key === 'secondaryTransactionRoutes') {
+      path = '/api/v1/secondary-transactions';
+    } else if (key === 'transferApprovalRoutes') {
+      path = '/api/v1/transfer-approvals';
+    } else if (key === 'transferRequestRoutes') {
+      path = '/api/v1/transfer-requests';
+    } else if (key === 'scheduledTriggerRoutes') {
+      path = '/api/v1/scheduled-triggers';
+    } else if (key === 'reportSchedulingRoutes') {
+      path = '/api/v1/report-scheduling';
+    } else if (key === 'reportAggregationRoutes') {
+      path = '/api/v1/report-aggregation';
     } else {
       path = `/api/v1/${key.replace('Routes', '').toLowerCase()}`;
     }
@@ -885,22 +930,21 @@ if (spvRouteModule) app.use('/api/v1/spv', spvRouteModule);
 // investors (plural) — alias for investor route (singular registered by generic mapper)
 const investorRouteModuleAlias = safeRequire(path.join(__dirname, 'routes/v1/investorRoutes'));
 if (investorRouteModuleAlias) app.use('/api/v1/investors', investorRouteModuleAlias);
-// Scenarios — no persistent backend yet; return empty list so the frontend uses localStorage
-app.get('/api/v1/scenarios', (req, res) => res.json([]));
-app.post('/api/v1/scenarios', (req, res) => res.status(201).json({ ...req.body, id: req.body.id || Date.now().toString() }));
-app.put('/api/v1/scenarios/:id', (req, res) => res.json({ ...req.body, id: req.params.id }));
-app.delete('/api/v1/scenarios/:id', (req, res) => res.json({ success: true }));
+// Scenarios — CRUD stubs moved to scenarioRoutes (Issue #176: RBAC enforcement)
+
+// RBAC middleware for stub route mutations (Issue #180)
+const { requireUserNotAgent, hasRole } = require('./middleware/rbacMiddleware');
 
 // Stub routes for frontend pages that have no backend implementation yet
 // Returns empty arrays so pages load gracefully without errors
 const _stub = (req, res) => res.json([]);
 const _stubObj = (req, res) => res.json({});
 app.get('/api/v1/assets', _stub);
-app.post('/api/v1/assets', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+app.post('/api/v1/assets', hasRole(['admin', 'super_admin', 'founder']), (req, res) => res.status(201).json({ id: Date.now().toString(), status: 'created' }));
 // board-resolutions stubs removed — now served by boardResolutionRoutes
 app.get('/api/v1/email-templates/history', _stub);
 app.get('/api/v1/exports', _stub);
-app.post('/api/v1/exports', (req, res) => res.status(202).json({ status: 'queued', id: Date.now().toString() }));
+app.post('/api/v1/exports', hasRole(['admin', 'super_admin', 'founder']), (req, res) => res.status(202).json({ status: 'queued', id: Date.now().toString() }));
 // document-access (frontend) → document-accesses (backend)
 const documentAccessRouteModule = safeRequire(path.join(__dirname, 'routes/v1/documentAccessRoutes'));
 if (documentAccessRouteModule) app.use('/api/v1/document-access', documentAccessRouteModule);
@@ -908,7 +952,6 @@ if (documentAccessRouteModule) app.use('/api/v1/document-access', documentAccess
 const apiKeyRouteModule = safeRequire(path.join(__dirname, 'routes/v1/apiKeyRoutes'));
 if (apiKeyRouteModule) app.use('/api/v1/api-keys', apiKeyRouteModule);
 // billing sub-routes — frontend calls /billing/current but backend has /billing/current-plan
-const { requireUserNotAgent } = require('./middleware/rbacMiddleware');
 app.get('/api/v1/billing/current', authenticateToken, requireUserNotAgent, billingController.getCurrentPlan);
 // integrations connect/disconnect — now served by integrationMarketplaceRoutes (#582)
 // fundraising-analytics — alias → /api/v1/fundraising
@@ -918,7 +961,7 @@ if (fundraisingAnalyticsRouteModule) app.use('/api/v1/fundraising-analytics', fu
 app.get('/api/v1/advanced-analytics/summary', _stubObj);
 // fundraising-scenarios stub (used by fundraise model page)
 app.get('/api/v1/fundraising-scenarios', _stub);
-app.post('/api/v1/fundraising-scenarios', (req, res) => res.status(201).json({ ...req.body, id: Date.now().toString() }));
+app.post('/api/v1/fundraising-scenarios', hasRole(['admin', 'super_admin', 'founder']), (req, res) => res.status(201).json({ id: Date.now().toString(), status: 'created' }));
 
 // Health check endpoint - must be before error handlers
 app.get('/health', (req, res) => {

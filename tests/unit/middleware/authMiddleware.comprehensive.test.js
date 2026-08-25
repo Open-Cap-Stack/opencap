@@ -69,6 +69,9 @@ describe('AuthMiddleware - Comprehensive Coverage', () => {
   // ---------------------------------------------------------------
   describe('query token extraction', () => {
     it('should accept token from query param on /documents/ path', async () => {
+      User.findOne.mockResolvedValue({
+        userId: 'user-q1', email: 'q@test.com', role: 'employee', companyId: 'c1', status: 'active', permissions: []
+      });
       const token = jwt.sign(
         { userId: 'user-q1', email: 'q@test.com', role: 'employee', companyId: 'c1' },
         JWT_SECRET,
@@ -84,6 +87,9 @@ describe('AuthMiddleware - Comprehensive Coverage', () => {
     });
 
     it('should accept token from query param on /files/ path', async () => {
+      User.findOne.mockResolvedValue({
+        userId: 'user-q2', email: 'f@test.com', role: 'employee', companyId: 'c1', status: 'active', permissions: []
+      });
       const token = jwt.sign(
         { userId: 'user-q2', email: 'f@test.com', role: 'employee', companyId: 'c1' },
         JWT_SECRET,
@@ -98,6 +104,9 @@ describe('AuthMiddleware - Comprehensive Coverage', () => {
     });
 
     it('should accept token from query param on /download path', async () => {
+      User.findOne.mockResolvedValue({
+        userId: 'user-q3', email: 'd@test.com', role: 'employee', companyId: 'c1', status: 'active', permissions: []
+      });
       const token = jwt.sign(
         { userId: 'user-q3', email: 'd@test.com', role: 'employee', companyId: 'c1' },
         JWT_SECRET,
@@ -166,6 +175,9 @@ describe('AuthMiddleware - Comprehensive Coverage', () => {
   // ---------------------------------------------------------------
   describe('JWT sub claim support', () => {
     it('should use sub claim when userId is absent', async () => {
+      User.findOne.mockResolvedValue({
+        userId: 'sub-user-1', email: 'sub@test.com', role: 'founder', companyId: 'c1', status: 'active', permissions: []
+      });
       const token = jwt.sign(
         { sub: 'sub-user-1', email: 'sub@test.com', role: 'founder', companyId: 'c1' },
         JWT_SECRET,

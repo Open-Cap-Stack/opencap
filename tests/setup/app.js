@@ -30,7 +30,11 @@ let server;
  */
 function createApp() {
   const app = express();
-  
+
+  // Enable MOCK_AUTH for integration tests so authenticateToken accepts JWT
+  // claims without requiring a real DB user record.
+  process.env.MOCK_AUTH = 'true';
+
   // Test environment middleware
   if (process.env.NODE_ENV === 'test') {
     app.use(morgan('combined'));

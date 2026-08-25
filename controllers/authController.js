@@ -831,10 +831,18 @@ const updateUserProfile = async (req, res) => {
     if (firstName) updates.firstName = firstName;
     if (lastName) updates.lastName = lastName;
     if (req.body.companyId) updates.companyId = req.body.companyId;
-    if (req.body.role) updates.role = req.body.role;
-    if (req.body.permissions) updates.permissions = req.body.permissions;
     if (req.body.profileCompleted !== undefined) updates.profileCompleted = req.body.profileCompleted;
     if (req.body.onboardingCompleted !== undefined) updates.onboardingCompleted = req.body.onboardingCompleted;
+
+    // Only super_admin can update role and permissions (prevent privilege escalation)
+    if (req.body.role || req.body.permissions) {
+      if (req.user.role === 'super_admin') {
+        if (req.body.role) updates.role = req.body.role;
+        if (req.body.permissions) updates.permissions = req.body.permissions;
+      } else {
+        return res.status(403).json({ message: 'Only super_admin can update role and permissions' });
+      }
+    }
 
     // Update email if provided and different
     if (email && email !== user.email) {

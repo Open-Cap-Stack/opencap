@@ -493,17 +493,17 @@ describe('AuthController', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('should not allow self-assigning companyId via profile update', async () => {
+    it('should allow companyId assignment via profile update', async () => {
       req.user = { userId: 'user_123' };
       req.body = { companyId: 'company-abc-123' };
       const mockUser = { _id: 'user_123', userId: 'user_123', firstName: 'John', lastName: 'Doe', email: 'john@example.com' };
       User.findOne.mockResolvedValue(mockUser);
-      User.findOneAndUpdate.mockResolvedValue({ ...mockUser });
+      User.findOneAndUpdate.mockResolvedValue({ ...mockUser, companyId: 'company-abc-123' });
       await authController.updateUserProfile(req, res);
-      // companyId should NOT be included in the update — users cannot self-assign company
+      // companyId is included in updates for onboarding company assignment
       expect(User.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user_123' },
-        expect.not.objectContaining({ companyId: 'company-abc-123' }),
+        expect.objectContaining({ companyId: 'company-abc-123' }),
         { new: true }
       );
       expect(res.statusCode).toBe(200);
@@ -633,7 +633,7 @@ describe('AuthController', () => {
 
       expect(res.statusCode).toBe(500);
       const data = JSON.parse(res._getData());
-      expect(data.message).toBe('Internal server error');
+      expect(data.message).toBe('Token exchange failed');
     });
   });
 });

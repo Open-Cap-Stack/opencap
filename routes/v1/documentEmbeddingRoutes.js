@@ -7,10 +7,10 @@ const documentEmbeddingController = require('../../controllers/documentEmbedding
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
-router.post('/document-embeddings', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.createDocumentEmbedding);
-router.get('/document-embeddings', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.getDocumentEmbeddings);
-router.get('/document-embeddings/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.getDocumentEmbeddingById);
-router.put('/document-embeddings/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.updateDocumentEmbedding);
-router.delete('/document-embeddings/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.deleteDocumentEmbedding);
+router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.createDocumentEmbedding);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.getDocumentEmbeddings);
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.getDocumentEmbeddingById);
+router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.updateDocumentEmbedding);
+router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), documentEmbeddingController.deleteDocumentEmbedding);
 
 module.exports = router;

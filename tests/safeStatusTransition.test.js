@@ -57,7 +57,7 @@ describe('PATCH /safes/:id/status — updateStatus', () => {
     await safeController.updateStatus(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, error: 'status is required' })
+      expect.objectContaining({ success: false, error: expect.objectContaining({ message: 'status is required' }) })
     );
   });
 
@@ -82,9 +82,9 @@ describe('PATCH /safes/:id/status — updateStatus', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     const body = res.json.mock.calls[0][0];
     expect(body.success).toBe(false);
-    expect(body.error).toContain("Cannot transition from 'draft' to 'funded'");
-    expect(body.error).toContain('sent');
-    expect(body.error).toContain('cancelled');
+    expect(body.error.message).toContain("Cannot transition from 'draft' to 'funded'");
+    expect(body.error.message).toContain('sent');
+    expect(body.error.message).toContain('cancelled');
   });
 
   test('returns 400 for terminal state (converted -> anything)', async () => {
@@ -96,7 +96,7 @@ describe('PATCH /safes/:id/status — updateStatus', () => {
     await safeController.updateStatus(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
     const body = res.json.mock.calls[0][0];
-    expect(body.error).toContain('terminal state');
+    expect(body.error.message).toContain('terminal state');
   });
 
   test('persists valid transition (draft -> sent) and returns updated SAFE', async () => {
@@ -152,8 +152,8 @@ describe('PUT /safes/:id — silent-drop guard for status', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     const body = res.json.mock.calls[0][0];
     expect(body.success).toBe(false);
-    expect(body.error).toContain('PATCH');
-    expect(body.error).toContain('/status');
+    expect(body.error.message).toContain('PATCH');
+    expect(body.error.message).toContain('/status');
   });
 
   test('allows update when status is NOT in the body', async () => {

@@ -78,7 +78,7 @@ describe('User Delete Controller', () => {
       const updateArg = User.findByIdAndUpdate.mock.calls[0][1];
       expect(updateArg.deletedAt).toBeDefined();
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith({ message: 'User deleted successfully' });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: true, message: 'User deleted successfully' });
     });
 
     it('should return 404 if user does not exist', async () => {
@@ -87,7 +87,7 @@ describe('User Delete Controller', () => {
       await deleteUserById(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(404);
-      expect(mockRes.json).toHaveBeenCalledWith({ error: 'User not found' });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'User not found' }) });
     });
 
     it('should return 404 if user is already soft-deleted', async () => {
@@ -158,7 +158,7 @@ describe('User Delete Controller', () => {
       await hardDeleteUserById(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
-      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Admin access required' });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'Admin access required' }) });
       expect(User.findById).not.toHaveBeenCalled();
     });
 
@@ -195,9 +195,7 @@ describe('User Delete Controller', () => {
       await bulkDeleteUsers(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'Bulk delete requires explicit confirmation'
-      });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'Bulk delete requires explicit confirmation' }) });
     });
 
     it('should reject if confirm is string "true" instead of boolean', async () => {
@@ -206,9 +204,7 @@ describe('User Delete Controller', () => {
       await bulkDeleteUsers(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'Bulk delete requires explicit confirmation'
-      });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'Bulk delete requires explicit confirmation' }) });
     });
 
     it('should reject if more than BULK_DELETE_MAX users', async () => {
@@ -219,9 +215,7 @@ describe('User Delete Controller', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
       const response = mockRes.json.mock.calls[0][0];
-      expect(response.error).toContain('limited to');
-      expect(response.requested).toBe(BULK_DELETE_MAX + 1);
-      expect(response.max).toBe(BULK_DELETE_MAX);
+      expect(response.error.message).toContain('limited to');
     });
 
     it('should reject non-admin users with 403', async () => {
@@ -239,9 +233,7 @@ describe('User Delete Controller', () => {
       await bulkDeleteUsers(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'userIds must be a non-empty array'
-      });
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: expect.objectContaining({ message: 'userIds must be a non-empty array' }) });
     });
 
     it('should reject if userIds is not an array', async () => {

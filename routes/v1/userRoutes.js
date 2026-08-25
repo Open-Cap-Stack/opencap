@@ -132,20 +132,24 @@ router.get('/', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manag
 
 // Bulk delete users (admin only, requires confirmation, max 10)
 // Issue #487: Prevent mass user wipe with safety guards
+// Issue #173: Restrict to admin roles only
 // NOTE: Must be registered before /:id to avoid route collision
-router.post('/bulk-delete', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.bulkDeleteUsers);
+router.post('/bulk-delete', hasRole(['admin', 'super_admin']), userController.bulkDeleteUsers);
 
 // Get user by ID
 router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.getUserById);
 
 // Update user by ID
-router.put('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.updateUserById);
+// Issue #173: Restrict to admin/founder roles (self-update handled in controller)
+router.put('/:id', hasRole(['admin', 'super_admin', 'founder']), userController.updateUserById);
 
 // Delete user by ID (soft-delete)
-router.delete('/:id', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.deleteUserById);
+// Issue #165: Restrict to admin roles only — employees/clients/investors must not delete users
+router.delete('/:id', hasRole(['admin', 'super_admin', 'founder']), userController.deleteUserById);
 
-// Hard-delete user by ID (admin only, cleans up related data)
+// Hard-delete user by ID (super_admin only — destructive operation)
 // Issue #485: Ensure orphaned data cleanup on user deletion
-router.delete('/:id/hard', hasRole(['super_admin', 'admin', 'founder', 'accountant', 'manager', 'service_provider', 'investor', 'employee', 'client']), userController.hardDeleteUserById);
+// Issue #173: Restrict to super_admin only
+router.delete('/:id/hard', hasRole(['super_admin']), userController.hardDeleteUserById);
 
 module.exports = router;

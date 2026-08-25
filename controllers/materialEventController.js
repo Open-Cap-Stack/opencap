@@ -6,12 +6,24 @@
  * Migrated to ZeroDB - no Mongoose patterns (no new Model(), .save(), .populate())
  */
 const MaterialEvent = require('../models/MaterialEvent');
+const { sendError } = require('../middleware/errorResponse');
+
+const VALID_EVENT_TYPES = [
+  'financing_round', 'down_round', 'bridge_financing',
+  'board_composition_change', 'stock_split', 'reverse_split',
+  'significant_revenue_change', 'major_customer_win', 'major_customer_loss',
+  'key_executive_change', 'key_employee_departure', 'key_employee_hire',
+  'litigation', 'regulatory_change', 'ma_activity',
+  'acquisition_offer', 'merger_discussion', 'going_concern_doubt',
+  'ip_event', 'product_launch', 'product_failure', 'market_disruption',
+  'ipo_filing', 'ipo_preparation', 'secondary_transaction',
+  'significant_transaction', 'other'
+];
 
 // Create a new material event
 exports.createEvent = async (req, res) => {
   try {
     const {
-      companyId,
       eventType,
       eventDate,
       description,
@@ -23,6 +35,20 @@ exports.createEvent = async (req, res) => {
       tags,
       metadata
     } = req.body;
+
+    // Validate required fields
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      return sendError(res, 400, 'companyId is required and must be provided via authenticated user context');
+    }
+
+    if (!eventType) {
+      return sendError(res, 400, 'eventType is required');
+    }
+
+    if (!VALID_EVENT_TYPES.includes(eventType)) {
+      return sendError(res, 400, `Invalid eventType '${eventType}'. Must be one of: ${VALID_EVENT_TYPES.join(', ')}`);
+    }
 
     const event = await MaterialEvent.create({
       companyId,
@@ -52,10 +78,7 @@ exports.createEvent = async (req, res) => {
       data: event
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -94,10 +117,7 @@ exports.getCompanyEvents = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -109,10 +129,7 @@ exports.getEvent = async (req, res) => {
     const event = await MaterialEvent.findOne({ eventId });
 
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
+      return sendError(res, 404, 'Event not found');
     }
 
     res.json({
@@ -120,10 +137,7 @@ exports.getEvent = async (req, res) => {
       data: event
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -135,10 +149,7 @@ exports.updateEvent = async (req, res) => {
 
     const event = await MaterialEvent.findOne({ eventId });
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: 'Event not found'
-      });
+      return sendError(res, 404, 'Event not found');
     }
 
     // Prevent status changes through this endpoint
@@ -155,10 +166,7 @@ exports.updateEvent = async (req, res) => {
       data: updatedEvent
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -176,10 +184,7 @@ exports.acknowledgeEvent = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -197,10 +202,7 @@ exports.markActionRequired = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -218,10 +220,7 @@ exports.resolveEvent = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -232,10 +231,7 @@ exports.dismissEvent = async (req, res) => {
     const { reason } = req.body;
 
     if (!reason) {
-      return res.status(400).json({
-        success: false,
-        error: 'Dismissal reason is required'
-      });
+      return sendError(res, 400, 'Dismissal reason is required');
     }
 
     const updatedEvent = await MaterialEvent.dismiss(eventId, req.user?.userId, reason);
@@ -246,10 +242,7 @@ exports.dismissEvent = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -267,10 +260,7 @@ exports.addActionItem = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -288,10 +278,7 @@ exports.completeActionItem = async (req, res) => {
     });
   } catch (error) {
     const statusCode = error.message === 'Event not found' || error.message === 'Action item not found' ? 404 : 400;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, statusCode, error.message);
   }
 };
 
@@ -308,10 +295,7 @@ exports.getActionRequired = async (req, res) => {
       count: events.length
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -328,10 +312,7 @@ exports.getValuationTriggers = async (req, res) => {
       count: events.length
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -347,10 +328,7 @@ exports.getCompanySummary = async (req, res) => {
       data: summary
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };
 
@@ -366,10 +344,7 @@ exports.detectFromFundraisingRound = async (req, res) => {
       data: event
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -379,10 +354,7 @@ exports.detectFromEmployeeChange = async (req, res) => {
     const { employeeData, changeType } = req.body;
 
     if (!['departure', 'hire'].includes(changeType)) {
-      return res.status(400).json({
-        success: false,
-        error: 'changeType must be "departure" or "hire"'
-      });
+      return sendError(res, 400, 'changeType must be "departure" or "hire"');
     }
 
     const event = await MaterialEvent.detectFromEmployeeChange(
@@ -396,10 +368,7 @@ exports.detectFromEmployeeChange = async (req, res) => {
       data: event
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 400, error.message);
   }
 };
 
@@ -445,9 +414,6 @@ exports.getComplianceDashboard = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return sendError(res, 500, error.message);
   }
 };

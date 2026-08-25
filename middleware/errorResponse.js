@@ -47,4 +47,16 @@ function errorResponse(res, status, message, details = null) {
   return res.status(status).json(response);
 }
 
-module.exports = { errorResponse };
+/**
+ * Convenience alias for errorResponse.
+ *
+ * Standard error format across all controllers:
+ *   { success: false, error: { status, message } }
+ *
+ * Usage:
+ *   const { sendError } = require('../middleware/errorResponse');
+ *   return sendError(res, 404, 'Resource not found');
+ */
+const sendError = errorResponse;
+
+module.exports = { errorResponse, sendError };

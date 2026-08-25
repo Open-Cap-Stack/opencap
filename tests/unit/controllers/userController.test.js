@@ -62,7 +62,7 @@ describe('UserController', () => {
       User.findOne.mockResolvedValue({ _id: 'existing-id', email: 'existing@example.com' });
       await userController.createUser(req, res);
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res._getData()).error).toContain('Email already exists');
+      expect(JSON.parse(res._getData()).error.message).toContain('Email already exists');
     });
 
     it('should return 500 on database error during creation', async () => {
@@ -113,7 +113,7 @@ describe('UserController', () => {
       User.findById.mockResolvedValue(null);
       await userController.getUserById(req, res);
       expect(res.statusCode).toBe(404);
-      expect(JSON.parse(res._getData()).error).toBe('User not found');
+      expect(JSON.parse(res._getData()).error.message).toBe('User not found');
     });
 
     it('should return 500 on database error', async () => {

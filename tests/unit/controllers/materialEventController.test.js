@@ -18,7 +18,7 @@ describe('MaterialEventController', () => {
     jest.clearAllMocks();
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
-    req.user = { userId: 'user-1' };
+    req.user = { userId: 'user-1', companyId: 'comp-1' };
   });
 
   // ─── createEvent ───────────────────────────────────────────────────────
@@ -26,13 +26,12 @@ describe('MaterialEventController', () => {
   describe('createEvent', () => {
     it('should create a material event successfully', async () => {
       req.body = {
-        companyId: 'comp-1',
         eventType: 'financing_round',
         description: 'Series A round',
         triggersValuation: true,
         impactSeverity: 'high'
       };
-      const mockEvent = { eventId: 'evt-1', ...req.body };
+      const mockEvent = { eventId: 'evt-1', companyId: 'comp-1', ...req.body };
       MaterialEvent.create.mockResolvedValue(mockEvent);
 
       await materialEventController.createEvent(req, res);
@@ -44,7 +43,7 @@ describe('MaterialEventController', () => {
     });
 
     it('should set default eventDate if not provided', async () => {
-      req.body = { companyId: 'comp-1', eventType: 'litigation' };
+      req.body = { eventType: 'litigation' };
       MaterialEvent.create.mockResolvedValue({ eventId: 'evt-1' });
 
       await materialEventController.createEvent(req, res);
@@ -60,7 +59,7 @@ describe('MaterialEventController', () => {
     });
 
     it('should include statusHistory in created event', async () => {
-      req.body = { companyId: 'comp-1', eventType: 'key_executive_change' };
+      req.body = { eventType: 'key_executive_change' };
       MaterialEvent.create.mockResolvedValue({ eventId: 'evt-1' });
 
       await materialEventController.createEvent(req, res);
@@ -75,7 +74,7 @@ describe('MaterialEventController', () => {
     });
 
     it('should return 400 on creation error', async () => {
-      req.body = {};
+      req.body = { eventType: 'litigation' };
       MaterialEvent.create.mockRejectedValue(new Error('Validation error'));
 
       await materialEventController.createEvent(req, res);
@@ -83,28 +82,23 @@ describe('MaterialEventController', () => {
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
       expect(data.success).toBe(false);
-      expect(data.error).toBe('Validation error');
+      expect(data.error.message).toBe('Validation error');
     });
 
-    it('should handle missing user gracefully', async () => {
+    it('should return 400 when user is null (no companyId)', async () => {
       req.user = null;
-      req.body = { companyId: 'comp-1', eventType: 'litigation' };
-      MaterialEvent.create.mockResolvedValue({ eventId: 'evt-1' });
+      req.body = { eventType: 'litigation' };
 
       await materialEventController.createEvent(req, res);
 
-      expect(res.statusCode).toBe(201);
-      expect(MaterialEvent.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detectedBy: undefined,
-          createdBy: undefined
-        })
-      );
+      expect(res.statusCode).toBe(400);
+      const data = JSON.parse(res._getData());
+      expect(data.success).toBe(false);
+      expect(data.error.message).toContain('companyId');
     });
 
     it('should pass all optional fields', async () => {
       req.body = {
-        companyId: 'comp-1',
         eventType: 'litigation',
         eventDate: '2026-03-01',
         description: 'Patent suit',
@@ -444,7 +438,7 @@ describe('MaterialEventController', () => {
 
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.error).toBe('Dismissal reason is required');
+      expect(data.error.message).toBe('Dismissal reason is required');
     });
 
     it('should return 404 when event not found', async () => {
@@ -681,7 +675,7 @@ describe('MaterialEventController', () => {
 
       expect(res.statusCode).toBe(400);
       const data = JSON.parse(res._getData());
-      expect(data.error).toContain('changeType must be');
+      expect(data.error.message).toContain('changeType must be');
     });
 
     it('should return 400 on error', async () => {
