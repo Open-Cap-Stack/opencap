@@ -20,12 +20,12 @@ const {
 const { sanitizeBody } = require('../../middleware/inputValidation');
 
 // Routes are mounted at /api/v1/document-accesses in app.js
-// Create document access with validation
+// Create document access with validation (validate before sanitize so XSS is rejected, not escaped)
 router.post(
     '/',
     hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']),
-    sanitizeBody(),
     validateDocumentAccessCreation,
+    sanitizeBody(),
     documentAccessController.createDocumentAccess
 );
 

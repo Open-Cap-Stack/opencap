@@ -9,6 +9,7 @@ const request = require('supertest');
 const app = require('../../app');
 const jwt = require('jsonwebtoken');
 const User = require('../../models/User');
+const { __clearCacheForTesting } = require('../../middleware/authMiddleware');
 const Valuation409A = require('../../models/Valuation409A');
 const ValuationPartner = require('../../models/ValuationPartner');
 
@@ -19,17 +20,24 @@ describe('Valuation Routes Authentication', () => {
   let testUser;
   let testCompany;
 
+  const testSecret = process.env.JWT_SECRET || 'test-jwt-secret';
+
   beforeAll(async () => {
-    // Create test user
-    testUser = await User.create({
+    if (!process.env.JWT_SECRET) {
+      process.env.JWT_SECRET = testSecret;
+    }
+
+    // Define test user (no real DB call)
+    testUser = {
+      userId: 'user_valuation_test_1',
       email: 'valuation-test@example.com',
       firstName: 'Test',
       lastName: 'User',
-      password: 'Test123!@#',
       role: 'admin',
       status: 'active',
+      permissions: ['admin:all'],
       companyId: 'test-company-123'
-    });
+    };
 
     testCompany = 'test-company-123';
 
@@ -60,11 +68,19 @@ describe('Valuation Routes Authentication', () => {
     invalidToken = 'invalid.token.here';
   });
 
+  beforeEach(() => {
+    __clearCacheForTesting();
+    // Mock User.findOne to return the active test user by default
+    jest.spyOn(User, 'findOne').mockResolvedValue(testUser);
+    jest.spyOn(User, 'findByEmail').mockResolvedValue(testUser);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   afterAll(async () => {
-    // Cleanup
-    if (testUser && testUser.userId) {
-      await User.delete(testUser.userId);
-    }
+    // No real DB cleanup needed
   });
 
   describe('GET /api/v1/valuations - Authentication', () => {
@@ -328,16 +344,17 @@ describe('Valuation Routes Authentication', () => {
     let inactiveUser;
 
     beforeAll(async () => {
-      // Create inactive user
-      inactiveUser = await User.create({
+      // Define inactive user (no real DB call)
+      inactiveUser = {
+        userId: 'user_inactive_test_1',
         email: 'inactive-user@example.com',
         firstName: 'Inactive',
         lastName: 'User',
-        password: 'Test123!@#',
         role: 'employee',
-        status: 'inactive', // Inactive status
+        status: 'inactive',
+        permissions: [],
         companyId: 'test-company-123'
-      });
+      };
 
       // Generate token for inactive user
       inactiveUserToken = jwt.sign(
@@ -351,13 +368,13 @@ describe('Valuation Routes Authentication', () => {
       );
     });
 
-    afterAll(async () => {
-      if (inactiveUser && inactiveUser.userId) {
-        await User.deleteOne({ userId: inactiveUser.userId });
-      }
-    });
-
     it('should return 403 when user account is inactive', async () => {
+      // Clear cache and mock User.findOne to return the inactive user
+      __clearCacheForTesting();
+      jest.restoreAllMocks();
+      jest.spyOn(User, 'findOne').mockResolvedValue(inactiveUser);
+      jest.spyOn(User, 'findByEmail').mockResolvedValue(inactiveUser);
+
       const response = await request(app)
         .get('/api/v1/valuations')
         .set('Authorization', `Bearer ${inactiveUserToken}`)

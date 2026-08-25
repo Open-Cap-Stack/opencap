@@ -160,6 +160,7 @@ describe('UserController', () => {
     it('should update user successfully', async () => {
       req.params = { id: 'user-id-123' };
       req.body = { name: 'John Updated', role: 'admin' };
+      User.findById.mockResolvedValue({ _id: 'user-id-123', name: 'John Doe', role: 'employee' });
       User.findByIdAndUpdate.mockResolvedValue({ _id: 'user-id-123', name: 'John Updated', role: 'admin' });
       await userController.updateUserById(req, res);
       expect(res.statusCode).toBe(200);
@@ -169,7 +170,7 @@ describe('UserController', () => {
     it('should return 404 when user not found for update', async () => {
       req.params = { id: 'non-existent-id' };
       req.body = { name: 'Updated Name' };
-      User.findByIdAndUpdate.mockResolvedValue(null);
+      User.findById.mockResolvedValue(null);
       await userController.updateUserById(req, res);
       expect(res.statusCode).toBe(404);
     });
@@ -177,6 +178,7 @@ describe('UserController', () => {
     it('should return 500 on database error during update', async () => {
       req.params = { id: 'error-id' };
       req.body = { name: 'Error Update' };
+      User.findById.mockResolvedValue({ _id: 'error-id', name: 'Existing', role: 'employee' });
       User.findByIdAndUpdate.mockRejectedValue(new Error('Update failed'));
       await userController.updateUserById(req, res);
       expect(res.statusCode).toBe(500);

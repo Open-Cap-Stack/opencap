@@ -7,6 +7,19 @@
 
 const request = require('supertest');
 const express = require('express');
+
+// Mock auth and RBAC middleware so integration tests focus on validation
+jest.mock('../../middleware/authMiddleware', () => ({
+  authenticateToken: (req, res, next) => {
+    req.user = { id: 'test-user', role: 'admin' };
+    next();
+  }
+}));
+
+jest.mock('../../middleware/rbacMiddleware', () => ({
+  hasRole: () => (req, res, next) => next()
+}));
+
 const documentAccessRoutes = require('../../routes/v1/documentAccessRoutes');
 const zerodbService = require('../../services/zerodbService');
 
@@ -19,7 +32,7 @@ describe('Document Access Validation Integration Tests', () => {
   beforeAll(() => {
     app = express();
     app.use(express.json());
-    app.use('/api/v1', documentAccessRoutes);
+    app.use('/api/v1/document-accesses', documentAccessRoutes);
   });
 
   beforeEach(() => {

@@ -1,614 +1,904 @@
 /**
- * FinancialForecast Model Tests
+ * FinancialForecast & ForecastLine Model Tests
  * Feature: Issue #264 - Create financial forecasts model for DCF valuation inputs
- * TDD: Write tests first
+ * Tests creation, validation, workflow transitions, queries, line management, and calculations.
  */
 
-const { FinancialForecast, ForecastLine, FORECAST_METRICS } = require('../../../models/FinancialForecast');
+// Mock zerodbService before any require
+jest.mock('../../../services/zerodbService', () => ({
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRows: jest.fn(),
+  deleteRowById: jest.fn(),
+  initialize: jest.fn(),
+  projectId: 'mock-project-id',
+  useLocalFallback: false,
+  client: { put: jest.fn().mockResolvedValue({}) }
+}));
+
+const zerodbService = require('../../../services/zerodbService');
 
 describe('FinancialForecast Model', () => {
-  describe('Schema Validation', () => {
-    it('should have all required forecast metrics defined', () => {
-      // Revenue metrics
+  let FinancialForecast, ForecastLine, FORECAST_METRICS;
+
+  beforeAll(() => {
+    const mod = require('../../../models/FinancialForecast');
+    FinancialForecast = mod.FinancialForecast;
+    ForecastLine = mod.ForecastLine;
+    FORECAST_METRICS = mod.FORECAST_METRICS;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    zerodbService.queryTable.mockReset();
+    zerodbService.insertRow.mockReset();
+    zerodbService.client.put.mockReset();
+    zerodbService.client.put.mockResolvedValue({});
+    zerodbService.queryTable.mockResolvedValue({ data: [] });
+  });
+
+  // Helpers
+  const mockInsert = (returnData = {}) => {
+    const data = { _id: 'mock-id', ...returnData };
+    zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'row_1', row_data: data }] });
+    return data;
+  };
+
+  const mockFind = (docs = []) => {
+    zerodbService.queryTable.mockResolvedValue({
+      data: docs.map((d, i) => ({ row_id: `row_${i}`, row_data: d }))
+    });
+  };
+
+  const mockFindOne = (doc) => {
+    if (doc) {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: doc }]
+      });
+    } else {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+    }
+  };
+
+  const buildForecastData = (overrides = {}) => ({
+    companyId: 'company_123',
+    name: '2026 Revenue Projection',
+    forecastType: 'PROJECTION',
+    startDate: '2026-01-01',
+    endDate: '2030-12-31',
+    createdBy: 'user_789',
+    ...overrides
+  });
+
+  // -------------------------------------------------------------------
+  // Exported Constants
+  // -------------------------------------------------------------------
+  describe('Exported Constants', () => {
+    it('should export FORECAST_METRICS with 24 items', () => {
+      expect(FORECAST_METRICS).toHaveLength(24);
+    });
+
+    it('should include revenue metrics', () => {
       expect(FORECAST_METRICS).toContain('REVENUE');
       expect(FORECAST_METRICS).toContain('REVENUE_RECURRING');
       expect(FORECAST_METRICS).toContain('REVENUE_SERVICES');
       expect(FORECAST_METRICS).toContain('REVENUE_OTHER');
+    });
 
-      // Cost metrics
-      expect(FORECAST_METRICS).toContain('COGS');
-      expect(FORECAST_METRICS).toContain('GROSS_PROFIT');
-      expect(FORECAST_METRICS).toContain('GROSS_MARGIN_PCT');
-
-      // Operating expense metrics
-      expect(FORECAST_METRICS).toContain('OPEX_TOTAL');
-      expect(FORECAST_METRICS).toContain('OPEX_RD');
-      expect(FORECAST_METRICS).toContain('OPEX_SALES_MARKETING');
-      expect(FORECAST_METRICS).toContain('OPEX_GENERAL_ADMIN');
-
-      // Profitability metrics
+    it('should include profitability metrics', () => {
       expect(FORECAST_METRICS).toContain('EBITDA');
-      expect(FORECAST_METRICS).toContain('EBITDA_MARGIN_PCT');
       expect(FORECAST_METRICS).toContain('EBIT');
       expect(FORECAST_METRICS).toContain('NET_INCOME');
+    });
 
-      // Cash metrics
-      expect(FORECAST_METRICS).toContain('CASH_BURN');
-      expect(FORECAST_METRICS).toContain('CASH_BALANCE');
-      expect(FORECAST_METRICS).toContain('FREE_CASH_FLOW');
-
-      // Operational metrics
+    it('should include operational metrics', () => {
       expect(FORECAST_METRICS).toContain('HEADCOUNT');
       expect(FORECAST_METRICS).toContain('CUSTOMERS');
       expect(FORECAST_METRICS).toContain('ARR');
       expect(FORECAST_METRICS).toContain('MRR');
-
-      // Capital metrics
-      expect(FORECAST_METRICS).toContain('CAPEX');
-      expect(FORECAST_METRICS).toContain('WORKING_CAPITAL');
     });
 
-    it('should have exactly 24 forecast metrics', () => {
-      expect(FORECAST_METRICS.length).toBe(24);
+    it('should include cash metrics', () => {
+      expect(FORECAST_METRICS).toContain('CASH_BURN');
+      expect(FORECAST_METRICS).toContain('FREE_CASH_FLOW');
     });
 
-    it('should create a valid forecast with required fields', () => {
-      const validData = {
-        companyId: 'company_123',
-        name: '2026 Board Approved Forecast',
-        forecastType: 'PROJECTION',
-        startDate: new Date('2026-01-01'),
-        endDate: new Date('2030-12-31'),
-        createdBy: 'user_123',
-        status: 'DRAFT'
-      };
-
-      expect(validData.companyId).toBeDefined();
-      expect(validData.name).toBeDefined();
-      expect(validData.forecastType).toBeDefined();
-      expect(validData.startDate).toBeDefined();
-      expect(validData.endDate).toBeDefined();
-      expect(validData.createdBy).toBeDefined();
-      expect(validData.status).toBe('DRAFT');
-    });
-
-    it('should reject invalid forecastType values', () => {
-      const validForecastTypes = ['BUDGET', 'PROJECTION', 'SCENARIO'];
-      const invalidTypes = ['invalid', 'estimate', 'plan'];
-
-      invalidTypes.forEach(type => {
-        expect(validForecastTypes).not.toContain(type);
-      });
-
-      validForecastTypes.forEach(type => {
-        expect(validForecastTypes).toContain(type);
-      });
-    });
-
-    it('should support scenario types for DCF modeling', () => {
-      const validScenarioTypes = ['BASE', 'BULL', 'BEAR'];
-
-      expect(validScenarioTypes).toContain('BASE');
-      expect(validScenarioTypes).toContain('BULL');
-      expect(validScenarioTypes).toContain('BEAR');
-      expect(validScenarioTypes.length).toBe(3);
-    });
-
-    it('should reject invalid periodType values', () => {
-      const validPeriodTypes = ['MONTHLY', 'QUARTERLY', 'ANNUAL'];
-      const invalidTypes = ['weekly', 'daily', 'biannual'];
-
-      invalidTypes.forEach(type => {
-        expect(validPeriodTypes).not.toContain(type);
-      });
-    });
-
-    it('should auto-generate forecastId with prefix', () => {
-      const prefix = 'forecast_';
-      const mockId = `${prefix}${Date.now()}`;
-      expect(mockId.startsWith('forecast_')).toBe(true);
+    it('should have correct table name', () => {
+      expect(FinancialForecast.tableName).toBe('forecasts');
     });
   });
 
-  describe('Status Workflow', () => {
-    const validTransitions = {
-      DRAFT: ['SUBMITTED'],
-      SUBMITTED: ['APPROVED', 'DRAFT'],
-      APPROVED: ['SUPERSEDED'],
-      SUPERSEDED: []
-    };
+  // -------------------------------------------------------------------
+  // create
+  // -------------------------------------------------------------------
+  describe('create', () => {
+    it('should create a forecast with auto-generated forecastId', async () => {
+      const data = buildForecastData();
+      mockInsert({ ...data });
 
-    it('should allow valid status transitions', () => {
-      expect(validTransitions.DRAFT).toContain('SUBMITTED');
-      expect(validTransitions.SUBMITTED).toContain('APPROVED');
-      expect(validTransitions.SUBMITTED).toContain('DRAFT');
-      expect(validTransitions.APPROVED).toContain('SUPERSEDED');
+      await FinancialForecast.create(data);
+
+      expect(zerodbService.insertRow).toHaveBeenCalledTimes(1);
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.forecastId).toMatch(/^forecast_/);
     });
 
-    it('should not allow invalid status transitions', () => {
-      expect(validTransitions.DRAFT).not.toContain('APPROVED');
-      expect(validTransitions.APPROVED).not.toContain('DRAFT');
-      expect(validTransitions.SUPERSEDED.length).toBe(0);
+    it('should keep caller-provided forecastId', async () => {
+      const data = buildForecastData({ forecastId: 'forecast_custom' });
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.forecastId).toBe('forecast_custom');
     });
 
-    it('should allow return to DRAFT from SUBMITTED', () => {
-      expect(validTransitions.SUBMITTED).toContain('DRAFT');
+    it('should default status to DRAFT', async () => {
+      const data = buildForecastData();
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.status).toBe('DRAFT');
     });
 
-    it('should prevent modifications to APPROVED forecasts', () => {
-      // Only SUPERSEDED is allowed from APPROVED
-      expect(validTransitions.APPROVED).toEqual(['SUPERSEDED']);
+    it('should default scenarioType to BASE', async () => {
+      const data = buildForecastData();
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.scenarioType).toBe('BASE');
     });
 
-    it('should have canTransitionTo method', () => {
-      expect(typeof FinancialForecast.canTransitionTo).toBe('function');
+    it('should default periodType to ANNUAL', async () => {
+      const data = buildForecastData();
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.periodType).toBe('ANNUAL');
     });
 
-    it('should correctly validate transitions with canTransitionTo', () => {
+    it('should initialize statusHistory with DRAFT entry', async () => {
+      const data = buildForecastData();
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.statusHistory).toHaveLength(1);
+      expect(insertArg.statusHistory[0].status).toBe('DRAFT');
+      expect(insertArg.statusHistory[0].changedBy).toBe('user_789');
+    });
+
+    it('should throw when companyId is missing', async () => {
+      const data = buildForecastData({ companyId: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('companyId is required');
+    });
+
+    it('should throw when name is missing', async () => {
+      const data = buildForecastData({ name: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('name is required');
+    });
+
+    it('should throw when forecastType is missing', async () => {
+      const data = buildForecastData({ forecastType: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('forecastType is required');
+    });
+
+    it('should throw when startDate is missing', async () => {
+      const data = buildForecastData({ startDate: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('startDate is required');
+    });
+
+    it('should throw when endDate is missing', async () => {
+      const data = buildForecastData({ endDate: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('endDate is required');
+    });
+
+    it('should throw when createdBy is missing', async () => {
+      const data = buildForecastData({ createdBy: undefined });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('createdBy is required');
+    });
+
+    it('should throw for invalid forecastType', async () => {
+      const data = buildForecastData({ forecastType: 'INVALID' });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('Invalid forecastType: INVALID');
+    });
+
+    it('should throw for invalid scenarioType', async () => {
+      const data = buildForecastData({ scenarioType: 'INVALID' });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('Invalid scenarioType: INVALID');
+    });
+
+    it('should throw when endDate is before startDate', async () => {
+      const data = buildForecastData({ startDate: '2030-01-01', endDate: '2025-01-01' });
+      await expect(FinancialForecast.create(data)).rejects.toThrow('endDate must be after startDate');
+    });
+
+    it('should accept BUDGET forecastType', async () => {
+      const data = buildForecastData({ forecastType: 'BUDGET' });
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.forecastType).toBe('BUDGET');
+    });
+
+    it('should accept SCENARIO forecastType', async () => {
+      const data = buildForecastData({ forecastType: 'SCENARIO' });
+      mockInsert({ ...data });
+
+      await FinancialForecast.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.forecastType).toBe('SCENARIO');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // canTransitionTo
+  // -------------------------------------------------------------------
+  describe('canTransitionTo', () => {
+    it('should allow DRAFT to SUBMITTED', () => {
       expect(FinancialForecast.canTransitionTo('DRAFT', 'SUBMITTED')).toBe(true);
-      expect(FinancialForecast.canTransitionTo('DRAFT', 'APPROVED')).toBe(false);
+    });
+
+    it('should allow SUBMITTED to APPROVED', () => {
       expect(FinancialForecast.canTransitionTo('SUBMITTED', 'APPROVED')).toBe(true);
+    });
+
+    it('should allow SUBMITTED back to DRAFT', () => {
+      expect(FinancialForecast.canTransitionTo('SUBMITTED', 'DRAFT')).toBe(true);
+    });
+
+    it('should allow APPROVED to SUPERSEDED', () => {
       expect(FinancialForecast.canTransitionTo('APPROVED', 'SUPERSEDED')).toBe(true);
+    });
+
+    it('should not allow DRAFT to APPROVED', () => {
+      expect(FinancialForecast.canTransitionTo('DRAFT', 'APPROVED')).toBe(false);
+    });
+
+    it('should not allow APPROVED to DRAFT', () => {
+      expect(FinancialForecast.canTransitionTo('APPROVED', 'DRAFT')).toBe(false);
+    });
+
+    it('should not allow any transition from SUPERSEDED', () => {
       expect(FinancialForecast.canTransitionTo('SUPERSEDED', 'DRAFT')).toBe(false);
+      expect(FinancialForecast.canTransitionTo('SUPERSEDED', 'SUBMITTED')).toBe(false);
+      expect(FinancialForecast.canTransitionTo('SUPERSEDED', 'APPROVED')).toBe(false);
+    });
+
+    it('should return false for unknown status', () => {
+      expect(FinancialForecast.canTransitionTo('UNKNOWN', 'DRAFT')).toBe(false);
     });
   });
 
-  describe('Growth Assumptions for DCF', () => {
-    it('should store growth rate assumptions', () => {
-      const growthAssumptions = {
-        revenueGrowthRate: 0.25,
-        terminalGrowthRate: 0.03,
-        discountRate: 0.15,
-        taxRate: 0.21
+  // -------------------------------------------------------------------
+  // transitionTo
+  // -------------------------------------------------------------------
+  describe('transitionTo', () => {
+    it('should transition to new status and append to statusHistory', async () => {
+      const forecast = {
+        forecastId: 'f1', status: 'DRAFT', statusHistory: [{ status: 'DRAFT' }], row_id: 'row_1'
       };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
 
-      expect(growthAssumptions.revenueGrowthRate).toBe(0.25);
-      expect(growthAssumptions.terminalGrowthRate).toBe(0.03);
-      expect(growthAssumptions.discountRate).toBe(0.15);
-      expect(growthAssumptions.taxRate).toBe(0.21);
+      await FinancialForecast.transitionTo('f1', 'SUBMITTED', 'user_1', 'Submitting');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
     });
 
-    it('should allow percentage values between 0 and 1', () => {
-      const discountRate = 0.12;
-      const terminalGrowthRate = 0.025;
+    it('should throw when forecast not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
 
-      expect(discountRate).toBeGreaterThan(0);
-      expect(discountRate).toBeLessThan(1);
-      expect(terminalGrowthRate).toBeGreaterThan(0);
-      expect(terminalGrowthRate).toBeLessThan(1);
+      await expect(FinancialForecast.transitionTo('missing', 'SUBMITTED', 'user_1'))
+        .rejects.toThrow('Forecast not found');
+    });
+
+    it('should throw for invalid transition', async () => {
+      const forecast = { forecastId: 'f1', status: 'DRAFT', row_id: 'row_1' };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
+
+      await expect(FinancialForecast.transitionTo('f1', 'APPROVED', 'user_1'))
+        .rejects.toThrow('Cannot transition from DRAFT to APPROVED');
+    });
+
+    it('should set approvedBy and approvedAt when transitioning to APPROVED', async () => {
+      const forecast = {
+        forecastId: 'f1', status: 'SUBMITTED', statusHistory: [], row_id: 'row_1'
+      };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
+
+      await FinancialForecast.transitionTo('f1', 'APPROVED', 'user_1');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
     });
   });
 
-  describe('Staleness Check', () => {
-    it('should identify stale forecasts (>6 months old)', () => {
+  // -------------------------------------------------------------------
+  // submit
+  // -------------------------------------------------------------------
+  describe('submit', () => {
+    it('should have submit method', () => {
+      expect(typeof FinancialForecast.submit).toBe('function');
+    });
+
+    it('should transition to SUBMITTED', async () => {
+      const forecast = { forecastId: 'f1', status: 'DRAFT', statusHistory: [], row_id: 'row_1' };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
+
+      await FinancialForecast.submit('f1', 'user_1');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // approve
+  // -------------------------------------------------------------------
+  describe('approve', () => {
+    it('should call updateOne when approving', async () => {
+      const forecast = { forecastId: 'f2', companyId: 'c1', status: 'SUBMITTED', statusHistory: [], row_id: 'row_2' };
+      // All queries return the forecast; the approve flow will attempt to supersede
+      // existing approved forecasts and then approve the target
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_2', row_data: forecast }]
+      });
+
+      await FinancialForecast.approve('f2', 'admin_1');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
+    });
+
+    it('should throw when forecast not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await expect(FinancialForecast.approve('missing', 'user_1'))
+        .rejects.toThrow('Forecast not found');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // linkToValuation
+  // -------------------------------------------------------------------
+  describe('linkToValuation', () => {
+    it('should link approved forecast to valuation', async () => {
+      const forecast = { forecastId: 'f1', status: 'APPROVED', row_id: 'row_1' };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
+
+      await FinancialForecast.linkToValuation('f1', 'val_1', 'user_1');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
+    });
+
+    it('should throw when forecast not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await expect(FinancialForecast.linkToValuation('missing', 'val_1', 'user_1'))
+        .rejects.toThrow('Forecast not found');
+    });
+
+    it('should throw when forecast is not approved', async () => {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { forecastId: 'f1', status: 'DRAFT', row_id: 'row_1' } }]
+      });
+
+      await expect(FinancialForecast.linkToValuation('f1', 'val_1', 'user_1'))
+        .rejects.toThrow('Only approved forecasts can be linked to valuations');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // isStale
+  // -------------------------------------------------------------------
+  describe('isStale', () => {
+    it('should return true for forecasts approved >6 months ago', () => {
       const sevenMonthsAgo = new Date();
       sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
 
-      const staleforecast = {
-        approvedAt: sevenMonthsAgo.toISOString(),
-        status: 'APPROVED'
-      };
-
-      const isStale = FinancialForecast.isStale(staleforecast);
-      expect(isStale).toBe(true);
+      expect(FinancialForecast.isStale({ approvedAt: sevenMonthsAgo.toISOString() })).toBe(true);
     });
 
-    it('should identify fresh forecasts (<6 months old)', () => {
+    it('should return false for forecasts approved <6 months ago', () => {
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-      const freshForecast = {
-        approvedAt: threeMonthsAgo.toISOString(),
-        status: 'APPROVED'
-      };
-
-      const isStale = FinancialForecast.isStale(freshForecast);
-      expect(isStale).toBe(false);
+      expect(FinancialForecast.isStale({ approvedAt: threeMonthsAgo.toISOString() })).toBe(false);
     });
 
-    it('should return false for forecasts without approvedAt', () => {
-      const draftForecast = {
-        status: 'DRAFT',
-        approvedAt: null
-      };
+    it('should return false when approvedAt is null', () => {
+      expect(FinancialForecast.isStale({ approvedAt: null })).toBe(false);
+    });
 
-      const isStale = FinancialForecast.isStale(draftForecast);
-      expect(isStale).toBe(false);
+    it('should return false when approvedAt is undefined', () => {
+      expect(FinancialForecast.isStale({})).toBe(false);
     });
   });
 
-  describe('Date Range Validation', () => {
-    it('should require endDate after startDate', () => {
-      const startDate = new Date('2026-01-01');
-      const endDate = new Date('2030-12-31');
+  // -------------------------------------------------------------------
+  // findByCompany
+  // -------------------------------------------------------------------
+  describe('findByCompany', () => {
+    it('should query by companyId', async () => {
+      mockFind([{ companyId: 'c1' }]);
 
-      expect(endDate > startDate).toBe(true);
+      const result = await FinancialForecast.findByCompany('c1');
+
+      expect(result).toHaveLength(1);
     });
 
-    it('should reject invalid date ranges', () => {
-      const startDate = new Date('2030-12-31');
-      const endDate = new Date('2026-01-01');
+    it('should filter by status when provided', async () => {
+      mockFind([]);
 
-      expect(endDate <= startDate).toBe(true);
-    });
+      await FinancialForecast.findByCompany('c1', 'APPROVED');
 
-    it('should support 5-year projection periods', () => {
-      const startDate = new Date('2026-01-01');
-      const endDate = new Date('2030-12-31');
-
-      const yearsDiff = endDate.getUTCFullYear() - startDate.getUTCFullYear();
-      expect(yearsDiff).toBe(4); // 4 years difference for 5 year coverage
+      const callArg = zerodbService.queryTable.mock.calls[0][1];
+      expect(callArg.filter.status).toBe('APPROVED');
     });
   });
 
-  describe('Period Coverage Validation', () => {
-    it('should validate period coverage with validatePeriodCoverage', () => {
+  // -------------------------------------------------------------------
+  // findLatestApproved
+  // -------------------------------------------------------------------
+  describe('findLatestApproved', () => {
+    it('should return the first approved forecast', async () => {
+      const approved = { companyId: 'c1', status: 'APPROVED', forecastId: 'f1' };
+      mockFind([approved]);
+
+      const result = await FinancialForecast.findLatestApproved('c1');
+
+      expect(result.forecastId).toBe('f1');
+    });
+
+    it('should return null when no approved forecasts exist', async () => {
+      mockFind([]);
+
+      const result = await FinancialForecast.findLatestApproved('c1');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // updateGrowthAssumptions
+  // -------------------------------------------------------------------
+  describe('updateGrowthAssumptions', () => {
+    it('should merge new assumptions with existing ones', async () => {
       const forecast = {
-        startDate: '2026-01-01',
-        endDate: '2030-12-31'
+        forecastId: 'f1', status: 'DRAFT', row_id: 'row_1',
+        growthAssumptions: { revenueGrowthRate: 0.25 }
       };
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: forecast }]
+      });
 
+      await FinancialForecast.updateGrowthAssumptions('f1', { discountRate: 0.12 }, 'user_1');
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
+    });
+
+    it('should throw when forecast not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await expect(FinancialForecast.updateGrowthAssumptions('missing', {}, 'user_1'))
+        .rejects.toThrow('Forecast not found');
+    });
+
+    it('should throw when forecast is approved', async () => {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { forecastId: 'f1', status: 'APPROVED', row_id: 'row_1' } }]
+      });
+
+      await expect(FinancialForecast.updateGrowthAssumptions('f1', {}, 'user_1'))
+        .rejects.toThrow('Cannot modify approved forecasts');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // validatePeriodCoverage
+  // -------------------------------------------------------------------
+  describe('validatePeriodCoverage', () => {
+    it('should return valid for forecasts with lines', () => {
+      const forecast = { startDate: '2026-01-01', endDate: '2030-12-31' };
       const lines = [
         { periodStart: '2026-01-01', periodEnd: '2026-12-31', metric: 'REVENUE', value: 1000000 },
         { periodStart: '2027-01-01', periodEnd: '2027-12-31', metric: 'REVENUE', value: 1250000 }
       ];
 
       const result = FinancialForecast.validatePeriodCoverage(forecast, lines);
+
       expect(result.valid).toBe(true);
       expect(result.periodCount).toBe(2);
     });
 
-    it('should fail validation with no lines', () => {
-      const forecast = {
-        startDate: '2026-01-01',
-        endDate: '2030-12-31'
-      };
+    it('should return invalid for empty lines', () => {
+      const forecast = { startDate: '2026-01-01', endDate: '2030-12-31' };
 
       const result = FinancialForecast.validatePeriodCoverage(forecast, []);
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('No forecast lines defined');
     });
   });
-
-  describe('Board Approval Linkage', () => {
-    it('should store board approval reference', () => {
-      const forecast = {
-        boardApprovalId: 'board_approval_123',
-        status: 'APPROVED'
-      };
-
-      expect(forecast.boardApprovalId).toBe('board_approval_123');
-    });
-
-    it('should store valuation linkage for DCF', () => {
-      const forecast = {
-        valuationId: 'val_123',
-        status: 'APPROVED'
-      };
-
-      expect(forecast.valuationId).toBe('val_123');
-    });
-  });
-
-  describe('Status History Audit Trail', () => {
-    it('should track status history', () => {
-      const statusHistory = [
-        { status: 'DRAFT', changedAt: new Date().toISOString(), changedBy: 'user_1', reason: 'Forecast created' },
-        { status: 'SUBMITTED', changedAt: new Date().toISOString(), changedBy: 'user_1', reason: 'Submitted for approval' },
-        { status: 'APPROVED', changedAt: new Date().toISOString(), changedBy: 'user_2', reason: 'Forecast approved' }
-      ];
-
-      expect(statusHistory.length).toBe(3);
-      expect(statusHistory[0].status).toBe('DRAFT');
-      expect(statusHistory[1].status).toBe('SUBMITTED');
-      expect(statusHistory[2].status).toBe('APPROVED');
-    });
-  });
 });
 
+// =====================================================================
+// ForecastLine Model
+// =====================================================================
 describe('ForecastLine Model', () => {
-  describe('Schema Validation', () => {
-    it('should create a valid forecast line with required fields', () => {
-      const validLine = {
-        forecastId: 'forecast_123',
-        periodStart: new Date('2026-01-01'),
-        periodEnd: new Date('2026-12-31'),
-        metric: 'REVENUE',
-        value: 5000000,
-        currency: 'USD',
-        confidence: 'HIGH'
-      };
+  let ForecastLine, FinancialForecast, FORECAST_METRICS;
 
-      expect(validLine.forecastId).toBeDefined();
-      expect(validLine.periodStart).toBeDefined();
-      expect(validLine.periodEnd).toBeDefined();
-      expect(validLine.metric).toBeDefined();
-      expect(validLine.value).toBeDefined();
+  beforeAll(() => {
+    const mod = require('../../../models/FinancialForecast');
+    ForecastLine = mod.ForecastLine;
+    FinancialForecast = mod.FinancialForecast;
+    FORECAST_METRICS = mod.FORECAST_METRICS;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    zerodbService.queryTable.mockReset();
+    zerodbService.insertRow.mockReset();
+    zerodbService.client.put.mockReset();
+    zerodbService.client.put.mockResolvedValue({});
+    zerodbService.queryTable.mockResolvedValue({ data: [] });
+  });
+
+  const mockInsert = (returnData = {}) => {
+    const data = { _id: 'mock-id', ...returnData };
+    zerodbService.insertRow.mockResolvedValue({ data: [{ row_id: 'row_1', row_data: data }] });
+    return data;
+  };
+
+  const mockFind = (docs = []) => {
+    zerodbService.queryTable.mockResolvedValue({
+      data: docs.map((d, i) => ({ row_id: `row_${i}`, row_data: d }))
+    });
+  };
+
+  const mockFindOne = (doc) => {
+    if (doc) {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: doc }]
+      });
+    } else {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+    }
+  };
+
+  const buildLineData = (overrides = {}) => ({
+    forecastId: 'forecast_123',
+    periodStart: '2026-01-01',
+    periodEnd: '2026-12-31',
+    metric: 'REVENUE',
+    value: 5000000,
+    ...overrides
+  });
+
+  // -------------------------------------------------------------------
+  // Constants
+  // -------------------------------------------------------------------
+  describe('Constants', () => {
+    it('should have correct table name', () => {
+      expect(ForecastLine.tableName).toBe('forecast_lines');
     });
 
-    it('should auto-generate lineId with prefix', () => {
-      const prefix = 'line_';
-      const mockId = `${prefix}${Date.now()}`;
-      expect(mockId.startsWith('line_')).toBe(true);
-    });
-
-    it('should have all FORECAST_METRICS available', () => {
+    it('should export FORECAST_METRICS', () => {
       expect(ForecastLine.FORECAST_METRICS).toEqual(FORECAST_METRICS);
     });
+  });
 
-    it('should validate metric enum', () => {
-      const validMetric = 'REVENUE';
-      const invalidMetric = 'INVALID_METRIC';
+  // -------------------------------------------------------------------
+  // create
+  // -------------------------------------------------------------------
+  describe('create', () => {
+    it('should create a line with auto-generated lineId', async () => {
+      const data = buildLineData();
+      mockInsert({ ...data });
 
-      expect(FORECAST_METRICS).toContain(validMetric);
-      expect(FORECAST_METRICS).not.toContain(invalidMetric);
+      await ForecastLine.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.lineId).toMatch(/^line_/);
     });
 
-    it('should validate confidence enum', () => {
-      const validConfidence = ['HIGH', 'MEDIUM', 'LOW'];
+    it('should default currency to USD', async () => {
+      const data = buildLineData();
+      mockInsert({ ...data });
 
-      expect(validConfidence).toContain('HIGH');
-      expect(validConfidence).toContain('MEDIUM');
-      expect(validConfidence).toContain('LOW');
-      expect(validConfidence.length).toBe(3);
+      await ForecastLine.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.currency).toBe('USD');
     });
 
-    it('should default currency to USD', () => {
-      const line = {
-        forecastId: 'forecast_123',
-        periodStart: '2026-01-01',
-        periodEnd: '2026-12-31',
-        metric: 'REVENUE',
-        value: 5000000
-      };
+    it('should default confidence to MEDIUM', async () => {
+      const data = buildLineData();
+      mockInsert({ ...data });
 
-      const expectedCurrency = 'USD';
-      expect(line.currency || expectedCurrency).toBe('USD');
+      await ForecastLine.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.confidence).toBe('MEDIUM');
+    });
+
+    it('should throw when forecastId is missing', async () => {
+      await expect(ForecastLine.create(buildLineData({ forecastId: undefined })))
+        .rejects.toThrow('forecastId is required');
+    });
+
+    it('should throw when periodStart is missing', async () => {
+      await expect(ForecastLine.create(buildLineData({ periodStart: undefined })))
+        .rejects.toThrow('periodStart is required');
+    });
+
+    it('should throw when periodEnd is missing', async () => {
+      await expect(ForecastLine.create(buildLineData({ periodEnd: undefined })))
+        .rejects.toThrow('periodEnd is required');
+    });
+
+    it('should throw when metric is missing', async () => {
+      await expect(ForecastLine.create(buildLineData({ metric: undefined })))
+        .rejects.toThrow('metric is required');
+    });
+
+    it('should throw when value is missing', async () => {
+      await expect(ForecastLine.create(buildLineData({ value: undefined })))
+        .rejects.toThrow('value is required');
+    });
+
+    it('should throw when value is null', async () => {
+      await expect(ForecastLine.create(buildLineData({ value: null })))
+        .rejects.toThrow('value is required');
+    });
+
+    it('should throw for invalid metric', async () => {
+      await expect(ForecastLine.create(buildLineData({ metric: 'INVALID_METRIC' })))
+        .rejects.toThrow('Invalid metric: INVALID_METRIC');
+    });
+
+    it('should throw for invalid confidence', async () => {
+      await expect(ForecastLine.create(buildLineData({ confidence: 'VERY_HIGH' })))
+        .rejects.toThrow('Invalid confidence: VERY_HIGH');
+    });
+
+    it('should accept zero value', async () => {
+      const data = buildLineData({ value: 0 });
+      mockInsert({ ...data });
+
+      await ForecastLine.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.value).toBe(0);
+    });
+
+    it('should accept negative value', async () => {
+      const data = buildLineData({ value: -500000, metric: 'CASH_BURN' });
+      mockInsert({ ...data });
+
+      await ForecastLine.create(data);
+
+      const insertArg = zerodbService.insertRow.mock.calls[0][1];
+      expect(insertArg.value).toBe(-500000);
     });
   });
 
-  describe('Value Types', () => {
-    it('should store numeric values for financial metrics', () => {
-      const revenueValue = 10000000.50;
-      expect(typeof revenueValue).toBe('number');
-    });
+  // -------------------------------------------------------------------
+  // createMany
+  // -------------------------------------------------------------------
+  describe('createMany', () => {
+    it('should create multiple lines', async () => {
+      zerodbService.insertRow
+        .mockResolvedValueOnce({ data: [{ row_id: 'r1', row_data: { lineId: 'l1' } }] })
+        .mockResolvedValueOnce({ data: [{ row_id: 'r2', row_data: { lineId: 'l2' } }] });
 
-    it('should store percentage values for margin metrics', () => {
-      const grossMarginPct = 0.65;
-      expect(grossMarginPct).toBeGreaterThan(0);
-      expect(grossMarginPct).toBeLessThan(1);
-    });
+      const lines = [
+        buildLineData({ metric: 'REVENUE', value: 1000000 }),
+        buildLineData({ metric: 'COGS', value: 300000 })
+      ];
 
-    it('should store integer values for operational metrics', () => {
-      const headcount = 150;
-      const customers = 5000;
+      const result = await ForecastLine.createMany(lines);
 
-      expect(Number.isInteger(headcount)).toBe(true);
-      expect(Number.isInteger(customers)).toBe(true);
-    });
-  });
-
-  describe('Period Validation', () => {
-    it('should require valid period dates', () => {
-      const periodStart = new Date('2026-01-01');
-      const periodEnd = new Date('2026-12-31');
-
-      expect(periodEnd > periodStart).toBe(true);
-    });
-
-    it('should support annual periods', () => {
-      const periodStart = new Date('2026-01-01');
-      const periodEnd = new Date('2026-12-31');
-
-      const daysInPeriod = Math.ceil((periodEnd - periodStart) / (1000 * 60 * 60 * 24));
-      expect(daysInPeriod).toBeGreaterThanOrEqual(364);
-    });
-
-    it('should support quarterly periods', () => {
-      const q1Start = new Date('2026-01-01');
-      const q1End = new Date('2026-03-31');
-
-      const daysInPeriod = Math.ceil((q1End - q1Start) / (1000 * 60 * 60 * 24));
-      expect(daysInPeriod).toBeGreaterThanOrEqual(89);
-      expect(daysInPeriod).toBeLessThanOrEqual(92);
-    });
-
-    it('should support monthly periods', () => {
-      const janStart = new Date('2026-01-01');
-      const janEnd = new Date('2026-01-31');
-
-      const daysInPeriod = Math.ceil((janEnd - janStart) / (1000 * 60 * 60 * 24));
-      expect(daysInPeriod).toBe(30);
+      expect(result).toHaveLength(2);
+      expect(zerodbService.insertRow).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('EBITDA Calculation', () => {
-    it('should calculate EBITDA from components', () => {
-      const revenue = 10000000;
-      const cogs = 3000000;
-      const opex = 4000000;
+  // -------------------------------------------------------------------
+  // findByForecast
+  // -------------------------------------------------------------------
+  describe('findByForecast', () => {
+    it('should query by forecastId', async () => {
+      mockFind([{ forecastId: 'f1', metric: 'REVENUE' }]);
 
-      const expectedEBITDA = revenue - cogs - opex;
-      expect(expectedEBITDA).toBe(3000000);
-    });
+      const result = await ForecastLine.findByForecast('f1');
 
-    it('should handle negative EBITDA (loss)', () => {
-      const revenue = 5000000;
-      const cogs = 3000000;
-      const opex = 6000000;
-
-      const ebitda = revenue - cogs - opex;
-      expect(ebitda).toBe(-4000000);
-      expect(ebitda).toBeLessThan(0);
+      expect(result).toHaveLength(1);
     });
   });
 
-  describe('Summary by Metric', () => {
-    it('should aggregate values by metric', () => {
+  // -------------------------------------------------------------------
+  // findByMetric
+  // -------------------------------------------------------------------
+  describe('findByMetric', () => {
+    it('should query by forecastId and metric', async () => {
+      mockFind([{ forecastId: 'f1', metric: 'REVENUE', value: 1000000 }]);
+
+      const result = await ForecastLine.findByMetric('f1', 'REVENUE');
+
+      expect(result).toHaveLength(1);
+      const callArg = zerodbService.queryTable.mock.calls[0][1];
+      expect(callArg.filter.forecastId).toBe('f1');
+      expect(callArg.filter.metric).toBe('REVENUE');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // update
+  // -------------------------------------------------------------------
+  describe('update', () => {
+    it('should update a forecast line', async () => {
+      const line = { lineId: 'l1', forecastId: 'f1', value: 1000000, row_id: 'row_1' };
+      // Both ForecastLine.findOne and FinancialForecast.findOne use different tables
+      // but the mock returns the same data; the update flow works through client.put
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { ...line, status: 'DRAFT' } }]
+      });
+
+      await ForecastLine.update('l1', { value: 2000000 });
+
+      expect(zerodbService.client.put).toHaveBeenCalled();
+    });
+
+    it('should throw when line not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await expect(ForecastLine.update('missing', { value: 100 }))
+        .rejects.toThrow('Forecast line not found');
+    });
+
+    it('should throw when forecast is approved', async () => {
+      // ForecastLine.update first finds the line, then finds the forecast.
+      // Both use the same mock. We need the line to be found but forecast to be APPROVED.
+      // Since both use queryTable with different table names, we use mockResolvedValue
+      // that returns a doc with status APPROVED - the line findOne will find it,
+      // then the forecast findOne will also find it with APPROVED status.
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { lineId: 'l1', forecastId: 'f1', status: 'APPROVED', row_id: 'row_1' } }]
+      });
+
+      await expect(ForecastLine.update('l1', { value: 100 }))
+        .rejects.toThrow('Cannot modify lines of approved forecasts');
+    });
+
+    it('should throw for invalid metric', async () => {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { lineId: 'l1', forecastId: 'f1', status: 'DRAFT', row_id: 'row_1' } }]
+      });
+
+      await expect(ForecastLine.update('l1', { metric: 'INVALID' }))
+        .rejects.toThrow('Invalid metric: INVALID');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // deleteByForecast
+  // -------------------------------------------------------------------
+  describe('deleteByForecast', () => {
+    it('should throw when forecast is approved', async () => {
+      zerodbService.queryTable.mockResolvedValue({
+        data: [{ row_id: 'row_1', row_data: { forecastId: 'f1', status: 'APPROVED', row_id: 'row_1' } }]
+      });
+
+      await expect(ForecastLine.deleteByForecast('f1'))
+        .rejects.toThrow('Cannot delete lines of approved forecasts');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // calculateEBITDA
+  // -------------------------------------------------------------------
+  describe('calculateEBITDA', () => {
+    it('should calculate EBITDA from revenue, cogs, and opex', async () => {
+      const lines = [
+        { metric: 'REVENUE', value: 10000000, periodStart: '2026-01-01', periodEnd: '2026-12-31' },
+        { metric: 'COGS', value: 3000000, periodStart: '2026-01-01', periodEnd: '2026-12-31' },
+        { metric: 'OPEX_TOTAL', value: 4000000, periodStart: '2026-01-01', periodEnd: '2026-12-31' }
+      ];
+      mockFind(lines);
+
+      const result = await ForecastLine.calculateEBITDA('f1', '2026-01-01', '2026-12-31');
+
+      expect(result).toBe(3000000);
+    });
+
+    it('should return null when revenue is zero', async () => {
+      mockFind([]);
+
+      const result = await ForecastLine.calculateEBITDA('f1', '2026-01-01', '2026-12-31');
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle negative EBITDA', async () => {
+      const lines = [
+        { metric: 'REVENUE', value: 5000000 },
+        { metric: 'COGS', value: 3000000 },
+        { metric: 'OPEX_TOTAL', value: 6000000 }
+      ];
+      mockFind(lines);
+
+      const result = await ForecastLine.calculateEBITDA('f1', '2026-01-01', '2026-12-31');
+
+      expect(result).toBe(-4000000);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // getSummaryByMetric
+  // -------------------------------------------------------------------
+  describe('getSummaryByMetric', () => {
+    it('should aggregate values by metric', async () => {
       const lines = [
         { metric: 'REVENUE', value: 1000000, periodStart: '2026-01-01', periodEnd: '2026-12-31' },
         { metric: 'REVENUE', value: 1250000, periodStart: '2027-01-01', periodEnd: '2027-12-31' },
-        { metric: 'REVENUE', value: 1500000, periodStart: '2028-01-01', periodEnd: '2028-12-31' }
+        { metric: 'COGS', value: 300000, periodStart: '2026-01-01', periodEnd: '2026-12-31' }
       ];
+      mockFind(lines);
 
-      const summary = {};
-      for (const line of lines) {
-        if (!summary[line.metric]) {
-          summary[line.metric] = { total: 0, periods: [] };
-        }
-        summary[line.metric].total += line.value;
-        summary[line.metric].periods.push({
-          periodStart: line.periodStart,
-          periodEnd: line.periodEnd,
-          value: line.value
-        });
-      }
+      const summary = await ForecastLine.getSummaryByMetric('f1');
 
-      expect(summary.REVENUE.total).toBe(3750000);
-      expect(summary.REVENUE.periods.length).toBe(3);
-    });
-  });
-});
-
-describe('DCF Integration', () => {
-  describe('Forecast to Valuation Linkage', () => {
-    it('should only allow linking approved forecasts to valuations', () => {
-      const approvedForecast = { status: 'APPROVED', forecastId: 'forecast_123' };
-      const draftForecast = { status: 'DRAFT', forecastId: 'forecast_456' };
-
-      expect(approvedForecast.status).toBe('APPROVED');
-      expect(draftForecast.status).not.toBe('APPROVED');
+      expect(summary.REVENUE.total).toBe(2250000);
+      expect(summary.REVENUE.periods).toHaveLength(2);
+      expect(summary.COGS.total).toBe(300000);
+      expect(summary.COGS.periods).toHaveLength(1);
     });
 
-    it('should store valuation reference in forecast', () => {
-      const linkedForecast = {
-        forecastId: 'forecast_123',
-        valuationId: 'val_456',
-        status: 'APPROVED'
-      };
+    it('should handle empty lines', async () => {
+      mockFind([]);
 
-      expect(linkedForecast.valuationId).toBe('val_456');
+      const summary = await ForecastLine.getSummaryByMetric('f1');
+
+      expect(Object.keys(summary)).toHaveLength(0);
     });
   });
 
-  describe('Terminal Value Requirements', () => {
-    it('should have terminalGrowthRate for DCF calculations', () => {
-      const forecast = {
-        growthAssumptions: {
-          terminalGrowthRate: 0.025,
-          discountRate: 0.12
-        }
-      };
-
-      expect(forecast.growthAssumptions.terminalGrowthRate).toBe(0.025);
-    });
-
-    it('should have discountRate for DCF calculations', () => {
-      const forecast = {
-        growthAssumptions: {
-          terminalGrowthRate: 0.025,
-          discountRate: 0.12
-        }
-      };
-
-      expect(forecast.growthAssumptions.discountRate).toBe(0.12);
-    });
-  });
-
-  describe('Scenario Support', () => {
-    it('should support multiple scenarios', () => {
-      const baseCase = { scenarioType: 'BASE', forecastId: 'forecast_base' };
-      const bullCase = { scenarioType: 'BULL', forecastId: 'forecast_bull' };
-      const bearCase = { scenarioType: 'BEAR', forecastId: 'forecast_bear' };
-
-      expect(baseCase.scenarioType).toBe('BASE');
-      expect(bullCase.scenarioType).toBe('BULL');
-      expect(bearCase.scenarioType).toBe('BEAR');
-    });
-  });
-});
-
-describe('Approval Workflow', () => {
-  describe('Submit for Approval', () => {
-    it('should have submit method', () => {
-      expect(typeof FinancialForecast.submit).toBe('function');
-    });
-  });
-
-  describe('Approve Forecast', () => {
-    it('should have approve method', () => {
-      expect(typeof FinancialForecast.approve).toBe('function');
-    });
-  });
-
-  describe('Supersession Logic', () => {
-    it('should only allow one approved forecast per company', () => {
-      const companyId = 'company_123';
-      const forecasts = [
-        { forecastId: 'forecast_1', companyId, status: 'SUPERSEDED' },
-        { forecastId: 'forecast_2', companyId, status: 'APPROVED' }
-      ];
-
-      const approvedCount = forecasts.filter(f => f.status === 'APPROVED').length;
-      expect(approvedCount).toBe(1);
-    });
-  });
-
-  describe('Link to Valuation', () => {
-    it('should have linkToValuation method', () => {
-      expect(typeof FinancialForecast.linkToValuation).toBe('function');
-    });
-  });
-});
-
-describe('Query Methods', () => {
-  describe('Find by Company', () => {
-    it('should have findByCompany method', () => {
-      expect(typeof FinancialForecast.findByCompany).toBe('function');
-    });
-  });
-
-  describe('Find Latest Approved', () => {
-    it('should have findLatestApproved method', () => {
-      expect(typeof FinancialForecast.findLatestApproved).toBe('function');
-    });
-  });
-
-  describe('Update Growth Assumptions', () => {
-    it('should have updateGrowthAssumptions method', () => {
-      expect(typeof FinancialForecast.updateGrowthAssumptions).toBe('function');
-    });
-  });
-});
-
-describe('ForecastLine Query Methods', () => {
-  describe('Find by Forecast', () => {
-    it('should have findByForecast method', () => {
-      expect(typeof ForecastLine.findByForecast).toBe('function');
-    });
-  });
-
-  describe('Find by Metric', () => {
-    it('should have findByMetric method', () => {
-      expect(typeof ForecastLine.findByMetric).toBe('function');
-    });
-  });
-
-  describe('Create Many Lines', () => {
-    it('should have createMany method', () => {
+  // -------------------------------------------------------------------
+  // CRUD method existence
+  // -------------------------------------------------------------------
+  describe('CRUD Methods', () => {
+    it('should have all required methods', () => {
+      expect(typeof ForecastLine.create).toBe('function');
+      expect(typeof ForecastLine.find).toBe('function');
+      expect(typeof ForecastLine.findOne).toBe('function');
+      expect(typeof ForecastLine.updateOne).toBe('function');
+      expect(typeof ForecastLine.deleteOne).toBe('function');
+      expect(typeof ForecastLine.deleteMany).toBe('function');
       expect(typeof ForecastLine.createMany).toBe('function');
-    });
-  });
-
-  describe('Get Summary by Metric', () => {
-    it('should have getSummaryByMetric method', () => {
-      expect(typeof ForecastLine.getSummaryByMetric).toBe('function');
-    });
-  });
-
-  describe('Delete by Forecast', () => {
-    it('should have deleteByForecast method', () => {
+      expect(typeof ForecastLine.findByForecast).toBe('function');
+      expect(typeof ForecastLine.findByMetric).toBe('function');
+      expect(typeof ForecastLine.update).toBe('function');
       expect(typeof ForecastLine.deleteByForecast).toBe('function');
+      expect(typeof ForecastLine.calculateEBITDA).toBe('function');
+      expect(typeof ForecastLine.getSummaryByMetric).toBe('function');
     });
   });
 });

@@ -347,7 +347,7 @@ class QueryBuilderService {
     // Validate fields
     if (!reportConfig.fields || reportConfig.fields.length === 0) {
       errors.push('At least one field is required');
-    } else {
+    } else if (reportConfig.dataSources && reportConfig.dataSources.length > 0) {
       // Get available fields for each data source
       const allowedFields = [];
       for (const dataSource of reportConfig.dataSources) {

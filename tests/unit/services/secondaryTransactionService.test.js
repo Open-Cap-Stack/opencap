@@ -1,480 +1,861 @@
 /**
- * SecondaryTransaction Service Unit Tests
+ * SecondaryTransactionService Tests
  * Issue #103: Create Secondary Transaction Model
- * TDD Red Phase: Tests written before implementation
+ *
+ * Test suite for secondary share transactions including:
+ * - Market listing creation and management
+ * - Transaction initiation, completion, cancellation
+ * - Fee calculations
+ * - Report generation
+ * - Market statistics
  */
-process.env.SKIP_DB_SETUP = 'true';
 
-// Mock must be before any requires
-jest.mock('../../../services/databaseAdapter', () => ({
-  initialized: true,
-  create: jest.fn(),
-  find: jest.fn(),
-  findOne: jest.fn(),
-  findById: jest.fn(),
-  findByIdAndUpdate: jest.fn(),
-  findByIdAndDelete: jest.fn(),
-  count: jest.fn()
-}));
-
+const SecondaryTransactionService = require('../../../services/secondaryTransactionService');
 const databaseAdapter = require('../../../services/databaseAdapter');
-const secondaryTransactionService = require('../../../services/secondaryTransactionService');
 
-describe('SecondaryTransaction Service', () => {
+jest.mock('../../../services/databaseAdapter');
+
+describe('SecondaryTransactionService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
+  describe('generateListingId', () => {
+    it('should generate a listing ID with LST- prefix', () => {
+      const id = SecondaryTransactionService.generateListingId();
+      expect(id).toMatch(/^LST-[A-Z0-9]{8}$/);
+    });
+
+    it('should generate unique IDs on each call', () => {
+      const id1 = SecondaryTransactionService.generateListingId();
+      const id2 = SecondaryTransactionService.generateListingId();
+      expect(id1).not.toBe(id2);
+    });
+  });
+
+  describe('generateTransactionId', () => {
+    it('should generate a transaction ID with TXN- prefix', () => {
+      const id = SecondaryTransactionService.generateTransactionId();
+      expect(id).toMatch(/^TXN-[A-Z0-9]{8}$/);
+    });
+  });
+
   describe('createListing', () => {
-    const validListingData = {
-      companyId: 'company123',
-      sellerId: 'seller123',
-      shareClassId: 'shareClass123',
-      numberOfShares: 1000,
-      askingPrice: 50000,
-      visibility: 'private'
-    };
+    it('should create a listing with default values', async () => {
+      const listingData = {
+        companyId: 'comp-1',
+        sellerId: 'seller-1',
+        numberOfShares: 1000,
+        askingPrice: 50000
+      };
 
-    it('should create a new listing successfully', async () => {
-      const mockSavedListing = { _id: 'listing123', ...validListingData };
-      databaseAdapter.create.mockResolvedValue(mockSavedListing);
+      databaseAdapter.create.mockResolvedValue({ ...listingData, _id: 'listing-1' });
 
-      const result = await secondaryTransactionService.createListing(validListingData);
+      await SecondaryTransactionService.createListing(listingData);
 
       expect(databaseAdapter.create).toHaveBeenCalledWith(
         'SecondaryMarketListing',
         expect.objectContaining({
-          ...validListingData,
-          listingId: expect.stringMatching(/^LST-/)
-        })
-      );
-      expect(result).toHaveProperty('_id', 'listing123');
-    });
-
-    it('should auto-generate listingId if not provided', async () => {
-      databaseAdapter.create.mockResolvedValue({ _id: 'listing123' });
-
-      await secondaryTransactionService.createListing(validListingData);
-
-      expect(databaseAdapter.create).toHaveBeenCalledWith(
-        'SecondaryMarketListing',
-        expect.objectContaining({
-          listingId: expect.stringMatching(/^LST-[A-Z0-9]{8}$/)
+          companyId: 'comp-1',
+          sellerId: 'seller-1',
+          numberOfShares: 1000,
+          askingPrice: 50000,
+          status: 'active',
+          sharesAvailable: 1000,
+          pricePerShare: 50
         })
       );
     });
 
-    it('should throw error for invalid data', async () => {
-      databaseAdapter.create.mockRejectedValue(new Error('Validation error'));
+    it('should generate listingId when not provided', async () => {
+      databaseAdapter.create.mockResolvedValue({});
 
-      await expect(secondaryTransactionService.createListing({})).rejects.toThrow();
+      await SecondaryTransactionService.createListing({ numberOfShares: 100 });
+
+      const callArg = databaseAdapter.create.mock.calls[0][1];
+      expect(callArg.listingId).toMatch(/^LST-/);
+    });
+
+    it('should preserve provided listingId and status', async () => {
+      const listingData = {
+        listingId: 'LST-CUSTOM01',
+        status: 'pending_review',
+        numberOfShares: 500,
+        sharesAvailable: 300
+      };
+
+      databaseAdapter.create.mockResolvedValue({});
+
+      await SecondaryTransactionService.createListing(listingData);
+
+      const callArg = databaseAdapter.create.mock.calls[0][1];
+      expect(callArg.listingId).toBe('LST-CUSTOM01');
+      expect(callArg.status).toBe('pending_review');
+      expect(callArg.sharesAvailable).toBe(300);
+    });
+
+    it('should not calculate pricePerShare when already provided', async () => {
+      const listingData = {
+        numberOfShares: 100,
+        askingPrice: 5000,
+        pricePerShare: 60
+      };
+
+      databaseAdapter.create.mockResolvedValue({});
+
+      await SecondaryTransactionService.createListing(listingData);
+
+      const callArg = databaseAdapter.create.mock.calls[0][1];
+      expect(callArg.pricePerShare).toBe(60);
     });
   });
 
   describe('updateListing', () => {
-    it('should update listing successfully', async () => {
-      const mockUpdatedListing = { _id: 'listing123', askingPrice: 60000 };
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockUpdatedListing);
+    it('should update a listing with new data', async () => {
+      const updated = { _id: 'listing-1', status: 'paused' };
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(updated);
 
-      const result = await secondaryTransactionService.updateListing('listing123', { askingPrice: 60000 });
+      const result = await SecondaryTransactionService.updateListing('listing-1', { status: 'paused' });
 
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
         'SecondaryMarketListing',
-        'listing123',
-        expect.objectContaining({ askingPrice: 60000 }),
+        'listing-1',
+        expect.objectContaining({ status: 'paused', updatedAt: expect.any(Date) }),
         { new: true }
       );
-      expect(result).toHaveProperty('askingPrice', 60000);
-    });
-
-    it('should return null if listing not found', async () => {
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue(null);
-
-      const result = await secondaryTransactionService.updateListing('nonexistent', { askingPrice: 60000 });
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('expressInterest', () => {
-    const interestData = {
-      listingId: 'listing123',
-      buyerId: 'buyer123',
-      buyerName: 'John Doe',
-      offeredPrice: 45000,
-      message: 'Interested in purchasing'
-    };
-
-    it('should add interested buyer to listing', async () => {
-      const mockListing = {
-        _id: 'listing123',
-        status: 'active',
-        interestedBuyers: [],
-        addInterestedBuyer: jest.fn()
-      };
-      databaseAdapter.findById.mockResolvedValue(mockListing);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
-        ...mockListing,
-        interestedBuyers: [{ buyerId: 'buyer123' }]
-      });
-
-      const result = await secondaryTransactionService.expressInterest(interestData);
-
-      expect(databaseAdapter.findById).toHaveBeenCalledWith('SecondaryMarketListing', 'listing123');
-      expect(result).toBeDefined();
-    });
-
-    it('should throw error if listing not found', async () => {
-      databaseAdapter.findById.mockResolvedValue(null);
-
-      await expect(secondaryTransactionService.expressInterest(interestData)).rejects.toThrow('Listing not found');
-    });
-
-    it('should throw error if listing is not active', async () => {
-      const mockListing = { _id: 'listing123', status: 'sold' };
-      databaseAdapter.findById.mockResolvedValue(mockListing);
-
-      await expect(secondaryTransactionService.expressInterest(interestData)).rejects.toThrow('Listing is not active');
-    });
-  });
-
-  describe('initiateTransaction', () => {
-    const transactionData = {
-      companyId: 'company123',
-      sellerId: 'seller123',
-      buyerId: 'buyer123',
-      shareClassId: 'shareClass123',
-      numberOfShares: 500,
-      pricePerShare: 50,
-      transactionType: 'private_sale',
-      transactionDate: new Date()
-    };
-
-    it('should create a new transaction', async () => {
-      const mockTransaction = { _id: 'transaction123', ...transactionData };
-      databaseAdapter.create.mockResolvedValue(mockTransaction);
-
-      const result = await secondaryTransactionService.initiateTransaction(transactionData);
-
-      expect(databaseAdapter.create).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        expect.objectContaining({
-          ...transactionData,
-          transactionId: expect.stringMatching(/^TXN-/),
-          status: 'pending',
-          totalAmount: 25000
-        })
-      );
-      expect(result).toHaveProperty('_id', 'transaction123');
-    });
-
-    it('should auto-generate transactionId', async () => {
-      databaseAdapter.create.mockResolvedValue({ _id: 'transaction123' });
-
-      await secondaryTransactionService.initiateTransaction(transactionData);
-
-      expect(databaseAdapter.create).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        expect.objectContaining({
-          transactionId: expect.stringMatching(/^TXN-[A-Z0-9]{8}$/)
-        })
-      );
-    });
-  });
-
-  describe('completeTransaction', () => {
-    it('should complete a pending transaction', async () => {
-      const mockTransaction = { _id: 'transaction123', status: 'pending' };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
-        ...mockTransaction,
-        status: 'completed'
-      });
-
-      const result = await secondaryTransactionService.completeTransaction('transaction123');
-
-      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        'transaction123',
-        expect.objectContaining({
-          status: 'completed',
-          completedAt: expect.any(Date)
-        }),
-        { new: true }
-      );
-      expect(result).toHaveProperty('status', 'completed');
-    });
-
-    it('should throw error if transaction not found', async () => {
-      databaseAdapter.findById.mockResolvedValue(null);
-
-      await expect(secondaryTransactionService.completeTransaction('nonexistent')).rejects.toThrow('Transaction not found');
-    });
-
-    it('should throw error if transaction is already completed', async () => {
-      const mockTransaction = { _id: 'transaction123', status: 'completed' };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-
-      await expect(secondaryTransactionService.completeTransaction('transaction123')).rejects.toThrow('Transaction cannot be completed');
-    });
-  });
-
-  describe('cancelTransaction', () => {
-    it('should cancel a pending transaction', async () => {
-      const mockTransaction = { _id: 'transaction123', status: 'pending' };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
-        ...mockTransaction,
-        status: 'canceled'
-      });
-
-      const result = await secondaryTransactionService.cancelTransaction('transaction123', 'Buyer withdrew', 'user123');
-
-      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        'transaction123',
-        expect.objectContaining({
-          status: 'canceled',
-          cancellationReason: 'Buyer withdrew',
-          canceledBy: 'user123',
-          canceledAt: expect.any(Date)
-        }),
-        { new: true }
-      );
-      expect(result).toHaveProperty('status', 'canceled');
-    });
-
-    it('should throw error if transaction cannot be canceled', async () => {
-      const mockTransaction = { _id: 'transaction123', status: 'completed' };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-
-      await expect(secondaryTransactionService.cancelTransaction('transaction123', 'reason', 'user123')).rejects.toThrow('Transaction cannot be canceled');
-    });
-  });
-
-  describe('getTransactionHistory', () => {
-    it('should return transaction history for a company', async () => {
-      const mockTransactions = [
-        { _id: 'txn1', companyId: 'company123', status: 'completed' },
-        { _id: 'txn2', companyId: 'company123', status: 'pending' }
-      ];
-      databaseAdapter.find.mockResolvedValue(mockTransactions);
-
-      const result = await secondaryTransactionService.getTransactionHistory({ companyId: 'company123' });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        { companyId: 'company123' },
-        expect.any(Object)
-      );
-      expect(result).toHaveLength(2);
-    });
-
-    it('should filter by status', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
-
-      await secondaryTransactionService.getTransactionHistory({
-        companyId: 'company123',
-        status: 'completed'
-      });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        expect.objectContaining({ companyId: 'company123', status: 'completed' }),
-        expect.any(Object)
-      );
-    });
-
-    it('should filter by sellerId', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
-
-      await secondaryTransactionService.getTransactionHistory({ sellerId: 'seller123' });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        expect.objectContaining({ sellerId: 'seller123' }),
-        expect.any(Object)
-      );
-    });
-
-    it('should filter by buyerId', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
-
-      await secondaryTransactionService.getTransactionHistory({ buyerId: 'buyer123' });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryTransaction',
-        expect.objectContaining({ buyerId: 'buyer123' }),
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe('calculateFees', () => {
-    it('should calculate transaction fees correctly', async () => {
-      const transactionData = {
-        totalAmount: 100000,
-        transactionType: 'private_sale'
-      };
-
-      const result = await secondaryTransactionService.calculateFees(transactionData);
-
-      expect(result).toHaveProperty('platformFee');
-      expect(result).toHaveProperty('totalFees');
-      expect(result.totalFees).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should apply different fee rates for different transaction types', async () => {
-      const privateSaleData = { totalAmount: 100000, transactionType: 'private_sale' };
-      const giftData = { totalAmount: 100000, transactionType: 'gift' };
-
-      const privateSaleFees = await secondaryTransactionService.calculateFees(privateSaleData);
-      const giftFees = await secondaryTransactionService.calculateFees(giftData);
-
-      // Gift transfers typically have lower fees
-      expect(giftFees.platformFee).toBeLessThanOrEqual(privateSaleFees.platformFee);
-    });
-  });
-
-  describe('generateTransactionReport', () => {
-    it('should generate a report for a transaction', async () => {
-      const mockTransaction = {
-        _id: 'transaction123',
-        transactionId: 'TXN-12345678',
-        companyId: 'company123',
-        sellerId: 'seller123',
-        buyerId: 'buyer123',
-        numberOfShares: 1000,
-        pricePerShare: 50,
-        totalAmount: 50000,
-        status: 'completed',
-        transactionDate: new Date(),
-        completedAt: new Date()
-      };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-
-      const result = await secondaryTransactionService.generateTransactionReport('transaction123');
-
-      expect(result).toHaveProperty('transaction');
-      expect(result).toHaveProperty('summary');
-      expect(result.summary).toHaveProperty('transactionId', 'TXN-12345678');
-      expect(result.summary).toHaveProperty('totalAmount', 50000);
-    });
-
-    it('should throw error if transaction not found', async () => {
-      databaseAdapter.findById.mockResolvedValue(null);
-
-      await expect(secondaryTransactionService.generateTransactionReport('nonexistent')).rejects.toThrow('Transaction not found');
-    });
-  });
-
-  describe('getListings', () => {
-    it('should return active listings for a company', async () => {
-      const mockListings = [
-        { _id: 'listing1', status: 'active' },
-        { _id: 'listing2', status: 'active' }
-      ];
-      databaseAdapter.find.mockResolvedValue(mockListings);
-
-      const result = await secondaryTransactionService.getListings({ companyId: 'company123' });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryMarketListing',
-        expect.objectContaining({ companyId: 'company123' }),
-        expect.any(Object)
-      );
-      expect(result).toHaveLength(2);
-    });
-
-    it('should filter by visibility', async () => {
-      databaseAdapter.find.mockResolvedValue([]);
-
-      await secondaryTransactionService.getListings({ visibility: 'public' });
-
-      expect(databaseAdapter.find).toHaveBeenCalledWith(
-        'SecondaryMarketListing',
-        expect.objectContaining({ visibility: 'public' }),
-        expect.any(Object)
-      );
+      expect(result).toEqual(updated);
     });
   });
 
   describe('getListingById', () => {
-    it('should return a listing by ID', async () => {
-      const mockListing = { _id: 'listing123', listingId: 'LST-12345678' };
-      databaseAdapter.findById.mockResolvedValue(mockListing);
+    it('should return listing by ID', async () => {
+      const listing = { _id: 'listing-1', status: 'active' };
+      databaseAdapter.findById.mockResolvedValue(listing);
 
-      const result = await secondaryTransactionService.getListingById('listing123');
+      const result = await SecondaryTransactionService.getListingById('listing-1');
 
-      expect(databaseAdapter.findById).toHaveBeenCalledWith('SecondaryMarketListing', 'listing123');
-      expect(result).toHaveProperty('listingId', 'LST-12345678');
+      expect(databaseAdapter.findById).toHaveBeenCalledWith('SecondaryMarketListing', 'listing-1');
+      expect(result).toEqual(listing);
+    });
+
+    it('should return null if listing not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      const result = await SecondaryTransactionService.getListingById('nonexistent');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getListings', () => {
+    it('should return listings with filters', async () => {
+      const listings = [{ _id: '1' }, { _id: '2' }];
+      databaseAdapter.find.mockResolvedValue(listings);
+
+      const result = await SecondaryTransactionService.getListings({
+        companyId: 'comp-1',
+        status: 'active'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SecondaryMarketListing',
+        { companyId: 'comp-1', status: 'active' },
+        { sort: { listedAt: -1 } }
+      );
+      expect(result).toHaveLength(2);
+    });
+
+    it('should return all listings when no filters given', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SecondaryTransactionService.getListings();
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SecondaryMarketListing',
+        {},
+        { sort: { listedAt: -1 } }
+      );
+    });
+
+    it('should support all filter types', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SecondaryTransactionService.getListings({
+        companyId: 'c1',
+        sellerId: 's1',
+        shareClassId: 'sc1',
+        status: 'active',
+        visibility: 'public'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SecondaryMarketListing',
+        {
+          companyId: 'c1',
+          sellerId: 's1',
+          shareClassId: 'sc1',
+          status: 'active',
+          visibility: 'public'
+        },
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('expressInterest', () => {
+    it('should add a new interested buyer to a listing', async () => {
+      const listing = {
+        _id: 'listing-1',
+        status: 'active',
+        interestedBuyers: []
+      };
+      databaseAdapter.findById.mockResolvedValue(listing);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ ...listing, interestedBuyers: [{}] });
+
+      await SecondaryTransactionService.expressInterest({
+        listingId: 'listing-1',
+        buyerId: 'buyer-1',
+        buyerName: 'John Doe',
+        offeredPrice: 55000,
+        offeredShares: 1000,
+        message: 'Interested in buying'
+      });
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'SecondaryMarketListing',
+        'listing-1',
+        expect.objectContaining({
+          interestedBuyers: expect.arrayContaining([
+            expect.objectContaining({
+              buyerId: 'buyer-1',
+              buyerName: 'John Doe',
+              status: 'interested'
+            })
+          ])
+        }),
+        { new: true }
+      );
+    });
+
+    it('should update existing buyer interest', async () => {
+      const listing = {
+        _id: 'listing-1',
+        status: 'active',
+        interestedBuyers: [
+          { buyerId: 'buyer-1', offeredPrice: 40000, status: 'interested' }
+        ]
+      };
+      databaseAdapter.findById.mockResolvedValue(listing);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.expressInterest({
+        listingId: 'listing-1',
+        buyerId: 'buyer-1',
+        buyerName: 'John Doe',
+        offeredPrice: 50000,
+        offeredShares: 900
+      });
+
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.interestedBuyers).toHaveLength(1);
+      expect(callArg.interestedBuyers[0].offeredPrice).toBe(50000);
+    });
+
+    it('should throw if listing not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(
+        SecondaryTransactionService.expressInterest({ listingId: 'bad-id' })
+      ).rejects.toThrow('Listing not found');
+    });
+
+    it('should throw if listing is not active', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: '1', status: 'withdrawn' });
+
+      await expect(
+        SecondaryTransactionService.expressInterest({ listingId: '1' })
+      ).rejects.toThrow('Listing is not active');
+    });
+
+    it('should allow interest on partially_sold listing', async () => {
+      const listing = {
+        _id: 'listing-1',
+        status: 'partially_sold',
+        interestedBuyers: []
+      };
+      databaseAdapter.findById.mockResolvedValue(listing);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.expressInterest({
+        listingId: 'listing-1',
+        buyerId: 'buyer-1'
+      });
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
     });
   });
 
   describe('withdrawListing', () => {
     it('should withdraw an active listing', async () => {
-      const mockListing = { _id: 'listing123', status: 'active' };
-      databaseAdapter.findById.mockResolvedValue(mockListing);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
-        ...mockListing,
-        status: 'withdrawn'
-      });
+      databaseAdapter.findById.mockResolvedValue({ _id: '1', status: 'active' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ status: 'withdrawn' });
 
-      const result = await secondaryTransactionService.withdrawListing('listing123', 'user123');
+      await SecondaryTransactionService.withdrawListing('1', 'user-1');
 
       expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
         'SecondaryMarketListing',
-        'listing123',
+        '1',
         expect.objectContaining({
           status: 'withdrawn',
+          updatedBy: 'user-1',
           withdrawnAt: expect.any(Date)
         }),
         { new: true }
       );
-      expect(result).toHaveProperty('status', 'withdrawn');
     });
 
-    it('should throw error if listing is not active', async () => {
-      const mockListing = { _id: 'listing123', status: 'sold' };
-      databaseAdapter.findById.mockResolvedValue(mockListing);
+    it('should throw if listing not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
 
-      await expect(secondaryTransactionService.withdrawListing('listing123', 'user123')).rejects.toThrow('Listing cannot be withdrawn');
+      await expect(
+        SecondaryTransactionService.withdrawListing('bad-id', 'user-1')
+      ).rejects.toThrow('Listing not found');
+    });
+
+    it('should throw if listing cannot be withdrawn', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: '1', status: 'sold' });
+
+      await expect(
+        SecondaryTransactionService.withdrawListing('1', 'user-1')
+      ).rejects.toThrow('Listing cannot be withdrawn');
+    });
+  });
+
+  describe('initiateTransaction', () => {
+    it('should create a transaction with calculated total', async () => {
+      const txnData = {
+        companyId: 'comp-1',
+        sellerId: 'seller-1',
+        buyerId: 'buyer-1',
+        numberOfShares: 100,
+        pricePerShare: 50
+      };
+
+      databaseAdapter.create.mockResolvedValue({ ...txnData, _id: 'txn-1' });
+
+      await SecondaryTransactionService.initiateTransaction(txnData);
+
+      const callArg = databaseAdapter.create.mock.calls[0][1];
+      expect(callArg.status).toBe('pending');
+      expect(callArg.totalAmount).toBe(5000);
+      expect(callArg.transactionId).toMatch(/^TXN-/);
+      expect(callArg.initiatedAt).toBeInstanceOf(Date);
+    });
+
+    it('should use provided totalAmount if given', async () => {
+      const txnData = {
+        totalAmount: 6000,
+        numberOfShares: 100,
+        pricePerShare: 50
+      };
+
+      databaseAdapter.create.mockResolvedValue({});
+
+      await SecondaryTransactionService.initiateTransaction(txnData);
+
+      const callArg = databaseAdapter.create.mock.calls[0][1];
+      expect(callArg.totalAmount).toBe(6000);
     });
   });
 
   describe('getTransactionById', () => {
-    it('should return a transaction by ID', async () => {
-      const mockTransaction = { _id: 'transaction123', transactionId: 'TXN-12345678' };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
+    it('should return transaction by ID', async () => {
+      const txn = { _id: 'txn-1', status: 'pending' };
+      databaseAdapter.findById.mockResolvedValue(txn);
 
-      const result = await secondaryTransactionService.getTransactionById('transaction123');
+      const result = await SecondaryTransactionService.getTransactionById('txn-1');
 
-      expect(databaseAdapter.findById).toHaveBeenCalledWith('SecondaryTransaction', 'transaction123');
-      expect(result).toHaveProperty('transactionId', 'TXN-12345678');
+      expect(databaseAdapter.findById).toHaveBeenCalledWith('SecondaryTransaction', 'txn-1');
+      expect(result).toEqual(txn);
+    });
+  });
+
+  describe('completeTransaction', () => {
+    it('should complete a pending transaction', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: 'txn-1', status: 'pending' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ status: 'completed' });
+
+      await SecondaryTransactionService.completeTransaction('txn-1');
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'SecondaryTransaction',
+        'txn-1',
+        expect.objectContaining({
+          status: 'completed',
+          completedAt: expect.any(Date),
+          settlementDate: expect.any(Date)
+        }),
+        { new: true }
+      );
+    });
+
+    it('should complete an approved transaction', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: 'txn-1', status: 'approved' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ status: 'completed' });
+
+      await SecondaryTransactionService.completeTransaction('txn-1');
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
+    });
+
+    it('should complete a transaction in_escrow', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: 'txn-1', status: 'in_escrow' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ status: 'completed' });
+
+      await SecondaryTransactionService.completeTransaction('txn-1');
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
+    });
+
+    it('should throw if transaction not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(
+        SecondaryTransactionService.completeTransaction('bad')
+      ).rejects.toThrow('Transaction not found');
+    });
+
+    it('should throw if transaction cannot be completed', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: '1', status: 'completed' });
+
+      await expect(
+        SecondaryTransactionService.completeTransaction('1')
+      ).rejects.toThrow('Transaction cannot be completed');
+    });
+
+    it('should use provided settlementDate from completionData', async () => {
+      const settlementDate = new Date('2026-06-01');
+      databaseAdapter.findById.mockResolvedValue({ _id: 'txn-1', status: 'pending' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.completeTransaction('txn-1', { settlementDate });
+
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.settlementDate).toEqual(settlementDate);
+    });
+  });
+
+  describe('cancelTransaction', () => {
+    it('should cancel a pending transaction', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: 'txn-1', status: 'pending' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ status: 'canceled' });
+
+      await SecondaryTransactionService.cancelTransaction('txn-1', 'Changed mind', 'user-1');
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'SecondaryTransaction',
+        'txn-1',
+        expect.objectContaining({
+          status: 'canceled',
+          cancellationReason: 'Changed mind',
+          canceledBy: 'user-1',
+          canceledAt: expect.any(Date)
+        }),
+        { new: true }
+      );
+    });
+
+    it('should throw if transaction not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(
+        SecondaryTransactionService.cancelTransaction('bad', 'reason', 'user')
+      ).rejects.toThrow('Transaction not found');
+    });
+
+    it('should throw if transaction cannot be canceled', async () => {
+      databaseAdapter.findById.mockResolvedValue({ _id: '1', status: 'completed' });
+
+      await expect(
+        SecondaryTransactionService.cancelTransaction('1', 'reason', 'user')
+      ).rejects.toThrow('Transaction cannot be canceled');
     });
   });
 
   describe('approveTransaction', () => {
-    it('should add approval to a transaction', async () => {
-      const mockTransaction = {
-        _id: 'transaction123',
+    it('should add an approval to a transaction', async () => {
+      databaseAdapter.findById.mockResolvedValue({
+        _id: 'txn-1',
         status: 'pending',
         approvals: []
-      };
-      databaseAdapter.findById.mockResolvedValue(mockTransaction);
-      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
-        ...mockTransaction,
-        approvals: [{ approverType: 'board', status: 'approved' }]
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.approveTransaction('txn-1', {
+        approverType: 'company',
+        approverId: 'admin-1',
+        status: 'approved',
+        notes: 'Approved'
       });
 
-      const result = await secondaryTransactionService.approveTransaction('transaction123', {
-        approverType: 'board',
-        approverId: 'approver123',
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.approvals).toHaveLength(1);
+      expect(callArg.approvals[0]).toMatchObject({
+        approverType: 'company',
+        status: 'approved',
+        approvedAt: expect.any(Date)
+      });
+    });
+
+    it('should set status to approved when all approvals pass for pending transaction', async () => {
+      databaseAdapter.findById.mockResolvedValue({
+        _id: 'txn-1',
+        status: 'pending',
+        approvals: []
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.approveTransaction('txn-1', {
+        approverType: 'company',
+        approverId: 'admin-1',
         status: 'approved'
       });
 
-      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
-      expect(result).toBeDefined();
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.status).toBe('approved');
+    });
+
+    it('should not change status if approval is rejected', async () => {
+      databaseAdapter.findById.mockResolvedValue({
+        _id: 'txn-1',
+        status: 'pending',
+        approvals: []
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.approveTransaction('txn-1', {
+        approverType: 'company',
+        approverId: 'admin-1',
+        status: 'rejected'
+      });
+
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.status).toBe('pending');
+    });
+
+    it('should set approvedAt to null if status is not approved', async () => {
+      databaseAdapter.findById.mockResolvedValue({
+        _id: 'txn-1',
+        status: 'pending',
+        approvals: []
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await SecondaryTransactionService.approveTransaction('txn-1', {
+        approverType: 'company',
+        approverId: 'admin-1',
+        status: 'pending_review'
+      });
+
+      const callArg = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(callArg.approvals[0].approvedAt).toBeNull();
+    });
+
+    it('should throw if transaction not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(
+        SecondaryTransactionService.approveTransaction('bad', {})
+      ).rejects.toThrow('Transaction not found');
+    });
+  });
+
+  describe('getTransactionHistory', () => {
+    it('should return transactions with filters', async () => {
+      databaseAdapter.find.mockResolvedValue([{ _id: '1' }]);
+
+      const result = await SecondaryTransactionService.getTransactionHistory({
+        companyId: 'comp-1',
+        status: 'completed'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SecondaryTransaction',
+        { companyId: 'comp-1', status: 'completed' },
+        { sort: { transactionDate: -1 } }
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it('should add date range filters when provided', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SecondaryTransactionService.getTransactionHistory({
+        startDate: '2026-01-01',
+        endDate: '2026-12-31'
+      });
+
+      const queryArg = databaseAdapter.find.mock.calls[0][1];
+      expect(queryArg.transactionDate).toEqual({
+        $gte: expect.any(Date),
+        $lte: expect.any(Date)
+      });
+    });
+
+    it('should handle partial date range with only startDate', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SecondaryTransactionService.getTransactionHistory({
+        startDate: '2026-01-01'
+      });
+
+      const queryArg = databaseAdapter.find.mock.calls[0][1];
+      expect(queryArg.transactionDate.$gte).toBeDefined();
+      expect(queryArg.transactionDate.$lte).toBeUndefined();
+    });
+
+    it('should support all filter types', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SecondaryTransactionService.getTransactionHistory({
+        companyId: 'c1',
+        sellerId: 's1',
+        buyerId: 'b1',
+        shareClassId: 'sc1',
+        status: 'completed',
+        transactionType: 'private_sale'
+      });
+
+      const queryArg = databaseAdapter.find.mock.calls[0][1];
+      expect(queryArg).toEqual(expect.objectContaining({
+        companyId: 'c1',
+        sellerId: 's1',
+        buyerId: 'b1',
+        shareClassId: 'sc1',
+        status: 'completed',
+        transactionType: 'private_sale'
+      }));
+    });
+  });
+
+  describe('calculateFees', () => {
+    it('should calculate fees for a private sale', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 100000,
+        transactionType: 'private_sale'
+      });
+
+      expect(result.platformFee).toBe(1500);
+      expect(result.legalFees).toBe(500);
+      expect(result.transferAgentFee).toBe(100);
+      expect(result.escrowFee).toBe(500);
+      expect(result.totalFees).toBe(2600);
+      expect(result.netAmount).toBe(97400);
+      expect(result.feePercentage).toBe(2.6);
+    });
+
+    it('should use private_sale rates for unknown transaction types', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 100000,
+        transactionType: 'unknown_type'
+      });
+
+      expect(result.platformFee).toBe(1500);
+    });
+
+    it('should cap transfer agent fee at $250', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 1000000,
+        transactionType: 'private_sale'
+      });
+
+      expect(result.transferAgentFee).toBe(250);
+    });
+
+    it('should use lower escrow fee for amounts under $50,000', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 30000,
+        transactionType: 'private_sale'
+      });
+
+      expect(result.escrowFee).toBe(250);
+    });
+
+    it('should calculate correct fees for gift transactions', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 10000,
+        transactionType: 'gift'
+      });
+
+      expect(result.platformFee).toBe(25);
+      expect(result.legalFees).toBe(25);
+    });
+
+    it('should default to private_sale when transactionType not given', async () => {
+      const result = await SecondaryTransactionService.calculateFees({
+        totalAmount: 100000
+      });
+
+      expect(result.platformFee).toBe(1500);
+    });
+  });
+
+  describe('generateTransactionReport', () => {
+    it('should generate a complete report for a transaction', async () => {
+      const transaction = {
+        _id: 'txn-1',
+        transactionId: 'TXN-12345678',
+        status: 'completed',
+        transactionType: 'private_sale',
+        sellerId: 'seller-1',
+        buyerId: 'buyer-1',
+        shareClassId: 'sc-1',
+        numberOfShares: 100,
+        pricePerShare: 50,
+        totalAmount: 5000,
+        transactionDate: new Date('2026-06-01'),
+        initiatedAt: new Date('2026-05-01'),
+        completedAt: new Date('2026-06-01'),
+        approvals: [
+          { approverType: 'company', status: 'approved', approvedAt: new Date('2026-05-15') }
+        ],
+        documents: ['doc-1']
+      };
+
+      databaseAdapter.findById.mockResolvedValue(transaction);
+
+      const report = await SecondaryTransactionService.generateTransactionReport('txn-1');
+
+      expect(report.transaction).toEqual(transaction);
+      expect(report.summary.transactionId).toBe('TXN-12345678');
+      expect(report.summary.status).toBe('completed');
+      expect(report.fees).toBeDefined();
+      expect(report.fees.totalFees).toBeGreaterThan(0);
+      expect(report.timeline.length).toBeGreaterThan(0);
+      expect(report.approvals).toHaveLength(1);
+      expect(report.documents).toEqual(['doc-1']);
+    });
+
+    it('should throw if transaction not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(
+        SecondaryTransactionService.generateTransactionReport('bad')
+      ).rejects.toThrow('Transaction not found');
+    });
+  });
+
+  describe('generateTransactionTimeline', () => {
+    it('should generate timeline with all events', () => {
+      const transaction = {
+        transactionId: 'TXN-1',
+        initiatedAt: new Date('2026-01-01'),
+        approvals: [
+          { approverType: 'company', status: 'approved', approvedAt: new Date('2026-01-05') }
+        ],
+        escrow: {
+          fundsReceivedAt: new Date('2026-01-10'),
+          fundsReleasedAt: new Date('2026-01-15')
+        },
+        completedAt: new Date('2026-01-20')
+      };
+
+      const timeline = SecondaryTransactionService.generateTransactionTimeline(transaction);
+
+      expect(timeline).toHaveLength(5);
+      expect(timeline[0].event).toBe('Transaction Initiated');
+      expect(timeline[1].event).toBe('company Approval');
+      expect(timeline[2].event).toBe('Funds Received in Escrow');
+      expect(timeline[3].event).toBe('Funds Released from Escrow');
+      expect(timeline[4].event).toBe('Transaction Completed');
+    });
+
+    it('should include cancellation event', () => {
+      const transaction = {
+        transactionId: 'TXN-1',
+        initiatedAt: new Date('2026-01-01'),
+        canceledAt: new Date('2026-01-02'),
+        cancellationReason: 'Deal fell through'
+      };
+
+      const timeline = SecondaryTransactionService.generateTransactionTimeline(transaction);
+
+      expect(timeline).toHaveLength(2);
+      expect(timeline[1].event).toBe('Transaction Canceled');
+      expect(timeline[1].description).toBe('Deal fell through');
+    });
+
+    it('should sort timeline by date', () => {
+      const transaction = {
+        transactionId: 'TXN-1',
+        completedAt: new Date('2026-01-20'),
+        initiatedAt: new Date('2026-01-01')
+      };
+
+      const timeline = SecondaryTransactionService.generateTransactionTimeline(transaction);
+
+      const dates = timeline.map(t => new Date(t.date).getTime());
+      for (let i = 1; i < dates.length; i++) {
+        expect(dates[i]).toBeGreaterThanOrEqual(dates[i - 1]);
+      }
+    });
+
+    it('should return empty timeline for empty transaction', () => {
+      const timeline = SecondaryTransactionService.generateTransactionTimeline({});
+      expect(timeline).toHaveLength(0);
+    });
+  });
+
+  describe('getMarketStatistics', () => {
+    it('should return comprehensive market statistics', async () => {
+      const transactions = [
+        { status: 'completed', totalAmount: 10000, numberOfShares: 100 },
+        { status: 'completed', totalAmount: 20000, numberOfShares: 200 },
+        { status: 'pending', totalAmount: 5000, numberOfShares: 50 }
+      ];
+      const listings = [
+        { status: 'active', sharesAvailable: 500 },
+        { status: 'partially_sold', sharesAvailable: 200 },
+        { status: 'sold', sharesAvailable: 0 }
+      ];
+
+      databaseAdapter.find
+        .mockResolvedValueOnce(transactions)
+        .mockResolvedValueOnce(listings);
+
+      const stats = await SecondaryTransactionService.getMarketStatistics('comp-1');
+
+      expect(stats.companyId).toBe('comp-1');
+      expect(stats.totalTransactions).toBe(3);
+      expect(stats.completedTransactions).toBe(2);
+      expect(stats.pendingTransactions).toBe(1);
+      expect(stats.totalListings).toBe(3);
+      expect(stats.activeListings).toBe(2);
+      expect(stats.totalVolume).toBe(30000);
+      expect(stats.totalSharesTraded).toBe(300);
+      expect(stats.averagePricePerShare).toBe(100);
+      expect(stats.sharesAvailableForSale).toBe(700);
+    });
+
+    it('should handle zero completed transactions', async () => {
+      databaseAdapter.find
+        .mockResolvedValueOnce([{ status: 'pending', totalAmount: 0, numberOfShares: 0 }])
+        .mockResolvedValueOnce([]);
+
+      const stats = await SecondaryTransactionService.getMarketStatistics('comp-1');
+
+      expect(stats.completedTransactions).toBe(0);
+      expect(stats.totalVolume).toBe(0);
+      expect(stats.averagePricePerShare).toBe(0);
+    });
+  });
+
+  describe('FEE_RATES', () => {
+    it('should define fee rates for all transaction types', () => {
+      const rates = SecondaryTransactionService.FEE_RATES;
+      expect(rates.private_sale).toBeDefined();
+      expect(rates.tender_offer).toBeDefined();
+      expect(rates.rofr_exercise).toBeDefined();
+      expect(rates.gift).toBeDefined();
+      expect(rates.estate_transfer).toBeDefined();
+      expect(rates.company_buyback).toBeDefined();
     });
   });
 });

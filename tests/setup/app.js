@@ -21,6 +21,7 @@ const stakeholderRoutes = require('../../routes/v1/stakeholderRoutes');
 const documentRoutes = require('../../routes/v1/documentRoutes');
 const adminRoutes = require('../../routes/v1/adminRoutes');
 const spvRoutes = require('../../routes/v1/spvRoutes');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 
 let server;
 
@@ -59,6 +60,17 @@ function createApp() {
     res.json({ status: 'ok', message: 'Test server is running' });
   });
   
+  // App-level auth middleware (mirrors main app.js behavior).
+  // Authenticates all /api/v1 routes except auth, health, and webhook paths
+  // so that req.user is set before route-level hasRole/hasPermission guards run.
+  app.use('/api/v1', (req, res, next) => {
+    const skipPaths = ['/auth', '/health', '/webhooks', '/billing/plans', '/billing/webhook'];
+    if (skipPaths.some(p => req.path.startsWith(p))) {
+      return next();
+    }
+    return authenticateToken(req, res, next);
+  });
+
   // API routes
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
@@ -78,9 +90,10 @@ function createApp() {
   
   // Error handling middleware
   app.use((err, req, res, next) => {
-    console.error('Test app error:', err);
-    res.status(500).json({
-      error: 'Internal server error',
+    console.error('Test app error:', err.message || err);
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({
+      error: status < 500 ? 'Bad request' : 'Internal server error',
       message: process.env.NODE_ENV === 'test' ? err.message : 'Something went wrong'
     });
   });

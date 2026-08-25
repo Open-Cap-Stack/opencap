@@ -866,6 +866,16 @@ describe('StakeholderReportService', () => {
     });
   });
 
+  describe('findStakeholder error handling', () => {
+    it('should throw Stakeholder not found when database throws unexpected error', async () => {
+      Stakeholder.findOne.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(
+        stakeholderReportService.generateHoldingsReport('STK-MISSING', 'COMP-001')
+      ).rejects.toThrow('Stakeholder not found');
+    });
+  });
+
   describe('Email Validation', () => {
     it('should validate correct email formats', async () => {
       const validEmails = [

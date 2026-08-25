@@ -367,4 +367,356 @@ describe('DocumentFolder Model', () => {
       await expect(DocumentFolder.validateDelete('folder-123')).resolves.toBeUndefined();
     });
   });
+
+  describe('create - parent not found', () => {
+    it('should throw error when parent folder does not exist', async () => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [] });
+
+      await expect(DocumentFolder.create({
+        name: 'Child',
+        parentId: 'non-existent-parent',
+        ownerCompany: 'c1',
+        createdBy: 'u1'
+      })).rejects.toThrow('Parent folder not found');
+    });
+
+    it('should throw error on circular reference during create', async () => {
+      const parentFolder = { folderId: 'parent-1', name: 'Parent', path: '/Parent', level: 0, parentId: null };
+      // First call finds the parent, second call for validateHierarchy returns the parent whose parentId is the folderId
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [parentFolder] });
+
+      // We need to force validateHierarchy to return false
+      // parentId=parent-1, folderId=parent-1 -> direct circular
+      await expect(DocumentFolder.create({
+        name: 'Child',
+        parentId: 'parent-1',
+        folderId: 'parent-1',
+        ownerCompany: 'c1',
+        createdBy: 'u1'
+      })).rejects.toThrow('Circular folder reference detected');
+    });
+  });
+
+  describe('create - defaults', () => {
+    it('should set default metadata and description if not provided', async () => {
+      zerodbService.insertRow = jest.fn().mockResolvedValue({
+        data: [{ _id: 'id-1', row_data: { folderId: 'f1', name: 'Test', path: '/Test', metadata: {}, description: '' } }]
+      });
+
+      const result = await DocumentFolder.create({
+        name: 'Test',
+        ownerCompany: 'c1',
+        createdBy: 'u1'
+      });
+
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'document_folders',
+        expect.objectContaining({ metadata: {}, description: '' })
+      );
+    });
+  });
+
+  describe('findRootFolders', () => {
+    it('should return only root folders (parentId is null/undefined/empty)', async () => {
+      const mockFolders = [
+        { folderId: 'f1', name: 'Root1', parentId: null, ownerCompany: 'c1' },
+        { folderId: 'f2', name: 'Child1', parentId: 'f1', ownerCompany: 'c1' },
+        { folderId: 'f3', name: 'Root2', parentId: undefined, ownerCompany: 'c1' },
+        { folderId: 'f4', name: 'Root3', parentId: '', ownerCompany: 'c1' }
+      ];
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: mockFolders });
+
+      const result = await DocumentFolder.findRootFolders('c1');
+      expect(result).toHaveLength(3);
+      expect(result.map(f => f.folderId)).toEqual(['f1', 'f3', 'f4']);
+    });
+
+    it('should work without ownerCompany filter', async () => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [{ folderId: 'f1', parentId: null }] });
+      const result = await DocumentFolder.findRootFolders(null);
+      expect(result).toHaveLength(1);
+      expect(zerodbService.queryTable).toHaveBeenCalledWith('document_folders', {
+        filter: {},
+        limit: 1000
+      });
+    });
+  });
+
+  describe('getFullPath - fallback', () => {
+    it('should return /<name> when path is not set', () => {
+      const result = DocumentFolder.getFullPath({ name: 'TestFolder' });
+      expect(result).toBe('/TestFolder');
+    });
+  });
+
+  describe('generatePath', () => {
+    it('should generate root path with no parent', () => {
+      expect(DocumentFolder.generatePath('RootFolder')).toBe('/RootFolder');
+    });
+
+    it('should generate nested path with parent', () => {
+      const parent = { path: '/Root', level: 0 };
+      expect(DocumentFolder.generatePath('Child', parent)).toBe('/Root/Child');
+    });
+  });
+
+  describe('calculateLevel', () => {
+    it('should return 0 for no parent', () => {
+      expect(DocumentFolder.calculateLevel()).toBe(0);
+    });
+
+    it('should return parent.level + 1', () => {
+      expect(DocumentFolder.calculateLevel({ level: 2 })).toBe(3);
+    });
+
+    it('should default parent level to 0 if not set', () => {
+      expect(DocumentFolder.calculateLevel({})).toBe(1);
+    });
+  });
+
+  describe('validateName', () => {
+    it('should throw for whitespace-only name', () => {
+      expect(() => DocumentFolder.validateName('   ')).toThrow('Folder name is required');
+    });
+
+    it('should throw for name with backslash', () => {
+      expect(() => DocumentFolder.validateName('test\\folder')).toThrow('Folder name cannot contain special characters');
+    });
+
+    it('should accept valid name', () => {
+      expect(() => DocumentFolder.validateName('Valid Folder Name')).not.toThrow();
+    });
+  });
+
+  describe('update()', () => {
+    it('should throw when folder is not found', async () => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [] });
+      await expect(DocumentFolder.update('non-existent', { name: 'New' })).rejects.toThrow('Folder not found');
+    });
+
+    it('should update name and regenerate path for root folder', async () => {
+      const folder = { folderId: 'f1', name: 'Old', path: '/Old', level: 0, parentId: null };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })   // findByFolderId in update
+        .mockResolvedValueOnce({ data: [] })          // findByParentId in updateChildPaths
+        .mockResolvedValueOnce({ data: [{ ...folder, name: 'New', path: '/New' }] }); // final findByFolderId
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+
+      const result = await DocumentFolder.update('f1', { name: 'New' });
+      expect(zerodbService.updateRows).toHaveBeenCalled();
+    });
+
+    it('should throw when new parent folder not found during reparent', async () => {
+      const folder = { folderId: 'f1', name: 'Test', path: '/Test', level: 0, parentId: null };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })   // findByFolderId in update
+        .mockResolvedValueOnce({ data: [] });         // findByFolderId for new parent
+      await expect(DocumentFolder.update('f1', { parentId: 'non-existent' })).rejects.toThrow('New parent folder not found');
+    });
+
+    it('should detect circular reference during reparent', async () => {
+      const folder = { folderId: 'f1', name: 'Test', path: '/Test', level: 0, parentId: null };
+      const newParent = { folderId: 'f1', name: 'Parent', path: '/Parent', level: 0, parentId: null };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })   // findByFolderId in update
+        .mockResolvedValueOnce({ data: [newParent] }); // findByFolderId for new parent
+      // validateHierarchy: parentId=f1, folderId=f1 -> circular
+      await expect(DocumentFolder.update('f1', { parentId: 'f1' })).rejects.toThrow('Circular folder reference detected');
+    });
+
+    it('should move folder to root (parentId set to null)', async () => {
+      const folder = { folderId: 'f1', name: 'Test', path: '/Parent/Test', level: 1, parentId: 'parent-1' };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })   // findByFolderId in update
+        .mockResolvedValueOnce({ data: [] })          // updateChildPaths - no children
+        .mockResolvedValueOnce({ data: [{ ...folder, path: '/Test', level: 0, parentId: null }] }); // final findByFolderId
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+
+      const result = await DocumentFolder.update('f1', { parentId: null });
+      expect(zerodbService.updateRows).toHaveBeenCalledWith(
+        'document_folders',
+        { folderId: 'f1' },
+        { $set: expect.objectContaining({ path: '/Test', level: 0 }) }
+      );
+    });
+
+    it('should reparent folder successfully to a valid new parent', async () => {
+      const folder = { folderId: 'f1', name: 'Test', path: '/Test', level: 0, parentId: null };
+      const newParent = { folderId: 'f2', name: 'NewParent', path: '/NewParent', level: 0, parentId: null };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })     // findByFolderId in update
+        .mockResolvedValueOnce({ data: [newParent] })   // findByFolderId for new parent
+        .mockResolvedValueOnce({ data: [newParent] })   // validateHierarchy checks parentId
+        .mockResolvedValueOnce({ data: [] })             // updateChildPaths - no children
+        .mockResolvedValueOnce({ data: [{ ...folder, path: '/NewParent/Test', level: 1, parentId: 'f2' }] }); // final findByFolderId
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+
+      const result = await DocumentFolder.update('f1', { parentId: 'f2' });
+      expect(zerodbService.updateRows).toHaveBeenCalled();
+    });
+
+    it('should validate name during update', async () => {
+      const folder = { folderId: 'f1', name: 'Old', path: '/Old', level: 0, parentId: null };
+      zerodbService.queryTable = jest.fn().mockResolvedValueOnce({ data: [folder] });
+
+      await expect(DocumentFolder.update('f1', { name: 'Invalid/Name' })).rejects.toThrow('Folder name cannot contain special characters');
+    });
+  });
+
+  describe('updateChildPaths()', () => {
+    it('should recursively update child folder paths', async () => {
+      const child1 = { folderId: 'c1', name: 'Child1', path: '/Old/Child1', parentId: 'f1' };
+      const grandchild = { folderId: 'gc1', name: 'GC', path: '/Old/Child1/GC', parentId: 'c1' };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [child1] })     // findByParentId for f1
+        .mockResolvedValueOnce({ data: [grandchild] })  // findByParentId for c1
+        .mockResolvedValueOnce({ data: [] });            // findByParentId for gc1
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+
+      await DocumentFolder.updateChildPaths('f1', '/Old', '/New');
+
+      expect(zerodbService.updateRows).toHaveBeenCalledTimes(2);
+      expect(zerodbService.updateRows).toHaveBeenCalledWith(
+        'document_folders',
+        { folderId: 'c1' },
+        { $set: { path: '/New/Child1' } }
+      );
+      expect(zerodbService.updateRows).toHaveBeenCalledWith(
+        'document_folders',
+        { folderId: 'gc1' },
+        { $set: { path: '/New/Child1/GC' } }
+      );
+    });
+  });
+
+  describe('delete()', () => {
+    it('should validate and delete folder', async () => {
+      zerodbService.countRows = jest.fn()
+        .mockResolvedValueOnce(0)   // no children
+        .mockResolvedValueOnce(0);  // no documents
+      zerodbService.deleteRows = jest.fn().mockResolvedValue({ deleted_count: 1 });
+
+      await DocumentFolder.delete('f1');
+      expect(zerodbService.deleteRows).toHaveBeenCalledWith('document_folders', { folderId: 'f1' });
+    });
+
+    it('should throw if folder has children when deleting', async () => {
+      zerodbService.countRows = jest.fn().mockResolvedValueOnce(3);
+      await expect(DocumentFolder.delete('f1')).rejects.toThrow('Cannot delete folder with subfolders');
+    });
+  });
+
+  describe('getContents()', () => {
+    it('should return folder contents including children and documents', async () => {
+      const folder = { folderId: 'f1', name: 'Legal', path: '/Legal', parentId: null };
+      const childFolder = { folderId: 'f2', name: 'Q1', path: '/Legal/Q1', parentId: 'f1' };
+      const doc = { documentId: 'doc1', name: 'Contract.pdf', folderId: 'f1' };
+
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [folder] })       // findByFolderId
+        .mockResolvedValueOnce({ data: [childFolder] })   // findByParentId (child folders)
+        .mockResolvedValueOnce({ data: [doc] });          // queryTable for documents
+
+      const contents = await DocumentFolder.getContents('f1');
+      expect(contents.folder).toEqual(folder);
+      expect(contents.childFolders).toHaveLength(1);
+      expect(contents.documents).toHaveLength(1);
+      expect(contents.breadcrumbs).toBeDefined();
+    });
+
+    it('should throw error when folder not found', async () => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [] });
+      await expect(DocumentFolder.getContents('non-existent')).rejects.toThrow('Folder not found');
+    });
+  });
+
+  describe('unwrapZeroDBResponse (via findByFolderId)', () => {
+    it('should unwrap row_data format from ZeroDB response', async () => {
+      const mockData = {
+        data: [{
+          row_data: { folderId: 'f1', name: 'Test', path: '/Test' },
+          row_id: 'row-123'
+        }]
+      };
+      zerodbService.queryTable = jest.fn().mockResolvedValue(mockData);
+
+      const result = await DocumentFolder.findByFolderId('f1');
+      expect(result.folderId).toBe('f1');
+      expect(result.id).toBe('row-123');
+      expect(result._id).toBe('row-123');
+      expect(result.row_id).toBe('row-123');
+    });
+
+    it('should handle row_data with existing id', async () => {
+      const mockData = {
+        data: [{
+          row_data: { folderId: 'f1', name: 'Test', id: 'existing-id' },
+          row_id: 'row-123'
+        }]
+      };
+      zerodbService.queryTable = jest.fn().mockResolvedValue(mockData);
+
+      const result = await DocumentFolder.findByFolderId('f1');
+      expect(result.id).toBe('row-123');
+    });
+
+    it('should handle plain objects (no row_data)', async () => {
+      const mockData = {
+        data: [{ folderId: 'f1', name: 'Test', path: '/Test' }]
+      };
+      zerodbService.queryTable = jest.fn().mockResolvedValue(mockData);
+
+      const result = await DocumentFolder.findByFolderId('f1');
+      expect(result.folderId).toBe('f1');
+    });
+
+    it('should handle response with rows key', async () => {
+      const mockData = {
+        rows: [{ folderId: 'f1', name: 'Test', path: '/Test' }]
+      };
+      zerodbService.queryTable = jest.fn().mockResolvedValue(mockData);
+
+      const result = await DocumentFolder.findByFolderId('f1');
+      expect(result.folderId).toBe('f1');
+    });
+
+    it('should return empty array for non-array response', async () => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: 'not-an-array' });
+      const result = await DocumentFolder.findByFolderId('f1');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('validateHierarchy - traversal with break', () => {
+    it('should return true when parent has no parentId (root)', async () => {
+      const parent = { folderId: 'p1', parentId: null };
+      zerodbService.queryTable = jest.fn().mockResolvedValueOnce({ data: [parent] });
+
+      const result = await DocumentFolder.validateHierarchy('p1', 'f1');
+      expect(result).toBe(true);
+    });
+
+    it('should detect circular reference through chain', async () => {
+      // f1 -> p1 -> p2 -> f1 (circular)
+      const p1 = { folderId: 'p1', parentId: 'p2' };
+      const p2 = { folderId: 'p2', parentId: 'f1' };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [p1] })   // get p1
+        .mockResolvedValueOnce({ data: [p2] });   // get p2 -> parentId=f1 which is in visited
+
+      const result = await DocumentFolder.validateHierarchy('p1', 'f1');
+      expect(result).toBe(false);
+    });
+
+    it('should break when parent is not found in chain', async () => {
+      const p1 = { folderId: 'p1', parentId: 'p2' };
+      zerodbService.queryTable = jest.fn()
+        .mockResolvedValueOnce({ data: [p1] })   // get p1
+        .mockResolvedValueOnce({ data: [] });     // p2 not found -> break
+
+      const result = await DocumentFolder.validateHierarchy('p1', 'f1');
+      expect(result).toBe(true);
+    });
+  });
 });

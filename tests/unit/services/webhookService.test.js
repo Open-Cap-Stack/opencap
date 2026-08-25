@@ -777,5 +777,236 @@ describe('WebhookService', () => {
 
       expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('Webhook', 'webhook123');
     });
+
+    it('should return null if webhook not found', async () => {
+      databaseAdapter.findByIdAndDelete.mockResolvedValue(null);
+
+      const result = await webhookService.deleteWebhook('nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('triggerWebhook - HTTP non-2xx responses', () => {
+    const mockWebhook = {
+      _id: 'webhook123',
+      webhookId: 'WH-12345678',
+      companyId: 'company123',
+      url: 'https://api.example.com/webhook',
+      secret: 'webhook-secret',
+      events: ['stakeholder.created'],
+      status: 'active',
+      retryConfig: { maxRetries: 3, retryDelay: 60000 },
+      headers: {}
+    };
+
+    it('should create failed delivery record for non-2xx HTTP response', async () => {
+      databaseAdapter.find.mockResolvedValue([mockWebhook]);
+      axios.post.mockResolvedValue({ status: 500, data: 'Internal Server Error', headers: {} });
+      databaseAdapter.create.mockResolvedValue({ deliveryId: 'DEL-123', status: 'failed' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockWebhook);
+
+      const result = await webhookService.triggerWebhook('stakeholder.created', { id: '123' }, 'company123');
+
+      expect(result.failed).toBe(1);
+      expect(databaseAdapter.create).toHaveBeenCalledWith(
+        'WebhookDelivery',
+        expect.objectContaining({
+          status: 'failed',
+          statusCode: 500
+        })
+      );
+    });
+
+    it('should handle webhook with Map headers', async () => {
+      const webhookWithMap = {
+        ...mockWebhook,
+        headers: new Map([['X-Custom', 'value']])
+      };
+      databaseAdapter.find.mockResolvedValue([webhookWithMap]);
+      axios.post.mockResolvedValue({ status: 200, data: 'ok', headers: {} });
+      databaseAdapter.create.mockResolvedValue({ deliveryId: 'DEL-123' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(webhookWithMap);
+
+      const result = await webhookService.triggerWebhook('stakeholder.created', { id: '123' }, 'company123');
+
+      expect(result.succeeded).toBe(1);
+    });
+
+    it('should handle response.data as string type', async () => {
+      databaseAdapter.find.mockResolvedValue([mockWebhook]);
+      axios.post.mockResolvedValue({ status: 200, data: 'plain text response', headers: {} });
+      databaseAdapter.create.mockResolvedValue({ deliveryId: 'DEL-123' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockWebhook);
+
+      const result = await webhookService.triggerWebhook('stakeholder.created', { id: '123' }, 'company123');
+
+      expect(result.succeeded).toBe(1);
+    });
+
+    it('should handle webhook with no events array', async () => {
+      const noEventsWebhook = { ...mockWebhook, events: null };
+      databaseAdapter.find.mockResolvedValue([noEventsWebhook]);
+
+      const result = await webhookService.triggerWebhook('stakeholder.created', {}, 'company123');
+
+      expect(result.triggered).toBe(0);
+      expect(axios.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('retryFailedDeliveries - HTTP non-2xx retry', () => {
+    const mockWebhook = {
+      _id: 'webhook123',
+      webhookId: 'WH-12345678',
+      url: 'https://api.example.com/webhook',
+      secret: 'webhook-secret',
+      status: 'active',
+      retryConfig: { maxRetries: 3, retryDelay: 60000 },
+      headers: {}
+    };
+
+    const mockFailedDelivery = {
+      _id: 'delivery123',
+      deliveryId: 'DEL-12345678',
+      webhookId: 'WH-12345678',
+      eventType: 'stakeholder.created',
+      payload: { data: { id: '123' } },
+      status: 'failed',
+      attempts: 1,
+      nextRetryAt: new Date(Date.now() - 1000)
+    };
+
+    it('should handle retry with HTTP non-2xx response and more retries available', async () => {
+      databaseAdapter.find
+        .mockResolvedValueOnce([mockFailedDelivery])
+        .mockResolvedValueOnce([mockWebhook]);
+      axios.post.mockResolvedValue({ status: 503, data: 'Service Unavailable', headers: {} });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      const result = await webhookService.retryFailedDeliveries();
+
+      expect(result.failed).toBe(1);
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'WebhookDelivery',
+        mockFailedDelivery._id,
+        expect.objectContaining({
+          status: 'failed',
+          statusCode: 503,
+          attempts: 2,
+          nextRetryAt: expect.any(Date)
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should permanently fail retry with HTTP non-2xx when max retries reached', async () => {
+      const maxRetriesDelivery = { ...mockFailedDelivery, attempts: 2 };
+      databaseAdapter.find
+        .mockResolvedValueOnce([maxRetriesDelivery])
+        .mockResolvedValueOnce([mockWebhook]);
+      axios.post.mockResolvedValue({ status: 500, data: 'Error', headers: {} });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      const result = await webhookService.retryFailedDeliveries();
+
+      expect(result.permanentlyFailed).toBe(1);
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'WebhookDelivery',
+        maxRetriesDelivery._id,
+        expect.objectContaining({
+          nextRetryAt: null
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should skip if webhook not found for delivery', async () => {
+      databaseAdapter.find
+        .mockResolvedValueOnce([mockFailedDelivery])
+        .mockResolvedValueOnce([]); // No webhook found
+
+      const result = await webhookService.retryFailedDeliveries();
+
+      expect(result.retried).toBe(0);
+      expect(axios.post).not.toHaveBeenCalled();
+    });
+
+    it('should handle retry with Map headers on webhook', async () => {
+      const webhookWithMap = { ...mockWebhook, headers: new Map([['X-Auth', 'token']]) };
+      databaseAdapter.find
+        .mockResolvedValueOnce([mockFailedDelivery])
+        .mockResolvedValueOnce([webhookWithMap]);
+      axios.post.mockResolvedValue({ status: 200, data: 'ok', headers: {} });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      const result = await webhookService.retryFailedDeliveries();
+
+      expect(result.succeeded).toBe(1);
+    });
+  });
+
+  describe('_calculateNextRetry', () => {
+    it('should return null when attempts exceed maxRetries', () => {
+      const result = webhookService._calculateNextRetry(5, { maxRetries: 3, retryDelay: 60000 });
+      expect(result).toBeNull();
+    });
+
+    it('should use default config when retryConfig is null', () => {
+      const result = webhookService._calculateNextRetry(1, null);
+      expect(result).toBeInstanceOf(Date);
+    });
+
+    it('should use default config when retryConfig has no properties', () => {
+      const result = webhookService._calculateNextRetry(1, {});
+      expect(result).toBeInstanceOf(Date);
+    });
+
+    it('should cap backoff delay at 1 hour', () => {
+      const before = Date.now();
+      const result = webhookService._calculateNextRetry(1, { maxRetries: 10, retryDelay: 7200000 });
+      // 7200000 * 2^0 = 7200000 which exceeds 3600000 max, so should be capped
+      const maxDelay = 3600000;
+      expect(result.getTime()).toBeLessThanOrEqual(before + maxDelay + 1000);
+    });
+  });
+
+  describe('updateWebhook - URL validation', () => {
+    it('should validate and update URL when provided', async () => {
+      const updates = { url: 'https://api.newsite.com/webhook' };
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
+        _id: 'webhook123',
+        url: 'https://api.newsite.com/webhook'
+      });
+
+      const result = await webhookService.updateWebhook('webhook123', updates);
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'Webhook',
+        'webhook123',
+        expect.objectContaining({ url: expect.any(String) }),
+        { new: true }
+      );
+    });
+
+    it('should throw error when updating with invalid URL', async () => {
+      await expect(webhookService.updateWebhook('webhook123', { url: 'not-a-url' }))
+        .rejects.toThrow();
+    });
+
+    it('should throw error when updating with internal URL', async () => {
+      await expect(webhookService.updateWebhook('webhook123', { url: 'https://192.168.1.1/hook' }))
+        .rejects.toThrow('Internal URLs not allowed');
+    });
+  });
+
+  describe('regenerateSecret - null case', () => {
+    it('should return null when webhook not found', async () => {
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(null);
+
+      const result = await webhookService.regenerateSecret('nonexistent');
+
+      expect(result).toBeNull();
+    });
   });
 });

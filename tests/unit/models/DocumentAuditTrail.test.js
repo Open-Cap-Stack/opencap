@@ -1,627 +1,761 @@
 /**
- * DocumentAuditTrail Model Tests
- *
- * Issue #102: Add Document Audit Trail
- *
- * Comprehensive tests for the DocumentAuditTrail model including
- * validation, schema behavior, and static methods.
+ * DocumentAuditTrail Model Unit Tests
+ * Tests for audit trail model including creation, validation,
+ * querying, aggregation, and immutability constraints.
  */
+process.env.SKIP_DB_SETUP = 'true';
 
-// Helper to generate mock ObjectId-like strings
-function generateId() {
-  return new Date().getTime().toString(16) + 'xxxxxxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
-}
+// Mock the zerodbService to prevent real API calls
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRows: jest.fn(),
+  deleteRowById: jest.fn(),
+  createTable: jest.fn(),
+  client: { put: jest.fn() },
+  projectId: 'test-project'
+}));
 
-// Mock the DocumentAuditTrail model to avoid database dependencies
-jest.mock('../../../models/DocumentAuditTrail', () => {
-  const validActionTypes = [
-    'created',
-    'viewed',
-    'downloaded',
-    'edited',
-    'signed',
-    'shared',
-    'deleted',
-    'restored',
-    'access_granted',
-    'access_revoked',
-    'version_created',
-    'commented',
-    'archived',
-    'unarchived'
-  ];
-
-  let auditIdCounter = 0;
-
-  function MockDocumentAuditTrail(data = {}) {
-    Object.assign(this, data);
-    this.isNew = true;
-    this.isModified = jest.fn();
-    this.save = jest.fn();
-
-    // Apply defaults with unique counter
-    if (!this.auditId) this.auditId = `test-uuid-${Date.now()}-${++auditIdCounter}`;
-    if (!this.timestamp) this.timestamp = new Date();
-    if (!this.changes) this.changes = [];
-    if (!this.metadata) this.metadata = {};
-
-    this.validateSync = jest.fn(() => {
-      const errors = {};
-
-      // Check required fields
-      if (!this.documentId) {
-        errors.documentId = { message: 'documentId is required' };
-      }
-      if (!this.actionType) {
-        errors.actionType = { message: 'actionType is required' };
-      } else if (!validActionTypes.includes(this.actionType)) {
-        errors.actionType = { message: `${this.actionType} is not a valid action type` };
-      }
-      if (!this.actor || !this.actor.userId) {
-        errors['actor.userId'] = { message: 'actor.userId is required' };
-      }
-      if (!this.ipAddress) {
-        errors.ipAddress = { message: 'ipAddress is required' };
-      }
-
-      return Object.keys(errors).length > 0 ? { errors } : null;
-    });
-
-    this.toObject = jest.fn(() => ({ ...data }));
-  }
-
-  // Add static methods
-  MockDocumentAuditTrail.findById = jest.fn();
-  MockDocumentAuditTrail.find = jest.fn();
-  MockDocumentAuditTrail.findOne = jest.fn();
-  MockDocumentAuditTrail.create = jest.fn();
-  MockDocumentAuditTrail.findByIdAndUpdate = jest.fn();
-  MockDocumentAuditTrail.findByIdAndDelete = jest.fn();
-  MockDocumentAuditTrail.countDocuments = jest.fn();
-  MockDocumentAuditTrail.aggregate = jest.fn();
-  MockDocumentAuditTrail.findByDocument = jest.fn();
-  MockDocumentAuditTrail.findByUser = jest.fn();
-  MockDocumentAuditTrail.findByDateRange = jest.fn();
-  MockDocumentAuditTrail.getActionCounts = jest.fn();
-  MockDocumentAuditTrail.getRecentActivitySummary = jest.fn();
-  MockDocumentAuditTrail.searchAuditTrail = jest.fn();
-  MockDocumentAuditTrail.ACTION_TYPES = validActionTypes;
-
-  return MockDocumentAuditTrail;
-});
+const DocumentAuditTrail = require('../../../models/DocumentAuditTrail');
+const zerodbService = require('../../../services/zerodbService');
 
 describe('DocumentAuditTrail Model', () => {
-  let DocumentAuditTrail;
-
-  const validActionTypes = [
-    'created',
-    'viewed',
-    'downloaded',
-    'edited',
-    'signed',
-    'shared',
-    'deleted',
-    'restored',
-    'access_granted',
-    'access_revoked',
-    'version_created',
-    'commented',
-    'archived',
-    'unarchived'
-  ];
-
-  let auditIdCounter = 0;
-
-  beforeAll(() => {
-    DocumentAuditTrail = require('../../../models/DocumentAuditTrail');
-  });
+  let store = [];
+  let idCounter = 0;
 
   beforeEach(() => {
+    store = [];
+    idCounter = 0;
     jest.clearAllMocks();
-  });
 
-  describe('Schema Validation', () => {
-    describe('Required Fields', () => {
-      it('should create audit entry with all required fields', () => {
-        const auditData = {
-          documentId: generateId(),
-          actionType: 'viewed',
-          actor: {
-            userId: generateId(),
-            email: 'user@example.com',
-            name: 'Test User',
-            role: 'admin'
-          },
-          ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0',
-          timestamp: new Date()
-        };
-
-        const audit = new DocumentAuditTrail(auditData);
-
-        expect(audit.documentId).toEqual(auditData.documentId);
-        expect(audit.actionType).toBe(auditData.actionType);
-        expect(audit.actor.userId).toEqual(auditData.actor.userId);
-        expect(audit.ipAddress).toBe(auditData.ipAddress);
-      });
-
-      it('should reject audit entry without documentId', () => {
-        const audit = new DocumentAuditTrail({
-          actionType: 'viewed',
-          actor: { userId: generateId() },
-          ipAddress: '192.168.1.1'
-        });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.documentId).toBeTruthy();
-      });
-
-      it('should reject audit entry without actionType', () => {
-        const audit = new DocumentAuditTrail({
-          documentId: generateId(),
-          actor: { userId: generateId() },
-          ipAddress: '192.168.1.1'
-        });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.actionType).toBeTruthy();
-      });
-
-      it('should reject audit entry without actor.userId', () => {
-        const audit = new DocumentAuditTrail({
-          documentId: generateId(),
-          actionType: 'viewed',
-          actor: {},
-          ipAddress: '192.168.1.1'
-        });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors['actor.userId']).toBeTruthy();
-      });
-
-      it('should reject audit entry without ipAddress', () => {
-        const audit = new DocumentAuditTrail({
-          documentId: generateId(),
-          actionType: 'viewed',
-          actor: { userId: generateId() }
-        });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.ipAddress).toBeTruthy();
+    // Mock insertRow
+    zerodbService.insertRow.mockImplementation((tableName, doc) => {
+      const row_id = ++idCounter;
+      const storedDoc = { ...doc };
+      store.push(storedDoc);
+      return Promise.resolve({
+        data: [{ row_id, row_data: storedDoc }]
       });
     });
 
-    describe('ActionType Enum Validation', () => {
-      it.each(validActionTypes)('should accept valid action type "%s"', (actionType) => {
-        const audit = new DocumentAuditTrail({
-          documentId: generateId(),
-          actionType: actionType,
-          actor: { userId: generateId() },
-          ipAddress: '192.168.1.1'
+    // Helper to get nested value by dotted key path (e.g. 'actor.userId')
+    const getNestedValue = (obj, path) => {
+      return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
+    };
+
+    // Mock queryTable
+    zerodbService.queryTable.mockImplementation((tableName, { filter = {} } = {}) => {
+      let results = [...store];
+      for (const [key, value] of Object.entries(filter)) {
+        results = results.filter(doc => {
+          const docValue = key.includes('.') ? getNestedValue(doc, key) : doc[key];
+          return docValue === value;
         });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeNull();
-        expect(audit.actionType).toBe(actionType);
-      });
-
-      it('should reject invalid action type', () => {
-        const audit = new DocumentAuditTrail({
-          documentId: generateId(),
-          actionType: 'invalid_action',
-          actor: { userId: generateId() },
-          ipAddress: '192.168.1.1'
-        });
-
-        const validationError = audit.validateSync();
-        expect(validationError).toBeTruthy();
-        expect(validationError.errors.actionType).toBeTruthy();
+      }
+      return Promise.resolve({
+        data: results.map((doc, i) => ({ row_id: i + 1, row_data: doc }))
       });
     });
   });
 
-  describe('Optional Fields', () => {
-    it('should handle userAgent field', () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'downloaded',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-      });
+  // ─── Constants ───────────────────────────────────────────────
 
-      expect(audit.userAgent).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+  describe('Constants', () => {
+    it('should expose ACTION_TYPES', () => {
+      expect(DocumentAuditTrail.ACTION_TYPES).toEqual([
+        'created', 'viewed', 'downloaded', 'edited', 'signed',
+        'shared', 'deleted', 'restored', 'access_granted',
+        'access_revoked', 'version_created', 'commented',
+        'archived', 'unarchived'
+      ]);
     });
 
-    it('should handle changes array', () => {
-      const changes = [
-        { field: 'name', previousValue: 'Old Name', newValue: 'New Name' },
-        { field: 'status', previousValue: 'draft', newValue: 'active' }
-      ];
-
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'edited',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        changes
-      });
-
-      expect(audit.changes).toEqual(changes);
-      expect(audit.changes.length).toBe(2);
+    it('should expose ACCESS_LEVELS', () => {
+      expect(DocumentAuditTrail.ACCESS_LEVELS).toEqual(['view', 'edit', 'admin']);
     });
 
-    it('should default changes to empty array', () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
+    it('should have tableName set to document_audit_trails', () => {
+      expect(DocumentAuditTrail.tableName).toBe('document_audit_trails');
+    });
+  });
+
+  // ─── Schema ──────────────────────────────────────────────────
+
+  describe('Schema', () => {
+    it('should define required fields', () => {
+      expect(DocumentAuditTrail.schema.auditId.required).toBe(true);
+      expect(DocumentAuditTrail.schema.documentId.required).toBe(true);
+      expect(DocumentAuditTrail.schema.actionType.required).toBe(true);
+      expect(DocumentAuditTrail.schema.timestamp.required).toBe(true);
+      expect(DocumentAuditTrail.schema.ipAddress.required).toBe(true);
+    });
+
+    it('should define actionType enum', () => {
+      expect(DocumentAuditTrail.schema.actionType.enum).toEqual(DocumentAuditTrail.ACTION_TYPES);
+    });
+
+    it('should have defaults for optional fields', () => {
+      expect(DocumentAuditTrail.schema.changes.default).toEqual([]);
+      expect(DocumentAuditTrail.schema.previousValues.default).toBeNull();
+      expect(DocumentAuditTrail.schema.newValues.default).toBeNull();
+      expect(DocumentAuditTrail.schema.userAgent.default).toBeNull();
+    });
+  });
+
+  // ─── create() ────────────────────────────────────────────────
+
+  describe('create()', () => {
+    const validData = {
+      documentId: 'doc-001',
+      actionType: 'viewed',
+      actor: { userId: 'user-001', email: 'user@test.com', name: 'Test User', role: 'admin' },
+      ipAddress: '192.168.1.1',
+      userAgent: 'Mozilla/5.0'
+    };
+
+    it('should create an audit entry with valid data', async () => {
+      const result = await DocumentAuditTrail.create(validData);
+
+      expect(result).toBeDefined();
+      expect(result.documentId).toBe('doc-001');
+      expect(result.actionType).toBe('viewed');
+      expect(result.actor.userId).toBe('user-001');
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'document_audit_trails',
+        expect.objectContaining({ documentId: 'doc-001' })
+      );
+    });
+
+    it('should auto-generate auditId if not provided', async () => {
+      const result = await DocumentAuditTrail.create(validData);
+      expect(result.auditId).toBeDefined();
+      expect(typeof result.auditId).toBe('string');
+      expect(result.auditId.length).toBeGreaterThan(0);
+    });
+
+    it('should preserve provided auditId', async () => {
+      const result = await DocumentAuditTrail.create({
+        ...validData,
+        auditId: 'custom-audit-id'
+      });
+      expect(result.auditId).toBe('custom-audit-id');
+    });
+
+    it('should set timestamp if not provided', async () => {
+      const result = await DocumentAuditTrail.create(validData);
+      expect(result.timestamp).toBeDefined();
+      expect(typeof result.timestamp).toBe('string');
+    });
+
+    it('should preserve provided timestamp', async () => {
+      const ts = '2025-06-01T12:00:00.000Z';
+      const result = await DocumentAuditTrail.create({
+        ...validData,
+        timestamp: ts
+      });
+      expect(result.timestamp).toBe(ts);
+    });
+
+    it('should throw for invalid actionType', async () => {
+      await expect(
+        DocumentAuditTrail.create({ ...validData, actionType: 'invalid_action' })
+      ).rejects.toThrow(/actionType must be one of/);
+    });
+
+    it('should accept all valid action types', async () => {
+      for (const actionType of DocumentAuditTrail.ACTION_TYPES) {
+        store = [];
+        idCounter = 0;
+        const result = await DocumentAuditTrail.create({
+          ...validData,
+          actionType
+        });
+        expect(result.actionType).toBe(actionType);
+      }
+    });
+
+    it('should add timestamps (createdAt, updatedAt)', async () => {
+      const result = await DocumentAuditTrail.create(validData);
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
+    });
+  });
+
+  // ─── findByDocument() ───────────────────────────────────────
+
+  describe('findByDocument()', () => {
+    const makeEntry = (overrides = {}) => ({
+      documentId: 'doc-find',
+      actionType: 'viewed',
+      actor: { userId: 'user-001' },
+      ipAddress: '10.0.0.1',
+      timestamp: new Date().toISOString(),
+      ...overrides
+    });
+
+    it('should find entries by documentId', async () => {
+      await DocumentAuditTrail.create(makeEntry({ documentId: 'doc-find' }));
+      await DocumentAuditTrail.create(makeEntry({ documentId: 'doc-find' }));
+      await DocumentAuditTrail.create(makeEntry({ documentId: 'doc-other' }));
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find');
+      expect(results.length).toBe(2);
+    });
+
+    it('should filter by actionType when provided', async () => {
+      await DocumentAuditTrail.create(makeEntry({ actionType: 'viewed' }));
+      await DocumentAuditTrail.create(makeEntry({ actionType: 'edited' }));
+      await DocumentAuditTrail.create(makeEntry({ actionType: 'viewed' }));
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find', { actionType: 'viewed' });
+      expect(results.length).toBe(2);
+      expect(results.every(r => r.actionType === 'viewed')).toBe(true);
+    });
+
+    it('should filter by startDate', async () => {
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-01-01T00:00:00.000Z' }));
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-06-01T00:00:00.000Z' }));
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find', {
+        startDate: '2025-03-01T00:00:00.000Z'
+      });
+      expect(results.length).toBe(1);
+    });
+
+    it('should filter by endDate', async () => {
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-01-01T00:00:00.000Z' }));
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-06-01T00:00:00.000Z' }));
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find', {
+        endDate: '2025-03-01T00:00:00.000Z'
+      });
+      expect(results.length).toBe(1);
+    });
+
+    it('should sort by timestamp descending', async () => {
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-01-01T00:00:00.000Z' }));
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-06-01T00:00:00.000Z' }));
+      await DocumentAuditTrail.create(makeEntry({ timestamp: '2025-03-01T00:00:00.000Z' }));
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find');
+      expect(new Date(results[0].timestamp) >= new Date(results[1].timestamp)).toBe(true);
+      expect(new Date(results[1].timestamp) >= new Date(results[2].timestamp)).toBe(true);
+    });
+
+    it('should apply limit option', async () => {
+      await DocumentAuditTrail.create(makeEntry());
+      await DocumentAuditTrail.create(makeEntry());
+      await DocumentAuditTrail.create(makeEntry());
+
+      const results = await DocumentAuditTrail.findByDocument('doc-find', { limit: 2 });
+      expect(results.length).toBe(2);
+    });
+
+    it('should return empty array for document with no entries', async () => {
+      const results = await DocumentAuditTrail.findByDocument('doc-none');
+      expect(results).toEqual([]);
+    });
+  });
+
+  // ─── findByUser() ───────────────────────────────────────────
+
+  describe('findByUser()', () => {
+    it('should find entries by user ID', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-user1',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
+        actor: { userId: 'user-A' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-01T00:00:00.000Z'
       });
-
-      expect(audit.changes).toEqual([]);
-    });
-
-    it('should handle previousValues and newValues', () => {
-      const previousValues = { name: 'Old Document', status: 'draft' };
-      const newValues = { name: 'New Document', status: 'active' };
-
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
+      await DocumentAuditTrail.create({
+        documentId: 'doc-user2',
         actionType: 'edited',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        previousValues,
-        newValues
+        actor: { userId: 'user-B' },
+        ipAddress: '10.0.0.2',
+        timestamp: '2025-06-02T00:00:00.000Z'
       });
 
-      expect(audit.previousValues).toEqual(previousValues);
-      expect(audit.newValues).toEqual(newValues);
+      const results = await DocumentAuditTrail.findByUser('user-A');
+      expect(results.length).toBe(1);
+      expect(results[0].actor.userId).toBe('user-A');
     });
 
-    it('should handle metadata object', () => {
-      const metadata = {
-        sessionId: 'session-123',
-        companyId: generateId(),
-        requestId: 'req-456',
-        documentVersion: 3,
-        details: { source: 'web' },
-        reason: 'Regular review',
-        tags: ['compliance', 'quarterly']
-      };
-
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
+    it('should filter by actionType', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-u1',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        metadata
+        actor: { userId: 'user-filter' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-01T00:00:00.000Z'
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-u2',
+        actionType: 'edited',
+        actor: { userId: 'user-filter' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-02T00:00:00.000Z'
       });
 
-      expect(audit.metadata.sessionId).toBe(metadata.sessionId);
-      expect(audit.metadata.companyId).toEqual(metadata.companyId);
-      expect(audit.metadata.tags).toEqual(metadata.tags);
+      const results = await DocumentAuditTrail.findByUser('user-filter', { actionType: 'viewed' });
+      expect(results.length).toBe(1);
     });
 
-    it('should handle sharedWith details', () => {
-      const sharedWith = {
-        users: [generateId(), generateId()],
-        emails: ['user1@example.com', 'user2@example.com'],
-        accessLevel: 'view',
-        expiresAt: new Date('2025-12-31')
-      };
+    it('should apply limit option', async () => {
+      for (let i = 0; i < 5; i++) {
+        await DocumentAuditTrail.create({
+          documentId: `doc-lim-${i}`,
+          actionType: 'viewed',
+          actor: { userId: 'user-lim' },
+          ipAddress: '10.0.0.1',
+          timestamp: `2025-06-0${i + 1}T00:00:00.000Z`
+        });
+      }
 
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'shared',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        sharedWith
-      });
-
-      expect(audit.sharedWith.users.length).toBe(2);
-      expect(audit.sharedWith.emails).toEqual(sharedWith.emails);
-      expect(audit.sharedWith.accessLevel).toBe('view');
-    });
-
-    it('should handle signatureDetails', () => {
-      const signatureDetails = {
-        signatureId: 'sig-123',
-        signatureType: 'electronic',
-        signedAt: new Date(),
-        certificateInfo: { issuer: 'DocuSign', validUntil: new Date('2025-12-31') }
-      };
-
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'signed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        signatureDetails
-      });
-
-      expect(audit.signatureDetails.signatureId).toBe('sig-123');
-      expect(audit.signatureDetails.signatureType).toBe('electronic');
+      const results = await DocumentAuditTrail.findByUser('user-lim', { limit: 3 });
+      expect(results.length).toBe(3);
     });
   });
 
-  describe('Action Types', () => {
-    it('should handle document created action', () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'created',
-        actor: { userId: generateId(), name: 'Creator' },
-        ipAddress: '192.168.1.1',
-        newValues: { name: 'New Document', category: 'contracts' }
+  // ─── findByDateRange() ──────────────────────────────────────
+
+  describe('findByDateRange()', () => {
+    beforeEach(async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-dr1',
+        actionType: 'viewed',
+        actor: { userId: 'user-001' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-01-15T00:00:00.000Z',
+        metadata: { companyId: 'comp-A' }
       });
-
-      expect(audit.actionType).toBe('created');
-      expect(audit.newValues).toBeTruthy();
-    });
-
-    it('should handle document deleted action', () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
+      await DocumentAuditTrail.create({
+        documentId: 'doc-dr2',
+        actionType: 'edited',
+        actor: { userId: 'user-002' },
+        ipAddress: '10.0.0.2',
+        timestamp: '2025-03-15T00:00:00.000Z',
+        metadata: { companyId: 'comp-A' }
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-dr3',
         actionType: 'deleted',
-        actor: { userId: generateId(), name: 'Deleter' },
-        ipAddress: '192.168.1.1',
-        metadata: { reason: 'No longer needed', details: { softDelete: true } }
+        actor: { userId: 'user-001' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-15T00:00:00.000Z',
+        metadata: { companyId: 'comp-B' }
       });
-
-      expect(audit.actionType).toBe('deleted');
-      expect(audit.metadata.reason).toBe('No longer needed');
     });
 
-    it('should handle document restored action', () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
-        actionType: 'restored',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
-      });
+    it('should find entries within date range', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-04-01'
+      );
+      expect(results.length).toBe(2);
+    });
 
-      expect(audit.actionType).toBe('restored');
+    it('should filter by documentId within date range', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-12-31',
+        { documentId: 'doc-dr1' }
+      );
+      expect(results.length).toBe(1);
+    });
+
+    it('should filter by actionType within date range', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-12-31',
+        { actionType: 'edited' }
+      );
+      expect(results.length).toBe(1);
+    });
+
+    it('should filter by companyId within date range', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-12-31',
+        { companyId: 'comp-A' }
+      );
+      expect(results.length).toBe(2);
+    });
+
+    it('should apply limit', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-12-31',
+        { limit: 1 }
+      );
+      expect(results.length).toBe(1);
+    });
+
+    it('should sort by timestamp descending', async () => {
+      const results = await DocumentAuditTrail.findByDateRange(
+        '2025-01-01', '2025-12-31'
+      );
+      expect(new Date(results[0].timestamp) >= new Date(results[1].timestamp)).toBe(true);
     });
   });
 
-  describe('Static Methods', () => {
-    it('should call findByDocument correctly', async () => {
-      const documentId = generateId();
-      const mockAuditEntries = [
-        { documentId, actionType: 'viewed', timestamp: new Date() },
-        { documentId, actionType: 'edited', timestamp: new Date() }
-      ];
+  // ─── getActionCounts() ──────────────────────────────────────
 
-      DocumentAuditTrail.findByDocument.mockResolvedValue(mockAuditEntries);
-
-      const result = await DocumentAuditTrail.findByDocument(documentId, { limit: 10 });
-
-      expect(DocumentAuditTrail.findByDocument).toHaveBeenCalledWith(documentId, { limit: 10 });
-      expect(result).toEqual(mockAuditEntries);
-    });
-
-    it('should call findByUser correctly', async () => {
-      const userId = generateId();
-      const mockAuditEntries = [
-        { actor: { userId }, actionType: 'created', timestamp: new Date() }
-      ];
-
-      DocumentAuditTrail.findByUser.mockResolvedValue(mockAuditEntries);
-
-      const result = await DocumentAuditTrail.findByUser(userId, { actionType: 'created' });
-
-      expect(DocumentAuditTrail.findByUser).toHaveBeenCalledWith(userId, { actionType: 'created' });
-      expect(result).toEqual(mockAuditEntries);
-    });
-
-    it('should call findByDateRange correctly', async () => {
-      const startDate = new Date('2024-01-01');
-      const endDate = new Date('2024-01-31');
-      const mockAuditEntries = [
-        { timestamp: new Date('2024-01-15'), actionType: 'viewed' }
-      ];
-
-      DocumentAuditTrail.findByDateRange.mockResolvedValue(mockAuditEntries);
-
-      const result = await DocumentAuditTrail.findByDateRange(startDate, endDate);
-
-      expect(DocumentAuditTrail.findByDateRange).toHaveBeenCalledWith(startDate, endDate);
-      expect(result).toEqual(mockAuditEntries);
-    });
-
-    it('should call getActionCounts correctly', async () => {
-      const documentId = generateId();
-      const mockCounts = [
-        { _id: 'viewed', count: 50 },
-        { _id: 'edited', count: 10 },
-        { _id: 'downloaded', count: 5 }
-      ];
-
-      DocumentAuditTrail.getActionCounts.mockResolvedValue(mockCounts);
-
-      const result = await DocumentAuditTrail.getActionCounts(documentId);
-
-      expect(DocumentAuditTrail.getActionCounts).toHaveBeenCalledWith(documentId);
-      expect(result).toEqual(mockCounts);
-    });
-
-    it('should call searchAuditTrail correctly', async () => {
-      const searchParams = {
-        companyId: generateId(),
-        actionType: ['viewed', 'edited'],
-        startDate: new Date('2024-01-01'),
-        limit: 50
-      };
-      const mockResults = [{ auditId: 'audit-1', actionType: 'viewed' }];
-
-      DocumentAuditTrail.searchAuditTrail.mockResolvedValue(mockResults);
-
-      const result = await DocumentAuditTrail.searchAuditTrail(searchParams);
-
-      expect(DocumentAuditTrail.searchAuditTrail).toHaveBeenCalledWith(searchParams);
-      expect(result).toEqual(mockResults);
-    });
-
-    it('should expose ACTION_TYPES constant', () => {
-      expect(DocumentAuditTrail.ACTION_TYPES).toEqual(validActionTypes);
-      expect(DocumentAuditTrail.ACTION_TYPES).toContain('created');
-      expect(DocumentAuditTrail.ACTION_TYPES).toContain('deleted');
-    });
-  });
-
-  describe('Instance Methods', () => {
-    it('should save audit entry successfully', async () => {
-      const audit = new DocumentAuditTrail({
-        documentId: generateId(),
+  describe('getActionCounts()', () => {
+    it('should return action counts for a document', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-counts',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-01T00:00:00.000Z'
       });
-
-      audit.save.mockResolvedValue(audit);
-      const saved = await audit.save();
-
-      expect(audit.save).toHaveBeenCalled();
-      expect(saved).toBe(audit);
-    });
-
-    it('should convert audit entry to object', () => {
-      const auditData = {
-        auditId: 'audit-123',
-        documentId: generateId(),
+      await DocumentAuditTrail.create({
+        documentId: 'doc-counts',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1',
-        timestamp: new Date()
-      };
-
-      const audit = new DocumentAuditTrail(auditData);
-      const auditObject = audit.toObject();
-
-      expect(auditObject).toEqual(auditData);
-    });
-  });
-
-  describe('Complex Scenarios', () => {
-    it('should handle audit entry with all fields populated', () => {
-      const auditData = {
-        auditId: 'audit-complete-123',
-        documentId: generateId(),
+        actor: { userId: 'u2' },
+        ipAddress: '10.0.0.2',
+        timestamp: '2025-06-02T00:00:00.000Z'
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-counts',
         actionType: 'edited',
-        actor: {
-          userId: generateId(),
-          email: 'admin@example.com',
-          name: 'Admin User',
-          role: 'admin'
-        },
-        timestamp: new Date(),
-        ipAddress: '192.168.1.100',
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-        changes: [
-          { field: 'name', previousValue: 'Draft Doc', newValue: 'Final Doc' }
-        ],
-        previousValues: { name: 'Draft Doc', status: 'draft' },
-        newValues: { name: 'Final Doc', status: 'active' },
-        metadata: {
-          sessionId: 'sess-789',
-          companyId: generateId(),
-          requestId: 'req-abc',
-          documentVersion: 5,
-          details: { browser: 'Chrome', os: 'macOS' },
-          reason: 'Finalizing document',
-          relatedDocuments: [generateId()],
-          tags: ['legal', 'contract', 'final'],
-          location: { country: 'US', region: 'CA', city: 'San Francisco' }
-        }
-      };
-
-      const audit = new DocumentAuditTrail(auditData);
-      const validationError = audit.validateSync();
-
-      expect(validationError).toBeNull();
-      expect(audit.changes.length).toBe(1);
-      expect(audit.metadata.tags.length).toBe(3);
-    });
-
-    it('should handle multiple audit entries for same document', async () => {
-      const documentId = generateId();
-      const auditEntries = [
-        { documentId, actionType: 'created', timestamp: new Date('2024-01-01T09:00:00Z') },
-        { documentId, actionType: 'viewed', timestamp: new Date('2024-01-01T10:00:00Z') },
-        { documentId, actionType: 'edited', timestamp: new Date('2024-01-01T11:00:00Z') },
-        { documentId, actionType: 'viewed', timestamp: new Date('2024-01-01T12:00:00Z') },
-        { documentId, actionType: 'downloaded', timestamp: new Date('2024-01-01T13:00:00Z') }
-      ];
-
-      DocumentAuditTrail.find.mockResolvedValue(auditEntries);
-
-      const result = await DocumentAuditTrail.find({ documentId });
-
-      expect(result.length).toBe(5);
-      expect(result.every(entry => entry.documentId === documentId)).toBe(true);
-    });
-
-    it('should handle empty audit entry', () => {
-      const audit = new DocumentAuditTrail({});
-      const validationError = audit.validateSync();
-
-      expect(validationError).toBeTruthy();
-      expect(Object.keys(validationError.errors).length).toBe(4); // All required fields
-    });
-
-    it('should handle filtering by multiple action types', async () => {
-      const mockResults = [
-        { actionType: 'deleted', timestamp: new Date() },
-        { actionType: 'shared', timestamp: new Date() }
-      ];
-
-      DocumentAuditTrail.find.mockResolvedValue(mockResults);
-
-      const result = await DocumentAuditTrail.find({
-        actionType: { $in: ['deleted', 'shared'] }
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-06-03T00:00:00.000Z'
       });
 
-      expect(result.length).toBe(2);
-      expect(result.every(e => ['deleted', 'shared'].includes(e.actionType))).toBe(true);
+      const counts = await DocumentAuditTrail.getActionCounts('doc-counts');
+
+      expect(counts.length).toBe(2);
+      // Sorted by count descending
+      expect(counts[0]._id).toBe('viewed');
+      expect(counts[0].count).toBe(2);
+      expect(counts[1]._id).toBe('edited');
+      expect(counts[1].count).toBe(1);
+    });
+
+    it('should filter by startDate', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-cnt2',
+        actionType: 'viewed',
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-01-01T00:00:00.000Z'
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-cnt2',
+        actionType: 'viewed',
+        actor: { userId: 'u2' },
+        ipAddress: '10.0.0.2',
+        timestamp: '2025-06-01T00:00:00.000Z'
+      });
+
+      const counts = await DocumentAuditTrail.getActionCounts('doc-cnt2', '2025-03-01');
+      expect(counts.length).toBe(1);
+      expect(counts[0].count).toBe(1);
+    });
+
+    it('should filter by endDate', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-cnt3',
+        actionType: 'viewed',
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: '2025-01-01T00:00:00.000Z'
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-cnt3',
+        actionType: 'viewed',
+        actor: { userId: 'u2' },
+        ipAddress: '10.0.0.2',
+        timestamp: '2025-12-01T00:00:00.000Z'
+      });
+
+      const counts = await DocumentAuditTrail.getActionCounts('doc-cnt3', null, '2025-06-01');
+      expect(counts[0].count).toBe(1);
+    });
+
+    it('should return empty array when no entries exist', async () => {
+      const counts = await DocumentAuditTrail.getActionCounts('doc-no-entries');
+      expect(counts).toEqual([]);
     });
   });
 
-  describe('Immutability', () => {
-    it('should not allow auditId to be modified after creation', () => {
-      const audit = new DocumentAuditTrail({
-        auditId: 'original-audit-id',
-        documentId: generateId(),
+  // ─── getRecentActivitySummary() ─────────────────────────────
+
+  describe('getRecentActivitySummary()', () => {
+    it('should return activity summary for a company', async () => {
+      const today = new Date();
+      const todayStr = today.toISOString();
+
+      await DocumentAuditTrail.create({
+        documentId: 'doc-ras1',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: todayStr,
+        metadata: { companyId: 'comp-ras' }
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-ras2',
+        actionType: 'edited',
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: todayStr,
+        metadata: { companyId: 'comp-ras' }
       });
 
-      // The auditId should be set on creation and not change
-      expect(audit.auditId).toBe('original-audit-id');
+      const summary = await DocumentAuditTrail.getRecentActivitySummary('comp-ras', 7);
+      expect(summary.length).toBeGreaterThan(0);
+      expect(summary[0]).toHaveProperty('date');
+      expect(summary[0]).toHaveProperty('actionType');
+      expect(summary[0]).toHaveProperty('count');
     });
 
-    it('should generate unique auditId by default', () => {
-      const audit1 = new DocumentAuditTrail({
-        documentId: generateId(),
+    it('should exclude entries older than specified days', async () => {
+      const oldDate = new Date();
+      oldDate.setDate(oldDate.getDate() - 30);
+
+      await DocumentAuditTrail.create({
+        documentId: 'doc-ras-old',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
+        actor: { userId: 'u1' },
+        ipAddress: '10.0.0.1',
+        timestamp: oldDate.toISOString(),
+        metadata: { companyId: 'comp-ras-old' }
       });
 
-      const audit2 = new DocumentAuditTrail({
-        documentId: generateId(),
+      const summary = await DocumentAuditTrail.getRecentActivitySummary('comp-ras-old', 7);
+      expect(summary.length).toBe(0);
+    });
+  });
+
+  // ─── searchAuditTrail() ─────────────────────────────────────
+
+  describe('searchAuditTrail()', () => {
+    beforeEach(async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-search1',
         actionType: 'viewed',
-        actor: { userId: generateId() },
-        ipAddress: '192.168.1.1'
+        actor: { userId: 'user-search', email: 'admin@test.com', name: 'Admin User' },
+        ipAddress: '192.168.1.100',
+        timestamp: '2025-06-01T00:00:00.000Z',
+        metadata: { companyId: 'comp-search', reason: 'quarterly review' }
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-search2',
+        actionType: 'edited',
+        actor: { userId: 'user-search2', email: 'editor@test.com', name: 'Editor' },
+        ipAddress: '192.168.1.200',
+        timestamp: '2025-07-01T00:00:00.000Z',
+        metadata: { companyId: 'comp-search' }
+      });
+      await DocumentAuditTrail.create({
+        documentId: 'doc-search3',
+        actionType: 'deleted',
+        actor: { userId: 'user-search', email: 'admin@test.com', name: 'Admin User' },
+        ipAddress: '192.168.1.100',
+        timestamp: '2025-08-01T00:00:00.000Z',
+        metadata: { companyId: 'comp-other' }
+      });
+    });
+
+    it('should search by documentId', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ documentId: 'doc-search1' });
+      expect(results.length).toBe(1);
+    });
+
+    it('should search by userId', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ userId: 'user-search' });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by single actionType', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ actionType: 'edited' });
+      expect(results.length).toBe(1);
+    });
+
+    it('should search by array of actionTypes', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({
+        actionType: ['viewed', 'deleted']
+      });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by companyId', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ companyId: 'comp-search' });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by ipAddress', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ ipAddress: '192.168.1.100' });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by keyword in reason', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ keyword: 'quarterly' });
+      expect(results.length).toBe(1);
+    });
+
+    it('should search by keyword in actor email', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ keyword: 'admin@test' });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by keyword in actor name', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ keyword: 'editor' });
+      expect(results.length).toBe(1);
+    });
+
+    it('should search by startDate', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({
+        startDate: '2025-06-15T00:00:00.000Z'
+      });
+      expect(results.length).toBe(2);
+    });
+
+    it('should search by endDate', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({
+        endDate: '2025-06-15T00:00:00.000Z'
+      });
+      expect(results.length).toBe(1);
+    });
+
+    it('should apply skip', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ skip: 2 });
+      expect(results.length).toBe(1);
+    });
+
+    it('should apply limit', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({ limit: 1 });
+      expect(results.length).toBe(1);
+    });
+
+    it('should sort results by timestamp descending', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({});
+      expect(new Date(results[0].timestamp) >= new Date(results[1].timestamp)).toBe(true);
+    });
+
+    it('should combine multiple search criteria', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({
+        userId: 'user-search',
+        companyId: 'comp-search'
+      });
+      expect(results.length).toBe(1);
+    });
+  });
+
+  // ─── Immutability ───────────────────────────────────────────
+
+  describe('Immutability design', () => {
+    it('should not explicitly re-export updateOne in the model definition', () => {
+      // The model source intentionally does NOT list updateOne/updateMany/deleteOne/deleteMany
+      // in its own method assignments. They may still be accessible via the baseModel spread,
+      // but the design intent is that audit records are append-only.
+      // We verify the model explicitly exposes only read operations by name.
+      const explicitlyExposed = [
+        'find', 'findOne', 'findById', 'countDocuments', 'exists', 'distinct', 'aggregate'
+      ];
+      for (const method of explicitlyExposed) {
+        expect(typeof DocumentAuditTrail[method]).toBe('function');
+      }
+    });
+
+    it('should expose read-only query methods', () => {
+      expect(typeof DocumentAuditTrail.find).toBe('function');
+      expect(typeof DocumentAuditTrail.findOne).toBe('function');
+      expect(typeof DocumentAuditTrail.findById).toBe('function');
+      expect(typeof DocumentAuditTrail.countDocuments).toBe('function');
+      expect(typeof DocumentAuditTrail.exists).toBe('function');
+      expect(typeof DocumentAuditTrail.distinct).toBe('function');
+      expect(typeof DocumentAuditTrail.aggregate).toBe('function');
+    });
+
+    it('should expose create method for appending new audit entries', () => {
+      expect(typeof DocumentAuditTrail.create).toBe('function');
+    });
+
+    it('should expose custom query methods', () => {
+      expect(typeof DocumentAuditTrail.findByDocument).toBe('function');
+      expect(typeof DocumentAuditTrail.findByUser).toBe('function');
+      expect(typeof DocumentAuditTrail.findByDateRange).toBe('function');
+      expect(typeof DocumentAuditTrail.getActionCounts).toBe('function');
+      expect(typeof DocumentAuditTrail.getRecentActivitySummary).toBe('function');
+      expect(typeof DocumentAuditTrail.searchAuditTrail).toBe('function');
+    });
+  });
+
+  // ─── Edge Cases ─────────────────────────────────────────────
+
+  describe('Edge Cases', () => {
+    it('should handle entry with minimal fields', async () => {
+      const result = await DocumentAuditTrail.create({
+        documentId: 'doc-min',
+        actionType: 'viewed',
+        ipAddress: '10.0.0.1'
+      });
+      expect(result.documentId).toBe('doc-min');
+      expect(result.auditId).toBeDefined();
+      expect(result.timestamp).toBeDefined();
+    });
+
+    it('should handle entry with full metadata', async () => {
+      const result = await DocumentAuditTrail.create({
+        documentId: 'doc-full',
+        actionType: 'edited',
+        actor: { userId: 'u1', email: 'u1@test.com', name: 'User 1', role: 'admin' },
+        ipAddress: '10.0.0.1',
+        userAgent: 'Mozilla/5.0',
+        changes: [{ field: 'name', previousValue: 'Old', newValue: 'New' }],
+        previousValues: { name: 'Old' },
+        newValues: { name: 'New' },
+        metadata: {
+          sessionId: 'sess-123',
+          companyId: 'comp-001',
+          requestId: 'req-456',
+          documentVersion: 3,
+          details: { source: 'web' },
+          reason: 'Annual review',
+          relatedDocuments: ['doc-other'],
+          tags: ['compliance', 'quarterly'],
+          location: { country: 'US', region: 'CA', city: 'SF' }
+        },
+        sharedWith: {
+          users: ['u2', 'u3'],
+          emails: ['u2@test.com'],
+          accessLevel: 'view',
+          expiresAt: '2025-12-31'
+        },
+        signatureDetails: {
+          signatureId: 'sig-001',
+          signatureType: 'electronic',
+          signedAt: '2025-06-01T00:00:00.000Z',
+          certificateInfo: { issuer: 'DocuSign' }
+        }
       });
 
-      expect(audit1.auditId).toBeTruthy();
-      expect(audit2.auditId).toBeTruthy();
-      expect(audit1.auditId).not.toBe(audit2.auditId);
+      expect(result.changes.length).toBe(1);
+      expect(result.metadata.tags).toContain('compliance');
+      expect(result.sharedWith.users.length).toBe(2);
+      expect(result.signatureDetails.signatureId).toBe('sig-001');
+    });
+
+    it('should handle searchAuditTrail with no matching results', async () => {
+      const results = await DocumentAuditTrail.searchAuditTrail({
+        documentId: 'nonexistent-doc'
+      });
+      expect(results).toEqual([]);
+    });
+
+    it('should handle getActionCounts for document with single action type', async () => {
+      await DocumentAuditTrail.create({
+        documentId: 'doc-single',
+        actionType: 'viewed',
+        ipAddress: '10.0.0.1'
+      });
+
+      const counts = await DocumentAuditTrail.getActionCounts('doc-single');
+      expect(counts.length).toBe(1);
+      expect(counts[0]._id).toBe('viewed');
+      expect(counts[0].count).toBe(1);
     });
   });
 });

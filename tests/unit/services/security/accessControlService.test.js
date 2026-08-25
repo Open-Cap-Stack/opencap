@@ -1,626 +1,717 @@
 /**
- * AccessControlService Tests
- *
- * Test suite for fine-grained permissions and access control
- * Tests resource-level permissions, session management, permission auditing
+ * Unit tests for AccessControlService
  */
 
 const AccessControlService = require('../../../../services/security/accessControlService');
 
 describe('AccessControlService', () => {
-  let accessService;
+  let acs;
 
   beforeEach(() => {
-    accessService = new AccessControlService();
+    acs = new AccessControlService({
+      sessionTimeout: 3600000,
+      maxConcurrentSessions: 3
+    });
   });
 
   afterEach(() => {
-    accessService.reset();
-    jest.clearAllMocks();
+    acs.reset();
+    acs.removeAllListeners();
   });
 
-  describe('initialization', () => {
-    it('should initialize with default configuration', () => {
-      expect(accessService).toBeDefined();
-      expect(accessService.config).toBeDefined();
+  // ============ Constructor ============
+
+  describe('constructor', () => {
+    it('should initialise with default config when none provided', () => {
+      const service = new AccessControlService();
+      expect(service.config.sessionTimeout).toBe(3600000);
+      expect(service.config.maxConcurrentSessions).toBe(10);
     });
 
-    it('should accept custom configuration', () => {
-      const customService = new AccessControlService({
-        sessionTimeout: 7200000,
-        maxConcurrentSessions: 5
-      });
-      expect(customService.config.sessionTimeout).toBe(7200000);
-      expect(customService.config.maxConcurrentSessions).toBe(5);
-    });
-
-    it('should have default session timeout of 1 hour', () => {
-      expect(accessService.config.sessionTimeout).toBe(3600000);
+    it('should accept custom config values', () => {
+      expect(acs.config.sessionTimeout).toBe(3600000);
+      expect(acs.config.maxConcurrentSessions).toBe(3);
     });
   });
 
-  describe('role management', () => {
-    it('should create a new role', () => {
-      const role = accessService.createRole({
-        name: 'editor',
-        description: 'Can edit content',
-        permissions: ['read', 'write', 'update']
+  // ============ Role Management ============
+
+  describe('Role Management', () => {
+    describe('createRole', () => {
+      it('should create a role and return its data', () => {
+        const role = acs.createRole({
+          name: 'editor',
+          description: 'Can edit documents',
+          permissions: ['read', 'write']
+        });
+
+        expect(role.name).toBe('editor');
+        expect(role.description).toBe('Can edit documents');
+        expect(role.permissions).toEqual(expect.arrayContaining(['read', 'write']));
+        expect(role.builtIn).toBe(false);
       });
 
-      expect(role.name).toBe('editor');
-      expect(role.permissions).toContain('read');
-      expect(role.permissions).toContain('write');
+      it('should throw when creating a duplicate role', () => {
+        acs.createRole({ name: 'admin', description: 'Admin', permissions: ['*'] });
+        expect(() =>
+          acs.createRole({ name: 'admin', description: 'Admin2', permissions: ['read'] })
+        ).toThrow('Role already exists: admin');
+      });
+
+      it('should support builtIn flag', () => {
+        const role = acs.createRole({
+          name: 'super_admin',
+          description: 'Super admin',
+          permissions: ['*'],
+          builtIn: true
+        });
+        expect(role.builtIn).toBe(true);
+      });
+
+      it('should store policies and inherits arrays', () => {
+        acs.createRole({ name: 'base', description: 'Base', permissions: ['read'] });
+        const role = acs.createRole({
+          name: 'extended',
+          description: 'Extended',
+          permissions: ['write'],
+          policies: ['office_hours'],
+          inherits: ['base']
+        });
+        expect(role.policies).toEqual(['office_hours']);
+        expect(role.inherits).toEqual(['base']);
+      });
     });
 
-    it('should update an existing role', () => {
-      accessService.createRole({
-        name: 'editor',
-        permissions: ['read', 'write']
+    describe('updateRole', () => {
+      it('should update role permissions', () => {
+        acs.createRole({ name: 'viewer', description: 'Viewer', permissions: ['read'] });
+        const updated = acs.updateRole('viewer', { permissions: ['read', 'comment'] });
+        expect(updated.permissions).toEqual(expect.arrayContaining(['read', 'comment']));
       });
 
-      const updated = accessService.updateRole('editor', {
-        permissions: ['read', 'write', 'delete']
+      it('should update role description', () => {
+        acs.createRole({ name: 'viewer', description: 'Old', permissions: ['read'] });
+        const updated = acs.updateRole('viewer', { description: 'New description' });
+        expect(updated.description).toBe('New description');
       });
 
-      expect(updated.permissions).toContain('delete');
+      it('should update policies and inherits', () => {
+        acs.createRole({ name: 'r1', description: 'R1', permissions: ['a'] });
+        acs.updateRole('r1', { policies: ['p1'], inherits: ['base'] });
+        expect(acs.roles.get('r1').policies).toEqual(['p1']);
+        expect(acs.roles.get('r1').inherits).toEqual(['base']);
+      });
+
+      it('should throw when updating non-existent role', () => {
+        expect(() => acs.updateRole('ghost', { permissions: [] })).toThrow('Role not found: ghost');
+      });
     });
 
-    it('should delete a role', () => {
-      accessService.createRole({
-        name: 'temp-role',
-        permissions: ['read']
+    describe('deleteRole', () => {
+      it('should delete a role', () => {
+        acs.createRole({ name: 'temp', description: 'Temp', permissions: ['read'] });
+        acs.deleteRole('temp');
+        expect(() => acs.getRole('temp')).toThrow('Role not found: temp');
       });
 
-      accessService.deleteRole('temp-role');
-
-      expect(() => accessService.getRole('temp-role')).toThrow();
-    });
-
-    it('should get all roles', () => {
-      accessService.createRole({ name: 'role1', permissions: ['read'] });
-      accessService.createRole({ name: 'role2', permissions: ['write'] });
-
-      const roles = accessService.getAllRoles();
-      expect(roles.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should prevent deletion of built-in roles', () => {
-      accessService.createRole({
-        name: 'admin',
-        permissions: ['*'],
-        builtIn: true
+      it('should throw when deleting non-existent role', () => {
+        expect(() => acs.deleteRole('nope')).toThrow('Role not found: nope');
       });
 
-      expect(() => accessService.deleteRole('admin')).toThrow('Cannot delete built-in role');
+      it('should throw when deleting a built-in role', () => {
+        acs.createRole({ name: 'sys', description: 'System', permissions: ['*'], builtIn: true });
+        expect(() => acs.deleteRole('sys')).toThrow('Cannot delete built-in role');
+      });
+    });
+
+    describe('getRole', () => {
+      it('should return role data', () => {
+        acs.createRole({ name: 'viewer', description: 'Viewer', permissions: ['read'] });
+        const role = acs.getRole('viewer');
+        expect(role.name).toBe('viewer');
+        expect(role.permissions).toContain('read');
+      });
+
+      it('should throw for unknown role', () => {
+        expect(() => acs.getRole('unknown')).toThrow('Role not found: unknown');
+      });
+    });
+
+    describe('getAllRoles', () => {
+      it('should return empty array when no roles exist', () => {
+        expect(acs.getAllRoles()).toEqual([]);
+      });
+
+      it('should return all created roles', () => {
+        acs.createRole({ name: 'a', description: 'A', permissions: ['x'] });
+        acs.createRole({ name: 'b', description: 'B', permissions: ['y'] });
+        const roles = acs.getAllRoles();
+        expect(roles).toHaveLength(2);
+        expect(roles.map(r => r.name)).toEqual(expect.arrayContaining(['a', 'b']));
+      });
     });
   });
 
-  describe('user role assignment', () => {
+  // ============ User Role Assignment ============
+
+  describe('User Role Assignment', () => {
     beforeEach(() => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.createRole({ name: 'editor', permissions: ['read', 'write'] });
+      acs.createRole({ name: 'admin', description: 'Admin', permissions: ['*'] });
+      acs.createRole({ name: 'editor', description: 'Editor', permissions: ['read', 'write'] });
     });
 
-    it('should assign role to user', () => {
-      accessService.assignRole('user123', 'editor');
-      const userRoles = accessService.getUserRoles('user123');
-      expect(userRoles).toContain('editor');
+    describe('assignRole', () => {
+      it('should assign a role to a user', () => {
+        acs.assignRole('user1', 'admin');
+        expect(acs.getUserRoles('user1')).toContain('admin');
+      });
+
+      it('should support multiple roles', () => {
+        acs.assignRole('user1', 'admin');
+        acs.assignRole('user1', 'editor');
+        expect(acs.getUserRoles('user1')).toHaveLength(2);
+      });
+
+      it('should throw when assigning non-existent role', () => {
+        expect(() => acs.assignRole('user1', 'fake')).toThrow('Role not found: fake');
+      });
+
+      it('should log role assignment in history', () => {
+        acs.assignRole('user1', 'admin');
+        const history = acs.getRoleChangeHistory('user1');
+        expect(history).toHaveLength(1);
+        expect(history[0].action).toBe('ROLE_ASSIGNED');
+        expect(history[0].role).toBe('admin');
+      });
     });
 
-    it('should assign multiple roles to user', () => {
-      accessService.assignRole('user123', 'viewer');
-      accessService.assignRole('user123', 'editor');
+    describe('removeRole', () => {
+      it('should remove an assigned role', () => {
+        acs.assignRole('user1', 'admin');
+        acs.removeRole('user1', 'admin');
+        expect(acs.getUserRoles('user1')).not.toContain('admin');
+      });
 
-      const userRoles = accessService.getUserRoles('user123');
-      expect(userRoles).toContain('viewer');
-      expect(userRoles).toContain('editor');
+      it('should log role removal in history', () => {
+        acs.assignRole('user1', 'editor');
+        acs.removeRole('user1', 'editor');
+        const history = acs.getRoleChangeHistory('user1');
+        expect(history).toHaveLength(2);
+        expect(history[1].action).toBe('ROLE_REMOVED');
+      });
+
+      it('should not throw when removing role from user with no roles', () => {
+        expect(() => acs.removeRole('nonexistent', 'admin')).not.toThrow();
+      });
     });
 
-    it('should remove role from user', () => {
-      accessService.assignRole('user123', 'editor');
-      accessService.removeRole('user123', 'editor');
-
-      const userRoles = accessService.getUserRoles('user123');
-      expect(userRoles).not.toContain('editor');
-    });
-
-    it('should throw error for non-existent role', () => {
-      expect(() => accessService.assignRole('user123', 'non-existent')).toThrow();
+    describe('getUserRoles', () => {
+      it('should return empty array for unknown user', () => {
+        expect(acs.getUserRoles('nobody')).toEqual([]);
+      });
     });
   });
 
-  describe('resource-level permissions', () => {
+  // ============ Resource-Level Permissions ============
+
+  describe('Resource-Level Permissions', () => {
     beforeEach(() => {
-      accessService.createRole({ name: 'user', permissions: ['read'] });
-      accessService.assignRole('user123', 'user');
+      acs.createRole({ name: 'viewer', description: 'Viewer', permissions: ['read'] });
+      acs.assignRole('user1', 'viewer');
     });
 
-    it('should grant permission on specific resource', () => {
-      accessService.grantResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permissions: ['read', 'write']
+    describe('grantResourcePermission', () => {
+      it('should grant permission on a resource', () => {
+        acs.grantResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['edit', 'delete']
+        });
+
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permission: 'edit'
+        })).toBe(true);
       });
 
-      const hasPermission = accessService.checkResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permission: 'write'
+      it('should log permission changes', () => {
+        acs.grantResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['edit']
+        });
+        const history = acs.getPermissionChangeHistory('user1');
+        expect(history).toHaveLength(1);
+        expect(history[0].action).toBe('PERMISSION_GRANTED');
       });
-
-      expect(hasPermission).toBe(true);
     });
 
-    it('should deny permission on resource without grant', () => {
-      const hasPermission = accessService.checkResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permission: 'delete'
+    describe('revokeResourcePermission', () => {
+      it('should revoke a granted permission', () => {
+        acs.grantResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['edit', 'delete']
+        });
+        acs.revokeResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['delete']
+        });
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permission: 'delete'
+        })).toBe(false);
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permission: 'edit'
+        })).toBe(true);
       });
 
-      expect(hasPermission).toBe(false);
+      it('should handle revoking when no permissions exist', () => {
+        expect(() => acs.revokeResourcePermission({
+          userId: 'user1',
+          resourceType: 'doc',
+          resourceId: 'x',
+          permissions: ['read']
+        })).not.toThrow();
+      });
     });
 
-    it('should revoke resource permission', () => {
-      accessService.grantResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permissions: ['read', 'write']
+    describe('checkResourcePermission', () => {
+      it('should check wildcard resource permissions', () => {
+        acs.grantResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: '*',
+          permissions: ['read']
+        });
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'any-doc',
+          permission: 'read'
+        })).toBe(true);
       });
 
-      accessService.revokeResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permissions: ['write']
+      it('should fall back to role-based permissions', () => {
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permission: 'read'
+        })).toBe(true);
       });
 
-      const hasReadPermission = accessService.checkResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permission: 'read'
+      it('should return false when no matching permission exists', () => {
+        expect(acs.checkResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permission: 'admin'
+        })).toBe(false);
       });
-
-      const hasWritePermission = accessService.checkResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permission: 'write'
-      });
-
-      expect(hasReadPermission).toBe(true);
-      expect(hasWritePermission).toBe(false);
     });
 
-    it('should get all permissions for a resource', () => {
-      accessService.grantResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permissions: ['read', 'write']
+    describe('getResourcePermissions', () => {
+      it('should return all users with permissions on a resource', () => {
+        acs.grantResourcePermission({
+          userId: 'user1',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['read']
+        });
+        acs.grantResourcePermission({
+          userId: 'user2',
+          resourceType: 'document',
+          resourceId: 'doc1',
+          permissions: ['write']
+        });
+
+        const perms = acs.getResourcePermissions('document', 'doc1');
+        expect(perms).toHaveLength(2);
+        const userIds = perms.map(p => p.userId);
+        expect(userIds).toContain('user1');
+        expect(userIds).toContain('user2');
       });
 
-      accessService.grantResourcePermission({
-        userId: 'user456',
-        resourceType: 'document',
-        resourceId: 'doc456',
-        permissions: ['read']
+      it('should return empty array for resource with no permissions', () => {
+        expect(acs.getResourcePermissions('doc', 'none')).toEqual([]);
       });
-
-      const permissions = accessService.getResourcePermissions('document', 'doc456');
-      expect(permissions.length).toBe(2);
-    });
-
-    it('should support wildcard resource permissions', () => {
-      accessService.grantResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: '*',
-        permissions: ['read']
-      });
-
-      const hasPermission = accessService.checkResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'any-doc-id',
-        permission: 'read'
-      });
-
-      expect(hasPermission).toBe(true);
     });
   });
 
-  describe('permission checking', () => {
+  // ============ Permission Checking ============
+
+  describe('Permission Checking', () => {
     beforeEach(() => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.createRole({ name: 'editor', permissions: ['read', 'write', 'update'] });
-      accessService.createRole({ name: 'admin', permissions: ['*'] });
+      acs.createRole({ name: 'admin', description: 'Admin', permissions: ['*'] });
+      acs.createRole({ name: 'base', description: 'Base', permissions: ['read'] });
+      acs.createRole({ name: 'extended', description: 'Ext', permissions: ['write'], inherits: ['base'] });
     });
 
-    it('should check if user has permission', () => {
-      accessService.assignRole('user123', 'viewer');
+    describe('hasPermission', () => {
+      it('should grant access via wildcard (*) permission', () => {
+        acs.assignRole('user1', 'admin');
+        expect(acs.hasPermission('user1', 'anything')).toBe(true);
+      });
 
-      expect(accessService.hasPermission('user123', 'read')).toBe(true);
-      expect(accessService.hasPermission('user123', 'write')).toBe(false);
+      it('should check inherited permissions', () => {
+        acs.assignRole('user1', 'extended');
+        expect(acs.hasPermission('user1', 'read')).toBe(true);
+        expect(acs.hasPermission('user1', 'write')).toBe(true);
+      });
+
+      it('should return false for users without the permission', () => {
+        acs.assignRole('user1', 'base');
+        expect(acs.hasPermission('user1', 'write')).toBe(false);
+      });
+
+      it('should return false for users with no roles', () => {
+        expect(acs.hasPermission('nobody', 'read')).toBe(false);
+      });
+
+      it('should increment permission check stats', () => {
+        const before = acs.stats.permissionChecks;
+        acs.hasPermission('user1', 'read');
+        expect(acs.stats.permissionChecks).toBe(before + 1);
+      });
+
+      it('should log audit entry when audit option is true', () => {
+        acs.assignRole('user1', 'base');
+        acs.hasPermission('user1', 'read', { audit: true });
+        const log = acs.getPermissionAuditLog('user1');
+        expect(log).toHaveLength(1);
+        expect(log[0].granted).toBe(true);
+      });
+
+      it('should check delegated permissions when role-based fails', () => {
+        const futureDate = new Date(Date.now() + 3600000).toISOString();
+        acs.delegatePermission({
+          fromUserId: 'admin1',
+          toUserId: 'user1',
+          permissions: ['deploy'],
+          expiresAt: futureDate
+        });
+        expect(acs.hasPermission('user1', 'deploy')).toBe(true);
+      });
     });
 
-    it('should allow all permissions for admin role', () => {
-      accessService.assignRole('admin1', 'admin');
+    describe('getInheritedPermissions', () => {
+      it('should handle circular inheritance', () => {
+        acs.createRole({ name: 'cycleA', description: 'A', permissions: ['a'], inherits: ['cycleB'] });
+        acs.createRole({ name: 'cycleB', description: 'B', permissions: ['b'], inherits: ['cycleA'] });
+        const perms = acs.getInheritedPermissions('cycleA');
+        expect(perms.has('a')).toBe(true);
+        expect(perms.has('b')).toBe(true);
+      });
 
-      expect(accessService.hasPermission('admin1', 'read')).toBe(true);
-      expect(accessService.hasPermission('admin1', 'write')).toBe(true);
-      expect(accessService.hasPermission('admin1', 'delete')).toBe(true);
-      expect(accessService.hasPermission('admin1', 'any-permission')).toBe(true);
+      it('should return empty set for non-existent role', () => {
+        const perms = acs.getInheritedPermissions('nonexistent');
+        expect(perms.size).toBe(0);
+      });
     });
 
-    it('should combine permissions from multiple roles', () => {
-      accessService.createRole({ name: 'reporter', permissions: ['report'] });
-      accessService.assignRole('user123', 'viewer');
-      accessService.assignRole('user123', 'reporter');
+    describe('getEffectivePermissions', () => {
+      it('should combine role and delegated permissions', () => {
+        acs.assignRole('user1', 'base');
+        const futureDate = new Date(Date.now() + 3600000).toISOString();
+        acs.delegatePermission({
+          fromUserId: 'admin1',
+          toUserId: 'user1',
+          permissions: ['deploy'],
+          expiresAt: futureDate
+        });
 
-      expect(accessService.hasPermission('user123', 'read')).toBe(true);
-      expect(accessService.hasPermission('user123', 'report')).toBe(true);
-    });
+        const perms = acs.getEffectivePermissions('user1');
+        expect(perms).toContain('read');
+        expect(perms).toContain('deploy');
+      });
 
-    it('should get all effective permissions for user', () => {
-      accessService.assignRole('user123', 'editor');
+      it('should return empty array for user with no roles or delegations', () => {
+        expect(acs.getEffectivePermissions('nobody')).toEqual([]);
+      });
 
-      const permissions = accessService.getEffectivePermissions('user123');
-      expect(permissions).toContain('read');
-      expect(permissions).toContain('write');
-      expect(permissions).toContain('update');
+      it('should not include expired delegations', () => {
+        const pastDate = new Date(Date.now() - 1000).toISOString();
+        acs.delegatePermission({
+          fromUserId: 'admin1',
+          toUserId: 'user1',
+          permissions: ['deploy'],
+          expiresAt: pastDate
+        });
+        expect(acs.getEffectivePermissions('user1')).not.toContain('deploy');
+      });
     });
   });
 
-  describe('session management', () => {
-    it('should create a new session', () => {
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1',
-        userAgent: 'Mozilla/5.0'
+  // ============ Policy Management ============
+
+  describe('Policy Management', () => {
+    it('should create and evaluate a policy', () => {
+      acs.createPolicy({
+        name: 'office_hours',
+        condition: (ctx) => ctx.hour >= 9 && ctx.hour <= 17
       });
-
-      expect(session.id).toBeDefined();
-      expect(session.userId).toBe('user123');
-      expect(session.isActive).toBe(true);
+      expect(acs.evaluatePolicies(['office_hours'], { hour: 10 })).toBe(true);
+      expect(acs.evaluatePolicies(['office_hours'], { hour: 3 })).toBe(false);
     });
 
-    it('should validate an active session', () => {
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
-
-      const isValid = accessService.validateSession(session.id);
-      expect(isValid).toBe(true);
+    it('should return true when all policies pass', () => {
+      acs.createPolicy({ name: 'p1', condition: () => true });
+      acs.createPolicy({ name: 'p2', condition: () => true });
+      expect(acs.evaluatePolicies(['p1', 'p2'], {})).toBe(true);
     });
 
-    it('should invalidate expired sessions', () => {
-      jest.useFakeTimers();
-
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
-
-      // Fast forward past session timeout (1 hour + 1 minute)
-      jest.advanceTimersByTime(61 * 60 * 1000);
-
-      const isValid = accessService.validateSession(session.id);
-      expect(isValid).toBe(false);
-
-      jest.useRealTimers();
+    it('should return false if any policy fails', () => {
+      acs.createPolicy({ name: 'p1', condition: () => true });
+      acs.createPolicy({ name: 'p2', condition: () => false });
+      expect(acs.evaluatePolicies(['p1', 'p2'], {})).toBe(false);
     });
 
-    it('should terminate a session', () => {
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
-
-      accessService.terminateSession(session.id);
-
-      const isValid = accessService.validateSession(session.id);
-      expect(isValid).toBe(false);
+    it('should skip unknown policies and return true', () => {
+      expect(acs.evaluatePolicies(['nonexistent'], {})).toBe(true);
     });
 
-    it('should terminate all sessions for a user', () => {
-      accessService.createSession({ userId: 'user123', ipAddress: '192.168.1.1' });
-      accessService.createSession({ userId: 'user123', ipAddress: '192.168.1.2' });
-      accessService.createSession({ userId: 'user123', ipAddress: '192.168.1.3' });
-
-      accessService.terminateAllUserSessions('user123');
-
-      const activeSessions = accessService.getUserSessions('user123');
-      expect(activeSessions.filter(s => s.isActive).length).toBe(0);
-    });
-
-    it('should get all active sessions for user', () => {
-      accessService.createSession({ userId: 'user123', ipAddress: '192.168.1.1' });
-      accessService.createSession({ userId: 'user123', ipAddress: '192.168.1.2' });
-
-      const sessions = accessService.getUserSessions('user123');
-      expect(sessions.filter(s => s.isActive).length).toBe(2);
-    });
-
-    it('should limit concurrent sessions', () => {
-      const limitedService = new AccessControlService({
-        maxConcurrentSessions: 2
-      });
-
-      limitedService.createSession({ userId: 'user123', ipAddress: '192.168.1.1' });
-      limitedService.createSession({ userId: 'user123', ipAddress: '192.168.1.2' });
-      limitedService.createSession({ userId: 'user123', ipAddress: '192.168.1.3' });
-
-      const sessions = limitedService.getUserSessions('user123');
-      expect(sessions.filter(s => s.isActive).length).toBe(2);
-    });
-
-    it('should refresh session timeout', () => {
-      jest.useFakeTimers();
-
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
-
-      // Advance 30 minutes
-      jest.advanceTimersByTime(30 * 60 * 1000);
-
-      // Refresh session
-      accessService.refreshSession(session.id);
-
-      // Advance another 45 minutes (total 75 minutes from start, but only 45 from refresh)
-      jest.advanceTimersByTime(45 * 60 * 1000);
-
-      const isValid = accessService.validateSession(session.id);
-      expect(isValid).toBe(true);
-
-      jest.useRealTimers();
-    });
-
-    it('should track session activity', () => {
-      const session = accessService.createSession({
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
-
-      accessService.recordSessionActivity(session.id, {
-        action: 'page_view',
-        resource: '/dashboard'
-      });
-
-      const sessionData = accessService.getSession(session.id);
-      expect(sessionData.activityLog.length).toBe(1);
-    });
-  });
-
-  describe('permission auditing', () => {
-    it('should log permission checks', () => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.assignRole('user123', 'viewer');
-
-      accessService.hasPermission('user123', 'read', { audit: true });
-
-      const auditLog = accessService.getPermissionAuditLog('user123');
-      expect(auditLog.length).toBeGreaterThan(0);
-      expect(auditLog[0].permission).toBe('read');
-      expect(auditLog[0].granted).toBe(true);
-    });
-
-    it('should log denied permission attempts', () => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.assignRole('user123', 'viewer');
-
-      accessService.hasPermission('user123', 'delete', { audit: true });
-
-      const auditLog = accessService.getPermissionAuditLog('user123');
-      const deniedEntry = auditLog.find(e => e.permission === 'delete');
-      expect(deniedEntry).toBeDefined();
-      expect(deniedEntry.granted).toBe(false);
-    });
-
-    it('should log role changes', () => {
-      accessService.createRole({ name: 'editor', permissions: ['read', 'write'] });
-      accessService.assignRole('user123', 'editor');
-
-      const changes = accessService.getRoleChangeHistory('user123');
-      expect(changes.length).toBe(1);
-      expect(changes[0].action).toBe('ROLE_ASSIGNED');
-      expect(changes[0].role).toBe('editor');
-    });
-
-    it('should log permission grants and revocations', () => {
-      accessService.grantResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc1',
-        permissions: ['read']
-      });
-
-      accessService.revokeResourcePermission({
-        userId: 'user123',
-        resourceType: 'document',
-        resourceId: 'doc1',
-        permissions: ['read']
-      });
-
-      const history = accessService.getPermissionChangeHistory('user123');
-      expect(history.length).toBe(2);
-    });
-  });
-
-  describe('policy enforcement', () => {
-    it('should enforce time-based access policies', () => {
-      accessService.createPolicy({
-        name: 'office-hours-only',
-        condition: (context) => {
-          const hour = new Date(context.timestamp).getHours();
-          return hour >= 9 && hour <= 17;
-        }
-      });
-
-      accessService.createRole({
-        name: 'contractor',
+    it('should enforce policy on hasPermission check', () => {
+      acs.createPolicy({ name: 'deny_all', condition: () => false });
+      acs.createRole({
+        name: 'restricted',
+        description: 'Restricted',
         permissions: ['read'],
-        policies: ['office-hours-only']
+        policies: ['deny_all']
+      });
+      acs.assignRole('user1', 'restricted');
+      expect(acs.hasPermission('user1', 'read', { context: {} })).toBe(false);
+    });
+  });
+
+  // ============ Session Management ============
+
+  describe('Session Management', () => {
+    describe('createSession', () => {
+      it('should create a new session', () => {
+        const session = acs.createSession({
+          userId: 'user1',
+          ipAddress: '127.0.0.1',
+          userAgent: 'Jest'
+        });
+
+        expect(session.id).toBeDefined();
+        expect(session.userId).toBe('user1');
+        expect(session.isActive).toBe(true);
+        expect(session.activityLog).toEqual([]);
       });
 
-      accessService.assignRole('contractor1', 'contractor');
+      it('should enforce max concurrent sessions', () => {
+        const s1 = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        const s2 = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.2', userAgent: 'B' });
+        const s3 = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.3', userAgent: 'C' });
+        const s4 = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.4', userAgent: 'D' });
 
-      // Mock office hours
-      const officeTime = new Date();
-      officeTime.setHours(10, 0, 0, 0);
-
-      const hasAccess = accessService.hasPermission('contractor1', 'read', {
-        context: { timestamp: officeTime }
+        expect(acs.getSession(s1.id).isActive).toBe(false);
+        expect(acs.getSession(s4.id).isActive).toBe(true);
       });
-
-      expect(hasAccess).toBe(true);
     });
 
-    it('should enforce IP-based access policies', () => {
-      accessService.createPolicy({
-        name: 'internal-network-only',
-        condition: (context) => {
-          return context.ipAddress && context.ipAddress.startsWith('192.168.');
-        }
+    describe('validateSession', () => {
+      it('should return true for valid active session', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        expect(acs.validateSession(session.id)).toBe(true);
       });
 
-      accessService.createRole({
-        name: 'internal-user',
+      it('should return false for non-existent session', () => {
+        expect(acs.validateSession('fake-id')).toBe(false);
+      });
+
+      it('should return false for terminated session', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.terminateSession(session.id);
+        expect(acs.validateSession(session.id)).toBe(false);
+      });
+
+      it('should return false for expired session', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.sessions.get(session.id).expiresAt = Date.now() - 1000;
+        expect(acs.validateSession(session.id)).toBe(false);
+      });
+    });
+
+    describe('refreshSession', () => {
+      it('should extend session expiry', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.sessions.get(session.id).expiresAt = Date.now() + 100;
+        acs.refreshSession(session.id);
+        const refreshed = acs.getSession(session.id);
+        expect(refreshed.expiresAt).toBeGreaterThan(Date.now() + 3500000);
+      });
+
+      it('should not refresh an inactive session', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.terminateSession(session.id);
+        const expiresAt = acs.getSession(session.id).expiresAt;
+        acs.refreshSession(session.id);
+        expect(acs.getSession(session.id).expiresAt).toBe(expiresAt);
+      });
+    });
+
+    describe('terminateAllUserSessions', () => {
+      it('should terminate all sessions for a user', () => {
+        acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.createSession({ userId: 'u1', ipAddress: '1.1.1.2', userAgent: 'B' });
+        acs.terminateAllUserSessions('u1');
+        const sessions = acs.getUserSessions('u1');
+        sessions.forEach(s => expect(s.isActive).toBe(false));
+      });
+
+      it('should not throw for user with no sessions', () => {
+        expect(() => acs.terminateAllUserSessions('nobody')).not.toThrow();
+      });
+    });
+
+    describe('getUserSessions', () => {
+      it('should return empty array for user with no sessions', () => {
+        expect(acs.getUserSessions('nobody')).toEqual([]);
+      });
+    });
+
+    describe('recordSessionActivity', () => {
+      it('should add activity to session log', () => {
+        const session = acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'A' });
+        acs.recordSessionActivity(session.id, { action: 'viewed_page', path: '/dashboard' });
+        const updated = acs.getSession(session.id);
+        expect(updated.activityLog).toHaveLength(1);
+        expect(updated.activityLog[0].action).toBe('viewed_page');
+      });
+
+      it('should not throw for non-existent session', () => {
+        expect(() => acs.recordSessionActivity('fake', { action: 'test' })).not.toThrow();
+      });
+    });
+  });
+
+  // ============ Delegation ============
+
+  describe('Delegation', () => {
+    it('should delegate permissions', () => {
+      const futureDate = new Date(Date.now() + 3600000).toISOString();
+      const delegation = acs.delegatePermission({
+        fromUserId: 'admin1',
+        toUserId: 'user1',
         permissions: ['read', 'write'],
-        policies: ['internal-network-only']
+        expiresAt: futureDate
       });
 
-      accessService.assignRole('user123', 'internal-user');
+      expect(delegation.id).toBeDefined();
+      expect(delegation.fromUserId).toBe('admin1');
+      expect(delegation.toUserId).toBe('user1');
+    });
 
-      const internalAccess = accessService.hasPermission('user123', 'write', {
-        context: { ipAddress: '192.168.1.100' }
+    it('should check delegated permissions', () => {
+      const futureDate = new Date(Date.now() + 3600000).toISOString();
+      acs.delegatePermission({
+        fromUserId: 'admin1',
+        toUserId: 'user1',
+        permissions: ['deploy'],
+        expiresAt: futureDate
       });
 
-      const externalAccess = accessService.hasPermission('user123', 'write', {
-        context: { ipAddress: '10.0.0.100' }
+      expect(acs.checkDelegatedPermissions('user1', 'deploy')).toBe(true);
+      expect(acs.checkDelegatedPermissions('user1', 'destroy')).toBe(false);
+    });
+
+    it('should not grant expired delegations', () => {
+      const pastDate = new Date(Date.now() - 10000).toISOString();
+      acs.delegatePermission({
+        fromUserId: 'admin1',
+        toUserId: 'user1',
+        permissions: ['deploy'],
+        expiresAt: pastDate
       });
 
-      expect(internalAccess).toBe(true);
-      expect(externalAccess).toBe(false);
+      expect(acs.checkDelegatedPermissions('user1', 'deploy')).toBe(false);
+    });
+
+    it('should revoke a delegation', () => {
+      const futureDate = new Date(Date.now() + 3600000).toISOString();
+      const delegation = acs.delegatePermission({
+        fromUserId: 'admin1',
+        toUserId: 'user1',
+        permissions: ['deploy'],
+        expiresAt: futureDate
+      });
+      acs.revokeDelegation(delegation.id);
+      expect(acs.checkDelegatedPermissions('user1', 'deploy')).toBe(false);
     });
   });
 
-  describe('delegation', () => {
-    it('should allow permission delegation', () => {
-      accessService.createRole({ name: 'manager', permissions: ['read', 'write', 'delegate'] });
-      accessService.assignRole('manager1', 'manager');
+  // ============ Audit Logging ============
 
-      accessService.delegatePermission({
-        fromUserId: 'manager1',
-        toUserId: 'assistant1',
-        permissions: ['read'],
-        expiresAt: new Date(Date.now() + 86400000) // 24 hours
-      });
-
-      const hasPermission = accessService.hasPermission('assistant1', 'read');
-      expect(hasPermission).toBe(true);
+  describe('Audit Logging', () => {
+    it('should return empty audit log for unknown user', () => {
+      expect(acs.getPermissionAuditLog('nobody')).toEqual([]);
     });
 
-    it('should expire delegated permissions', () => {
-      jest.useFakeTimers();
-
-      accessService.createRole({ name: 'manager', permissions: ['read', 'write', 'delegate'] });
-      accessService.assignRole('manager1', 'manager');
-
-      accessService.delegatePermission({
-        fromUserId: 'manager1',
-        toUserId: 'assistant1',
-        permissions: ['read'],
-        expiresAt: new Date(Date.now() + 3600000) // 1 hour
-      });
-
-      // Fast forward past expiration
-      jest.advanceTimersByTime(3600001);
-
-      const hasPermission = accessService.hasPermission('assistant1', 'read');
-      expect(hasPermission).toBe(false);
-
-      jest.useRealTimers();
+    it('should return empty role change history for unknown user', () => {
+      expect(acs.getRoleChangeHistory('nobody')).toEqual([]);
     });
 
-    it('should revoke delegated permissions', () => {
-      accessService.createRole({ name: 'manager', permissions: ['read', 'write', 'delegate'] });
-      accessService.assignRole('manager1', 'manager');
-
-      const delegation = accessService.delegatePermission({
-        fromUserId: 'manager1',
-        toUserId: 'assistant1',
-        permissions: ['read'],
-        expiresAt: new Date(Date.now() + 86400000)
-      });
-
-      accessService.revokeDelegation(delegation.id);
-
-      const hasPermission = accessService.hasPermission('assistant1', 'read');
-      expect(hasPermission).toBe(false);
+    it('should return empty permission change history for unknown user', () => {
+      expect(acs.getPermissionChangeHistory('nobody')).toEqual([]);
     });
   });
 
-  describe('access control statistics', () => {
-    it('should return access control statistics', () => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.assignRole('user1', 'viewer');
-      accessService.createSession({ userId: 'user1', ipAddress: '192.168.1.1' });
+  // ============ Statistics ============
 
-      const stats = accessService.getStatistics();
+  describe('getStatistics', () => {
+    it('should return correct statistics', () => {
+      acs.createRole({ name: 'a', description: 'A', permissions: ['x'] });
+      acs.assignRole('u1', 'a');
+      acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'X' });
+      acs.hasPermission('u1', 'x');
 
-      expect(stats).toHaveProperty('totalRoles');
-      expect(stats).toHaveProperty('totalUsers');
-      expect(stats).toHaveProperty('activeSessions');
-      expect(stats).toHaveProperty('permissionChecks');
+      const stats = acs.getStatistics();
+      expect(stats.totalRoles).toBe(1);
+      expect(stats.totalUsers).toBe(1);
+      expect(stats.activeSessions).toBe(1);
+      expect(stats.permissionChecks).toBe(1);
     });
   });
 
-  describe('hierarchical roles', () => {
-    it('should support role inheritance', () => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.createRole({
-        name: 'editor',
-        permissions: ['write', 'update'],
-        inherits: ['viewer']
-      });
+  // ============ Reset ============
 
-      accessService.assignRole('user123', 'editor');
+  describe('reset', () => {
+    it('should clear all data', () => {
+      acs.createRole({ name: 'a', description: 'A', permissions: ['x'] });
+      acs.assignRole('u1', 'a');
+      acs.createSession({ userId: 'u1', ipAddress: '1.1.1.1', userAgent: 'X' });
+      acs.hasPermission('u1', 'x');
+      acs.reset();
 
-      const permissions = accessService.getEffectivePermissions('user123');
-      expect(permissions).toContain('read');
-      expect(permissions).toContain('write');
-      expect(permissions).toContain('update');
+      const stats = acs.getStatistics();
+      expect(stats.totalRoles).toBe(0);
+      expect(stats.totalUsers).toBe(0);
+      expect(stats.activeSessions).toBe(0);
+      expect(stats.permissionChecks).toBe(0);
     });
+  });
 
-    it('should support multi-level inheritance', () => {
-      accessService.createRole({ name: 'viewer', permissions: ['read'] });
-      accessService.createRole({
-        name: 'editor',
-        permissions: ['write'],
-        inherits: ['viewer']
-      });
-      accessService.createRole({
-        name: 'admin',
-        permissions: ['delete', 'manage'],
-        inherits: ['editor']
-      });
+  // ============ generateId ============
 
-      accessService.assignRole('admin1', 'admin');
-
-      const permissions = accessService.getEffectivePermissions('admin1');
-      expect(permissions).toContain('read');
-      expect(permissions).toContain('write');
-      expect(permissions).toContain('delete');
-      expect(permissions).toContain('manage');
+  describe('generateId', () => {
+    it('should produce unique IDs', () => {
+      const ids = new Set(Array.from({ length: 20 }, () => acs.generateId()));
+      expect(ids.size).toBe(20);
     });
   });
 });

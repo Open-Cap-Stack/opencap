@@ -121,8 +121,10 @@ describe('PATCH /safes/:id/status — updateStatus', () => {
   });
 
   test('falls back to findById when findOne returns null', async () => {
-    SAFE.findOne.mockResolvedValue(null);
-    SAFE.findById.mockResolvedValue({ safeId: 'safe_1', status: 'draft' });
+    // resolveSafe calls findOne({ safeId: id }) first, then findOne({ _id: id })
+    SAFE.findOne
+      .mockResolvedValueOnce(null)                                   // findOne({ safeId: 'safe_1' })
+      .mockResolvedValueOnce({ safeId: 'safe_1', status: 'draft' }); // findOne({ _id: 'safe_1' })
     SAFE.transitionTo.mockResolvedValue({ safeId: 'safe_1', status: 'sent' });
 
     const { req, res } = mockReqRes({
@@ -130,7 +132,7 @@ describe('PATCH /safes/:id/status — updateStatus', () => {
       body: { status: 'sent' }
     });
     await safeController.updateStatus(req, res);
-    expect(SAFE.findById).toHaveBeenCalledWith('safe_1');
+    expect(SAFE.findOne).toHaveBeenCalledWith({ _id: 'safe_1' });
     expect(SAFE.transitionTo).toHaveBeenCalled();
   });
 });

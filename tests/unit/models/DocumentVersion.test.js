@@ -1,336 +1,630 @@
 /**
  * DocumentVersion Model Unit Tests
- * Issue #98: Implement Document Version Control
- * TDD Red Phase: Tests written before implementation
+ * Tests for document version control model including creation,
+ * validation, business logic methods, and edge cases.
  */
 process.env.SKIP_DB_SETUP = 'true';
 
+// Mock the zerodbService to prevent real API calls
+jest.mock('../../../services/zerodbService', () => ({
+  initialize: jest.fn(),
+  insertRow: jest.fn(),
+  queryTable: jest.fn(),
+  updateRows: jest.fn(),
+  deleteRows: jest.fn(),
+  deleteRowById: jest.fn(),
+  createTable: jest.fn(),
+  client: { put: jest.fn() },
+  projectId: 'test-project'
+}));
+
+const DocumentVersion = require('../../../models/DocumentVersion');
+const zerodbService = require('../../../services/zerodbService');
+
 describe('DocumentVersion Model', () => {
-  let DocumentVersion;
-  let mockDocument;
+  let store = [];
+  let idCounter = 0;
 
   beforeEach(() => {
+    store = [];
+    idCounter = 0;
     jest.clearAllMocks();
 
-    // Create a base mock document for testing
-    mockDocument = {
-      _id: 'version123',
-      versionId: 'DV-12345678',
-      documentId: 'doc123',
-      versionNumber: 1,
-      majorVersion: 1,
-      minorVersion: 0,
+    // Mock insertRow
+    zerodbService.insertRow.mockImplementation((tableName, doc) => {
+      const row_id = ++idCounter;
+      const storedDoc = { ...doc };
+      store.push(storedDoc);
+      return Promise.resolve({
+        data: [{ row_id, row_data: storedDoc }]
+      });
+    });
+
+    // Mock queryTable
+    zerodbService.queryTable.mockImplementation((tableName, { filter = {} } = {}) => {
+      let results = [...store];
+      for (const [key, value] of Object.entries(filter)) {
+        results = results.filter(doc => doc[key] === value);
+      }
+      return Promise.resolve({
+        data: results.map((doc, i) => ({ row_id: i + 1, row_data: doc }))
+      });
+    });
+
+    // Mock client.put for updates
+    zerodbService.client.put.mockImplementation((url, { row_data }) => {
+      const idx = store.findIndex(doc => doc._id === row_data._id);
+      if (idx !== -1) {
+        store[idx] = { ...store[idx], ...row_data };
+      }
+      return Promise.resolve({ data: { row_data } });
+    });
+  });
+
+  // ─── Constants ───────────────────────────────────────────────
+
+  describe('Constants', () => {
+    it('should expose STORAGE_PROVIDERS', () => {
+      expect(DocumentVersion.STORAGE_PROVIDERS).toEqual(['zerodb', 'minio', 's3', 'local']);
+    });
+
+    it('should expose VALID_STATUSES', () => {
+      expect(DocumentVersion.VALID_STATUSES).toEqual(['draft', 'published', 'archived', 'deleted']);
+    });
+
+    it('should have tableName set to document_versions', () => {
+      expect(DocumentVersion.tableName).toBe('document_versions');
+    });
+  });
+
+  // ─── Schema ──────────────────────────────────────────────────
+
+  describe('Schema', () => {
+    it('should define required fields', () => {
+      expect(DocumentVersion.schema.versionId.required).toBe(true);
+      expect(DocumentVersion.schema.documentId.required).toBe(true);
+      expect(DocumentVersion.schema.versionNumber.required).toBe(true);
+      expect(DocumentVersion.schema.storageReference.required).toBe(true);
+      expect(DocumentVersion.schema.changeSummary.required).toBe(true);
+      expect(DocumentVersion.schema.author.required).toBe(true);
+      expect(DocumentVersion.schema.originalFilename.required).toBe(true);
+      expect(DocumentVersion.schema.mimeType.required).toBe(true);
+      expect(DocumentVersion.schema.fileSize.required).toBe(true);
+      expect(DocumentVersion.schema.fileHash.required).toBe(true);
+    });
+
+    it('should define status enum', () => {
+      expect(DocumentVersion.schema.status.enum).toEqual(['draft', 'published', 'archived', 'deleted']);
+    });
+
+    it('should have defaults for optional fields', () => {
+      expect(DocumentVersion.schema.majorVersion.default).toBe(1);
+      expect(DocumentVersion.schema.minorVersion.default).toBe(0);
+      expect(DocumentVersion.schema.status.default).toBe('draft');
+      expect(DocumentVersion.schema.previousVersion.default).toBeNull();
+      expect(DocumentVersion.schema.nextVersion.default).toBeNull();
+    });
+  });
+
+  // ─── create() ────────────────────────────────────────────────
+
+  describe('create()', () => {
+    const validData = {
+      documentId: 'doc-001',
+      changeSummary: 'Initial version',
+      author: 'user-001',
+      originalFilename: 'contract.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 2048,
+      fileHash: 'sha256:abcdef123456',
       storageReference: {
         provider: 'zerodb',
-        fileKey: 'opencap/documents/doc123/v1',
+        fileKey: 'docs/contract.pdf',
         bucket: 'documents'
-      },
-      changeSummary: 'Initial version',
-      changeDescription: 'First upload of the document',
-      author: 'user123',
-      fileSize: 1024,
-      fileHash: 'sha256:abc123def456',
-      mimeType: 'application/pdf',
-      originalFilename: 'contract.pdf',
-      previousVersion: null,
-      nextVersion: null,
-      status: 'published',
-      metadata: {},
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
+      }
     };
-  });
 
-  describe('Schema Structure', () => {
-    it('should have required versionId field', () => {
-      const doc = { ...mockDocument };
-      delete doc.versionId;
-      // Validation should fail without versionId
-      expect(doc.versionId).toBeUndefined();
+    it('should create a version with valid data', async () => {
+      const result = await DocumentVersion.create(validData);
+
+      expect(result).toBeDefined();
+      expect(result.documentId).toBe('doc-001');
+      expect(result.author).toBe('user-001');
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'document_versions',
+        expect.objectContaining({ documentId: 'doc-001' })
+      );
     });
 
-    it('should have required documentId field', () => {
-      const doc = { ...mockDocument };
-      delete doc.documentId;
-      expect(doc.documentId).toBeUndefined();
+    it('should auto-generate versionId if not provided', async () => {
+      const result = await DocumentVersion.create(validData);
+
+      expect(result.versionId).toBeDefined();
+      expect(result.versionId).toMatch(/^DV-[A-Z0-9]{8}$/);
     });
 
-    it('should have required versionNumber field', () => {
-      const doc = { ...mockDocument };
-      expect(doc.versionNumber).toBe(1);
+    it('should preserve provided versionId', async () => {
+      const result = await DocumentVersion.create({
+        ...validData,
+        versionId: 'DV-CUSTOM01'
+      });
+
+      expect(result.versionId).toBe('DV-CUSTOM01');
     });
 
-    it('should have required author field', () => {
-      const doc = { ...mockDocument };
-      expect(doc.author).toBe('user123');
+    it('should default versionNumber to 1 if not provided', async () => {
+      const result = await DocumentVersion.create(validData);
+      expect(result.versionNumber).toBe(1);
     });
 
-    it('should have required storageReference field', () => {
-      const doc = { ...mockDocument };
-      expect(doc.storageReference).toBeDefined();
-      expect(doc.storageReference.provider).toBe('zerodb');
-      expect(doc.storageReference.fileKey).toBeDefined();
+    it('should preserve provided versionNumber', async () => {
+      const result = await DocumentVersion.create({
+        ...validData,
+        versionNumber: 5
+      });
+      expect(result.versionNumber).toBe(5);
     });
 
-    it('should have status field with default value', () => {
-      const doc = { ...mockDocument };
-      expect(doc.status).toBe('published');
+    it('should default status to draft if not provided', async () => {
+      const result = await DocumentVersion.create(validData);
+      expect(result.status).toBe('draft');
     });
 
-    it('should have fileSize field', () => {
-      const doc = { ...mockDocument };
-      expect(doc.fileSize).toBe(1024);
+    it('should set publishedAt when status is published', async () => {
+      const result = await DocumentVersion.create({
+        ...validData,
+        status: 'published'
+      });
+
+      expect(result.publishedAt).toBeDefined();
+      expect(typeof result.publishedAt).toBe('string');
     });
 
-    it('should have fileHash for integrity verification', () => {
-      const doc = { ...mockDocument };
-      expect(doc.fileHash).toBeDefined();
-      expect(doc.fileHash).toMatch(/^sha256:/);
+    it('should not overwrite existing publishedAt', async () => {
+      const customDate = '2025-01-15T00:00:00.000Z';
+      const result = await DocumentVersion.create({
+        ...validData,
+        status: 'published',
+        publishedAt: customDate
+      });
+
+      expect(result.publishedAt).toBe(customDate);
     });
 
-    it('should support semantic versioning with majorVersion and minorVersion', () => {
-      const doc = { ...mockDocument };
-      expect(doc.majorVersion).toBe(1);
-      expect(doc.minorVersion).toBe(0);
+    it('should set archivedAt when status is archived', async () => {
+      const result = await DocumentVersion.create({
+        ...validData,
+        status: 'archived'
+      });
+
+      expect(result.archivedAt).toBeDefined();
+      expect(typeof result.archivedAt).toBe('string');
     });
 
-    it('should support linked list with previousVersion and nextVersion', () => {
-      const doc = { ...mockDocument };
-      expect(doc.previousVersion).toBeNull();
-      doc.previousVersion = 'version122';
-      doc.nextVersion = 'version124';
-      expect(doc.previousVersion).toBe('version122');
-      expect(doc.nextVersion).toBe('version124');
-    });
-  });
+    it('should not overwrite existing archivedAt', async () => {
+      const customDate = '2025-06-01T00:00:00.000Z';
+      const result = await DocumentVersion.create({
+        ...validData,
+        status: 'archived',
+        archivedAt: customDate
+      });
 
-  describe('Status Enum Validation', () => {
-    it('should accept valid status: draft', () => {
-      const doc = { ...mockDocument, status: 'draft' };
-      expect(doc.status).toBe('draft');
+      expect(result.archivedAt).toBe(customDate);
     });
 
-    it('should accept valid status: published', () => {
-      const doc = { ...mockDocument, status: 'published' };
-      expect(doc.status).toBe('published');
-    });
+    it('should add timestamps (createdAt, updatedAt)', async () => {
+      const result = await DocumentVersion.create(validData);
 
-    it('should accept valid status: archived', () => {
-      const doc = { ...mockDocument, status: 'archived' };
-      expect(doc.status).toBe('archived');
-    });
-
-    it('should accept valid status: deleted', () => {
-      const doc = { ...mockDocument, status: 'deleted' };
-      expect(doc.status).toBe('deleted');
-    });
-  });
-
-  describe('Storage Reference Structure', () => {
-    it('should have provider field in storageReference', () => {
-      const doc = { ...mockDocument };
-      expect(doc.storageReference.provider).toBeDefined();
-    });
-
-    it('should have fileKey field in storageReference', () => {
-      const doc = { ...mockDocument };
-      expect(doc.storageReference.fileKey).toBeDefined();
-    });
-
-    it('should support MinIO storage provider', () => {
-      const doc = {
-        ...mockDocument,
-        storageReference: {
-          provider: 'minio',
-          fileKey: 'documents/doc123/v1/contract.pdf',
-          bucket: 'opencap-documents'
-        }
-      };
-      expect(doc.storageReference.provider).toBe('minio');
-      expect(doc.storageReference.bucket).toBe('opencap-documents');
-    });
-
-    it('should support ZeroDB storage provider', () => {
-      const doc = { ...mockDocument };
-      expect(doc.storageReference.provider).toBe('zerodb');
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
     });
   });
 
-  describe('Version Number Validation', () => {
-    it('should require versionNumber to be at least 1', () => {
-      const doc = { ...mockDocument, versionNumber: 1 };
-      expect(doc.versionNumber).toBeGreaterThanOrEqual(1);
+  // ─── findByVersionId() ──────────────────────────────────────
+
+  describe('findByVersionId()', () => {
+    it('should find a version by its versionId', async () => {
+      await DocumentVersion.create({
+        versionId: 'DV-FIND0001',
+        documentId: 'doc-001',
+        changeSummary: 'Test',
+        author: 'user-001',
+        originalFilename: 'test.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+      });
+
+      const found = await DocumentVersion.findByVersionId('DV-FIND0001');
+      expect(found).toBeDefined();
+      expect(found.versionId).toBe('DV-FIND0001');
     });
 
-    it('should support incremental version numbers', () => {
-      const versions = [
-        { ...mockDocument, versionNumber: 1 },
-        { ...mockDocument, versionNumber: 2 },
-        { ...mockDocument, versionNumber: 3 }
-      ];
-      expect(versions[0].versionNumber).toBe(1);
-      expect(versions[1].versionNumber).toBe(2);
-      expect(versions[2].versionNumber).toBe(3);
-    });
-
-    it('should support semantic version string format', () => {
-      const doc = {
-        ...mockDocument,
-        majorVersion: 2,
-        minorVersion: 1
-      };
-      const semanticVersion = `${doc.majorVersion}.${doc.minorVersion}`;
-      expect(semanticVersion).toBe('2.1');
-    });
-  });
-
-  describe('Timestamps', () => {
-    it('should have createdAt timestamp', () => {
-      const doc = { ...mockDocument };
-      expect(doc.createdAt).toBeInstanceOf(Date);
-    });
-
-    it('should have updatedAt timestamp', () => {
-      const doc = { ...mockDocument };
-      expect(doc.updatedAt).toBeInstanceOf(Date);
+    it('should return null for non-existent versionId', async () => {
+      const found = await DocumentVersion.findByVersionId('DV-NONEXIST');
+      expect(found).toBeNull();
     });
   });
 
-  describe('Metadata Support', () => {
-    it('should support custom metadata object', () => {
-      const doc = {
-        ...mockDocument,
-        metadata: {
-          tags: ['contract', 'legal'],
-          category: 'legal-documents',
-          reviewedBy: 'legal-team'
-        }
-      };
-      expect(doc.metadata.tags).toContain('contract');
-      expect(doc.metadata.category).toBe('legal-documents');
+  // ─── findByDocument() ───────────────────────────────────────
+
+  describe('findByDocument()', () => {
+    const baseData = {
+      changeSummary: 'Update',
+      author: 'user-001',
+      originalFilename: 'doc.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      fileHash: 'sha256:abc',
+      storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+    };
+
+    it('should find all versions for a document', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-A', versionNumber: 1 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-A', versionNumber: 2 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-B', versionNumber: 1 });
+
+      const results = await DocumentVersion.findByDocument('doc-A');
+      expect(results.length).toBe(2);
     });
 
-    it('should support empty metadata', () => {
-      const doc = { ...mockDocument, metadata: {} };
-      expect(doc.metadata).toEqual({});
+    it('should sort versions by versionNumber descending', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-sort', versionNumber: 1 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-sort', versionNumber: 3 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-sort', versionNumber: 2 });
+
+      const results = await DocumentVersion.findByDocument('doc-sort');
+      expect(results[0].versionNumber).toBe(3);
+      expect(results[1].versionNumber).toBe(2);
+      expect(results[2].versionNumber).toBe(1);
+    });
+
+    it('should filter by status when provided', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-status', versionNumber: 1, status: 'draft' });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-status', versionNumber: 2, status: 'published' });
+
+      const results = await DocumentVersion.findByDocument('doc-status', { status: 'published' });
+      expect(results.length).toBe(1);
+      expect(results[0].status).toBe('published');
+    });
+
+    it('should apply skip option', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-skip', versionNumber: 1 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-skip', versionNumber: 2 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-skip', versionNumber: 3 });
+
+      const results = await DocumentVersion.findByDocument('doc-skip', { skip: 1 });
+      expect(results.length).toBe(2);
+    });
+
+    it('should apply limit option', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lim', versionNumber: 1 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lim', versionNumber: 2 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lim', versionNumber: 3 });
+
+      const results = await DocumentVersion.findByDocument('doc-lim', { limit: 2 });
+      expect(results.length).toBe(2);
+    });
+
+    it('should return empty array for document with no versions', async () => {
+      const results = await DocumentVersion.findByDocument('doc-none');
+      expect(results).toEqual([]);
     });
   });
 
-  describe('Change Tracking', () => {
-    it('should have changeSummary field', () => {
-      const doc = { ...mockDocument };
-      expect(doc.changeSummary).toBe('Initial version');
+  // ─── findLatestVersion() ────────────────────────────────────
+
+  describe('findLatestVersion()', () => {
+    const baseData = {
+      changeSummary: 'Update',
+      author: 'user-001',
+      originalFilename: 'doc.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      fileHash: 'sha256:abc',
+      storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+    };
+
+    it('should return the version with highest versionNumber', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lat', versionNumber: 1 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lat', versionNumber: 3 });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-lat', versionNumber: 2 });
+
+      const latest = await DocumentVersion.findLatestVersion('doc-lat');
+      expect(latest).toBeDefined();
+      expect(latest.versionNumber).toBe(3);
     });
 
-    it('should have changeDescription field for detailed notes', () => {
-      const doc = { ...mockDocument };
-      expect(doc.changeDescription).toBe('First upload of the document');
+    it('should return null when no versions exist', async () => {
+      const latest = await DocumentVersion.findLatestVersion('doc-empty');
+      expect(latest).toBeNull();
     });
 
-    it('should track author who made the change', () => {
-      const doc = { ...mockDocument };
-      expect(doc.author).toBe('user123');
+    it('should filter by status when provided', async () => {
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-latst', versionNumber: 1, status: 'published' });
+      await DocumentVersion.create({ ...baseData, documentId: 'doc-latst', versionNumber: 2, status: 'draft' });
+
+      const latest = await DocumentVersion.findLatestVersion('doc-latst', { status: 'published' });
+      expect(latest).toBeDefined();
+      expect(latest.versionNumber).toBe(1);
+      expect(latest.status).toBe('published');
     });
   });
 
-  describe('File Information', () => {
-    it('should store original filename', () => {
-      const doc = { ...mockDocument };
-      expect(doc.originalFilename).toBe('contract.pdf');
+  // ─── findByVersionNumber() ──────────────────────────────────
+
+  describe('findByVersionNumber()', () => {
+    it('should find version by document and version number', async () => {
+      await DocumentVersion.create({
+        documentId: 'doc-vn',
+        versionNumber: 3,
+        changeSummary: 'v3',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+      });
+
+      const found = await DocumentVersion.findByVersionNumber('doc-vn', 3);
+      expect(found).toBeDefined();
+      expect(found.changeSummary).toBe('v3');
     });
 
-    it('should store MIME type', () => {
-      const doc = { ...mockDocument };
-      expect(doc.mimeType).toBe('application/pdf');
-    });
-
-    it('should store file size in bytes', () => {
-      const doc = { ...mockDocument };
-      expect(doc.fileSize).toBe(1024);
-    });
-
-    it('should store file hash for integrity', () => {
-      const doc = { ...mockDocument };
-      expect(doc.fileHash).toBeDefined();
+    it('should return null for non-existent version number', async () => {
+      const found = await DocumentVersion.findByVersionNumber('doc-vn', 99);
+      expect(found).toBeNull();
     });
   });
 
-  describe('Version Relationships', () => {
-    it('should reference original document', () => {
-      const doc = { ...mockDocument };
-      expect(doc.documentId).toBe('doc123');
+  // ─── Synchronous helpers ────────────────────────────────────
+
+  describe('getSemanticVersion()', () => {
+    it('should return major.minor version string', () => {
+      const version = { majorVersion: 2, minorVersion: 3 };
+      expect(DocumentVersion.getSemanticVersion(version)).toBe('2.3');
     });
 
-    it('should support previousVersion reference (linked list)', () => {
-      const v2 = {
-        ...mockDocument,
-        versionNumber: 2,
-        previousVersion: 'version1'
-      };
-      expect(v2.previousVersion).toBe('version1');
+    it('should handle version 1.0', () => {
+      const version = { majorVersion: 1, minorVersion: 0 };
+      expect(DocumentVersion.getSemanticVersion(version)).toBe('1.0');
+    });
+  });
+
+  describe('isFirstVersion()', () => {
+    it('should return true when previousVersion is null', () => {
+      expect(DocumentVersion.isFirstVersion({ previousVersion: null })).toBe(true);
     });
 
-    it('should support nextVersion reference (doubly linked list)', () => {
-      const v1 = {
-        ...mockDocument,
+    it('should return false when previousVersion is set', () => {
+      expect(DocumentVersion.isFirstVersion({ previousVersion: 'DV-001' })).toBe(false);
+    });
+  });
+
+  describe('isLatestVersion()', () => {
+    it('should return true when nextVersion is null', () => {
+      expect(DocumentVersion.isLatestVersion({ nextVersion: null })).toBe(true);
+    });
+
+    it('should return false when nextVersion is set', () => {
+      expect(DocumentVersion.isLatestVersion({ nextVersion: 'DV-002' })).toBe(false);
+    });
+  });
+
+  describe('getDisplayVersion()', () => {
+    it('should return formatted display string', () => {
+      const version = { versionNumber: 3, majorVersion: 2, minorVersion: 1 };
+      expect(DocumentVersion.getDisplayVersion(version)).toBe('v3 (2.1)');
+    });
+
+    it('should handle first version', () => {
+      const version = { versionNumber: 1, majorVersion: 1, minorVersion: 0 };
+      expect(DocumentVersion.getDisplayVersion(version)).toBe('v1 (1.0)');
+    });
+  });
+
+  // ─── publish() ──────────────────────────────────────────────
+
+  describe('publish()', () => {
+    it('should update status to published and set publishedAt', async () => {
+      await DocumentVersion.create({
+        versionId: 'DV-PUB00001',
+        documentId: 'doc-pub',
         versionNumber: 1,
-        nextVersion: 'version2'
-      };
-      expect(v1.nextVersion).toBe('version2');
+        changeSummary: 'Test',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' },
+        status: 'draft'
+      });
+
+      const result = await DocumentVersion.publish('DV-PUB00001');
+
+      expect(result).toBeDefined();
+      expect(result.acknowledged).toBe(true);
+      expect(result.modifiedCount).toBe(1);
     });
 
-    it('should allow null for first version previousVersion', () => {
-      const doc = { ...mockDocument };
-      expect(doc.previousVersion).toBeNull();
-    });
-
-    it('should allow null for latest version nextVersion', () => {
-      const doc = { ...mockDocument };
-      expect(doc.nextVersion).toBeNull();
-    });
-  });
-
-  describe('Virtual Properties', () => {
-    it('should calculate semantic version string', () => {
-      const doc = { ...mockDocument, majorVersion: 2, minorVersion: 3 };
-      const semanticVersion = `${doc.majorVersion}.${doc.minorVersion}`;
-      expect(semanticVersion).toBe('2.3');
-    });
-
-    it('should determine if version is latest based on nextVersion', () => {
-      const doc = { ...mockDocument, nextVersion: null };
-      const isLatest = doc.nextVersion === null;
-      expect(isLatest).toBe(true);
-    });
-
-    it('should determine if version is first based on previousVersion', () => {
-      const doc = { ...mockDocument, previousVersion: null };
-      const isFirst = doc.previousVersion === null;
-      expect(isFirst).toBe(true);
+    it('should return modifiedCount 0 for non-existent version', async () => {
+      const result = await DocumentVersion.publish('DV-NOEXIST1');
+      expect(result.modifiedCount).toBe(0);
     });
   });
 
-  describe('Index Support', () => {
-    it('should support lookup by documentId', () => {
-      const doc = { ...mockDocument };
-      // Index on documentId should allow efficient queries
-      expect(doc.documentId).toBeDefined();
+  // ─── archive() ──────────────────────────────────────────────
+
+  describe('archive()', () => {
+    it('should update status to archived and set archivedAt', async () => {
+      await DocumentVersion.create({
+        versionId: 'DV-ARC00001',
+        documentId: 'doc-arc',
+        versionNumber: 1,
+        changeSummary: 'Test',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' },
+        status: 'published'
+      });
+
+      const result = await DocumentVersion.archive('DV-ARC00001');
+
+      expect(result).toBeDefined();
+      expect(result.acknowledged).toBe(true);
+      expect(result.modifiedCount).toBe(1);
     });
 
-    it('should support lookup by versionId', () => {
-      const doc = { ...mockDocument };
-      expect(doc.versionId).toBeDefined();
+    it('should return modifiedCount 0 for non-existent version', async () => {
+      const result = await DocumentVersion.archive('DV-NOEXIST2');
+      expect(result.modifiedCount).toBe(0);
+    });
+  });
+
+  // ─── linkVersions() ─────────────────────────────────────────
+
+  describe('linkVersions()', () => {
+    it('should link previous and next versions', async () => {
+      await DocumentVersion.create({
+        versionId: 'DV-LINK0001',
+        documentId: 'doc-link',
+        versionNumber: 1,
+        changeSummary: 'v1',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+      });
+      await DocumentVersion.create({
+        versionId: 'DV-LINK0002',
+        documentId: 'doc-link',
+        versionNumber: 2,
+        changeSummary: 'v2',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 2048,
+        fileHash: 'sha256:def',
+        storageReference: { provider: 'zerodb', fileKey: 'k2', bucket: 'b' }
+      });
+
+      const result = await DocumentVersion.linkVersions('DV-LINK0001', 'DV-LINK0002');
+
+      expect(result).toBeDefined();
+      expect(result.acknowledged).toBe(true);
+      // Verify updateOne was called twice (once for each direction)
+      expect(zerodbService.queryTable).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Exposed base model methods ─────────────────────────────
+
+  describe('Exposed base model methods', () => {
+    it('should expose find method', () => {
+      expect(typeof DocumentVersion.find).toBe('function');
     });
 
-    it('should support compound index on documentId and versionNumber', () => {
-      const doc = { ...mockDocument };
-      expect(doc.documentId).toBeDefined();
-      expect(doc.versionNumber).toBeDefined();
+    it('should expose findOne method', () => {
+      expect(typeof DocumentVersion.findOne).toBe('function');
     });
 
-    it('should support filtering by status', () => {
-      const doc = { ...mockDocument };
-      expect(doc.status).toBeDefined();
+    it('should expose findById method', () => {
+      expect(typeof DocumentVersion.findById).toBe('function');
+    });
+
+    it('should expose updateOne method', () => {
+      expect(typeof DocumentVersion.updateOne).toBe('function');
+    });
+
+    it('should expose deleteOne method', () => {
+      expect(typeof DocumentVersion.deleteOne).toBe('function');
+    });
+
+    it('should expose deleteMany method', () => {
+      expect(typeof DocumentVersion.deleteMany).toBe('function');
+    });
+
+    it('should expose countDocuments method', () => {
+      expect(typeof DocumentVersion.countDocuments).toBe('function');
+    });
+
+    it('should expose exists method', () => {
+      expect(typeof DocumentVersion.exists).toBe('function');
+    });
+
+    it('should expose distinct method', () => {
+      expect(typeof DocumentVersion.distinct).toBe('function');
+    });
+
+    it('should expose aggregate method', () => {
+      expect(typeof DocumentVersion.aggregate).toBe('function');
+    });
+  });
+
+  // ─── Edge Cases ─────────────────────────────────────────────
+
+  describe('Edge Cases', () => {
+    it('should handle version with zero file size', async () => {
+      const result = await DocumentVersion.create({
+        documentId: 'doc-edge',
+        changeSummary: 'Empty file',
+        author: 'user-001',
+        originalFilename: 'empty.txt',
+        mimeType: 'text/plain',
+        fileSize: 0,
+        fileHash: 'sha256:e3b0c44298fc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' }
+      });
+
+      expect(result.fileSize).toBe(0);
+    });
+
+    it('should handle version with large metadata', async () => {
+      const result = await DocumentVersion.create({
+        documentId: 'doc-meta',
+        changeSummary: 'Metadata test',
+        author: 'user-001',
+        originalFilename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        fileHash: 'sha256:abc',
+        storageReference: { provider: 'zerodb', fileKey: 'k', bucket: 'b' },
+        metadata: {
+          tags: ['legal', 'contract', 'reviewed'],
+          category: 'legal-documents',
+          reviewedBy: 'legal-team',
+          customField1: 'value1',
+          customField2: 'value2'
+        }
+      });
+
+      expect(result.metadata.tags.length).toBe(3);
+      expect(result.metadata.category).toBe('legal-documents');
+    });
+
+    it('should handle different storage providers', async () => {
+      const providers = ['zerodb', 'minio', 's3', 'local'];
+      for (const provider of providers) {
+        const result = await DocumentVersion.create({
+          documentId: `doc-${provider}`,
+          changeSummary: `${provider} test`,
+          author: 'user-001',
+          originalFilename: 'doc.pdf',
+          mimeType: 'application/pdf',
+          fileSize: 1024,
+          fileHash: 'sha256:abc',
+          storageReference: { provider, fileKey: 'k', bucket: 'b' }
+        });
+        expect(result.storageReference.provider).toBe(provider);
+      }
     });
   });
 });

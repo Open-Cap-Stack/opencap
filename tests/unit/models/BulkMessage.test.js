@@ -398,6 +398,246 @@ describe('BulkMessage Model', () => {
     });
   });
 
+  describe('create()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.insertRow = jest.fn().mockResolvedValue({
+        data: [{ _id: 'test-id', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+      });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [] });
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should auto-generate bulkMessageId if not provided', async () => {
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ bulkMessageId: expect.stringMatching(/^msg_/) })
+      );
+    });
+
+    it('should use provided bulkMessageId', async () => {
+      const data = { bulkMessageId: 'msg_custom', companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ bulkMessageId: 'msg_custom' })
+      );
+    });
+
+    it('should default status to draft if not provided', async () => {
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ status: 'draft' })
+      );
+    });
+
+    it('should use provided status', async () => {
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email', status: 'scheduled' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ status: 'scheduled' })
+      );
+    });
+
+    it('should set default deliveryStats if not provided', async () => {
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({
+          deliveryStats: { totalRecipients: 0, sent: 0, delivered: 0, failed: 0, bounced: 0, opened: 0, clicked: 0 }
+        })
+      );
+    });
+
+    it('should use provided deliveryStats', async () => {
+      const customStats = { totalRecipients: 5, sent: 3, delivered: 2, failed: 0, bounced: 0, opened: 1, clicked: 0 };
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email', deliveryStats: customStats };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ deliveryStats: customStats })
+      );
+    });
+
+    it('should set default rateLimiting if not provided', async () => {
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email' };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ rateLimiting: { batchSize: 100, delayBetweenBatches: 500 } })
+      );
+    });
+
+    it('should use provided rateLimiting', async () => {
+      const customLimiting = { batchSize: 50, delayBetweenBatches: 1000 };
+      const data = { companyId: 'c1', senderId: 's1', subject: 'Test', content: 'Body', messageType: 'email', rateLimiting: customLimiting };
+      await BulkMessage.create(data);
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ rateLimiting: customLimiting })
+      );
+    });
+  });
+
+  describe('findByBulkMessageId()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should find a bulk message by its bulkMessageId', async () => {
+      const mockMsg = { _id: 'id-1', bulkMessageId: 'msg_123', subject: 'Hello' };
+      zerodbService.queryTable.mockResolvedValue({ data: [mockMsg] });
+
+      const result = await BulkMessage.findByBulkMessageId('msg_123');
+      expect(result).toEqual(mockMsg);
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ filter: { bulkMessageId: 'msg_123' }, limit: 1 })
+      );
+    });
+
+    it('should return null if not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+      const result = await BulkMessage.findByBulkMessageId('msg_nonexistent');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findByCompany()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should find all bulk messages for a company', async () => {
+      const mockMsgs = [
+        { _id: '1', bulkMessageId: 'msg_1', companyId: 'c1' },
+        { _id: '2', bulkMessageId: 'msg_2', companyId: 'c1' }
+      ];
+      zerodbService.queryTable.mockResolvedValue({ data: mockMsgs });
+
+      const result = await BulkMessage.findByCompany('c1');
+      expect(result).toHaveLength(2);
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'bulk_messages',
+        expect.objectContaining({ filter: { companyId: 'c1' } })
+      );
+    });
+  });
+
+  describe('findScheduledForProcessing()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should return scheduled messages with scheduledAt in the past', async () => {
+      const pastDate = new Date(Date.now() - 60000).toISOString();
+      const futureDate = new Date(Date.now() + 60000).toISOString();
+      const mockMsgs = [
+        { bulkMessageId: 'msg_1', status: 'scheduled', scheduledAt: pastDate },
+        { bulkMessageId: 'msg_2', status: 'scheduled', scheduledAt: futureDate },
+        { bulkMessageId: 'msg_3', status: 'scheduled', scheduledAt: null }
+      ];
+      zerodbService.queryTable.mockResolvedValue({ data: mockMsgs });
+
+      const result = await BulkMessage.findScheduledForProcessing();
+      expect(result).toHaveLength(1);
+      expect(result[0].bulkMessageId).toBe('msg_1');
+    });
+
+    it('should return empty array when no scheduled messages exist', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+      const result = await BulkMessage.findScheduledForProcessing();
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getStatsByCompany()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should aggregate stats by status', async () => {
+      const mockMsgs = [
+        { status: 'sent', deliveryStats: { totalRecipients: 10, sent: 8, delivered: 7, failed: 1 } },
+        { status: 'sent', deliveryStats: { totalRecipients: 5, sent: 5, delivered: 5, failed: 0 } },
+        { status: 'draft', deliveryStats: { totalRecipients: 0, sent: 0, delivered: 0, failed: 0 } }
+      ];
+      zerodbService.queryTable.mockResolvedValue({ data: mockMsgs });
+
+      const stats = await BulkMessage.getStatsByCompany('c1');
+      expect(stats).toHaveLength(2);
+
+      const sentStat = stats.find(s => s._id === 'sent');
+      expect(sentStat.count).toBe(2);
+      expect(sentStat.totalRecipients).toBe(15);
+      expect(sentStat.totalSent).toBe(13);
+      expect(sentStat.totalDelivered).toBe(12);
+      expect(sentStat.totalFailed).toBe(1);
+
+      const draftStat = stats.find(s => s._id === 'draft');
+      expect(draftStat.count).toBe(1);
+    });
+
+    it('should handle messages without deliveryStats', async () => {
+      const mockMsgs = [
+        { status: 'draft' },
+        { status: 'draft', deliveryStats: null }
+      ];
+      zerodbService.queryTable.mockResolvedValue({ data: mockMsgs });
+
+      const stats = await BulkMessage.getStatsByCompany('c1');
+      expect(stats).toHaveLength(1);
+      expect(stats[0]._id).toBe('draft');
+      expect(stats[0].count).toBe(2);
+      expect(stats[0].totalRecipients).toBe(0);
+    });
+
+    it('should return empty array when no messages exist', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+      const stats = await BulkMessage.getStatsByCompany('c1');
+      expect(stats).toEqual([]);
+    });
+  });
+
+  describe('updateDeliveryStats - empty recipients', () => {
+    it('should handle message with no recipients array', () => {
+      const message = {};
+      const stats = BulkMessage.updateDeliveryStats(message);
+      expect(stats.totalRecipients).toBe(0);
+      expect(stats.sent).toBe(0);
+    });
+
+    it('should handle message with empty recipients array', () => {
+      const message = { recipients: [] };
+      const stats = BulkMessage.updateDeliveryStats(message);
+      expect(stats.totalRecipients).toBe(0);
+    });
+  });
+
   describe('Additional Schema Validations', () => {
     it('should have subject field of type string', () => {
       expect(schema.subject.type).toBe('string');

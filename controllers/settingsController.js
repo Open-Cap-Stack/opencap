@@ -61,16 +61,17 @@ const updateUserSettings = async (req, res) => {
 
         const updates = req.body;
 
-        // Validate that we have updates
-        if (!updates || Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No settings updates provided' });
-        }
-
-        // Don't allow updating settingsId, userId, or settingsType
+        // Don't allow updating protected fields
         delete updates.settingsId;
         delete updates.userId;
         delete updates.settingsType;
         delete updates.createdAt;
+        delete updates.companyId;
+
+        // Validate that we have updates (after stripping protected fields)
+        if (!updates || Object.keys(updates).length === 0) {
+            return res.status(400).json({ error: 'No settings updates provided' });
+        }
 
         // Check if settings exist, if not create them first
         let settings = await Settings.getUserSettings(userId);

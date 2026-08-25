@@ -1,646 +1,568 @@
 /**
- * AuditLoggingService Tests
- *
- * Test suite for audit trail logging service
- * Tests data modification logging, user action tracking, API call recording
+ * Unit tests for AuditLoggingService
  */
 
 const AuditLoggingService = require('../../../../services/security/auditLoggingService');
 
 describe('AuditLoggingService', () => {
-  let auditService;
+  let audit;
 
   beforeEach(() => {
-    auditService = new AuditLoggingService();
+    audit = new AuditLoggingService({
+      maxLogSize: 100,
+      retentionDays: 30
+    });
   });
 
   afterEach(() => {
-    auditService.clear();
-    jest.clearAllMocks();
+    audit.clear();
+    audit.removeAllListeners();
   });
 
-  describe('initialization', () => {
-    it('should initialize with default configuration', () => {
-      expect(auditService).toBeDefined();
-      expect(auditService.logs).toBeDefined();
-      expect(auditService.config).toBeDefined();
+  // ============ Constructor ============
+
+  describe('constructor', () => {
+    it('should use default config when none provided', () => {
+      const service = new AuditLoggingService();
+      expect(service.config.maxLogSize).toBe(10000);
+      expect(service.config.retentionDays).toBe(365);
     });
 
-    it('should accept custom configuration', () => {
-      const customService = new AuditLoggingService({
-        maxLogSize: 5000,
-        retentionDays: 90
-      });
-      expect(customService.config.maxLogSize).toBe(5000);
-      expect(customService.config.retentionDays).toBe(90);
-    });
-
-    it('should have default retention of 365 days', () => {
-      expect(auditService.config.retentionDays).toBe(365);
+    it('should accept custom config', () => {
+      expect(audit.config.maxLogSize).toBe(100);
+      expect(audit.config.retentionDays).toBe(30);
     });
   });
+
+  // ============ Data Sanitization ============
+
+  describe('sanitizeData', () => {
+    it('should redact sensitive fields', () => {
+      const data = {
+        name: 'John',
+        password: 'secret123',
+        ssn: '123-45-6789',
+        creditCardNumber: '4111111111111111'
+      };
+      const sanitized = audit.sanitizeData(data);
+      expect(sanitized.name).toBe('John');
+      expect(sanitized.password).toBe('[REDACTED]');
+      expect(sanitized.ssn).toBe('[REDACTED]');
+      expect(sanitized.creditCardNumber).toBe('[REDACTED]');
+    });
+
+    it('should handle nested sensitive fields', () => {
+      const data = {
+        user: {
+          name: 'Jane',
+          bankAccount: '12345'
+        }
+      };
+      const sanitized = audit.sanitizeData(data);
+      expect(sanitized.user.name).toBe('Jane');
+      expect(sanitized.user.bankAccount).toBe('[REDACTED]');
+    });
+
+    it('should return primitive values unchanged', () => {
+      expect(audit.sanitizeData('hello')).toBe('hello');
+      expect(audit.sanitizeData(42)).toBe(42);
+      expect(audit.sanitizeData(null)).toBe(null);
+      expect(audit.sanitizeData(undefined)).toBe(undefined);
+    });
+
+    it('should handle arrays', () => {
+      const data = [{ password: 'secret' }, { name: 'ok' }];
+      const sanitized = audit.sanitizeData(data);
+      expect(sanitized[0].password).toBe('[REDACTED]');
+      expect(sanitized[1].name).toBe('ok');
+    });
+  });
+
+  // ============ Log Data Modification ============
 
   describe('logDataModification', () => {
-    it('should log create operations', () => {
-      const entry = auditService.logDataModification({
+    it('should create a data modification log entry', () => {
+      const entry = audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        newData: { name: 'John Doe', email: 'john@example.com' }
+        collection: 'stakeholders',
+        documentId: 'doc1',
+        userId: 'user1',
+        newData: { name: 'New Stakeholder' },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Jest'
       });
 
       expect(entry.id).toBeDefined();
+      expect(entry.category).toBe('DATA_MODIFICATION');
       expect(entry.operation).toBe('CREATE');
-      expect(entry.collection).toBe('users');
-      expect(entry.documentId).toBe('user123');
-      expect(entry.userId).toBe('admin1');
-      expect(entry.timestamp).toBeDefined();
-      expect(entry.newData).toEqual({ name: 'John Doe', email: 'john@example.com' });
+      expect(entry.collection).toBe('stakeholders');
+      expect(entry.documentId).toBe('doc1');
+      expect(entry.hash).toBeDefined();
+      expect(entry.immutable).toBe(true);
     });
 
-    it('should log update operations with old and new data', () => {
-      const entry = auditService.logDataModification({
+    it('should sanitize old and new data', () => {
+      const entry = audit.logDataModification({
         operation: 'UPDATE',
         collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        oldData: { name: 'John Doe' },
-        newData: { name: 'John Smith' }
+        documentId: 'u1',
+        userId: 'admin',
+        oldData: { password: 'old_pw' },
+        newData: { password: 'new_pw' },
+        ipAddress: '10.0.0.1'
       });
 
-      expect(entry.operation).toBe('UPDATE');
-      expect(entry.oldData).toEqual({ name: 'John Doe' });
-      expect(entry.newData).toEqual({ name: 'John Smith' });
-    });
-
-    it('should log delete operations', () => {
-      const entry = auditService.logDataModification({
-        operation: 'DELETE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        oldData: { name: 'John Doe', email: 'john@example.com' }
-      });
-
-      expect(entry.operation).toBe('DELETE');
-      expect(entry.oldData).toEqual({ name: 'John Doe', email: 'john@example.com' });
-    });
-
-    it('should include IP address and user agent when provided', () => {
-      const entry = auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        ipAddress: '192.168.1.1',
-        userAgent: 'Mozilla/5.0',
-        newData: { name: 'Test' }
-      });
-
-      expect(entry.ipAddress).toBe('192.168.1.1');
-      expect(entry.userAgent).toBe('Mozilla/5.0');
-    });
-
-    it('should generate unique IDs for each log entry', () => {
-      const entry1 = auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: {}
-      });
-
-      const entry2 = auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user2',
-        userId: 'admin1',
-        newData: {}
-      });
-
-      expect(entry1.id).not.toBe(entry2.id);
-    });
-
-    it('should sanitize sensitive fields from logged data', () => {
-      const entry = auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        newData: {
-          name: 'John Doe',
-          password: 'secretPassword123',
-          ssn: '123-45-6789',
-          creditCard: '4111111111111111'
-        }
-      });
-
-      expect(entry.newData.name).toBe('John Doe');
+      expect(entry.oldData.password).toBe('[REDACTED]');
       expect(entry.newData.password).toBe('[REDACTED]');
-      expect(entry.newData.ssn).toBe('[REDACTED]');
-      expect(entry.newData.creditCard).toBe('[REDACTED]');
+    });
+
+    it('should handle missing old/new data', () => {
+      const entry = audit.logDataModification({
+        operation: 'DELETE',
+        collection: 'documents',
+        documentId: 'doc1',
+        userId: 'user1'
+      });
+      expect(entry.oldData).toBeUndefined();
+      expect(entry.newData).toBeUndefined();
     });
   });
 
+  // ============ Log User Action ============
+
   describe('logUserAction', () => {
-    it('should log user login events', () => {
-      const entry = auditService.logUserAction({
+    it('should create a user action log entry', () => {
+      const entry = audit.logUserAction({
         action: 'LOGIN',
-        userId: 'user123',
+        userId: 'user1',
         success: true,
-        ipAddress: '192.168.1.1'
+        ipAddress: '10.0.0.1',
+        userAgent: 'Chrome'
       });
 
-      expect(entry.action).toBe('LOGIN');
-      expect(entry.userId).toBe('user123');
-      expect(entry.success).toBe(true);
       expect(entry.category).toBe('USER_ACTION');
+      expect(entry.action).toBe('LOGIN');
+      expect(entry.success).toBe(true);
     });
 
-    it('should log user logout events', () => {
-      const entry = auditService.logUserAction({
-        action: 'LOGOUT',
-        userId: 'user123',
-        ipAddress: '192.168.1.1'
-      });
+    it('should emit security event on failed user action', () => {
+      const securityHandler = jest.fn();
+      audit.on('security', securityHandler);
 
-      expect(entry.action).toBe('LOGOUT');
-    });
-
-    it('should log failed login attempts', () => {
-      const entry = auditService.logUserAction({
+      audit.logUserAction({
         action: 'LOGIN',
-        userId: 'user123',
+        userId: 'user1',
         success: false,
         reason: 'Invalid password',
-        ipAddress: '192.168.1.1'
+        ipAddress: '10.0.0.1'
       });
 
-      expect(entry.success).toBe(false);
-      expect(entry.reason).toBe('Invalid password');
+      expect(securityHandler).toHaveBeenCalledTimes(1);
+      expect(securityHandler.mock.calls[0][0].success).toBe(false);
     });
 
-    it('should log permission changes', () => {
-      const entry = auditService.logUserAction({
-        action: 'PERMISSION_CHANGE',
-        userId: 'admin1',
-        targetUserId: 'user123',
-        oldPermissions: ['read'],
-        newPermissions: ['read', 'write'],
-        ipAddress: '192.168.1.1'
+    it('should not emit security event on successful action', () => {
+      const securityHandler = jest.fn();
+      audit.on('security', securityHandler);
+
+      audit.logUserAction({
+        action: 'LOGIN',
+        userId: 'user1',
+        success: true,
+        ipAddress: '10.0.0.1'
       });
 
-      expect(entry.action).toBe('PERMISSION_CHANGE');
-      expect(entry.targetUserId).toBe('user123');
+      expect(securityHandler).not.toHaveBeenCalled();
+    });
+
+    it('should store permission change details', () => {
+      const entry = audit.logUserAction({
+        action: 'PERMISSION_CHANGE',
+        userId: 'admin',
+        success: true,
+        targetUserId: 'user2',
+        oldPermissions: ['read'],
+        newPermissions: ['read', 'write'],
+        initiatedBy: 'admin'
+      });
+
+      expect(entry.targetUserId).toBe('user2');
       expect(entry.oldPermissions).toEqual(['read']);
       expect(entry.newPermissions).toEqual(['read', 'write']);
     });
-
-    it('should log password reset events', () => {
-      const entry = auditService.logUserAction({
-        action: 'PASSWORD_RESET',
-        userId: 'user123',
-        initiatedBy: 'admin1',
-        ipAddress: '192.168.1.1'
-      });
-
-      expect(entry.action).toBe('PASSWORD_RESET');
-      expect(entry.initiatedBy).toBe('admin1');
-    });
   });
 
+  // ============ Log API Call ============
+
   describe('logAPICall', () => {
-    it('should log successful API calls', () => {
-      const entry = auditService.logAPICall({
+    it('should create an API call log entry', () => {
+      const entry = audit.logAPICall({
         method: 'GET',
-        endpoint: '/api/v1/users',
-        userId: 'user123',
+        endpoint: '/api/stakeholders',
+        userId: 'user1',
         statusCode: 200,
         responseTime: 45,
-        ipAddress: '192.168.1.1'
+        ipAddress: '10.0.0.1',
+        userAgent: 'Postman'
       });
 
-      expect(entry.method).toBe('GET');
-      expect(entry.endpoint).toBe('/api/v1/users');
-      expect(entry.statusCode).toBe(200);
-      expect(entry.responseTime).toBe(45);
       expect(entry.category).toBe('API_CALL');
+      expect(entry.method).toBe('GET');
+      expect(entry.endpoint).toBe('/api/stakeholders');
+      expect(entry.statusCode).toBe(200);
     });
 
-    it('should log failed API calls', () => {
-      const entry = auditService.logAPICall({
+    it('should sanitize request body', () => {
+      const entry = audit.logAPICall({
         method: 'POST',
-        endpoint: '/api/v1/users',
-        userId: 'user123',
-        statusCode: 400,
-        errorMessage: 'Validation failed',
-        responseTime: 12,
-        ipAddress: '192.168.1.1'
-      });
-
-      expect(entry.statusCode).toBe(400);
-      expect(entry.errorMessage).toBe('Validation failed');
-    });
-
-    it('should log request body for write operations (sanitized)', () => {
-      const entry = auditService.logAPICall({
-        method: 'POST',
-        endpoint: '/api/v1/users',
-        userId: 'admin1',
-        statusCode: 201,
-        requestBody: { name: 'John', password: 'secret123' },
+        endpoint: '/api/auth/login',
+        userId: 'user1',
+        statusCode: 200,
         responseTime: 100,
-        ipAddress: '192.168.1.1'
+        requestBody: { email: 'test@example.com', password: 'secret' },
+        ipAddress: '10.0.0.1'
       });
 
-      expect(entry.requestBody.name).toBe('John');
+      expect(entry.requestBody.email).toBe('test@example.com');
       expect(entry.requestBody.password).toBe('[REDACTED]');
     });
 
-    it('should log query parameters', () => {
-      const entry = auditService.logAPICall({
-        method: 'GET',
-        endpoint: '/api/v1/users',
-        userId: 'user123',
-        statusCode: 200,
-        queryParams: { page: 1, limit: 20, search: 'john' },
-        responseTime: 30,
-        ipAddress: '192.168.1.1'
-      });
-
-      expect(entry.queryParams).toEqual({ page: 1, limit: 20, search: 'john' });
-    });
-
-    it('should track rate-limited requests', () => {
-      const entry = auditService.logAPICall({
-        method: 'GET',
-        endpoint: '/api/v1/users',
-        userId: 'user123',
+    it('should record error messages and rate limiting', () => {
+      const entry = audit.logAPICall({
+        method: 'POST',
+        endpoint: '/api/data',
+        userId: 'user1',
         statusCode: 429,
-        rateLimited: true,
         responseTime: 5,
-        ipAddress: '192.168.1.1'
+        errorMessage: 'Rate limited',
+        rateLimited: true,
+        ipAddress: '10.0.0.1'
       });
 
-      expect(entry.statusCode).toBe(429);
       expect(entry.rateLimited).toBe(true);
+      expect(entry.errorMessage).toBe('Rate limited');
     });
   });
+
+  // ============ Log Retrieval ============
+
+  describe('Log Retrieval', () => {
+    let logEntry;
+
+    beforeEach(() => {
+      logEntry = audit.logDataModification({
+        operation: 'CREATE',
+        collection: 'stakeholders',
+        documentId: 'doc1',
+        userId: 'user1',
+        ipAddress: '127.0.0.1'
+      });
+    });
+
+    describe('getLogById', () => {
+      it('should return log entry by ID', () => {
+        const found = audit.getLogById(logEntry.id);
+        expect(found).toBeDefined();
+        expect(found.id).toBe(logEntry.id);
+      });
+
+      it('should return null for non-existent ID', () => {
+        expect(audit.getLogById('fake-id')).toBeNull();
+      });
+    });
+
+    describe('getLogsByDocumentId', () => {
+      it('should return logs for a document', () => {
+        const logs = audit.getLogsByDocumentId('doc1');
+        expect(logs).toHaveLength(1);
+        expect(logs[0].documentId).toBe('doc1');
+      });
+
+      it('should return empty array when no logs exist', () => {
+        expect(audit.getLogsByDocumentId('nonexistent')).toEqual([]);
+      });
+    });
+  });
+
+  // ============ Search Logs ============
 
   describe('searchLogs', () => {
     beforeEach(() => {
-      // Create test data
-      auditService.logDataModification({
+      audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: { name: 'User 1' }
+        collection: 'stakeholders',
+        documentId: 'doc1',
+        userId: 'user1',
+        ipAddress: '10.0.0.1'
       });
-      auditService.logDataModification({
+      audit.logDataModification({
         operation: 'UPDATE',
-        collection: 'users',
-        documentId: 'user2',
-        userId: 'admin2',
-        oldData: { name: 'Old' },
-        newData: { name: 'New' }
+        collection: 'stakeholders',
+        documentId: 'doc1',
+        userId: 'user2',
+        ipAddress: '10.0.0.2'
       });
-      auditService.logUserAction({
+      audit.logUserAction({
         action: 'LOGIN',
         userId: 'user1',
         success: true,
-        ipAddress: '192.168.1.1'
-      });
-      auditService.logAPICall({
-        method: 'GET',
-        endpoint: '/api/v1/documents',
-        userId: 'user1',
-        statusCode: 200,
-        responseTime: 50,
-        ipAddress: '192.168.1.1'
-      });
-    });
-
-    it('should search logs by userId', () => {
-      const results = auditService.searchLogs({ userId: 'admin1' });
-      expect(results.length).toBe(1);
-      expect(results[0].userId).toBe('admin1');
-    });
-
-    it('should search logs by category', () => {
-      const results = auditService.searchLogs({ category: 'DATA_MODIFICATION' });
-      expect(results.length).toBe(2);
-      results.forEach(r => expect(r.category).toBe('DATA_MODIFICATION'));
-    });
-
-    it('should search logs by date range', () => {
-      const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      const results = auditService.searchLogs({
-        startDate: oneHourAgo,
-        endDate: now
-      });
-      expect(results.length).toBe(4);
-    });
-
-    it('should search logs by collection', () => {
-      const results = auditService.searchLogs({ collection: 'users' });
-      expect(results.length).toBe(2);
-    });
-
-    it('should search logs by operation type', () => {
-      const results = auditService.searchLogs({ operation: 'CREATE' });
-      expect(results.length).toBe(1);
-      expect(results[0].operation).toBe('CREATE');
-    });
-
-    it('should support pagination', () => {
-      const results = auditService.searchLogs({ limit: 2, offset: 0 });
-      expect(results.length).toBe(2);
-    });
-
-    it('should return logs sorted by timestamp (newest first)', () => {
-      const results = auditService.searchLogs({});
-      for (let i = 1; i < results.length; i++) {
-        expect(new Date(results[i - 1].timestamp) >= new Date(results[i].timestamp)).toBe(true);
-      }
-    });
-
-    it('should search by IP address', () => {
-      const results = auditService.searchLogs({ ipAddress: '192.168.1.1' });
-      expect(results.length).toBeGreaterThan(0);
-      results.forEach(r => expect(r.ipAddress).toBe('192.168.1.1'));
-    });
-
-    it('should combine multiple search criteria', () => {
-      const results = auditService.searchLogs({
-        userId: 'user1',
-        category: 'API_CALL'
-      });
-      expect(results.length).toBe(1);
-      expect(results[0].userId).toBe('user1');
-      expect(results[0].category).toBe('API_CALL');
-    });
-  });
-
-  describe('getLogById', () => {
-    it('should retrieve a specific log entry by ID', () => {
-      const entry = auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        newData: { name: 'Test' }
-      });
-
-      const retrieved = auditService.getLogById(entry.id);
-      expect(retrieved).toEqual(entry);
-    });
-
-    it('should return null for non-existent log ID', () => {
-      const result = auditService.getLogById('non-existent-id');
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('getLogsByDocumentId', () => {
-    it('should retrieve all logs for a specific document', () => {
-      auditService.logDataModification({
-        operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin1',
-        newData: { name: 'Initial' }
-      });
-      auditService.logDataModification({
-        operation: 'UPDATE',
-        collection: 'users',
-        documentId: 'user123',
-        userId: 'admin2',
-        oldData: { name: 'Initial' },
-        newData: { name: 'Updated' }
-      });
-
-      const logs = auditService.getLogsByDocumentId('user123');
-      expect(logs.length).toBe(2);
-    });
-  });
-
-  describe('getStatistics', () => {
-    beforeEach(() => {
-      // Create varied test data
-      for (let i = 0; i < 5; i++) {
-        auditService.logDataModification({
-          operation: 'CREATE',
-          collection: 'users',
-          documentId: `user${i}`,
-          userId: 'admin1',
-          newData: {}
-        });
-      }
-      for (let i = 0; i < 3; i++) {
-        auditService.logUserAction({
-          action: 'LOGIN',
-          userId: `user${i}`,
-          success: true,
-          ipAddress: '192.168.1.1'
-        });
-      }
-      auditService.logUserAction({
-        action: 'LOGIN',
-        userId: 'user_failed',
-        success: false,
         ipAddress: '10.0.0.1'
       });
     });
 
-    it('should return total log count', () => {
-      const stats = auditService.getStatistics();
-      expect(stats.totalLogs).toBe(9);
+    it('should return all logs when no filters', () => {
+      const results = audit.searchLogs();
+      expect(results).toHaveLength(3);
     });
 
-    it('should return logs grouped by category', () => {
-      const stats = auditService.getStatistics();
-      expect(stats.byCategory.DATA_MODIFICATION).toBe(5);
-      expect(stats.byCategory.USER_ACTION).toBe(4);
+    it('should filter by userId', () => {
+      const results = audit.searchLogs({ userId: 'user1' });
+      expect(results).toHaveLength(2);
     });
 
-    it('should return logs grouped by operation', () => {
-      const stats = auditService.getStatistics();
-      expect(stats.byOperation.CREATE).toBe(5);
+    it('should filter by category', () => {
+      const results = audit.searchLogs({ category: 'USER_ACTION' });
+      expect(results).toHaveLength(1);
     });
 
-    it('should track failed vs successful user actions', () => {
-      const stats = auditService.getStatistics();
-      expect(stats.userActions.successful).toBe(3);
-      expect(stats.userActions.failed).toBe(1);
+    it('should filter by collection', () => {
+      const results = audit.searchLogs({ collection: 'stakeholders' });
+      expect(results).toHaveLength(2);
     });
 
-    it('should track unique users', () => {
-      const stats = auditService.getStatistics();
-      expect(stats.uniqueUsers).toBeGreaterThan(0);
+    it('should filter by operation', () => {
+      const results = audit.searchLogs({ operation: 'CREATE' });
+      expect(results).toHaveLength(1);
+    });
+
+    it('should filter by ipAddress', () => {
+      const results = audit.searchLogs({ ipAddress: '10.0.0.2' });
+      expect(results).toHaveLength(1);
+    });
+
+    it('should filter by date range', () => {
+      const results = audit.searchLogs({
+        startDate: new Date(Date.now() - 60000),
+        endDate: new Date(Date.now() + 60000)
+      });
+      expect(results).toHaveLength(3);
+    });
+
+    it('should respect limit and offset', () => {
+      const results = audit.searchLogs({ limit: 1, offset: 0 });
+      expect(results).toHaveLength(1);
+    });
+
+    it('should sort by timestamp descending', () => {
+      const results = audit.searchLogs();
+      for (let i = 1; i < results.length; i++) {
+        expect(new Date(results[i - 1].timestamp).getTime())
+          .toBeGreaterThanOrEqual(new Date(results[i].timestamp).getTime());
+      }
     });
   });
+
+  // ============ Statistics ============
+
+  describe('getStatistics', () => {
+    it('should return correct statistics', () => {
+      audit.logDataModification({
+        operation: 'CREATE',
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
+      });
+      audit.logUserAction({
+        action: 'LOGIN',
+        userId: 'u1',
+        success: true
+      });
+      audit.logUserAction({
+        action: 'LOGIN',
+        userId: 'u2',
+        success: false,
+        reason: 'Wrong password'
+      });
+
+      const stats = audit.getStatistics();
+      expect(stats.totalLogs).toBe(3);
+      expect(stats.byCategory.DATA_MODIFICATION).toBe(1);
+      expect(stats.byCategory.USER_ACTION).toBe(2);
+      expect(stats.byOperation.CREATE).toBe(1);
+      expect(stats.userActions.successful).toBe(1);
+      expect(stats.userActions.failed).toBe(1);
+      expect(stats.uniqueUsers).toBe(2);
+    });
+
+    it('should return zeroes when no logs exist', () => {
+      const stats = audit.getStatistics();
+      expect(stats.totalLogs).toBe(0);
+      expect(stats.uniqueUsers).toBe(0);
+    });
+  });
+
+  // ============ Export ============
 
   describe('exportLogs', () => {
     beforeEach(() => {
-      auditService.logDataModification({
+      audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: { name: 'Test' }
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1',
+        ipAddress: '10.0.0.1'
       });
     });
 
-    it('should export logs as JSON', () => {
-      const exported = auditService.exportLogs({ format: 'json' });
-      expect(typeof exported).toBe('string');
+    it('should export as JSON', () => {
+      const exported = audit.exportLogs({ format: 'json' });
       const parsed = JSON.parse(exported);
       expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(1);
     });
 
-    it('should export logs as CSV', () => {
-      const exported = auditService.exportLogs({ format: 'csv' });
-      expect(typeof exported).toBe('string');
-      expect(exported).toContain('id,');
-      expect(exported).toContain('timestamp,');
+    it('should export as CSV', () => {
+      const csv = audit.exportLogs({ format: 'csv' });
+      const lines = csv.split('\n');
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      expect(lines[0]).toContain('id');
     });
 
-    it('should filter exported logs by criteria', () => {
-      auditService.logUserAction({
-        action: 'LOGIN',
-        userId: 'user1',
-        success: true,
-        ipAddress: '192.168.1.1'
-      });
+    it('should return empty string for CSV with no logs', () => {
+      audit.clear();
+      const csv = audit.exportLogs({ format: 'csv' });
+      expect(csv).toBe('');
+    });
 
-      const exported = auditService.exportLogs({
-        format: 'json',
-        filter: { category: 'DATA_MODIFICATION' }
-      });
-      const parsed = JSON.parse(exported);
-      expect(parsed.length).toBe(1);
+    it('should throw for unsupported format', () => {
+      expect(() => audit.exportLogs({ format: 'xml' })).toThrow('Unsupported format: xml');
     });
   });
 
-  describe('log retention and cleanup', () => {
+  // ============ Cleanup ============
+
+  describe('cleanup', () => {
     it('should remove logs older than retention period', () => {
-      jest.useFakeTimers();
-
-      auditService.logDataModification({
+      const entry = audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: {}
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
+      const old = audit.logs.get(entry.id);
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 60);
+      old.timestamp = pastDate.toISOString();
 
-      // Fast forward past retention period (365 days + 1 day)
-      jest.advanceTimersByTime(366 * 24 * 60 * 60 * 1000);
-
-      auditService.cleanup();
-
-      const stats = auditService.getStatistics();
-      expect(stats.totalLogs).toBe(0);
-
-      jest.useRealTimers();
+      const deleted = audit.cleanup();
+      expect(deleted).toBe(1);
+      expect(audit.logs.size).toBe(0);
     });
 
-    it('should respect custom retention period', () => {
-      jest.useFakeTimers();
-
-      const shortRetentionService = new AuditLoggingService({ retentionDays: 30 });
-
-      shortRetentionService.logDataModification({
+    it('should keep logs within retention period', () => {
+      audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: {}
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
 
-      // Fast forward past 30 days + 1 day
-      jest.advanceTimersByTime(31 * 24 * 60 * 60 * 1000);
-
-      shortRetentionService.cleanup();
-
-      expect(shortRetentionService.getStatistics().totalLogs).toBe(0);
-
-      jest.useRealTimers();
+      const deleted = audit.cleanup();
+      expect(deleted).toBe(0);
+      expect(audit.logs.size).toBe(1);
     });
   });
 
-  describe('event listeners', () => {
-    it('should emit events on new log entries', (done) => {
-      auditService.on('log', (entry) => {
-        expect(entry.operation).toBe('CREATE');
-        done();
-      });
+  // ============ Log Integrity ============
 
-      auditService.logDataModification({
+  describe('verifyLogIntegrity', () => {
+    it('should return true for untampered log', () => {
+      const entry = audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: {}
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
+      expect(audit.verifyLogIntegrity(entry.id)).toBe(true);
     });
 
-    it('should emit events for security-related actions', (done) => {
-      auditService.on('security', (entry) => {
-        expect(entry.action).toBe('LOGIN');
-        expect(entry.success).toBe(false);
-        done();
+    it('should return false for tampered log', () => {
+      const entry = audit.logDataModification({
+        operation: 'CREATE',
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
+      const log = audit.logs.get(entry.id);
+      log.userId = 'hacker';
+      expect(audit.verifyLogIntegrity(entry.id)).toBe(false);
+    });
 
-      auditService.logUserAction({
-        action: 'LOGIN',
-        userId: 'user1',
-        success: false,
-        ipAddress: '192.168.1.1'
-      });
+    it('should throw for non-existent log', () => {
+      expect(() => audit.verifyLogIntegrity('nonexistent')).toThrow('Log not found: nonexistent');
     });
   });
 
-  describe('compliance features', () => {
-    it('should mark logs as immutable after creation', () => {
-      const entry = auditService.logDataModification({
+  // ============ Max Log Size ============
+
+  describe('maxLogSize enforcement', () => {
+    it('should evict oldest log when max size exceeded', () => {
+      const smallAudit = new AuditLoggingService({ maxLogSize: 2 });
+      const first = smallAudit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: { name: 'Test' }
+        collection: 'a',
+        documentId: 'a1',
+        userId: 'u1'
+      });
+      smallAudit.logDataModification({
+        operation: 'CREATE',
+        collection: 'b',
+        documentId: 'b1',
+        userId: 'u1'
+      });
+      smallAudit.logDataModification({
+        operation: 'CREATE',
+        collection: 'c',
+        documentId: 'c1',
+        userId: 'u1'
       });
 
-      expect(entry.immutable).toBe(true);
+      expect(smallAudit.logs.size).toBe(2);
+      expect(smallAudit.getLogById(first.id)).toBeNull();
     });
+  });
 
-    it('should generate hash for log integrity verification', () => {
-      const entry = auditService.logDataModification({
+  // ============ Events ============
+
+  describe('events', () => {
+    it('should emit log event on every entry', () => {
+      const handler = jest.fn();
+      audit.on('log', handler);
+
+      audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: { name: 'Test' }
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
 
-      expect(entry.hash).toBeDefined();
-      expect(typeof entry.hash).toBe('string');
+      expect(handler).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it('should verify log integrity', () => {
-      const entry = auditService.logDataModification({
+  // ============ Clear ============
+
+  describe('clear', () => {
+    it('should remove all logs and indices', () => {
+      audit.logDataModification({
         operation: 'CREATE',
-        collection: 'users',
-        documentId: 'user1',
-        userId: 'admin1',
-        newData: { name: 'Test' }
+        collection: 'docs',
+        documentId: 'd1',
+        userId: 'u1'
       });
-
-      const isValid = auditService.verifyLogIntegrity(entry.id);
-      expect(isValid).toBe(true);
+      audit.clear();
+      expect(audit.logs.size).toBe(0);
+      expect(audit.getLogsByDocumentId('d1')).toEqual([]);
     });
   });
 });

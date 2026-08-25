@@ -312,10 +312,10 @@ describe('SQL/NoSQL Injection Prevention', () => {
 
       for (const token of maliciousTokens) {
         const response = await request(app)
-          .get('/api/users/me')
+          .get('/api/v1/auth/me')
           .set('Authorization', token);
 
-        // Should reject invalid tokens
+        // Should reject invalid tokens with 401
         expect(response.status).toBe(401);
       }
     });
@@ -483,15 +483,16 @@ describe('SQL/NoSQL Injection Prevention', () => {
   describe('Security Best Practices Compliance', () => {
     test('Should not expose sensitive error details', async () => {
       const response = await request(app)
-        .get('/api/users/invalid-id-format')
+        .get('/api/v1/users/invalid-id-format')
         .set('Authorization', `Bearer ${authToken}`);
 
+      // Collect all text from the error response body for inspection
+      const bodyText = JSON.stringify(response.body);
+
       // Should not expose database structure or query details
-      if (response.body.error) {
-        expect(response.body.error).not.toMatch(/mongo/i);
-        expect(response.body.error).not.toMatch(/collection/i);
-        expect(response.body.error).not.toMatch(/query/i);
-      }
+      expect(bodyText).not.toMatch(/mongo/i);
+      expect(bodyText).not.toMatch(/collection/i);
+      expect(bodyText).not.toMatch(/\bquery\b/i);
     });
 
     test('Should log injection attempts for monitoring', async () => {

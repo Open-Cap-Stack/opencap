@@ -22,9 +22,9 @@ describe('errorResponse', () => {
   test('includes details in non-production', () => {
     const origEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'development';
-    errorResponse(mockRes, 500, 'Server error', 'stack trace here');
+    errorResponse(mockRes, 500, 'Server error', 'something went wrong');
     const call = mockRes.json.mock.calls[0][0];
-    expect(call.error.details).toBe('stack trace here');
+    expect(call.error.details).toBe('something went wrong');
     process.env.NODE_ENV = origEnv;
   });
 

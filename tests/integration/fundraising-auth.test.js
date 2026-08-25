@@ -15,7 +15,7 @@
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { authenticate } = require('../../middleware/authMiddleware');
+const { authenticate, __clearCacheForTesting } = require('../../middleware/authMiddleware');
 const User = require('../../models/User');
 
 // Import the routes to test
@@ -68,13 +68,12 @@ describe('Fundraising Routes Authentication', () => {
   });
 
   beforeEach(() => {
+    jest.clearAllMocks();
+    __clearCacheForTesting();
+
     // Create a fresh Express app for each test
     app = express();
     app.use(express.json());
-
-    // Mock User model methods
-    User.findOne = jest.fn();
-    User.findByEmail = jest.fn();
 
     // Setup default mock user
     const mockUser = {
@@ -86,10 +85,9 @@ describe('Fundraising Routes Authentication', () => {
       companyId: mockCompanyId
     };
 
-    User.findOne.mockResolvedValue(mockUser);
-    User.findByEmail.mockResolvedValue(mockUser);
-
-    jest.clearAllMocks();
+    // Mock User model methods AFTER clearAllMocks
+    User.findOne = jest.fn().mockResolvedValue(mockUser);
+    User.findByEmail = jest.fn().mockResolvedValue(mockUser);
   });
 
   afterAll(() => {

@@ -702,7 +702,8 @@ describe('SubscriptionService', () => {
       planId: 'PLAN-001',
       name: 'Professional',
       isActive: true,
-      trialPeriodDays: 0
+      trialPeriodDays: 0,
+      interval: 'month'
     };
 
     it('should reactivate a canceled subscription', async () => {
@@ -736,6 +737,396 @@ describe('SubscriptionService', () => {
 
       await expect(SubscriptionService.reactivateSubscription('sub-id-123'))
         .rejects.toThrow('Plan is no longer active');
+    });
+
+    it('should throw error if subscription not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(SubscriptionService.reactivateSubscription('sub-id-123'))
+        .rejects.toThrow('Subscription not found');
+    });
+
+    it('should throw error if plan not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(mockCanceledSubscription);
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(SubscriptionService.reactivateSubscription('sub-id-123'))
+        .rejects.toThrow('Plan is no longer active');
+    });
+  });
+
+  describe('getSubscriptionById', () => {
+    it('should return subscription by ID', async () => {
+      const mockSub = { _id: 'sub-id-123', subscriptionId: 'SUB-001' };
+      databaseAdapter.findById.mockResolvedValue(mockSub);
+
+      const result = await SubscriptionService.getSubscriptionById('sub-id-123');
+
+      expect(databaseAdapter.findById).toHaveBeenCalledWith('Subscription', 'sub-id-123');
+      expect(result).toEqual(mockSub);
+    });
+
+    it('should return null if subscription not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      const result = await SubscriptionService.getSubscriptionById('nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getAllPlans', () => {
+    it('should return all plans', async () => {
+      const mockPlans = [
+        { planId: 'PLAN-001', name: 'Starter', sortOrder: 1 },
+        { planId: 'PLAN-002', name: 'Pro', sortOrder: 2 }
+      ];
+      databaseAdapter.find.mockResolvedValue(mockPlans);
+
+      const result = await SubscriptionService.getAllPlans();
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        {},
+        expect.objectContaining({ sort: { sortOrder: 1 } })
+      );
+      expect(result).toHaveLength(2);
+    });
+
+    it('should filter by active status', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SubscriptionService.getAllPlans({ active: true });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        { isActive: true },
+        expect.any(Object)
+      );
+    });
+
+    it('should filter by inactive status', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await SubscriptionService.getAllPlans({ active: false });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        { isActive: false },
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('getPlanById', () => {
+    it('should return plan by ID', async () => {
+      const mockPlan = { _id: 'plan-id-123', planId: 'PLAN-001', name: 'Starter' };
+      databaseAdapter.findById.mockResolvedValue(mockPlan);
+
+      const result = await SubscriptionService.getPlanById('plan-id-123');
+
+      expect(databaseAdapter.findById).toHaveBeenCalledWith('SubscriptionPlan', 'plan-id-123');
+      expect(result).toEqual(mockPlan);
+    });
+
+    it('should return null if plan not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      const result = await SubscriptionService.getPlanById('nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('createPlan', () => {
+    it('should create a new plan with provided planId', async () => {
+      const planData = {
+        planId: 'PLAN-CUSTOM',
+        name: 'Enterprise',
+        price: 299,
+        interval: 'month',
+        features: ['advanced_analytics']
+      };
+      databaseAdapter.create.mockResolvedValue(planData);
+
+      const result = await SubscriptionService.createPlan(planData);
+
+      expect(databaseAdapter.create).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        expect.objectContaining({ planId: 'PLAN-CUSTOM' })
+      );
+    });
+
+    it('should auto-generate planId if not provided', async () => {
+      const planData = { name: 'Basic', price: 9 };
+      databaseAdapter.create.mockResolvedValue({ ...planData, planId: 'PLAN-12345678' });
+
+      await SubscriptionService.createPlan(planData);
+
+      expect(databaseAdapter.create).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        expect.objectContaining({
+          planId: expect.stringMatching(/^PLAN-/)
+        })
+      );
+    });
+  });
+
+  describe('updatePlan', () => {
+    it('should update an existing plan', async () => {
+      const existingPlan = { _id: 'plan-123', planId: 'PLAN-001', name: 'Starter' };
+      databaseAdapter.findById.mockResolvedValue(existingPlan);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ ...existingPlan, name: 'Updated' });
+
+      const result = await SubscriptionService.updatePlan('plan-123', { name: 'Updated' });
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'SubscriptionPlan',
+        'plan-123',
+        { name: 'Updated' },
+        { new: true }
+      );
+      expect(result.name).toBe('Updated');
+    });
+
+    it('should throw error if plan not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(SubscriptionService.updatePlan('nonexistent', { name: 'New' }))
+        .rejects.toThrow('Plan not found');
+    });
+  });
+
+  describe('deletePlan', () => {
+    it('should delete a plan with no active subscriptions', async () => {
+      const existingPlan = { _id: 'plan-123', planId: 'PLAN-001' };
+      databaseAdapter.findById.mockResolvedValue(existingPlan);
+      databaseAdapter.find.mockResolvedValue([]); // No active subscriptions
+      databaseAdapter.findByIdAndDelete.mockResolvedValue(existingPlan);
+
+      const result = await SubscriptionService.deletePlan('plan-123');
+
+      expect(databaseAdapter.findByIdAndDelete).toHaveBeenCalledWith('SubscriptionPlan', 'plan-123');
+    });
+
+    it('should throw error if plan not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(SubscriptionService.deletePlan('nonexistent'))
+        .rejects.toThrow('Plan not found');
+    });
+
+    it('should throw error if plan has active subscriptions', async () => {
+      const existingPlan = { _id: 'plan-123', planId: 'PLAN-001' };
+      databaseAdapter.findById.mockResolvedValue(existingPlan);
+      databaseAdapter.find.mockResolvedValue([{ subscriptionId: 'SUB-001', status: 'active' }]);
+
+      await expect(SubscriptionService.deletePlan('plan-123'))
+        .rejects.toThrow('Cannot delete plan with active subscriptions');
+    });
+  });
+
+  describe('updateSubscription - additional branches', () => {
+    const mockSubscription = {
+      _id: 'sub-id-123',
+      subscriptionId: 'SUB-001',
+      companyId: 'COMPANY-001',
+      planId: 'PLAN-001',
+      status: 'active',
+      quantity: 1,
+      metadata: { key1: 'value1' }
+    };
+
+    it('should throw error when new plan is not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(mockSubscription);
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(SubscriptionService.updateSubscription('sub-id-123', { planId: 'PLAN-INVALID' }))
+        .rejects.toThrow('New plan not found');
+    });
+
+    it('should throw error when new plan is not active', async () => {
+      databaseAdapter.findById.mockResolvedValue(mockSubscription);
+      databaseAdapter.findOne.mockResolvedValue({ planId: 'PLAN-002', isActive: false });
+
+      await expect(SubscriptionService.updateSubscription('sub-id-123', { planId: 'PLAN-002' }))
+        .rejects.toThrow('New plan is not active');
+    });
+
+    it('should throw error when quantity is less than 1', async () => {
+      databaseAdapter.findById.mockResolvedValue(mockSubscription);
+
+      await expect(SubscriptionService.updateSubscription('sub-id-123', { quantity: 0 }))
+        .rejects.toThrow('Quantity must be at least 1');
+    });
+
+    it('should merge metadata when updating', async () => {
+      databaseAdapter.findById.mockResolvedValue(mockSubscription);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
+        ...mockSubscription,
+        metadata: { key1: 'value1', key2: 'value2' }
+      });
+
+      const result = await SubscriptionService.updateSubscription('sub-id-123', {
+        metadata: { key2: 'value2' }
+      });
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'Subscription',
+        'sub-id-123',
+        expect.objectContaining({
+          metadata: { key1: 'value1', key2: 'value2' }
+        }),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('checkUsageLimit - additional branches', () => {
+    const mockPlan = {
+      planId: 'PLAN-001',
+      limits: {
+        stakeholders: -1,
+        documents: 100,
+        storageGB: 10,
+        users: 5,
+        apiCallsPerMonth: 10000
+      }
+    };
+
+    const mockSubscription = {
+      _id: 'sub-id-123',
+      companyId: 'COMPANY-001',
+      planId: 'PLAN-001',
+      status: 'active',
+      quantity: 1
+    };
+
+    it('should return unlimited when plan limit is -1', async () => {
+      databaseAdapter.findOne
+        .mockResolvedValueOnce(mockSubscription)
+        .mockResolvedValueOnce(mockPlan);
+
+      const result = await SubscriptionService.checkUsageLimit('COMPANY-001', 'stakeholders');
+
+      expect(result.unlimited).toBe(true);
+      expect(result.withinLimit).toBe(true);
+      expect(result.remaining).toBe(-1);
+    });
+
+    it('should return error when no active subscription', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      const result = await SubscriptionService.checkUsageLimit('COMPANY-001', 'stakeholders');
+
+      expect(result.withinLimit).toBe(false);
+      expect(result.error).toBe('No active subscription');
+    });
+
+    it('should throw error when plan has no limits', async () => {
+      databaseAdapter.findOne
+        .mockResolvedValueOnce(mockSubscription)
+        .mockResolvedValueOnce({ planId: 'PLAN-001', limits: null });
+
+      await expect(SubscriptionService.checkUsageLimit('COMPANY-001', 'stakeholders'))
+        .rejects.toThrow('Plan configuration error');
+    });
+
+    it('should check document usage', async () => {
+      databaseAdapter.findOne
+        .mockResolvedValueOnce(mockSubscription)
+        .mockResolvedValueOnce({ ...mockPlan, limits: { ...mockPlan.limits, documents: 50 } });
+      databaseAdapter.count.mockResolvedValue(30);
+
+      const result = await SubscriptionService.checkUsageLimit('COMPANY-001', 'documents');
+
+      expect(result.withinLimit).toBe(true);
+      expect(result.currentUsage).toBe(30);
+    });
+
+    it('should check user usage', async () => {
+      databaseAdapter.findOne
+        .mockResolvedValueOnce(mockSubscription)
+        .mockResolvedValueOnce({ ...mockPlan, limits: { ...mockPlan.limits, users: 10 } });
+      databaseAdapter.count.mockResolvedValue(8);
+
+      const result = await SubscriptionService.checkUsageLimit('COMPANY-001', 'users');
+
+      expect(result.withinLimit).toBe(true);
+      expect(result.currentUsage).toBe(8);
+    });
+
+    it('should handle storageGB limit type with no model mapping', async () => {
+      databaseAdapter.findOne
+        .mockResolvedValueOnce(mockSubscription)
+        .mockResolvedValueOnce({ ...mockPlan, limits: { ...mockPlan.limits, storageGB: 50 } });
+
+      const result = await SubscriptionService.checkUsageLimit('COMPANY-001', 'storageGB');
+
+      expect(result.withinLimit).toBe(true);
+      expect(result.currentUsage).toBe(0);
+    });
+  });
+
+  describe('processRenewal - trialing to active', () => {
+    it('should transition from trialing to active on renewal', async () => {
+      const trialingSubscription = {
+        _id: 'sub-id-123',
+        subscriptionId: 'SUB-001',
+        planId: 'PLAN-001',
+        status: 'trialing',
+        currentPeriodStart: new Date('2024-01-01'),
+        currentPeriodEnd: new Date('2024-01-15')
+      };
+
+      const mockPlan = { planId: 'PLAN-001', interval: 'month' };
+
+      databaseAdapter.findById.mockResolvedValue(trialingSubscription);
+      databaseAdapter.findOne.mockResolvedValue(mockPlan);
+      databaseAdapter.findByIdAndUpdate.mockImplementation((model, id, data) =>
+        Promise.resolve({ ...trialingSubscription, ...data })
+      );
+
+      const result = await SubscriptionService.processRenewal('sub-id-123');
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'Subscription',
+        'sub-id-123',
+        expect.objectContaining({
+          status: 'active'
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should throw error when plan not found during renewal', async () => {
+      databaseAdapter.findById.mockResolvedValue({
+        _id: 'sub-id-123',
+        status: 'active',
+        planId: 'PLAN-001'
+      });
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(SubscriptionService.processRenewal('sub-id-123'))
+        .rejects.toThrow('Plan not found');
+    });
+  });
+
+  describe('_calculatePeriodEnd', () => {
+    it('should add 1 month for monthly interval', () => {
+      const start = new Date(2024, 0, 15); // Jan 15 2024 in local time
+      const result = SubscriptionService._calculatePeriodEnd(start, 'month');
+
+      expect(result.getMonth()).toBe(1); // February
+      expect(result.getDate()).toBe(15);
+    });
+
+    it('should add 1 year for yearly interval', () => {
+      const start = new Date(2024, 0, 15); // Jan 15 2024 in local time
+      const result = SubscriptionService._calculatePeriodEnd(start, 'year');
+
+      expect(result.getFullYear()).toBe(2025);
+      expect(result.getMonth()).toBe(0); // January
     });
   });
 });

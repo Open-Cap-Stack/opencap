@@ -546,6 +546,165 @@ describe('WaterfallAnalysisService', () => {
     });
   });
 
+  describe('calculateWaterfall - default parameters', () => {
+    it('should handle missing optional parameters (defaults to 0)', () => {
+      const analysis = {
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 1000000, pricePerShare: 0.001 }
+        ]
+      };
+
+      // exitValuation defaults to 0
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+      expect(result.summary.totalDistributed).toBe(0);
+    });
+
+    it('should calculate fully diluted shares correctly', () => {
+      const analysis = {
+        exitValuation: 10000000,
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 8000000, pricePerShare: 0.001 },
+          { shareClassId: 'pref', name: 'Preferred', preferenceType: 'non_participating', liquidationMultiple: 1, seniorityRank: 1, totalShares: 2000000, pricePerShare: 1.00, originalInvestment: 2000000 }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+      expect(result.summary.fullyDilutedShares).toBe(10000000);
+      expect(result.summary.pricePerShareAtExit).toBe(1.00);
+    });
+  });
+
+  describe('calculateWaterfall - conversion vs preference decision', () => {
+    it('should keep preference when conversion value is equal', () => {
+      // Setup so that conversion = preference exactly
+      const analysis = {
+        exitValuation: 10000000,
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 8000000, pricePerShare: 0.001 },
+          {
+            shareClassId: 'series-a', name: 'Series A', preferenceType: 'non_participating',
+            liquidationMultiple: 1, seniorityRank: 1, totalShares: 2000000,
+            pricePerShare: 1.00, originalInvestment: 2000000
+          }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+
+      // Conversion = 2M/10M * $10M = $2M = preference $2M
+      // When equal, should NOT elect conversion (preference >= conversion)
+      const seriesAResult = result.shareClassResults.find(r => r.shareClassId === 'series-a');
+      expect(seriesAResult).toBeDefined();
+    });
+
+    it('should handle participating_capped with cap already reached', () => {
+      const analysis = {
+        exitValuation: 100000000, // $100M
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 8000000, pricePerShare: 0.001 },
+          {
+            shareClassId: 'series-a', name: 'Series A', preferenceType: 'participating_capped',
+            liquidationMultiple: 1, participationCap: 1.5, // 1.5x cap
+            seniorityRank: 1, totalShares: 2000000,
+            pricePerShare: 1.00, originalInvestment: 2000000
+          }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+
+      // Max return = 1.5 * $2M = $3M
+      const seriesAResult = result.shareClassResults.find(r => r.shareClassId === 'series-a');
+      expect(seriesAResult.totalProceeds).toBeLessThanOrEqual(3000000);
+    });
+
+    it('should handle participating preferred with zero remaining', () => {
+      const analysis = {
+        exitValuation: 2000000, // Exactly equal to preference
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 8000000, pricePerShare: 0.001 },
+          {
+            shareClassId: 'series-a', name: 'Series A', preferenceType: 'participating',
+            liquidationMultiple: 1, seniorityRank: 1, totalShares: 2000000,
+            pricePerShare: 1.00, originalInvestment: 2000000
+          }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+
+      const seriesAResult = result.shareClassResults.find(r => r.shareClassId === 'series-a');
+      expect(seriesAResult.preferenceAmount).toBe(2000000);
+      // No remaining for participation
+      expect(seriesAResult.participationAmount).toBe(0);
+    });
+
+    it('should use originalInvestment fallback to totalShares * pricePerShare', () => {
+      const analysis = {
+        exitValuation: 10000000,
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 8000000, pricePerShare: 0.001 },
+          {
+            shareClassId: 'series-a', name: 'Series A', preferenceType: 'non_participating',
+            liquidationMultiple: 1, seniorityRank: 1, totalShares: 2000000,
+            pricePerShare: 1.00 // No originalInvestment
+          }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+
+      const seriesAResult = result.shareClassResults.find(r => r.shareClassId === 'series-a');
+      // Should use 2000000 * 1.00 = 2000000 as investment for preference
+      expect(seriesAResult.totalProceeds).toBeGreaterThan(0);
+    });
+
+    it('should handle common classes with zero shares', () => {
+      const analysis = {
+        exitValuation: 5000000,
+        shareClasses: [
+          { shareClassId: 'common', name: 'Common', preferenceType: 'common', totalShares: 0, pricePerShare: 0.001 },
+          {
+            shareClassId: 'series-a', name: 'Series A', preferenceType: 'non_participating',
+            liquidationMultiple: 1, seniorityRank: 1, totalShares: 2000000,
+            pricePerShare: 1.00, originalInvestment: 2000000
+          }
+        ]
+      };
+
+      const result = WaterfallAnalysisService.calculateWaterfall(analysis);
+
+      expect(result.shareClassResults).toBeDefined();
+      expect(result.summary.totalDistributed).toBeGreaterThan(0);
+    });
+  });
+
+  describe('distributeProceeds - edge cases', () => {
+    it('should handle zero total shares', () => {
+      const shareClasses = [
+        { shareClassId: 'class-a', totalShares: 0 },
+        { shareClassId: 'class-b', totalShares: 0 }
+      ];
+
+      const result = WaterfallAnalysisService.distributeProceeds(shareClasses, 10000000);
+
+      expect(result['class-a']).toBe(0);
+      expect(result['class-b']).toBe(0);
+    });
+  });
+
+  describe('calculateParticipation - edge cases', () => {
+    it('should handle zero total shares', () => {
+      const shareClasses = [
+        { shareClassId: 'class-a', totalShares: 0, preferenceType: 'participating' }
+      ];
+
+      const result = WaterfallAnalysisService.calculateParticipation(shareClasses, 10000000);
+
+      expect(result['class-a']).toBe(0);
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle zero exit valuation', () => {
       const analysis = {

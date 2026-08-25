@@ -213,4 +213,309 @@ describe('InvestorCommunicationTemplate Model', () => {
       expect(typeof InvestorCommunicationTemplate.setDefault).toBe('function');
     });
   });
+
+  describe('create()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.insertRow = jest.fn().mockResolvedValue({
+        data: [{ _id: 'test-id', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+      });
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [] });
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should auto-generate templateId if not provided', async () => {
+      await InvestorCommunicationTemplate.create({
+        companyId: 'c1',
+        name: 'Q4 Update',
+        communicationType: 'quarterly_update',
+        subject: 'Update',
+        content: 'Content',
+        createdBy: 'u1'
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({ templateId: expect.stringMatching(/^TPL-/) })
+      );
+    });
+
+    it('should use provided templateId', async () => {
+      await InvestorCommunicationTemplate.create({
+        templateId: 'TPL-CUSTOM',
+        companyId: 'c1',
+        name: 'Q4 Update',
+        communicationType: 'quarterly_update',
+        subject: 'Update',
+        content: 'Content',
+        createdBy: 'u1'
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({ templateId: 'TPL-CUSTOM' })
+      );
+    });
+
+    it('should throw for invalid communicationType', async () => {
+      await expect(InvestorCommunicationTemplate.create({
+        companyId: 'c1',
+        name: 'Test',
+        communicationType: 'invalid_type',
+        subject: 'Subj',
+        content: 'Body',
+        createdBy: 'u1'
+      })).rejects.toThrow('communicationType must be one of');
+    });
+
+    it('should default isActive to true if not provided', async () => {
+      await InvestorCommunicationTemplate.create({
+        companyId: 'c1',
+        name: 'Q4',
+        communicationType: 'general',
+        subject: 'Subj',
+        content: 'Body',
+        createdBy: 'u1'
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({ isActive: true })
+      );
+    });
+
+    it('should not override isActive when explicitly set to false', async () => {
+      await InvestorCommunicationTemplate.create({
+        companyId: 'c1',
+        name: 'Q4',
+        communicationType: 'general',
+        subject: 'Subj',
+        content: 'Body',
+        createdBy: 'u1',
+        isActive: false
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({ isActive: false })
+      );
+    });
+  });
+
+  describe('findByTemplateId()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should find template by templateId', async () => {
+      const mockTemplate = { _id: 'id-1', templateId: 'TPL-123', name: 'Test' };
+      zerodbService.queryTable.mockResolvedValue({ data: [mockTemplate] });
+
+      const result = await InvestorCommunicationTemplate.findByTemplateId('TPL-123');
+      expect(result).toEqual(mockTemplate);
+    });
+
+    it('should return null if not found', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+      const result = await InvestorCommunicationTemplate.findByTemplateId('TPL-NONE');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findByCompany()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should find all templates for a company', async () => {
+      const mockTemplates = [
+        { templateId: 'TPL-1', companyId: 'c1' },
+        { templateId: 'TPL-2', companyId: 'c1' }
+      ];
+      zerodbService.queryTable.mockResolvedValue({ data: mockTemplates });
+
+      const result = await InvestorCommunicationTemplate.findByCompany('c1');
+      expect(result).toHaveLength(2);
+    });
+
+    it('should filter by isActive when option is provided', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await InvestorCommunicationTemplate.findByCompany('c1', { isActive: true });
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({
+          filter: expect.objectContaining({ companyId: 'c1', isActive: true })
+        })
+      );
+    });
+
+    it('should filter by communicationType when option is provided', async () => {
+      zerodbService.queryTable.mockResolvedValue({ data: [] });
+
+      await InvestorCommunicationTemplate.findByCompany('c1', { communicationType: 'quarterly_update' });
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({
+          filter: expect.objectContaining({ companyId: 'c1', communicationType: 'quarterly_update' })
+        })
+      );
+    });
+  });
+
+  describe('findDefault()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn();
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should find default template for company and type', async () => {
+      const mockTemplate = { templateId: 'TPL-1', isDefault: true };
+      zerodbService.queryTable.mockResolvedValue({ data: [mockTemplate] });
+
+      const result = await InvestorCommunicationTemplate.findDefault('c1', 'quarterly_update');
+      expect(result).toEqual(mockTemplate);
+      expect(zerodbService.queryTable).toHaveBeenCalledWith(
+        'investor_communication_templates',
+        expect.objectContaining({
+          filter: { companyId: 'c1', communicationType: 'quarterly_update', isDefault: true, isActive: true }
+        })
+      );
+    });
+  });
+
+  describe('activate()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [{ _id: 'id', templateId: 'TPL-1' }] });
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should activate a template', async () => {
+      await InvestorCommunicationTemplate.activate('TPL-1');
+      // updateOne is called which eventually calls updateRows or client.put
+      expect(zerodbService.queryTable).toHaveBeenCalled();
+    });
+  });
+
+  describe('deactivate()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [{ _id: 'id', templateId: 'TPL-1' }] });
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should deactivate a template', async () => {
+      await InvestorCommunicationTemplate.deactivate('TPL-1');
+      expect(zerodbService.queryTable).toHaveBeenCalled();
+    });
+  });
+
+  describe('setDefault()', () => {
+    const zerodbService = require('../../../services/zerodbService');
+
+    beforeEach(() => {
+      zerodbService.queryTable = jest.fn().mockResolvedValue({ data: [{ _id: 'id', templateId: 'TPL-1' }] });
+      zerodbService.updateRows = jest.fn().mockResolvedValue({ modified_count: 1 });
+      zerodbService.initialize = jest.fn().mockResolvedValue({ projectId: 'test' });
+      zerodbService.projectId = 'test';
+    });
+
+    it('should unset existing defaults and set new default', async () => {
+      await InvestorCommunicationTemplate.setDefault('c1', 'TPL-1', 'quarterly_update');
+      // Should have called updateMany (to unset) and updateOne (to set)
+      expect(zerodbService.queryTable).toHaveBeenCalled();
+    });
+  });
+
+  describe('processTemplate - edge cases', () => {
+    it('should leave unresolved variables as-is when no default', () => {
+      const template = {
+        subject: 'Hello {{unknown}}',
+        content: 'Body {{missing}}',
+        variables: []
+      };
+      const result = InvestorCommunicationTemplate.processTemplate(template, {});
+      expect(result.subject).toBe('Hello {{unknown}}');
+      expect(result.content).toBe('Body {{missing}}');
+    });
+
+    it('should handle null htmlContent', () => {
+      const template = {
+        subject: 'Subj',
+        content: 'Body',
+        htmlContent: null,
+        variables: []
+      };
+      const result = InvestorCommunicationTemplate.processTemplate(template, {});
+      expect(result.htmlContent).toBeNull();
+    });
+
+    it('should handle htmlContent with variable substitution', () => {
+      const template = {
+        subject: 'Subj',
+        content: 'Body',
+        htmlContent: '<p>Hello {{name}}</p>',
+        variables: []
+      };
+      const result = InvestorCommunicationTemplate.processTemplate(template, { name: 'Alice' });
+      expect(result.htmlContent).toBe('<p>Hello Alice</p>');
+    });
+
+    it('should convert non-string values to string', () => {
+      const template = {
+        subject: 'Amount: {{value}}',
+        content: 'Count: {{count}}',
+        variables: []
+      };
+      const result = InvestorCommunicationTemplate.processTemplate(template, { value: 42, count: 0 });
+      expect(result.subject).toBe('Amount: 42');
+      expect(result.content).toBe('Count: 0');
+    });
+
+    it('should handle deeply nested object paths that fail', () => {
+      const template = {
+        subject: '{{a.b.c}}',
+        content: 'test',
+        variables: []
+      };
+      const result = InvestorCommunicationTemplate.processTemplate(template, { a: { b: 'not-object' } });
+      expect(result.subject).toBe('{{a.b.c}}');
+    });
+  });
+
+  describe('extractVariables - edge cases', () => {
+    it('should deduplicate variables', () => {
+      const template = {
+        subject: '{{name}} {{name}}',
+        content: '{{name}}'
+      };
+      const result = InvestorCommunicationTemplate.extractVariables(template);
+      expect(result).toEqual(['name']);
+    });
+
+    it('should handle templates with no variables', () => {
+      const template = {
+        subject: 'No variables here',
+        content: 'Just plain text'
+      };
+      const result = InvestorCommunicationTemplate.extractVariables(template);
+      expect(result).toEqual([]);
+    });
+  });
 });

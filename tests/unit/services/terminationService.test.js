@@ -619,7 +619,8 @@ describe('TerminationService', () => {
         exerciseWindowEndDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
         status: 'exercise_window_open',
         vestedSharesAtTermination: 5000,
-        sharesExercised: 2000
+        sharesExercised: 2000,
+        sharesForfeited: 0
       };
 
       const updatedTermination = {
@@ -643,7 +644,8 @@ describe('TerminationService', () => {
         exerciseWindowEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         status: 'exercise_window_open',
         vestedSharesAtTermination: 5000,
-        sharesExercised: 5000
+        sharesExercised: 5000,
+        sharesForfeited: 0
       };
 
       const updatedTermination = {
@@ -657,6 +659,506 @@ describe('TerminationService', () => {
       const result = await TerminationService.updateTerminationStatus('term123');
 
       expect(result.status).toBe('completed');
+    });
+
+    it('should throw error if termination not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(TerminationService.updateTerminationStatus('nonexistent'))
+        .rejects.toThrow('Termination not found');
+    });
+
+    it('should return unchanged termination if no status change needed', async () => {
+      const mockTermination = {
+        _id: 'term123',
+        exerciseWindowEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        status: 'exercise_window_open',
+        vestedSharesAtTermination: 5000,
+        sharesExercised: 2000,
+        sharesForfeited: 0
+      };
+
+      databaseAdapter.findById.mockResolvedValue(mockTermination);
+
+      const result = await TerminationService.updateTerminationStatus('term123');
+
+      expect(result).toEqual(mockTermination);
+      expect(databaseAdapter.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('calculateVestedShares - additional scenarios', () => {
+    it('should handle annual vesting correctly', () => {
+      const params = {
+        grantDate: new Date('2022-01-01'),
+        terminationDate: new Date('2024-06-01'), // 29 months = 2 years rounded down
+        totalGrantedShares: 12000,
+        vestingSchedule: {
+          type: 'annual',
+          cliffMonths: 12,
+          totalMonths: 48
+        }
+      };
+
+      const result = TerminationService.calculateVestedShares(params);
+
+      // 29 months = 2 full years = 24 months vested out of 48
+      expect(result.vestedShares).toBe(6000); // 24/48 * 12000
+      expect(result.vestedMonths).toBe(24);
+    });
+
+    it('should handle vesting with no cliff', () => {
+      const params = {
+        grantDate: new Date('2024-01-01'),
+        terminationDate: new Date('2024-04-01'), // 3 months
+        totalGrantedShares: 4800,
+        vestingSchedule: {
+          type: 'monthly',
+          cliffMonths: 0,
+          totalMonths: 48
+        }
+      };
+
+      const result = TerminationService.calculateVestedShares(params);
+
+      expect(result.vestedShares).toBe(300); // 3/48 * 4800
+      expect(result.cliffNotMet).toBe(false);
+    });
+
+    it('should handle termination on the same day as grant', () => {
+      const params = {
+        grantDate: new Date('2024-01-01'),
+        terminationDate: new Date('2024-01-01'),
+        totalGrantedShares: 10000,
+        vestingSchedule: {
+          type: 'monthly',
+          cliffMonths: 12,
+          totalMonths: 48
+        }
+      };
+
+      const result = TerminationService.calculateVestedShares(params);
+
+      expect(result.vestedShares).toBe(0);
+      expect(result.cliffNotMet).toBe(true);
+      expect(result.monthsElapsed).toBe(0);
+    });
+  });
+
+  describe('calculateExerciseWindow - additional scenarios', () => {
+    it('should use default for layoff termination type', () => {
+      const result = TerminationService.calculateExerciseWindow({
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'layoff'
+      });
+
+      expect(result.exerciseWindowDays).toBe(90);
+      expect(result.immediateForfeiture).toBe(false);
+    });
+
+    it('should use disability extended window', () => {
+      const result = TerminationService.calculateExerciseWindow({
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'disability'
+      });
+
+      expect(result.exerciseWindowDays).toBe(365);
+    });
+
+    it('should use plan rules when available but type not specified', () => {
+      const result = TerminationService.calculateExerciseWindow({
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'retirement',
+        equityPlanRules: {
+          exerciseWindowDays: {}
+        }
+      });
+
+      // Falls through to DEFAULT_EXERCISE_WINDOW_DAYS for retirement = 90
+      expect(result.exerciseWindowDays).toBe(90);
+    });
+  });
+
+  describe('processTermination - additional scenarios', () => {
+    it('should handle termination with no grants', async () => {
+      const terminationData = {
+        employeeId: 'emp123',
+        companyId: 'comp456',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'voluntary',
+        grants: []
+      };
+
+      databaseAdapter.create.mockImplementation((model, data) => Promise.resolve(data));
+
+      const result = await TerminationService.processTermination(terminationData);
+
+      expect(result.totalGrantedShares).toBe(0);
+      expect(result.vestedSharesAtTermination).toBe(0);
+      expect(result.status).toBe('completed');
+    });
+
+    it('should handle for_cause termination with immediate forfeiture', async () => {
+      const terminationData = {
+        employeeId: 'emp123',
+        companyId: 'comp456',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'for_cause',
+        grants: [
+          {
+            grantId: 'grant1',
+            grantDate: new Date('2022-01-01'),
+            totalShares: 10000,
+            vestingSchedule: { type: 'monthly', cliffMonths: 12, totalMonths: 48 }
+          }
+        ]
+      };
+
+      databaseAdapter.create.mockImplementation((model, data) => Promise.resolve(data));
+
+      const result = await TerminationService.processTermination(terminationData);
+
+      expect(result.immediateForfeiture).toBe(true);
+      expect(result.exerciseWindowDays).toBe(0);
+      expect(result.status).toBe('exercise_window_expired');
+    });
+
+    it('should handle termination with null grants', async () => {
+      const terminationData = {
+        employeeId: 'emp123',
+        companyId: 'comp456',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'voluntary',
+        grants: null
+      };
+
+      databaseAdapter.create.mockImplementation((model, data) => Promise.resolve(data));
+
+      const result = await TerminationService.processTermination(terminationData);
+
+      expect(result.totalGrantedShares).toBe(0);
+      expect(result.status).toBe('completed');
+    });
+
+    it('should track cliffNotMet across multiple grants', async () => {
+      const terminationData = {
+        employeeId: 'emp123',
+        companyId: 'comp456',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'voluntary',
+        grants: [
+          {
+            grantId: 'grant1',
+            grantDate: new Date('2024-01-01'), // Only 5 months, cliff not met
+            totalShares: 5000,
+            vestingSchedule: { type: 'monthly', cliffMonths: 12, totalMonths: 48 }
+          },
+          {
+            grantId: 'grant2',
+            grantDate: new Date('2022-01-01'), // 29 months, cliff met
+            totalShares: 10000,
+            vestingSchedule: { type: 'monthly', cliffMonths: 12, totalMonths: 48 }
+          }
+        ]
+      };
+
+      databaseAdapter.create.mockImplementation((model, data) => Promise.resolve(data));
+
+      const result = await TerminationService.processTermination(terminationData);
+
+      expect(result.cliffNotMet).toBe(true);
+    });
+  });
+
+  describe('calculateRepurchaseRights - additional scenarios', () => {
+    it('should use exercise price only when method specifies', () => {
+      const result = TerminationService.calculateRepurchaseRights({
+        unvestedShares: 1000,
+        originalExercisePrice: 5.00,
+        currentFMV: 2.00,
+        terminationType: 'voluntary',
+        companyPlanRules: {
+          repurchaseEnabled: true,
+          repurchasePriceMethod: 'exercise_price_only'
+        }
+      });
+
+      expect(result.repurchasePrice).toBe(5.00);
+      expect(result.totalRepurchaseValue).toBe(5000);
+    });
+
+    it('should use default method for unknown repurchase price method', () => {
+      const result = TerminationService.calculateRepurchaseRights({
+        unvestedShares: 1000,
+        originalExercisePrice: 5.00,
+        currentFMV: 2.00,
+        terminationType: 'voluntary',
+        companyPlanRules: {
+          repurchaseEnabled: true,
+          repurchasePriceMethod: 'some_unknown_method'
+        }
+      });
+
+      expect(result.repurchasePrice).toBe(2.00); // lower of 5 and 2
+    });
+
+    it('should return disabled repurchase when company rules not provided', () => {
+      const result = TerminationService.calculateRepurchaseRights({
+        unvestedShares: 1000,
+        originalExercisePrice: 5.00,
+        currentFMV: 10.00,
+        terminationType: 'voluntary',
+        companyPlanRules: null
+      });
+
+      expect(result.repurchaseRightEnabled).toBe(false);
+    });
+
+    it('should return disabled repurchase when repurchase not enabled', () => {
+      const result = TerminationService.calculateRepurchaseRights({
+        unvestedShares: 1000,
+        originalExercisePrice: 5.00,
+        currentFMV: 10.00,
+        terminationType: 'voluntary',
+        companyPlanRules: { repurchaseEnabled: false }
+      });
+
+      expect(result.repurchaseRightEnabled).toBe(false);
+    });
+  });
+
+  describe('getExerciseWindowStatus - error cases', () => {
+    it('should throw error if termination not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(TerminationService.getExerciseWindowStatus('nonexistent'))
+        .rejects.toThrow('Termination not found');
+    });
+  });
+
+  describe('extendExerciseWindow - error cases', () => {
+    it('should throw error if termination not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(TerminationService.extendExerciseWindow('nonexistent', {
+        additionalDays: 30
+      })).rejects.toThrow('Termination not found');
+    });
+  });
+
+  describe('recordExercise - additional scenarios', () => {
+    it('should throw error if termination not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(TerminationService.recordExercise('nonexistent', {
+        shares: 100,
+        exercisePrice: 1.00
+      })).rejects.toThrow('Termination not found');
+    });
+
+    it('should update status to completed when all shares exercised', async () => {
+      const mockTermination = {
+        _id: 'term123',
+        exerciseWindowEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        vestedSharesAtTermination: 5000,
+        sharesExercised: 4000,
+        status: 'exercise_window_open',
+        exerciseHistory: []
+      };
+
+      const updatedTermination = {
+        ...mockTermination,
+        sharesExercised: 5000,
+        status: 'completed'
+      };
+
+      databaseAdapter.findById.mockResolvedValue(mockTermination);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(updatedTermination);
+
+      const result = await TerminationService.recordExercise('term123', {
+        shares: 1000,
+        exercisePrice: 1.00,
+        fmvAtExercise: 10.00
+      });
+
+      expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalledWith(
+        'Termination',
+        'term123',
+        expect.objectContaining({
+          status: 'completed',
+          sharesExercised: 5000
+        }),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('generateTerminationDocuments - additional scenarios', () => {
+    it('should throw error if termination not found', async () => {
+      databaseAdapter.findById.mockResolvedValue(null);
+
+      await expect(TerminationService.generateTerminationDocuments('nonexistent'))
+        .rejects.toThrow('Termination not found');
+    });
+
+    it('should not include exercise window notification when days are 0', async () => {
+      const mockTermination = {
+        _id: 'term123',
+        employeeId: 'emp123',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'for_cause',
+        vestedSharesAtTermination: 5000,
+        unvestedSharesForfeited: 5000,
+        exerciseWindowDays: 0,
+        totalGrantedShares: 10000,
+        vestingPercentage: 50
+      };
+
+      databaseAdapter.findById.mockResolvedValue(mockTermination);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockTermination);
+
+      const result = await TerminationService.generateTerminationDocuments('term123');
+
+      const types = result.documents.map(d => d.type);
+      expect(types).toContain('termination_notice');
+      expect(types).toContain('equity_summary');
+      expect(types).not.toContain('exercise_window_notification');
+    });
+
+    it('should not include forfeiture notice when no unvested shares', async () => {
+      const mockTermination = {
+        _id: 'term123',
+        employeeId: 'emp123',
+        terminationDate: new Date('2024-06-01'),
+        terminationType: 'voluntary',
+        vestedSharesAtTermination: 10000,
+        unvestedSharesForfeited: 0,
+        exerciseWindowDays: 90,
+        exerciseWindowEndDate: new Date('2024-08-30'),
+        totalGrantedShares: 10000,
+        vestingPercentage: 100
+      };
+
+      databaseAdapter.findById.mockResolvedValue(mockTermination);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue(mockTermination);
+
+      const result = await TerminationService.generateTerminationDocuments('term123');
+
+      const types = result.documents.map(d => d.type);
+      expect(types).not.toContain('forfeiture_notice');
+    });
+  });
+
+  describe('getTerminationsByCompany - additional filters', () => {
+    it('should filter by termination type', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await TerminationService.getTerminationsByCompany('comp456', {
+        terminationType: 'voluntary'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'Termination',
+        { companyId: 'comp456', terminationType: 'voluntary' },
+        expect.any(Object)
+      );
+    });
+
+    it('should filter by date range', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await TerminationService.getTerminationsByCompany('comp456', {
+        startDate: '2024-01-01',
+        endDate: '2024-12-31'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'Termination',
+        expect.objectContaining({
+          companyId: 'comp456',
+          terminationDate: {
+            $gte: expect.any(Date),
+            $lte: expect.any(Date)
+          }
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should apply limit filter', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await TerminationService.getTerminationsByCompany('comp456', {
+        limit: '10'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'Termination',
+        { companyId: 'comp456' },
+        expect.objectContaining({ limit: 10 })
+      );
+    });
+
+    it('should filter by startDate only', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await TerminationService.getTerminationsByCompany('comp456', {
+        startDate: '2024-01-01'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'Termination',
+        expect.objectContaining({
+          terminationDate: { $gte: expect.any(Date) }
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should filter by endDate only', async () => {
+      databaseAdapter.find.mockResolvedValue([]);
+
+      await TerminationService.getTerminationsByCompany('comp456', {
+        endDate: '2024-12-31'
+      });
+
+      expect(databaseAdapter.find).toHaveBeenCalledWith(
+        'Termination',
+        expect.objectContaining({
+          terminationDate: { $lte: expect.any(Date) }
+        }),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('_calculateMonthsElapsed', () => {
+    it('should handle partial months by rounding down', () => {
+      // Jan 15 to Mar 10 = 1 month (not 2, since day 10 < day 15)
+      const result = TerminationService._calculateMonthsElapsed(
+        new Date('2024-01-15'),
+        new Date('2024-03-10')
+      );
+
+      expect(result).toBe(1);
+    });
+
+    it('should return 0 for same date', () => {
+      const result = TerminationService._calculateMonthsElapsed(
+        new Date('2024-01-01'),
+        new Date('2024-01-01')
+      );
+
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 if end is before start', () => {
+      const result = TerminationService._calculateMonthsElapsed(
+        new Date('2024-06-01'),
+        new Date('2024-01-01')
+      );
+
+      expect(result).toBe(0);
     });
   });
 });

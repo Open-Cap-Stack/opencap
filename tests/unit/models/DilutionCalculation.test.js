@@ -606,4 +606,286 @@ describe('DilutionCalculation Model', () => {
       );
     });
   });
+
+  describe('create() - validation branches', () => {
+    it('should throw when scenarioId is missing', async () => {
+      await expect(DilutionCalculation.create({
+        companyId: 'c1',
+        calculationType: 'funding_round',
+        inputs: {},
+        results: {}
+      })).rejects.toThrow('Scenario ID is required');
+    });
+
+    it('should throw when companyId is missing', async () => {
+      await expect(DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        calculationType: 'funding_round',
+        inputs: {},
+        results: {}
+      })).rejects.toThrow('Company ID is required');
+    });
+
+    it('should throw when calculationType is missing', async () => {
+      await expect(DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        inputs: {},
+        results: {}
+      })).rejects.toThrow('Calculation type is required');
+    });
+
+    it('should throw when calculationType is invalid', async () => {
+      await expect(DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'invalid_type',
+        inputs: {},
+        results: {}
+      })).rejects.toThrow('Invalid calculation type');
+    });
+
+    it('should default inputs to empty object if not provided', async () => {
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ _id: 'calc-id' }]
+      });
+      await DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'funding_round'
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'dilution_calculations',
+        expect.objectContaining({ inputs: {} })
+      );
+    });
+
+    it('should default results to empty object if not provided', async () => {
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ _id: 'calc-id' }]
+      });
+      await DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'funding_round'
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'dilution_calculations',
+        expect.objectContaining({ results: {} })
+      );
+    });
+
+    it('should default status to completed if not provided', async () => {
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ _id: 'calc-id' }]
+      });
+      await DilutionCalculation.create({
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'funding_round',
+        inputs: {},
+        results: {}
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'dilution_calculations',
+        expect.objectContaining({ status: 'completed' })
+      );
+    });
+
+    it('should use provided calculationId if given', async () => {
+      zerodbService.insertRow.mockResolvedValue({
+        data: [{ _id: 'calc-id' }]
+      });
+      await DilutionCalculation.create({
+        calculationId: 'DC-CUSTOM',
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'funding_round',
+        inputs: {},
+        results: {}
+      });
+      expect(zerodbService.insertRow).toHaveBeenCalledWith(
+        'dilution_calculations',
+        expect.objectContaining({ calculationId: 'DC-CUSTOM' })
+      );
+    });
+  });
+
+  describe('getStakeholderDilution() - missing results.stakeholders', () => {
+    it('should return null when results is missing', () => {
+      const result = DilutionCalculation.getStakeholderDilution({}, 's1');
+      expect(result).toBeNull();
+    });
+
+    it('should return null when results.stakeholders is missing', () => {
+      const result = DilutionCalculation.getStakeholderDilution({ results: {} }, 's1');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('calculateTotalDilution() - non-array stakeholders', () => {
+    it('should return 0 when stakeholders is not an array', () => {
+      const result = DilutionCalculation.calculateTotalDilution({ results: { stakeholders: 'not-array' } });
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 when results.stakeholders is missing', () => {
+      const result = DilutionCalculation.calculateTotalDilution({ results: {} });
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('getShareClassBreakdown()', () => {
+    it('should return share classes from calculation', () => {
+      const shareClasses = [
+        { shareClassId: 'common', name: 'Common', preRoundShares: 1000 },
+        { shareClassId: 'pref-a', name: 'Preferred A', preRoundShares: 500 }
+      ];
+      const result = DilutionCalculation.getShareClassBreakdown({ results: { shareClasses } });
+      expect(result).toEqual(shareClasses);
+    });
+
+    it('should return empty array when results is missing', () => {
+      const result = DilutionCalculation.getShareClassBreakdown({});
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when shareClasses is missing', () => {
+      const result = DilutionCalculation.getShareClassBreakdown({ results: {} });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getOwnershipChanges()', () => {
+    it('should calculate ownership changes for all stakeholders', () => {
+      const calculation = {
+        results: {
+          stakeholders: [
+            { stakeholderId: 's1', name: 'Founder', preRoundOwnership: 50, postRoundOwnership: 33.3, dilutionPercentage: 16.7 },
+            { stakeholderId: 's2', name: 'Investor', preRoundOwnership: 0, postRoundOwnership: 33.3, dilutionPercentage: 0 }
+          ]
+        }
+      };
+      const changes = DilutionCalculation.getOwnershipChanges(calculation);
+      expect(changes).toHaveLength(2);
+      expect(changes[0].stakeholderId).toBe('s1');
+      expect(changes[0].change).toBeCloseTo(-16.7, 1);
+      expect(changes[1].stakeholderId).toBe('s2');
+      expect(changes[1].change).toBeCloseTo(33.3, 1);
+    });
+
+    it('should handle missing ownership values', () => {
+      const calculation = {
+        results: {
+          stakeholders: [{ stakeholderId: 's1', name: 'Founder' }]
+        }
+      };
+      const changes = DilutionCalculation.getOwnershipChanges(calculation);
+      expect(changes[0].preRoundOwnership).toBe(0);
+      expect(changes[0].postRoundOwnership).toBe(0);
+      expect(changes[0].change).toBe(0);
+      expect(changes[0].dilutionPercentage).toBe(0);
+    });
+
+    it('should return empty array when results is missing', () => {
+      expect(DilutionCalculation.getOwnershipChanges({})).toEqual([]);
+    });
+
+    it('should return empty array when stakeholders is missing', () => {
+      expect(DilutionCalculation.getOwnershipChanges({ results: {} })).toEqual([]);
+    });
+  });
+
+  describe('getSummary()', () => {
+    it('should return summary with results', () => {
+      const calculation = {
+        calculationType: 'funding_round',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        results: {
+          stakeholders: [
+            { stakeholderId: 's1', dilutionPercentage: 10 },
+            { stakeholderId: 's2', dilutionPercentage: 15 }
+          ],
+          shareClasses: [{ shareClassId: 'common' }],
+          postMoney: 15000000,
+          totalShares: 1500000
+        }
+      };
+      const summary = DilutionCalculation.getSummary(calculation);
+      expect(summary.totalDilution).toBe(25);
+      expect(summary.stakeholderCount).toBe(2);
+      expect(summary.shareClassCount).toBe(1);
+      expect(summary.calculationType).toBe('funding_round');
+      expect(summary.postMoney).toBe(15000000);
+      expect(summary.totalShares).toBe(1500000);
+      expect(summary.createdAt).toBe('2024-01-01T00:00:00.000Z');
+    });
+
+    it('should return default summary when results is missing', () => {
+      const calculation = { calculationType: 'option_pool' };
+      const summary = DilutionCalculation.getSummary(calculation);
+      expect(summary.totalDilution).toBe(0);
+      expect(summary.stakeholderCount).toBe(0);
+      expect(summary.shareClassCount).toBe(0);
+      expect(summary.calculationType).toBe('option_pool');
+    });
+
+    it('should handle results without stakeholders or shareClasses', () => {
+      const calculation = { calculationType: 'comparison', results: {} };
+      const summary = DilutionCalculation.getSummary(calculation);
+      expect(summary.stakeholderCount).toBe(0);
+      expect(summary.shareClassCount).toBe(0);
+    });
+  });
+
+  describe('validate()', () => {
+    it('should return valid for complete calculation', () => {
+      const calculation = {
+        scenarioId: 'DS-001',
+        companyId: 'c1',
+        calculationType: 'funding_round',
+        inputs: {},
+        results: {}
+      };
+      const result = DilutionCalculation.validate(calculation);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('should return errors for missing scenarioId', () => {
+      const result = DilutionCalculation.validate({ companyId: 'c1', calculationType: 'x', inputs: {}, results: {} });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Scenario ID is required');
+    });
+
+    it('should return errors for missing companyId', () => {
+      const result = DilutionCalculation.validate({ scenarioId: 's1', calculationType: 'x', inputs: {}, results: {} });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Company ID is required');
+    });
+
+    it('should return errors for missing calculationType', () => {
+      const result = DilutionCalculation.validate({ scenarioId: 's1', companyId: 'c1', inputs: {}, results: {} });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Calculation type is required');
+    });
+
+    it('should return errors for missing inputs', () => {
+      const result = DilutionCalculation.validate({ scenarioId: 's1', companyId: 'c1', calculationType: 'x', results: {} });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Inputs are required');
+    });
+
+    it('should return errors for missing results', () => {
+      const result = DilutionCalculation.validate({ scenarioId: 's1', companyId: 'c1', calculationType: 'x', inputs: {} });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Results are required');
+    });
+
+    it('should return all errors for completely empty calculation', () => {
+      const result = DilutionCalculation.validate({});
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(5);
+    });
+  });
 });

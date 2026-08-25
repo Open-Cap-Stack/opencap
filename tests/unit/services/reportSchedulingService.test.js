@@ -166,6 +166,37 @@ describe('ReportSchedulingService', () => {
       const updateCall = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
       expect(updateCall.scheduleId).toBeUndefined();
     });
+
+    it('should throw error for invalid cron expression during update', async () => {
+      databaseAdapter.findOne.mockResolvedValue({ scheduleId, status: 'active' });
+
+      await expect(
+        ReportSchedulingService.updateSchedule(scheduleId, { schedule: 'invalid-cron' })
+      ).rejects.toThrow('Invalid cron expression');
+    });
+
+    it('should validate email recipients during update', async () => {
+      databaseAdapter.findOne.mockResolvedValue({ scheduleId, status: 'active' });
+
+      await expect(
+        ReportSchedulingService.updateSchedule(scheduleId, { recipients: ['not-an-email'] })
+      ).rejects.toThrow('Invalid email');
+    });
+
+    it('should use existing timezone when updating schedule without timezone', async () => {
+      databaseAdapter.findOne.mockResolvedValue({
+        scheduleId,
+        schedule: '0 9 1 * *',
+        timezone: 'America/New_York',
+        status: 'active'
+      });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({});
+
+      await ReportSchedulingService.updateSchedule(scheduleId, { schedule: '0 10 1 * *' });
+
+      const updateCall = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+      expect(updateCall.nextRunAt).toBeDefined();
+    });
   });
 
   describe('pauseSchedule', () => {
@@ -661,6 +692,54 @@ describe('ReportSchedulingService', () => {
         expect(ReportSchedulingService.validateCronExpression(expr)).toBe(false);
       });
     });
+
+    it('should reject null and non-string inputs', () => {
+      expect(ReportSchedulingService.validateCronExpression(null)).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression(undefined)).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression(123)).toBe(false);
+    });
+
+    it('should reject expression with wrong number of parts', () => {
+      expect(ReportSchedulingService.validateCronExpression('0 9 * *')).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression('0 9 * * * *')).toBe(false);
+    });
+
+    it('should validate range expressions', () => {
+      expect(ReportSchedulingService.validateCronExpression('1-30 * * * *')).toBe(true);
+      expect(ReportSchedulingService.validateCronExpression('* 9-17 * * *')).toBe(true);
+    });
+
+    it('should reject invalid range expressions', () => {
+      expect(ReportSchedulingService.validateCronExpression('30-5 * * * *')).toBe(false);
+    });
+
+    it('should validate list expressions', () => {
+      expect(ReportSchedulingService.validateCronExpression('0,15,30,45 * * * *')).toBe(true);
+      expect(ReportSchedulingService.validateCronExpression('* * * 1,6,12 *')).toBe(true);
+    });
+
+    it('should reject invalid list expressions', () => {
+      expect(ReportSchedulingService.validateCronExpression('0,15,60 * * * *')).toBe(false);
+    });
+
+    it('should reject invalid step values', () => {
+      expect(ReportSchedulingService.validateCronExpression('*/0 * * * *')).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression('*/abc * * * *')).toBe(false);
+    });
+
+    it('should reject invalid day of month values', () => {
+      expect(ReportSchedulingService.validateCronExpression('0 9 32 * *')).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression('0 9 0 * *')).toBe(false);
+    });
+
+    it('should reject invalid month values', () => {
+      expect(ReportSchedulingService.validateCronExpression('0 9 * 13 *')).toBe(false);
+      expect(ReportSchedulingService.validateCronExpression('0 9 * 0 *')).toBe(false);
+    });
+
+    it('should reject invalid day of week values', () => {
+      expect(ReportSchedulingService.validateCronExpression('0 9 * * 7')).toBe(false);
+    });
   });
 
   describe('calculateNextRunTime', () => {
@@ -684,6 +763,74 @@ describe('ReportSchedulingService', () => {
 
       // Different timezones should produce different UTC times
       expect(nextRun1.getTime()).not.toBe(nextRun2.getTime());
+    });
+
+    it('should handle step values in cron expression', () => {
+      const cronExpression = '*/15 * * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'UTC');
+
+      expect(nextRun instanceof Date).toBe(true);
+      expect(nextRun.getMinutes() % 15).toBe(0);
+    });
+
+    it('should handle range values in cron expression', () => {
+      const cronExpression = '0 9-17 * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'UTC');
+
+      expect(nextRun instanceof Date).toBe(true);
+    });
+
+    it('should handle list values in cron expression', () => {
+      const cronExpression = '0,30 * * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'UTC');
+
+      expect(nextRun instanceof Date).toBe(true);
+      expect([0, 30]).toContain(nextRun.getMinutes());
+    });
+
+    it('should handle America/Los_Angeles timezone', () => {
+      const cronExpression = '0 9 * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'America/Los_Angeles');
+
+      expect(nextRun instanceof Date).toBe(true);
+    });
+
+    it('should handle Asia/Tokyo timezone', () => {
+      const cronExpression = '0 9 * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'Asia/Tokyo');
+
+      expect(nextRun instanceof Date).toBe(true);
+    });
+
+    it('should handle Europe/Paris timezone', () => {
+      const cronExpression = '0 9 * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'Europe/Paris');
+
+      expect(nextRun instanceof Date).toBe(true);
+    });
+
+    it('should handle unknown timezone with zero offset', () => {
+      const cronExpression = '0 9 * * *';
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'Pacific/Fiji');
+
+      expect(nextRun instanceof Date).toBe(true);
+    });
+
+    it('should accept a fromDate parameter', () => {
+      const cronExpression = '0 9 * * *';
+      const fromDate = new Date('2025-01-15T08:00:00Z');
+
+      const nextRun = ReportSchedulingService.calculateNextRunTime(cronExpression, 'UTC', fromDate);
+
+      expect(nextRun instanceof Date).toBe(true);
+      expect(nextRun > fromDate).toBe(true);
     });
   });
 });

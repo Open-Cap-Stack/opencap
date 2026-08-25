@@ -118,6 +118,36 @@ describe('VestingCalculatorService', () => {
       // 1 month / 48 months = 2.08333...% - rounds down to 208 shares (monthly)
       expect(result.vestedShares).toBeCloseTo(208, 0);
     });
+
+    it('should handle unknown vesting frequency using default case', () => {
+      const schedule = {
+        ...baseSchedule,
+        cliffPeriodMonths: 0,
+        vestingFrequency: 'biweekly' // not a recognized frequency
+      };
+      const calculationDate = new Date('2024-01-01'); // 12 months
+
+      const result = VestingCalculatorService.calculateVestedShares(schedule, calculationDate);
+
+      // Default case: same as monthly
+      expect(result.vestedShares).toBe(2500);
+      expect(result.vestingPercentage).toBe(25);
+    });
+
+    it('should handle daily vesting frequency after cliff', () => {
+      const schedule = {
+        ...baseSchedule,
+        cliffPeriodMonths: 1,
+        vestingPeriodMonths: 12,
+        vestingFrequency: 'daily'
+      };
+      const calculationDate = new Date('2023-03-01'); // ~59 days
+
+      const result = VestingCalculatorService.calculateVestedShares(schedule, calculationDate);
+
+      expect(result.cliffReached).toBe(true);
+      expect(result.vestedShares).toBeGreaterThan(0);
+    });
   });
 
   describe('calculateAcceleration', () => {
@@ -620,6 +650,274 @@ describe('VestingCalculatorService', () => {
 
       expect(result).toHaveProperty('accelerated', false);
       expect(result).toHaveProperty('reason');
+    });
+
+    it('should return not accelerated when no accelerationTerms exist', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: undefined
+      };
+      const triggerData = {
+        triggerType: 'single_trigger',
+        event: 'change_of_control',
+        effectiveDate: new Date('2024-06-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toBe('No acceleration terms defined');
+    });
+
+    it('should reject single trigger for non-allowed event', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: {
+            enabled: true,
+            accelerationPercentage: 100,
+            events: ['ipo'] // Only ipo allowed
+          },
+          doubleTrigger: { enabled: false }
+        }
+      };
+      const triggerData = {
+        triggerType: 'single_trigger',
+        event: 'change_of_control', // Not allowed
+        effectiveDate: new Date('2024-06-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toContain('not eligible');
+    });
+
+    it('should reject double trigger when missing required fields', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: { enabled: false },
+          doubleTrigger: {
+            enabled: true,
+            accelerationPercentage: 100,
+            terminationTypes: ['involuntary_without_cause'],
+            windowPeriodMonths: 12
+          }
+        }
+      };
+      const triggerData = {
+        triggerType: 'double_trigger',
+        event: 'change_of_control',
+        changeOfControlDate: new Date('2024-06-01'),
+        // Missing terminationDate and terminationType
+        effectiveDate: new Date('2024-08-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toContain('requires');
+    });
+
+    it('should reject double trigger with non-qualifying termination type', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: { enabled: false },
+          doubleTrigger: {
+            enabled: true,
+            accelerationPercentage: 100,
+            terminationTypes: ['involuntary_without_cause'],
+            windowPeriodMonths: 12
+          }
+        }
+      };
+      const triggerData = {
+        triggerType: 'double_trigger',
+        event: 'change_of_control',
+        changeOfControlDate: new Date('2024-06-01'),
+        terminationDate: new Date('2024-08-01'),
+        terminationType: 'voluntary_resignation', // Not qualifying
+        effectiveDate: new Date('2024-08-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toContain('does not qualify');
+    });
+
+    it('should reject double trigger when termination is outside window', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: { enabled: false },
+          doubleTrigger: {
+            enabled: true,
+            accelerationPercentage: 100,
+            terminationTypes: ['involuntary_without_cause'],
+            windowPeriodMonths: 6  // 6 month window
+          }
+        }
+      };
+      const triggerData = {
+        triggerType: 'double_trigger',
+        event: 'change_of_control',
+        changeOfControlDate: new Date('2024-01-01'),
+        terminationDate: new Date('2024-12-01'), // 11 months later - outside window
+        terminationType: 'involuntary_without_cause',
+        effectiveDate: new Date('2024-12-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toContain('outside');
+    });
+
+    it('should handle unknown trigger type', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: { enabled: true, accelerationPercentage: 100 },
+          doubleTrigger: { enabled: true, accelerationPercentage: 100 }
+        }
+      };
+      const triggerData = {
+        triggerType: 'triple_trigger',
+        event: 'change_of_control',
+        effectiveDate: new Date('2024-06-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(false);
+      expect(result.reason).toContain('Unknown trigger type');
+    });
+
+    it('should include full details in successful double trigger result', () => {
+      const schedule = {
+        ...baseSchedule,
+        accelerationTerms: {
+          singleTrigger: { enabled: false },
+          doubleTrigger: {
+            enabled: true,
+            accelerationPercentage: 50,
+            terminationTypes: ['involuntary_without_cause', 'good_reason'],
+            windowPeriodMonths: 12
+          }
+        }
+      };
+      const triggerData = {
+        triggerType: 'double_trigger',
+        event: 'change_of_control',
+        changeOfControlDate: new Date('2024-06-01'),
+        terminationDate: new Date('2024-08-01'),
+        terminationType: 'good_reason',
+        effectiveDate: new Date('2024-08-01')
+      };
+
+      const result = VestingCalculatorService.handleAcceleration(schedule, triggerData);
+
+      expect(result.accelerated).toBe(true);
+      expect(result.accelerationType).toBe('double_trigger');
+      expect(result.accelerationPercentage).toBe(50);
+      expect(result).toHaveProperty('changeOfControlDate');
+      expect(result).toHaveProperty('terminationDate');
+      expect(result).toHaveProperty('terminationType', 'good_reason');
+      expect(result.remainingUnvested).toBeLessThan(schedule.totalShares);
+    });
+  });
+
+  describe('processVestingEvent edge cases', () => {
+    it('should identify cliff event when first vesting occurs', () => {
+      const schedule = {
+        scheduleId: 'VS-002',
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 12,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'monthly',
+        vestedShares: 0 // No shares vested yet
+      };
+      const eventDate = new Date('2024-01-01'); // At cliff
+
+      const result = VestingCalculatorService.processVestingEvent(schedule, eventDate);
+
+      expect(result.eventType).toBe('cliff');
+      expect(result.newVestedShares).toBe(2500);
+      expect(result.sharesVestedInEvent).toBe(2500);
+    });
+
+    it('should return none event type before cliff', () => {
+      const schedule = {
+        scheduleId: 'VS-003',
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 12,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'monthly',
+        vestedShares: 0
+      };
+      const eventDate = new Date('2023-06-01'); // Before cliff
+
+      const result = VestingCalculatorService.processVestingEvent(schedule, eventDate);
+
+      expect(result.eventType).toBe('none');
+      expect(result.sharesVestedInEvent).toBe(0);
+    });
+
+    it('should mark isComplete when fully vested', () => {
+      const schedule = {
+        scheduleId: 'VS-004',
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 12,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'monthly',
+        vestedShares: 9800
+      };
+      const eventDate = new Date('2027-02-01'); // After full vesting
+
+      const result = VestingCalculatorService.processVestingEvent(schedule, eventDate);
+
+      expect(result.isComplete).toBe(true);
+      expect(result.newVestedShares).toBe(10000);
+    });
+  });
+
+  describe('getNextVestingEvent edge cases', () => {
+    it('should handle default frequency in next event calculation', () => {
+      const schedule = {
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 0,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'unknown_freq'
+      };
+      const fromDate = new Date('2023-06-01');
+
+      const result = VestingCalculatorService.getNextVestingEvent(schedule, fromDate);
+
+      expect(result).not.toBeNull();
+      expect(result.eventType).toBe('periodic');
+    });
+
+    it('should return null when next event is past vesting end', () => {
+      const schedule = {
+        totalShares: 10000,
+        vestingStartDate: new Date('2023-01-01'),
+        cliffPeriodMonths: 12,
+        vestingPeriodMonths: 48,
+        vestingFrequency: 'annually'
+      };
+      // After 4 years, fully vested - no more events
+      const fromDate = new Date('2027-01-15');
+
+      const result = VestingCalculatorService.getNextVestingEvent(schedule, fromDate);
+
+      expect(result).toBeNull();
     });
   });
 });

@@ -1,342 +1,592 @@
 /**
  * SecondaryTransaction Model Unit Tests
  * Issue #103: Create Secondary Transaction Model
+ *
+ * Tests the actual model file for creation, validation, query methods,
+ * fee calculations, approval workflow, and status transitions.
  */
 
-// Lightweight schema helper to replace mongoose.Schema for testing
-function createTestSchema(definition, schemaOptions = {}) {
-  const paths = {};
-  const compoundIndexes = [];
+// Mock the ZeroDB base model before importing the model
+jest.mock('../../../models/base/ZeroDBModel', () => {
+  let mockData = [];
 
-  function processField(fieldName, fieldDef) {
-    if (Array.isArray(fieldDef)) {
-      paths[fieldName] = { options: {}, isRequired: false };
-      return;
-    }
-    if (fieldDef && typeof fieldDef === 'object' && fieldDef.type !== undefined) {
-      const pathObj = {
-        options: { ...fieldDef },
-        isRequired: fieldDef.required || false,
-        defaultValue: fieldDef.default,
-        enumValues: fieldDef.enum || undefined
-      };
-      paths[fieldName] = pathObj;
-    } else if (fieldDef && typeof fieldDef === 'object' && !fieldDef.type) {
-      paths[fieldName] = { options: fieldDef };
-    } else {
-      paths[fieldName] = { options: { type: fieldDef } };
-    }
-  }
-
-  for (const [key, value] of Object.entries(definition)) {
-    processField(key, value);
-  }
+  const mockBaseModel = {
+    create: jest.fn(async (data) => {
+      const doc = { _id: `id_${Date.now()}_${Math.random()}`, ...data };
+      mockData.push(doc);
+      return doc;
+    }),
+    find: jest.fn(async (query = {}) => {
+      return mockData.filter(doc => {
+        for (const [key, value] of Object.entries(query)) {
+          if (doc[key] !== value) return false;
+        }
+        return true;
+      });
+    }),
+    findOne: jest.fn(async (query = {}) => {
+      return mockData.find(doc => {
+        for (const [key, value] of Object.entries(query)) {
+          if (doc[key] !== value) return false;
+        }
+        return true;
+      }) || null;
+    }),
+    findById: jest.fn(async (id) => {
+      return mockData.find(doc => doc._id === id) || null;
+    }),
+    updateOne: jest.fn(async (query, update) => {
+      const doc = mockData.find(d => {
+        for (const [key, value] of Object.entries(query)) {
+          if (d[key] !== value) return false;
+        }
+        return true;
+      });
+      if (doc) {
+        if (update.$set) {
+          Object.assign(doc, update.$set);
+        } else {
+          Object.assign(doc, update);
+        }
+        return { modifiedCount: 1 };
+      }
+      return { modifiedCount: 0 };
+    }),
+    findOneAndUpdate: jest.fn(async (query, update, options) => {
+      const doc = mockData.find(d => {
+        for (const [key, value] of Object.entries(query)) {
+          if (d[key] !== value) return false;
+        }
+        return true;
+      });
+      if (doc) {
+        const updateData = update.$set || update;
+        Object.assign(doc, updateData);
+        return doc;
+      }
+      return null;
+    }),
+    findByIdAndUpdate: jest.fn(async (id, update, options) => {
+      const doc = mockData.find(d => d._id === id);
+      if (doc) {
+        const updateData = update.$set || update;
+        Object.assign(doc, updateData);
+        return doc;
+      }
+      return null;
+    }),
+    updateMany: jest.fn(async () => ({ modifiedCount: 0 })),
+    deleteOne: jest.fn(async (query) => {
+      const index = mockData.findIndex(d => {
+        for (const [key, value] of Object.entries(query)) {
+          if (d[key] !== value) return false;
+        }
+        return true;
+      });
+      if (index >= 0) {
+        mockData.splice(index, 1);
+        return { deletedCount: 1 };
+      }
+      return { deletedCount: 0 };
+    }),
+    deleteMany: jest.fn(async () => ({ deletedCount: 0 })),
+    findOneAndDelete: jest.fn(async () => null),
+    findByIdAndDelete: jest.fn(async () => null),
+    countDocuments: jest.fn(async () => mockData.length),
+    exists: jest.fn(async () => mockData.length > 0),
+    distinct: jest.fn(async () => []),
+    aggregate: jest.fn(async () => []),
+    tableName: 'secondary_transactions'
+  };
 
   return {
-    paths,
-    options: schemaOptions,
-    path(fieldName) {
-      return paths[fieldName] || undefined;
-    },
-    index(indexDef) {
-      compoundIndexes.push([indexDef]);
-    },
-    indexes() {
-      return compoundIndexes;
-    }
+    createModel: jest.fn(() => mockBaseModel),
+    __mockData: mockData,
+    __resetMockData: () => { mockData.length = 0; },
+    __getMockBaseModel: () => mockBaseModel
   };
-}
-
-// Define schema for testing
-const secondaryTransactionSchema = createTestSchema({
-  transactionId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  companyId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  sellerId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  buyerId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  shareClassId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  numberOfShares: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  pricePerShare: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  totalAmount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  currency: {
-    type: String,
-    default: 'USD',
-    uppercase: true
-  },
-  transactionDate: {
-    type: Date,
-    required: true
-  },
-  settlementDate: {
-    type: Date
-  },
-  initiatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  completedAt: {
-    type: Date
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'in_escrow', 'completed', 'canceled', 'failed', 'rejected'],
-    default: 'pending',
-    index: true
-  },
-  transactionType: {
-    type: String,
-    enum: ['private_sale', 'tender_offer', 'rofr_exercise', 'gift', 'estate_transfer', 'company_buyback'],
-    required: true,
-    index: true
-  },
-  transferRequestId: {
-    type: String,
-    index: true
-  },
-  rofrDetails: {
-    type: Object
-  },
-  documents: [{ documentId: String, documentType: String }],
-  fees: {
-    type: Object,
-    default: () => ({})
-  },
-  escrow: {
-    type: Object
-  },
-  approvals: [{ approverType: String, approverId: String }],
-  notes: {
-    type: String
-  },
-  internalNotes: {
-    type: String
-  },
-  metadata: {
-    type: Object
-  },
-  cancellationReason: {
-    type: String
-  },
-  failureReason: {
-    type: String
-  },
-  canceledBy: {
-    type: String
-  },
-  canceledAt: {
-    type: Date
-  },
-  createdBy: {
-    type: String
-  },
-  updatedBy: {
-    type: String
-  }
-}, {
-  timestamps: true
 });
 
-// Add compound indexes
-secondaryTransactionSchema.index({ companyId: 1, status: 1 });
-secondaryTransactionSchema.index({ sellerId: 1, status: 1 });
+const SecondaryTransaction = require('../../../models/SecondaryTransaction');
+const zeroDBModelMock = require('../../../models/base/ZeroDBModel');
 
 describe('SecondaryTransaction Model', () => {
-  const secondaryTransactionSchemaRef = secondaryTransactionSchema;
+  beforeEach(() => {
+    zeroDBModelMock.__resetMockData();
+    jest.clearAllMocks();
+  });
 
-  describe('Schema Definition', () => {
-    it('should have required transaction identification fields', () => {
-      expect(secondaryTransactionSchemaRef).toBeDefined();
-      const paths = secondaryTransactionSchemaRef.paths;
+  // Valid transaction data
+  const validData = {
+    companyId: 'company_123',
+    sellerId: 'seller_456',
+    buyerId: 'buyer_789',
+    shareClassId: 'sc_001',
+    numberOfShares: 1000,
+    pricePerShare: 10.50,
+    totalAmount: 10500,
+    transactionDate: '2026-01-15',
+    transactionType: 'private_sale'
+  };
 
-      expect(paths).toHaveProperty('transactionId');
-      expect(paths).toHaveProperty('companyId');
+  describe('Constants', () => {
+    it('should export valid statuses', () => {
+      expect(SecondaryTransaction.VALID_STATUSES).toEqual(
+        ['pending', 'approved', 'in_escrow', 'completed', 'canceled', 'failed', 'rejected']
+      );
     });
 
-    it('should have seller and buyer fields', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-
-      expect(paths).toHaveProperty('sellerId');
-      expect(paths).toHaveProperty('buyerId');
+    it('should export transaction types', () => {
+      expect(SecondaryTransaction.TRANSACTION_TYPES).toEqual(
+        ['private_sale', 'tender_offer', 'rofr_exercise', 'gift', 'estate_transfer', 'company_buyback']
+      );
     });
 
-    it('should have share class and quantity fields', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-
-      expect(paths).toHaveProperty('shareClassId');
-      expect(paths).toHaveProperty('numberOfShares');
+    it('should export document types', () => {
+      expect(SecondaryTransaction.DOCUMENT_TYPES).toEqual(
+        ['purchase_agreement', 'board_consent', 'rofr_waiver', 'transfer_notice', 'tax_form', 'other']
+      );
     });
 
-    it('should have price fields', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-
-      expect(paths).toHaveProperty('pricePerShare');
-      expect(paths).toHaveProperty('totalAmount');
+    it('should export fee payers', () => {
+      expect(SecondaryTransaction.FEE_PAYERS).toEqual(
+        ['seller', 'buyer', 'split', 'company']
+      );
     });
 
-    it('should have date fields', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-
-      expect(paths).toHaveProperty('transactionDate');
-      expect(paths).toHaveProperty('settlementDate');
-    });
-
-    it('should have status enum with valid values', () => {
-      const statusPath = secondaryTransactionSchemaRef.paths.status;
-      expect(statusPath.enumValues).toContain('pending');
-      expect(statusPath.enumValues).toContain('completed');
-      expect(statusPath.enumValues).toContain('canceled');
-      expect(statusPath.enumValues).toContain('failed');
-    });
-
-    it('should have transactionType enum with valid values', () => {
-      const typePath = secondaryTransactionSchemaRef.paths.transactionType;
-      expect(typePath.enumValues).toContain('private_sale');
-      expect(typePath.enumValues).toContain('tender_offer');
-      expect(typePath.enumValues).toContain('rofr_exercise');
-      expect(typePath.enumValues).toContain('gift');
-    });
-
-    it('should have transferRequestId field', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-      expect(paths).toHaveProperty('transferRequestId');
-    });
-
-    it('should have documents field', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-      expect(paths).toHaveProperty('documents');
-    });
-
-    it('should have notes field', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-      expect(paths).toHaveProperty('notes');
-    });
-
-    it('should have fees field', () => {
-      const paths = secondaryTransactionSchemaRef.paths;
-      expect(paths).toHaveProperty('fees');
+    it('should export approver types', () => {
+      expect(SecondaryTransaction.APPROVER_TYPES).toEqual(
+        ['board', 'company_admin', 'legal', 'transfer_agent']
+      );
     });
   });
 
-  describe('Validation', () => {
-    it('should require transactionId to be unique', () => {
-      const transactionIdPath = secondaryTransactionSchemaRef.paths.transactionId;
-      expect(transactionIdPath.options.unique).toBe(true);
-      expect(transactionIdPath.options.required).toBe(true);
+  describe('Schema', () => {
+    it('should have a schema definition', () => {
+      expect(SecondaryTransaction.schema).toBeDefined();
+      expect(SecondaryTransaction.schema.transactionId).toBeDefined();
+      expect(SecondaryTransaction.schema.companyId).toBeDefined();
+      expect(SecondaryTransaction.schema.sellerId).toBeDefined();
+      expect(SecondaryTransaction.schema.buyerId).toBeDefined();
     });
 
-    it('should require companyId', () => {
-      const companyIdPath = secondaryTransactionSchemaRef.paths.companyId;
-      expect(companyIdPath.options.required).toBe(true);
-    });
-
-    it('should require sellerId', () => {
-      const sellerIdPath = secondaryTransactionSchemaRef.paths.sellerId;
-      expect(sellerIdPath.options.required).toBe(true);
-    });
-
-    it('should require buyerId', () => {
-      const buyerIdPath = secondaryTransactionSchemaRef.paths.buyerId;
-      expect(buyerIdPath.options.required).toBe(true);
-    });
-
-    it('should require shareClassId', () => {
-      const shareClassIdPath = secondaryTransactionSchemaRef.paths.shareClassId;
-      expect(shareClassIdPath.options.required).toBe(true);
-    });
-
-    it('should require numberOfShares to be positive', () => {
-      const numberOfSharesPath = secondaryTransactionSchemaRef.paths.numberOfShares;
-      expect(numberOfSharesPath.options.min).toBe(1);
-      expect(numberOfSharesPath.options.required).toBe(true);
-    });
-
-    it('should require pricePerShare to be non-negative', () => {
-      const pricePerSharePath = secondaryTransactionSchemaRef.paths.pricePerShare;
-      expect(pricePerSharePath.options.min).toBe(0);
-      expect(pricePerSharePath.options.required).toBe(true);
-    });
-
-    it('should require totalAmount to be non-negative', () => {
-      const totalAmountPath = secondaryTransactionSchemaRef.paths.totalAmount;
-      expect(totalAmountPath.options.min).toBe(0);
-      expect(totalAmountPath.options.required).toBe(true);
-    });
-
-    it('should default status to pending', () => {
-      const statusPath = secondaryTransactionSchemaRef.paths.status;
-      expect(statusPath.options.default).toBe('pending');
+    it('should define the table name as secondary_transactions', () => {
+      expect(SecondaryTransaction.tableName).toBe('secondary_transactions');
     });
   });
 
-  describe('Indexes', () => {
-    it('should have index on transactionId', () => {
-      const transactionIdPath = secondaryTransactionSchemaRef.paths.transactionId;
-      expect(transactionIdPath.options.index).toBe(true);
+  describe('create()', () => {
+    it('should create a transaction with valid data', async () => {
+      const result = await SecondaryTransaction.create({ ...validData });
+      expect(result).toBeDefined();
+      expect(result.companyId).toBe('company_123');
+      expect(result.sellerId).toBe('seller_456');
+      expect(result.buyerId).toBe('buyer_789');
+      expect(result.numberOfShares).toBe(1000);
+      expect(result.pricePerShare).toBe(10.50);
+      expect(result.transactionType).toBe('private_sale');
     });
 
-    it('should have index on companyId', () => {
-      const companyIdPath = secondaryTransactionSchemaRef.paths.companyId;
-      expect(companyIdPath.options.index).toBe(true);
+    it('should auto-generate transactionId if not provided', async () => {
+      const result = await SecondaryTransaction.create({ ...validData });
+      expect(result.transactionId).toBeDefined();
+      expect(result.transactionId).toMatch(/^stx_/);
     });
 
-    it('should have index on sellerId', () => {
-      const sellerIdPath = secondaryTransactionSchemaRef.paths.sellerId;
-      expect(sellerIdPath.options.index).toBe(true);
+    it('should use provided transactionId if given', async () => {
+      const result = await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_custom_123'
+      });
+      expect(result.transactionId).toBe('stx_custom_123');
     });
 
-    it('should have index on buyerId', () => {
-      const buyerIdPath = secondaryTransactionSchemaRef.paths.buyerId;
-      expect(buyerIdPath.options.index).toBe(true);
+    it('should default status to pending', async () => {
+      const result = await SecondaryTransaction.create({ ...validData });
+      expect(result.status).toBe('pending');
     });
 
-    it('should have index on status', () => {
-      const statusPath = secondaryTransactionSchemaRef.paths.status;
-      expect(statusPath.options.index).toBe(true);
+    it('should set initiatedAt if not provided', async () => {
+      const result = await SecondaryTransaction.create({ ...validData });
+      expect(result.initiatedAt).toBeDefined();
+    });
+
+    it('should calculate totalAmount if not set', async () => {
+      const data = { ...validData };
+      delete data.totalAmount;
+      const result = await SecondaryTransaction.create(data);
+      expect(result.totalAmount).toBe(1000 * 10.50);
+    });
+
+    it('should throw error if numberOfShares is less than 1', async () => {
+      await expect(
+        SecondaryTransaction.create({ ...validData, numberOfShares: 0 })
+      ).rejects.toThrow('numberOfShares must be at least 1');
+    });
+
+    it('should throw error if pricePerShare is negative', async () => {
+      await expect(
+        SecondaryTransaction.create({ ...validData, pricePerShare: -5 })
+      ).rejects.toThrow('pricePerShare cannot be negative');
+    });
+
+    it('should throw error for invalid transactionType', async () => {
+      await expect(
+        SecondaryTransaction.create({ ...validData, transactionType: 'invalid_type' })
+      ).rejects.toThrow('transactionType must be one of');
+    });
+
+    it('should accept all valid transaction types', async () => {
+      for (const type of SecondaryTransaction.TRANSACTION_TYPES) {
+        zeroDBModelMock.__resetMockData();
+        const result = await SecondaryTransaction.create({
+          ...validData,
+          transactionType: type
+        });
+        expect(result.transactionType).toBe(type);
+      }
     });
   });
 
-  describe('Timestamps', () => {
-    it('should have timestamps enabled', () => {
-      expect(secondaryTransactionSchemaRef.options.timestamps).toBe(true);
+  describe('findByTransactionId()', () => {
+    it('should find a transaction by its transactionId', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_find_me'
+      });
+      const found = await SecondaryTransaction.findByTransactionId('stx_find_me');
+      expect(found).toBeDefined();
+      expect(found.transactionId).toBe('stx_find_me');
+    });
+
+    it('should return null for non-existent transactionId', async () => {
+      const found = await SecondaryTransaction.findByTransactionId('stx_nonexistent');
+      expect(found).toBeNull();
     });
   });
 
-  describe('Fees Sub-schema', () => {
-    it('should have platformFee in fees', () => {
-      const feesPath = secondaryTransactionSchemaRef.paths.fees;
-      expect(feesPath).toBeDefined();
+  describe('findByCompany()', () => {
+    it('should find transactions by companyId', async () => {
+      await SecondaryTransaction.create({ ...validData, companyId: 'comp_A' });
+      await SecondaryTransaction.create({ ...validData, companyId: 'comp_A' });
+      await SecondaryTransaction.create({ ...validData, companyId: 'comp_B' });
+
+      const results = await SecondaryTransaction.findByCompany('comp_A');
+      expect(results).toHaveLength(2);
+    });
+
+    it('should filter by status when provided', async () => {
+      await SecondaryTransaction.create({ ...validData, companyId: 'comp_C' });
+      const results = await SecondaryTransaction.findByCompany('comp_C', { status: 'pending' });
+      expect(results).toHaveLength(1);
+    });
+
+    it('should filter by transactionType when provided', async () => {
+      await SecondaryTransaction.create({ ...validData, companyId: 'comp_D' });
+      const results = await SecondaryTransaction.findByCompany('comp_D', { transactionType: 'private_sale' });
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  describe('findBySeller()', () => {
+    it('should find transactions by sellerId', async () => {
+      await SecondaryTransaction.create({ ...validData, sellerId: 'seller_A' });
+      await SecondaryTransaction.create({ ...validData, sellerId: 'seller_A' });
+
+      const results = await SecondaryTransaction.findBySeller('seller_A');
+      expect(results).toHaveLength(2);
+    });
+
+    it('should filter by status when provided', async () => {
+      await SecondaryTransaction.create({ ...validData, sellerId: 'seller_B' });
+      const results = await SecondaryTransaction.findBySeller('seller_B', { status: 'pending' });
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  describe('findByBuyer()', () => {
+    it('should find transactions by buyerId', async () => {
+      await SecondaryTransaction.create({ ...validData, buyerId: 'buyer_A' });
+      const results = await SecondaryTransaction.findByBuyer('buyer_A');
+      expect(results).toHaveLength(1);
+    });
+
+    it('should filter by status when provided', async () => {
+      await SecondaryTransaction.create({ ...validData, buyerId: 'buyer_B' });
+      const results = await SecondaryTransaction.findByBuyer('buyer_B', { status: 'completed' });
+      expect(results).toHaveLength(0);
+    });
+  });
+
+  describe('getTotalFees()', () => {
+    it('should sum all fee components', () => {
+      const transaction = {
+        fees: {
+          platformFee: 100,
+          legalFees: 200,
+          transferAgentFee: 50,
+          escrowFee: 75,
+          otherFees: 25
+        }
+      };
+      expect(SecondaryTransaction.getTotalFees(transaction)).toBe(450);
+    });
+
+    it('should handle missing fee components', () => {
+      const transaction = {
+        fees: { platformFee: 100 }
+      };
+      expect(SecondaryTransaction.getTotalFees(transaction)).toBe(100);
+    });
+
+    it('should return 0 when fees object is empty', () => {
+      const transaction = { fees: {} };
+      expect(SecondaryTransaction.getTotalFees(transaction)).toBe(0);
+    });
+
+    it('should return 0 when fees is undefined', () => {
+      const transaction = {};
+      expect(SecondaryTransaction.getTotalFees(transaction)).toBe(0);
+    });
+  });
+
+  describe('getNetAmount()', () => {
+    it('should return totalAmount minus total fees', () => {
+      const transaction = {
+        totalAmount: 10000,
+        fees: {
+          platformFee: 100,
+          legalFees: 200,
+          transferAgentFee: 50,
+          escrowFee: 0,
+          otherFees: 0
+        }
+      };
+      expect(SecondaryTransaction.getNetAmount(transaction)).toBe(9650);
+    });
+
+    it('should return totalAmount when no fees', () => {
+      const transaction = { totalAmount: 5000, fees: {} };
+      expect(SecondaryTransaction.getNetAmount(transaction)).toBe(5000);
+    });
+  });
+
+  describe('hasAllApprovals()', () => {
+    it('should return true when all approvals are approved', () => {
+      const transaction = {
+        approvals: [
+          { approverType: 'board', status: 'approved' },
+          { approverType: 'legal', status: 'approved' }
+        ]
+      };
+      expect(SecondaryTransaction.hasAllApprovals(transaction)).toBe(true);
+    });
+
+    it('should return false when any approval is not approved', () => {
+      const transaction = {
+        approvals: [
+          { approverType: 'board', status: 'approved' },
+          { approverType: 'legal', status: 'pending' }
+        ]
+      };
+      expect(SecondaryTransaction.hasAllApprovals(transaction)).toBe(false);
+    });
+
+    it('should return false when approvals array is empty', () => {
+      const transaction = { approvals: [] };
+      expect(SecondaryTransaction.hasAllApprovals(transaction)).toBe(false);
+    });
+
+    it('should return false when approvals is undefined', () => {
+      const transaction = {};
+      expect(SecondaryTransaction.hasAllApprovals(transaction)).toBe(false);
+    });
+  });
+
+  describe('addApproval()', () => {
+    it('should add an approval to a transaction', async () => {
+      const created = await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_approval_test'
+      });
+
+      await SecondaryTransaction.addApproval('stx_approval_test', {
+        approverType: 'board',
+        approverId: 'approver_001',
+        status: 'approved',
+        notes: 'Looks good'
+      });
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      expect(baseModel.updateOne).toHaveBeenCalled();
+    });
+
+    it('should throw error for non-existent transaction', async () => {
+      await expect(
+        SecondaryTransaction.addApproval('stx_nonexistent', {
+          approverType: 'board',
+          approverId: 'approver_001',
+          status: 'approved'
+        })
+      ).rejects.toThrow('Transaction not found');
+    });
+
+    it('should set approvedAt when status is approved', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_approval_date'
+      });
+
+      await SecondaryTransaction.addApproval('stx_approval_date', {
+        approverType: 'board',
+        approverId: 'approver_002',
+        status: 'approved',
+        notes: 'Approved'
+      });
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      const updateCall = baseModel.updateOne.mock.calls[0];
+      const approvals = updateCall[1].$set.approvals;
+      expect(approvals[0].approvedAt).toBeDefined();
+    });
+
+    it('should set approvedAt to null when status is not approved', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_approval_null'
+      });
+
+      await SecondaryTransaction.addApproval('stx_approval_null', {
+        approverType: 'legal',
+        approverId: 'approver_003',
+        status: 'pending',
+        notes: 'Pending review'
+      });
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      const updateCall = baseModel.updateOne.mock.calls[0];
+      const approvals = updateCall[1].$set.approvals;
+      expect(approvals[0].approvedAt).toBeNull();
+    });
+  });
+
+  describe('addDocument()', () => {
+    it('should add a document to a transaction', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_doc_test'
+      });
+
+      await SecondaryTransaction.addDocument('stx_doc_test', {
+        documentId: 'doc_001',
+        documentType: 'purchase_agreement',
+        uploadedBy: 'user_001'
+      });
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      expect(baseModel.updateOne).toHaveBeenCalled();
+      const updateCall = baseModel.updateOne.mock.calls[0];
+      const documents = updateCall[1].$set.documents;
+      expect(documents[0].documentId).toBe('doc_001');
+      expect(documents[0].documentType).toBe('purchase_agreement');
+      expect(documents[0].uploadedBy).toBe('user_001');
+      expect(documents[0].uploadedAt).toBeDefined();
+    });
+
+    it('should throw error for non-existent transaction', async () => {
+      await expect(
+        SecondaryTransaction.addDocument('stx_nonexistent', {
+          documentId: 'doc_002',
+          documentType: 'board_consent',
+          uploadedBy: 'user_002'
+        })
+      ).rejects.toThrow('Transaction not found');
+    });
+  });
+
+  describe('complete()', () => {
+    it('should mark a transaction as completed', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_complete_test'
+      });
+
+      await SecondaryTransaction.complete('stx_complete_test');
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      expect(baseModel.updateOne).toHaveBeenCalledWith(
+        { transactionId: 'stx_complete_test' },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            status: 'completed'
+          })
+        })
+      );
+    });
+  });
+
+  describe('cancel()', () => {
+    it('should cancel a transaction with reason', async () => {
+      await SecondaryTransaction.create({
+        ...validData,
+        transactionId: 'stx_cancel_test'
+      });
+
+      await SecondaryTransaction.cancel('stx_cancel_test', 'Buyer backed out', 'user_cancel_001');
+
+      const baseModel = zeroDBModelMock.__getMockBaseModel();
+      expect(baseModel.updateOne).toHaveBeenCalledWith(
+        { transactionId: 'stx_cancel_test' },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            status: 'canceled',
+            cancellationReason: 'Buyer backed out',
+            canceledBy: 'user_cancel_001'
+          })
+        })
+      );
+    });
+  });
+
+  describe('Exposed base model methods', () => {
+    it('should expose find method', () => {
+      expect(typeof SecondaryTransaction.find).toBe('function');
+    });
+
+    it('should expose findOne method', () => {
+      expect(typeof SecondaryTransaction.findOne).toBe('function');
+    });
+
+    it('should expose findById method', () => {
+      expect(typeof SecondaryTransaction.findById).toBe('function');
+    });
+
+    it('should expose updateOne method', () => {
+      expect(typeof SecondaryTransaction.updateOne).toBe('function');
+    });
+
+    it('should expose deleteOne method', () => {
+      expect(typeof SecondaryTransaction.deleteOne).toBe('function');
+    });
+
+    it('should expose deleteMany method', () => {
+      expect(typeof SecondaryTransaction.deleteMany).toBe('function');
+    });
+
+    it('should expose countDocuments method', () => {
+      expect(typeof SecondaryTransaction.countDocuments).toBe('function');
+    });
+
+    it('should expose exists method', () => {
+      expect(typeof SecondaryTransaction.exists).toBe('function');
+    });
+
+    it('should expose distinct method', () => {
+      expect(typeof SecondaryTransaction.distinct).toBe('function');
+    });
+
+    it('should expose aggregate method', () => {
+      expect(typeof SecondaryTransaction.aggregate).toBe('function');
     });
   });
 });

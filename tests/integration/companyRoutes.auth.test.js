@@ -52,7 +52,8 @@ describe('Company Routes - Auth/RBAC Integration', () => {
     id: 'user-readonly',
     email: 'reader@test.com',
     role: 'employee',
-    permissions: []
+    permissions: [],
+    companyId: 'COMP-EXISTING'
   });
 
   beforeAll(() => {

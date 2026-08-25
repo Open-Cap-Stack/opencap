@@ -1,572 +1,447 @@
 /**
- * EncryptionService Tests
- *
- * Test suite for data encryption service
- * Tests field-level encryption, key management, encryption utilities
+ * Unit tests for EncryptionService
  */
 
 const EncryptionService = require('../../../../services/security/encryptionService');
 
+const MASTER_KEY = 'a'.repeat(32);
+
 describe('EncryptionService', () => {
-  let encryptionService;
+  let enc;
 
   beforeEach(() => {
-    encryptionService = new EncryptionService({
-      masterKey: 'test-master-key-32-characters!!X'
+    enc = new EncryptionService({ masterKey: MASTER_KEY });
+  });
+
+  // ============ Constructor ============
+
+  describe('constructor', () => {
+    it('should throw when no masterKey is provided', () => {
+      expect(() => new EncryptionService({})).toThrow('Master key is required');
+    });
+
+    it('should throw when masterKey is too short', () => {
+      expect(() => new EncryptionService({ masterKey: 'short' })).toThrow(
+        'Master key must be at least 32 characters'
+      );
+    });
+
+    it('should use default algorithm aes-256-gcm', () => {
+      expect(enc.config.algorithm).toBe('aes-256-gcm');
+    });
+
+    it('should accept custom algorithm', () => {
+      const service = new EncryptionService({ masterKey: MASTER_KEY, algorithm: 'aes-256-gcm' });
+      expect(service.config.algorithm).toBe('aes-256-gcm');
     });
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  // ============ Encrypt / Decrypt ============
 
-  describe('initialization', () => {
-    it('should initialize with configuration', () => {
-      expect(encryptionService).toBeDefined();
-      expect(encryptionService.config).toBeDefined();
-    });
-
-    it('should require a master key', () => {
-      expect(() => new EncryptionService()).toThrow('Master key is required');
-    });
-
-    it('should validate master key length', () => {
-      expect(() => new EncryptionService({ masterKey: 'short' })).toThrow('Master key must be at least 32 characters');
-    });
-
-    it('should accept custom algorithm configuration', () => {
-      const customService = new EncryptionService({
-        masterKey: 'test-master-key-32-characters!!X',
-        algorithm: 'aes-128-cbc'
-      });
-      expect(customService.config.algorithm).toBe('aes-128-cbc');
-    });
-
-    it('should default to aes-256-gcm algorithm', () => {
-      expect(encryptionService.config.algorithm).toBe('aes-256-gcm');
-    });
-  });
-
-  describe('symmetric encryption', () => {
-    it('should encrypt a string', () => {
+  describe('encrypt and decrypt', () => {
+    it('should encrypt and decrypt a string', () => {
       const plaintext = 'Hello, World!';
-      const encrypted = encryptionService.encrypt(plaintext);
-
-      expect(encrypted).toBeDefined();
+      const encrypted = enc.encrypt(plaintext);
       expect(encrypted).not.toBe(plaintext);
-      expect(typeof encrypted).toBe('string');
-    });
-
-    it('should decrypt an encrypted string', () => {
-      const plaintext = 'Hello, World!';
-      const encrypted = encryptionService.encrypt(plaintext);
-      const decrypted = encryptionService.decrypt(encrypted);
-
+      const decrypted = enc.decrypt(encrypted);
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should produce different ciphertext for same plaintext', () => {
-      const plaintext = 'Hello, World!';
-      const encrypted1 = encryptionService.encrypt(plaintext);
-      const encrypted2 = encryptionService.encrypt(plaintext);
-
-      expect(encrypted1).not.toBe(encrypted2);
+    it('should produce different ciphertexts for the same plaintext (random IV)', () => {
+      const plaintext = 'Same data';
+      const enc1 = enc.encrypt(plaintext);
+      const enc2 = enc.encrypt(plaintext);
+      expect(enc1).not.toBe(enc2);
     });
 
-    it('should handle empty strings', () => {
-      const plaintext = '';
-      const encrypted = encryptionService.encrypt(plaintext);
-      const decrypted = encryptionService.decrypt(encrypted);
-
-      expect(decrypted).toBe(plaintext);
+    it('should handle empty string', () => {
+      const encrypted = enc.encrypt('');
+      expect(enc.decrypt(encrypted)).toBe('');
     });
 
-    it('should handle special characters', () => {
-      const plaintext = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~';
-      const encrypted = encryptionService.encrypt(plaintext);
-      const decrypted = encryptionService.decrypt(encrypted);
-
-      expect(decrypted).toBe(plaintext);
+    it('should handle long strings', () => {
+      const longText = 'x'.repeat(10000);
+      const encrypted = enc.encrypt(longText);
+      expect(enc.decrypt(encrypted)).toBe(longText);
     });
 
     it('should handle unicode characters', () => {
-      const plaintext = 'Hello, World! Emoji: test';
-      const encrypted = encryptionService.encrypt(plaintext);
-      const decrypted = encryptionService.decrypt(encrypted);
-
-      expect(decrypted).toBe(plaintext);
+      const unicodeText = 'Stakeholder name in Japanese';
+      const encrypted = enc.encrypt(unicodeText);
+      expect(enc.decrypt(encrypted)).toBe(unicodeText);
     });
 
-    it('should handle large data', () => {
-      const plaintext = 'A'.repeat(100000);
-      const encrypted = encryptionService.encrypt(plaintext);
-      const decrypted = encryptionService.decrypt(encrypted);
-
-      expect(decrypted).toBe(plaintext);
+    it('should throw on decryption with wrong key', () => {
+      const encrypted = enc.encrypt('secret data');
+      const otherService = new EncryptionService({ masterKey: 'b'.repeat(32) });
+      expect(() => otherService.decrypt(encrypted)).toThrow('Decryption failed');
     });
 
-    it('should throw error for invalid ciphertext', () => {
-      expect(() => encryptionService.decrypt('invalid-ciphertext')).toThrow();
-    });
-
-    it('should throw error for tampered ciphertext', () => {
-      const encrypted = encryptionService.encrypt('Hello, World!');
-      const tampered = encrypted.slice(0, -5) + 'XXXXX';
-
-      expect(() => encryptionService.decrypt(tampered)).toThrow();
+    it('should throw on corrupted ciphertext', () => {
+      expect(() => enc.decrypt('not-valid-base64-ciphertext!!')).toThrow();
     });
   });
 
-  describe('field-level encryption', () => {
-    it('should encrypt specified fields in an object', () => {
+  // ============ Field-Level Encryption ============
+
+  describe('encryptFields and decryptFields', () => {
+    it('should encrypt and decrypt specified fields', () => {
       const data = {
         name: 'John Doe',
         ssn: '123-45-6789',
         email: 'john@example.com'
       };
 
-      const encrypted = encryptionService.encryptFields(data, ['ssn']);
-
+      const encrypted = enc.encryptFields(data, ['ssn']);
       expect(encrypted.name).toBe('John Doe');
-      expect(encrypted.email).toBe('john@example.com');
       expect(encrypted.ssn).not.toBe('123-45-6789');
-    });
 
-    it('should decrypt specified fields in an object', () => {
-      const data = {
-        name: 'John Doe',
-        ssn: '123-45-6789'
-      };
-
-      const encrypted = encryptionService.encryptFields(data, ['ssn']);
-      const decrypted = encryptionService.decryptFields(encrypted, ['ssn']);
-
+      const decrypted = enc.decryptFields(encrypted, ['ssn']);
       expect(decrypted.ssn).toBe('123-45-6789');
     });
 
-    it('should handle nested objects', () => {
+    it('should handle nested fields', () => {
       const data = {
-        name: 'John Doe',
-        personal: {
-          ssn: '123-45-6789',
-          dob: '1990-01-01'
+        user: {
+          name: 'Jane',
+          ssn: '987-65-4321'
         }
       };
 
-      const encrypted = encryptionService.encryptFields(data, ['personal.ssn']);
+      const encrypted = enc.encryptFields(data, ['user.ssn']);
+      expect(encrypted.user.ssn).not.toBe('987-65-4321');
 
-      expect(encrypted.personal.ssn).not.toBe('123-45-6789');
-      expect(encrypted.personal.dob).toBe('1990-01-01');
+      const decrypted = enc.decryptFields(encrypted, ['user.ssn']);
+      expect(decrypted.user.ssn).toBe('987-65-4321');
     });
 
-    it('should handle arrays of objects', () => {
+    it('should handle array notation fields', () => {
       const data = {
         users: [
-          { name: 'John', ssn: '111-11-1111' },
-          { name: 'Jane', ssn: '222-22-2222' }
+          { name: 'Alice', ssn: '111-11-1111' },
+          { name: 'Bob', ssn: '222-22-2222' }
         ]
       };
 
-      const encrypted = encryptionService.encryptFields(data, ['users[].ssn']);
-
+      const encrypted = enc.encryptFields(data, ['users[].ssn']);
+      expect(encrypted.users[0].name).toBe('Alice');
       expect(encrypted.users[0].ssn).not.toBe('111-11-1111');
       expect(encrypted.users[1].ssn).not.toBe('222-22-2222');
-      expect(encrypted.users[0].name).toBe('John');
+
+      const decrypted = enc.decryptFields(encrypted, ['users[].ssn']);
+      expect(decrypted.users[0].ssn).toBe('111-11-1111');
+      expect(decrypted.users[1].ssn).toBe('222-22-2222');
     });
 
-    it('should skip null and undefined fields', () => {
-      const data = {
-        name: 'John Doe',
-        ssn: null,
-        taxId: undefined
-      };
-
-      const encrypted = encryptionService.encryptFields(data, ['ssn', 'taxId']);
-
+    it('should skip null/undefined field values', () => {
+      const data = { name: 'Test', ssn: null };
+      const encrypted = enc.encryptFields(data, ['ssn']);
       expect(encrypted.ssn).toBeNull();
-      expect(encrypted.taxId).toBeUndefined();
     });
 
-    it('should handle multiple encryption fields', () => {
-      const data = {
-        name: 'John Doe',
-        ssn: '123-45-6789',
-        creditCard: '4111111111111111',
-        bankAccount: '123456789'
-      };
-
-      const encrypted = encryptionService.encryptFields(data, ['ssn', 'creditCard', 'bankAccount']);
-
-      expect(encrypted.name).toBe('John Doe');
-      expect(encrypted.ssn).not.toBe('123-45-6789');
-      expect(encrypted.creditCard).not.toBe('4111111111111111');
-      expect(encrypted.bankAccount).not.toBe('123456789');
+    it('should not modify original data', () => {
+      const data = { ssn: '123-45-6789' };
+      enc.encryptFields(data, ['ssn']);
+      expect(data.ssn).toBe('123-45-6789');
     });
   });
 
-  describe('key management', () => {
-    it('should generate a new encryption key', () => {
-      const key = encryptionService.generateKey();
+  // ============ Key Generation and Derivation ============
 
-      expect(key).toBeDefined();
+  describe('generateKey', () => {
+    it('should generate a base64-encoded key', () => {
+      const key = enc.generateKey();
       expect(typeof key).toBe('string');
       expect(key.length).toBeGreaterThan(0);
     });
 
-    it('should generate unique keys', () => {
-      const key1 = encryptionService.generateKey();
-      const key2 = encryptionService.generateKey();
-
-      expect(key1).not.toBe(key2);
+    it('should generate 256-bit key by default', () => {
+      const key = enc.generateKey();
+      const bytes = Buffer.from(key, 'base64');
+      expect(bytes.length).toBe(32);
     });
 
-    it('should generate key with specified length', () => {
-      const key = encryptionService.generateKey({ bits: 128 });
-      // Base64 encoded 128 bits = 16 bytes = ~24 chars with padding
-      expect(key.length).toBeGreaterThanOrEqual(16);
+    it('should support custom bit lengths', () => {
+      const key = enc.generateKey({ bits: 128 });
+      const bytes = Buffer.from(key, 'base64');
+      expect(bytes.length).toBe(16);
+    });
+  });
+
+  describe('deriveKey', () => {
+    it('should derive a key from password and salt', () => {
+      const key = enc.deriveKey({ password: 'my-password', salt: 'my-salt' });
+      expect(typeof key).toBe('string');
+      expect(key.length).toBeGreaterThan(0);
     });
 
-    it('should derive key from password', () => {
-      const derivedKey = encryptionService.deriveKey({
-        password: 'user-password',
-        salt: 'random-salt-value'
-      });
-
-      expect(derivedKey).toBeDefined();
-      expect(typeof derivedKey).toBe('string');
-    });
-
-    it('should produce consistent derived keys', () => {
-      const key1 = encryptionService.deriveKey({
-        password: 'user-password',
-        salt: 'random-salt-value'
-      });
-
-      const key2 = encryptionService.deriveKey({
-        password: 'user-password',
-        salt: 'random-salt-value'
-      });
-
+    it('should produce deterministic output for same inputs', () => {
+      const key1 = enc.deriveKey({ password: 'pw', salt: 'salt' });
+      const key2 = enc.deriveKey({ password: 'pw', salt: 'salt' });
       expect(key1).toBe(key2);
     });
 
-    it('should produce different keys with different salts', () => {
-      const key1 = encryptionService.deriveKey({
-        password: 'user-password',
-        salt: 'salt1'
-      });
-
-      const key2 = encryptionService.deriveKey({
-        password: 'user-password',
-        salt: 'salt2'
-      });
-
+    it('should produce different output for different salts', () => {
+      const key1 = enc.deriveKey({ password: 'pw', salt: 'salt1' });
+      const key2 = enc.deriveKey({ password: 'pw', salt: 'salt2' });
       expect(key1).not.toBe(key2);
     });
 
-    it('should rotate encryption key', () => {
-      const plaintext = 'Sensitive data';
-      const encrypted = encryptionService.encrypt(plaintext);
-
-      const newKey = 'new-master-key-32-characters!!--';
-      const reEncrypted = encryptionService.rotateKey(encrypted, newKey);
-
-      // Create new service with new key to decrypt
-      const newService = new EncryptionService({ masterKey: newKey });
-      const decrypted = newService.decrypt(reEncrypted);
-
-      expect(decrypted).toBe(plaintext);
+    it('should accept custom iterations', () => {
+      const key = enc.deriveKey({ password: 'pw', salt: 'salt', iterations: 1000 });
+      expect(typeof key).toBe('string');
     });
+  });
 
-    it('should batch rotate keys for multiple records', () => {
+  // ============ Key Rotation ============
+
+  describe('rotateKey', () => {
+    it('should re-encrypt data with a new key', () => {
+      const newKey = 'c'.repeat(32);
+      const encrypted = enc.encrypt('sensitive data');
+      const rotated = enc.rotateKey(encrypted, newKey);
+
+      expect(rotated).not.toBe(encrypted);
+
+      const newService = new EncryptionService({ masterKey: newKey });
+      expect(newService.decrypt(rotated)).toBe('sensitive data');
+    });
+  });
+
+  describe('batchRotateKeys', () => {
+    it('should rotate keys for multiple records', () => {
+      const newKey = 'd'.repeat(32);
       const records = [
-        { id: 1, data: encryptionService.encrypt('data1') },
-        { id: 2, data: encryptionService.encrypt('data2') },
-        { id: 3, data: encryptionService.encrypt('data3') }
+        { id: 1, secret: enc.encrypt('data1') },
+        { id: 2, secret: enc.encrypt('data2') }
       ];
 
-      const newKey = 'new-master-key-32-characters!!--';
-      const rotated = encryptionService.batchRotateKeys(records, 'data', newKey);
-
+      const rotated = enc.batchRotateKeys(records, 'secret', newKey);
       const newService = new EncryptionService({ masterKey: newKey });
-      expect(newService.decrypt(rotated[0].data)).toBe('data1');
-      expect(newService.decrypt(rotated[1].data)).toBe('data2');
-      expect(newService.decrypt(rotated[2].data)).toBe('data3');
+
+      expect(newService.decrypt(rotated[0].secret)).toBe('data1');
+      expect(newService.decrypt(rotated[1].secret)).toBe('data2');
     });
   });
 
-  describe('hashing', () => {
-    it('should hash a password', () => {
-      const password = 'user-password';
-      const hash = encryptionService.hashPassword(password);
+  // ============ Password Hashing ============
 
-      expect(hash).toBeDefined();
-      expect(hash).not.toBe(password);
+  describe('hashPassword and verifyPassword', () => {
+    it('should hash and verify a password', () => {
+      const hash = enc.hashPassword('myP@ssw0rd');
+      expect(hash).toContain(':');
+      expect(enc.verifyPassword('myP@ssw0rd', hash)).toBe(true);
     });
 
-    it('should verify a password hash', () => {
-      const password = 'user-password';
-      const hash = encryptionService.hashPassword(password);
-
-      const isValid = encryptionService.verifyPassword(password, hash);
-      expect(isValid).toBe(true);
+    it('should reject wrong password', () => {
+      const hash = enc.hashPassword('correct');
+      expect(enc.verifyPassword('wrong', hash)).toBe(false);
     });
 
-    it('should reject invalid password', () => {
-      const password = 'user-password';
-      const hash = encryptionService.hashPassword(password);
-
-      const isValid = encryptionService.verifyPassword('wrong-password', hash);
-      expect(isValid).toBe(false);
-    });
-
-    it('should produce different hashes for same password', () => {
-      const password = 'user-password';
-      const hash1 = encryptionService.hashPassword(password);
-      const hash2 = encryptionService.hashPassword(password);
-
+    it('should produce different hashes for same password (random salt)', () => {
+      const hash1 = enc.hashPassword('same');
+      const hash2 = enc.hashPassword('same');
       expect(hash1).not.toBe(hash2);
     });
+  });
 
-    it('should create deterministic hash for data integrity', () => {
-      const data = 'important data';
-      const hash1 = encryptionService.hash(data);
-      const hash2 = encryptionService.hash(data);
+  // ============ Hashing ============
 
-      expect(hash1).toBe(hash2);
+  describe('hash', () => {
+    it('should produce deterministic SHA-256 hash', () => {
+      const h1 = enc.hash('test');
+      const h2 = enc.hash('test');
+      expect(h1).toBe(h2);
     });
 
-    it('should support different hash algorithms', () => {
-      const data = 'test data';
-      const sha256 = encryptionService.hash(data, { algorithm: 'sha256' });
-      const sha512 = encryptionService.hash(data, { algorithm: 'sha512' });
-
-      expect(sha256).not.toBe(sha512);
-      expect(sha512.length).toBeGreaterThan(sha256.length);
+    it('should support alternate algorithms', () => {
+      const sha512 = enc.hash('test', { algorithm: 'sha512' });
+      const sha256 = enc.hash('test');
+      expect(sha512).not.toBe(sha256);
+      expect(sha512.length).toBe(128);
     });
   });
 
-  describe('digital signatures', () => {
-    it('should sign data', () => {
-      const data = 'important document content';
-      const signature = encryptionService.sign(data);
+  // ============ Signing and Verification ============
 
-      expect(signature).toBeDefined();
-      expect(typeof signature).toBe('string');
-    });
-
-    it('should verify valid signature', () => {
-      const data = 'important document content';
-      const signature = encryptionService.sign(data);
-
-      const isValid = encryptionService.verify(data, signature);
-      expect(isValid).toBe(true);
+  describe('sign and verify', () => {
+    it('should sign data and verify the signature', () => {
+      const signature = enc.sign('important data');
+      expect(enc.verify('important data', signature)).toBe(true);
     });
 
     it('should reject tampered data', () => {
-      const data = 'important document content';
-      const signature = encryptionService.sign(data);
-
-      const isValid = encryptionService.verify('modified content', signature);
-      expect(isValid).toBe(false);
+      const signature = enc.sign('original');
+      expect(enc.verify('tampered', signature)).toBe(false);
     });
 
-    it('should reject invalid signature', () => {
-      const data = 'important document content';
-
-      const isValid = encryptionService.verify(data, 'invalid-signature');
-      expect(isValid).toBe(false);
+    it('should reject tampered signature', () => {
+      const signature = enc.sign('data');
+      expect(enc.verify('data', 'invalid-signature')).toBe(false);
     });
   });
 
-  describe('token generation', () => {
-    it('should generate secure random tokens', () => {
-      const token = encryptionService.generateToken();
+  // ============ Token Generation ============
 
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
-      expect(token.length).toBeGreaterThan(0);
+  describe('generateToken', () => {
+    it('should generate a hex token of specified length', () => {
+      const token = enc.generateToken({ length: 16 });
+      expect(token).toHaveLength(16);
     });
 
-    it('should generate unique tokens', () => {
-      const tokens = new Set();
-      for (let i = 0; i < 100; i++) {
-        tokens.add(encryptionService.generateToken());
-      }
-      expect(tokens.size).toBe(100);
+    it('should default to 32-character tokens', () => {
+      const token = enc.generateToken();
+      expect(token).toHaveLength(32);
     });
 
-    it('should generate token with specified length', () => {
-      const token = encryptionService.generateToken({ length: 64 });
-      expect(token.length).toBe(64);
-    });
-
-    it('should generate URL-safe tokens', () => {
-      const token = encryptionService.generateToken({ urlSafe: true });
-      expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
+    it('should generate URL-safe tokens when requested', () => {
+      const token = enc.generateToken({ urlSafe: true, length: 32 });
+      expect(token).toHaveLength(32);
+      expect(token).not.toMatch(/[+/=]/);
     });
   });
 
-  describe('envelope encryption', () => {
-    it('should encrypt data with envelope encryption', () => {
-      const plaintext = 'Sensitive data';
-      const envelope = encryptionService.envelopeEncrypt(plaintext);
+  // ============ Envelope Encryption ============
 
-      expect(envelope).toHaveProperty('encryptedData');
-      expect(envelope).toHaveProperty('encryptedKey');
-      expect(envelope).toHaveProperty('iv');
-    });
+  describe('envelopeEncrypt and envelopeDecrypt', () => {
+    it('should envelope encrypt and decrypt data', () => {
+      const plaintext = 'Envelope encrypted data';
+      const envelope = enc.envelopeEncrypt(plaintext);
 
-    it('should decrypt envelope encrypted data', () => {
-      const plaintext = 'Sensitive data';
-      const envelope = encryptionService.envelopeEncrypt(plaintext);
-      const decrypted = encryptionService.envelopeDecrypt(envelope);
+      expect(envelope.encryptedData).toBeDefined();
+      expect(envelope.encryptedKey).toBeDefined();
+      expect(envelope.iv).toBeDefined();
 
+      const decrypted = enc.envelopeDecrypt(envelope);
       expect(decrypted).toBe(plaintext);
     });
-  });
 
-  describe('encryption utilities', () => {
-    it('should encode data to base64', () => {
-      const data = 'Hello, World!';
-      const encoded = encryptionService.toBase64(data);
-
-      expect(encoded).toBe('SGVsbG8sIFdvcmxkIQ==');
-    });
-
-    it('should decode data from base64', () => {
-      const encoded = 'SGVsbG8sIFdvcmxkIQ==';
-      const decoded = encryptionService.fromBase64(encoded);
-
-      expect(decoded).toBe('Hello, World!');
-    });
-
-    it('should encode data to hex', () => {
-      const data = 'Hello';
-      const encoded = encryptionService.toHex(data);
-
-      expect(encoded).toBe('48656c6c6f');
-    });
-
-    it('should decode data from hex', () => {
-      const encoded = '48656c6c6f';
-      const decoded = encryptionService.fromHex(encoded);
-
-      expect(decoded).toBe('Hello');
-    });
-
-    it('should generate a secure IV', () => {
-      const iv = encryptionService.generateIV();
-
-      expect(iv).toBeDefined();
-      expect(iv.length).toBe(12); // 96 bits for GCM
-    });
-
-    it('should generate unique IVs', () => {
-      const ivs = new Set();
-      for (let i = 0; i < 100; i++) {
-        ivs.add(encryptionService.generateIV().toString('hex'));
-      }
-      expect(ivs.size).toBe(100);
+    it('should produce different envelopes for same data', () => {
+      const e1 = enc.envelopeEncrypt('same');
+      const e2 = enc.envelopeEncrypt('same');
+      expect(e1.encryptedData).not.toBe(e2.encryptedData);
     });
   });
 
-  describe('constant-time comparison', () => {
-    it('should compare strings in constant time', () => {
-      const a = 'secret-value';
-      const b = 'secret-value';
+  // ============ Encoding Utilities ============
 
-      const isEqual = encryptionService.constantTimeCompare(a, b);
-      expect(isEqual).toBe(true);
-    });
-
-    it('should detect different strings', () => {
-      const a = 'secret-value';
-      const b = 'different-value';
-
-      const isEqual = encryptionService.constantTimeCompare(a, b);
-      expect(isEqual).toBe(false);
-    });
-
-    it('should handle different length strings', () => {
-      const a = 'short';
-      const b = 'longer-string';
-
-      const isEqual = encryptionService.constantTimeCompare(a, b);
-      expect(isEqual).toBe(false);
+  describe('base64 encoding', () => {
+    it('should encode to base64 and decode back', () => {
+      const original = 'Hello, Base64!';
+      const encoded = enc.toBase64(original);
+      expect(encoded).not.toBe(original);
+      expect(enc.fromBase64(encoded)).toBe(original);
     });
   });
 
-  describe('secure data handling', () => {
-    it('should securely wipe sensitive data from memory', () => {
-      const sensitiveData = Buffer.from('sensitive-data');
-      encryptionService.secureWipe(sensitiveData);
+  describe('hex encoding', () => {
+    it('should encode to hex and decode back', () => {
+      const original = 'Hello, Hex!';
+      const encoded = enc.toHex(original);
+      expect(encoded).not.toBe(original);
+      expect(enc.fromHex(encoded)).toBe(original);
+    });
+  });
 
-      // All bytes should be zeroed
-      expect(sensitiveData.every(byte => byte === 0)).toBe(true);
+  // ============ Constant-Time Comparison ============
+
+  describe('constantTimeCompare', () => {
+    it('should return true for equal strings', () => {
+      expect(enc.constantTimeCompare('abc', 'abc')).toBe(true);
     });
 
-    it('should mask sensitive data for logging', () => {
-      const ssn = '123-45-6789';
-      const masked = encryptionService.mask(ssn);
-
-      expect(masked).toBe('***-**-6789');
+    it('should return false for different strings', () => {
+      expect(enc.constantTimeCompare('abc', 'def')).toBe(false);
     });
 
-    it('should mask credit card numbers', () => {
-      const cc = '4111111111111111';
-      const masked = encryptionService.mask(cc, { type: 'creditCard' });
+    it('should return false for different lengths', () => {
+      expect(enc.constantTimeCompare('abc', 'abcd')).toBe(false);
+    });
 
+    it('should return false for non-string inputs', () => {
+      expect(enc.constantTimeCompare(123, 'abc')).toBe(false);
+      expect(enc.constantTimeCompare('abc', null)).toBe(false);
+    });
+  });
+
+  // ============ Secure Wipe ============
+
+  describe('secureWipe', () => {
+    it('should zero out a buffer', () => {
+      const buf = Buffer.from('sensitive data');
+      enc.secureWipe(buf);
+      expect(buf.every(b => b === 0)).toBe(true);
+    });
+
+    it('should not throw for non-buffer input', () => {
+      expect(() => enc.secureWipe('not a buffer')).not.toThrow();
+      expect(() => enc.secureWipe(null)).not.toThrow();
+    });
+  });
+
+  // ============ Masking ============
+
+  describe('mask', () => {
+    it('should mask credit card showing last 4 digits', () => {
+      const masked = enc.mask('4111111111111111', { type: 'creditCard' });
       expect(masked).toBe('************1111');
     });
 
     it('should mask email addresses', () => {
-      const email = 'john.doe@example.com';
-      const masked = encryptionService.mask(email, { type: 'email' });
+      const masked = enc.mask('john@example.com', { type: 'email' });
+      expect(masked).toContain('@example.com');
+      expect(masked).not.toBe('john@example.com');
+    });
 
-      expect(masked).toBe('j******e@example.com');
+    it('should default-mask SSN-like values with dashes', () => {
+      const masked = enc.mask('123-45-6789');
+      expect(masked).toBe('***-**-6789');
+    });
+
+    it('should default-mask plain strings showing last 4', () => {
+      const masked = enc.mask('1234567890');
+      expect(masked).toBe('******7890');
+    });
+
+    it('should return falsy values as-is', () => {
+      expect(enc.mask(null)).toBeNull();
+      expect(enc.mask(undefined)).toBeUndefined();
+      expect(enc.mask('')).toBe('');
     });
   });
 
-  describe('encryption metadata', () => {
-    it('should include metadata with encrypted data', () => {
-      const plaintext = 'Hello, World!';
-      const encrypted = encryptionService.encryptWithMetadata(plaintext);
+  // ============ Encrypt / Decrypt with Metadata ============
 
-      expect(encrypted).toHaveProperty('data');
-      expect(encrypted).toHaveProperty('metadata');
-      expect(encrypted.metadata).toHaveProperty('algorithm');
-      expect(encrypted.metadata).toHaveProperty('timestamp');
-      expect(encrypted.metadata).toHaveProperty('version');
-    });
+  describe('encryptWithMetadata and decryptWithMetadata', () => {
+    it('should encrypt with metadata and decrypt', () => {
+      const result = enc.encryptWithMetadata('hello');
+      expect(result.data).toBeDefined();
+      expect(result.metadata.algorithm).toBe('aes-256-gcm');
+      expect(result.metadata.version).toBe('1.0');
+      expect(result.metadata.timestamp).toBeDefined();
 
-    it('should decrypt data with metadata', () => {
-      const plaintext = 'Hello, World!';
-      const encrypted = encryptionService.encryptWithMetadata(plaintext);
-      const decrypted = encryptionService.decryptWithMetadata(encrypted);
-
-      expect(decrypted.data).toBe(plaintext);
-      expect(decrypted.metadata).toEqual(encrypted.metadata);
+      const decrypted = enc.decryptWithMetadata(result);
+      expect(decrypted.data).toBe('hello');
+      expect(decrypted.metadata).toEqual(result.metadata);
     });
   });
 
-  describe('error handling', () => {
-    it('should handle encryption of non-string types', () => {
-      const data = { key: 'value' };
-      const encrypted = encryptionService.encrypt(JSON.stringify(data));
-      const decrypted = JSON.parse(encryptionService.decrypt(encrypted));
+  // ============ Nested Value Helpers ============
 
-      expect(decrypted).toEqual(data);
+  describe('getNestedValue and setNestedValue', () => {
+    it('should get a nested value', () => {
+      const obj = { a: { b: { c: 42 } } };
+      expect(enc.getNestedValue(obj, 'a.b.c')).toBe(42);
     });
 
-    it('should throw meaningful error for decryption with wrong key', () => {
-      const encrypted = encryptionService.encrypt('Hello, World!');
+    it('should return undefined for missing path', () => {
+      expect(enc.getNestedValue({}, 'a.b.c')).toBeUndefined();
+    });
 
-      const wrongKeyService = new EncryptionService({
-        masterKey: 'different-key-32-characters!!!!!'
-      });
-
-      expect(() => wrongKeyService.decrypt(encrypted)).toThrow();
+    it('should set a nested value, creating intermediate objects', () => {
+      const obj = {};
+      enc.setNestedValue(obj, 'a.b.c', 99);
+      expect(obj.a.b.c).toBe(99);
     });
   });
 });

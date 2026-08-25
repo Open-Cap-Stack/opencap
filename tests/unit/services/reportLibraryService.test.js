@@ -170,6 +170,35 @@ describe('ReportLibraryService', () => {
         await expect(ReportLibraryService.updateTemplate('nonexistent', {}))
           .rejects.toThrow('Template not found');
       });
+
+      it('should validate field definitions during update', async () => {
+        databaseAdapter.findOne.mockResolvedValue({ templateId: 'TPL-001', version: 1 });
+        await expect(ReportLibraryService.updateTemplate('TPL-001', {
+          fields: [{ name: 'x', label: 'X', type: 'invalidType' }]
+        })).rejects.toThrow('Invalid field definition');
+      });
+
+      it('should strip templateId from update data', async () => {
+        databaseAdapter.findOne.mockResolvedValue({ templateId: 'TPL-001', version: 1 });
+        databaseAdapter.findByIdAndUpdate.mockResolvedValue({ templateId: 'TPL-001' });
+
+        await ReportLibraryService.updateTemplate('TPL-001', { templateId: 'TPL-HACK', name: 'Test' });
+
+        const updateCall = databaseAdapter.findByIdAndUpdate.mock.calls[0][2];
+        expect(updateCall.templateId).toBeUndefined();
+        expect(updateCall.version).toBe(2);
+      });
+
+      it('should accept valid field definitions during update', async () => {
+        databaseAdapter.findOne.mockResolvedValue({ templateId: 'TPL-001', version: 1 });
+        databaseAdapter.findByIdAndUpdate.mockResolvedValue({ templateId: 'TPL-001' });
+
+        await ReportLibraryService.updateTemplate('TPL-001', {
+          fields: [{ name: 'revenue', label: 'Revenue', type: 'currency' }]
+        });
+
+        expect(databaseAdapter.findByIdAndUpdate).toHaveBeenCalled();
+      });
     });
 
     describe('deleteTemplate', () => {
@@ -204,6 +233,32 @@ describe('ReportLibraryService', () => {
         await ReportLibraryService.getLibrary({ search: 'balance' });
         expect(databaseAdapter.find).toHaveBeenCalledWith('ReportTemplate', expect.objectContaining({ $or: expect.any(Array) }), expect.any(Object));
       });
+
+      it('should filter by categoryId', async () => {
+        databaseAdapter.find
+          .mockResolvedValueOnce([{ categoryId: 'CAT-001' }])
+          .mockResolvedValueOnce([{ templateId: 'TPL-001', categoryId: 'CAT-001' }]);
+
+        const result = await ReportLibraryService.getLibrary({ categoryId: 'CAT-001' });
+
+        expect(databaseAdapter.find).toHaveBeenCalledWith(
+          'ReportTemplate',
+          expect.objectContaining({ categoryId: 'CAT-001' }),
+          expect.any(Object)
+        );
+        expect(result.totalCount).toBe(1);
+      });
+
+      it('should show reportCount of 0 for categories without templates', async () => {
+        databaseAdapter.find
+          .mockResolvedValueOnce([{ categoryId: 'CAT-001' }, { categoryId: 'CAT-002' }])
+          .mockResolvedValueOnce([{ templateId: 'TPL-001', categoryId: 'CAT-001' }]);
+
+        const result = await ReportLibraryService.getLibrary();
+
+        const cat2 = result.categories.find(c => c.categoryId === 'CAT-002');
+        expect(cat2.reportCount).toBe(0);
+      });
     });
   });
 
@@ -226,6 +281,32 @@ describe('ReportLibraryService', () => {
         databaseAdapter.findOne.mockResolvedValue({ reportId: 'RPT-001' });
         await expect(ReportLibraryService.shareReport('RPT-001', { recipients: ['invalid-email'] }))
           .rejects.toThrow('Invalid email format');
+      });
+
+      it('should throw error for empty recipients array', async () => {
+        databaseAdapter.findOne.mockResolvedValue({ reportId: 'RPT-001' });
+        await expect(ReportLibraryService.shareReport('RPT-001', { recipients: [] }))
+          .rejects.toThrow('At least one recipient is required');
+      });
+
+      it('should throw error for missing recipients', async () => {
+        databaseAdapter.findOne.mockResolvedValue({ reportId: 'RPT-001' });
+        await expect(ReportLibraryService.shareReport('RPT-001', {}))
+          .rejects.toThrow('At least one recipient is required');
+      });
+
+      it('should find report from ReportTemplate when not in GeneratedReport', async () => {
+        databaseAdapter.findOne
+          .mockResolvedValueOnce(null) // GeneratedReport not found
+          .mockResolvedValueOnce({ templateId: 'TPL-001' }); // Found in ReportTemplate
+        databaseAdapter.create.mockResolvedValue({ shareId: 'SHR-002' });
+
+        const result = await ReportLibraryService.shareReport('TPL-001', {
+          recipients: ['user@test.com'],
+          permissions: ['view', 'edit']
+        });
+
+        expect(result).toHaveProperty('shareId');
       });
     });
 
@@ -287,6 +368,38 @@ describe('ReportLibraryService', () => {
         const result = await ReportLibraryService.validateShareAccess('nonexistent', 'user@test.com');
         expect(result).toBe(false);
       });
+    });
+  });
+
+  describe('Validation Helpers', () => {
+    it('should validate correct email addresses', () => {
+      expect(ReportLibraryService._validateEmail('user@example.com')).toBe(true);
+      expect(ReportLibraryService._validateEmail('a.b+c@d.co')).toBe(true);
+    });
+
+    it('should reject invalid email addresses', () => {
+      expect(ReportLibraryService._validateEmail('not-an-email')).toBe(false);
+      expect(ReportLibraryService._validateEmail('@foo.com')).toBe(false);
+      expect(ReportLibraryService._validateEmail('foo@')).toBe(false);
+    });
+
+    it('should validate correct field definitions', () => {
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'string' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'number' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'currency' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'percentage' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'date' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'datetime' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'boolean' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'array' })).toBe(true);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'object' })).toBe(true);
+    });
+
+    it('should reject invalid field definitions', () => {
+      expect(ReportLibraryService._validateFieldDefinition({ label: 'X', type: 'string' })).toBe(false);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', type: 'string' })).toBe(false);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X' })).toBe(false);
+      expect(ReportLibraryService._validateFieldDefinition({ name: 'x', label: 'X', type: 'invalidType' })).toBe(false);
     });
   });
 

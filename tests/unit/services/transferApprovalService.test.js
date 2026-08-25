@@ -603,7 +603,203 @@ describe('TransferApprovalService', () => {
     it('should validate ROFR status value', async () => {
       await expect(
         TransferApprovalService.updateRofrStatus('TR-001', 'invalid_status')
-      ).rejects.toThrow();
+      ).rejects.toThrow('Invalid ROFR status');
+    });
+
+    it('should throw error if request not found', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(
+        TransferApprovalService.updateRofrStatus('TR-001', 'waived')
+      ).rejects.toThrow('Transfer request not found');
+    });
+
+    it('should allow all valid ROFR statuses', async () => {
+      const validStatuses = ['not_applicable', 'pending', 'waived', 'exercised', 'expired'];
+      const mockRequest = { _id: 'request123', requestId: 'TR-001' };
+
+      for (const status of validStatuses) {
+        databaseAdapter.findOne.mockResolvedValue(mockRequest);
+        databaseAdapter.findByIdAndUpdate.mockResolvedValue({ ...mockRequest, rofrStatus: status });
+
+        const result = await TransferApprovalService.updateRofrStatus('TR-001', status);
+        expect(result.rofrStatus).toBe(status);
+      }
+    });
+  });
+
+  describe('approveTransfer - additional scenarios', () => {
+    it('should throw error if request not found', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(
+        TransferApprovalService.approveTransfer({
+          requestId: 'TR-999',
+          approverId: 'approver123',
+          approverRole: 'cfo'
+        })
+      ).rejects.toThrow('Transfer request not found');
+    });
+  });
+
+  describe('rejectTransfer - additional scenarios', () => {
+    it('should throw error if request not found', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(
+        TransferApprovalService.rejectTransfer({
+          requestId: 'TR-999',
+          approverId: 'approver123',
+          approverRole: 'cfo',
+          rejectionReason: 'Not allowed'
+        })
+      ).rejects.toThrow('Transfer request not found');
+    });
+
+    it('should throw error if request is not under review', async () => {
+      databaseAdapter.findOne.mockResolvedValue({
+        _id: 'request123',
+        status: 'pending'
+      });
+
+      await expect(
+        TransferApprovalService.rejectTransfer({
+          requestId: 'TR-001',
+          approverId: 'approver123',
+          approverRole: 'cfo',
+          rejectionReason: 'Not allowed'
+        })
+      ).rejects.toThrow('Only requests under review can be rejected');
+    });
+  });
+
+  describe('requestChanges - additional scenarios', () => {
+    it('should throw error if request not found', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(
+        TransferApprovalService.requestChanges({
+          requestId: 'TR-999',
+          approverId: 'approver123',
+          approverRole: 'legal',
+          comments: 'Need more docs'
+        })
+      ).rejects.toThrow('Transfer request not found');
+    });
+
+    it('should throw error if request is not under review', async () => {
+      databaseAdapter.findOne.mockResolvedValue({
+        _id: 'request123',
+        status: 'approved'
+      });
+
+      await expect(
+        TransferApprovalService.requestChanges({
+          requestId: 'TR-001',
+          approverId: 'approver123',
+          approverRole: 'legal',
+          comments: 'Need more info'
+        })
+      ).rejects.toThrow('Only requests under review can have changes requested');
+    });
+
+    it('should accept comments without conditions', async () => {
+      const mockRequest = {
+        _id: 'request123',
+        requestId: 'TR-001',
+        status: 'under_review'
+      };
+      databaseAdapter.findOne.mockResolvedValue(mockRequest);
+      databaseAdapter.create.mockResolvedValue({ approvalId: 'AP-001' });
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({ ...mockRequest, status: 'pending' });
+
+      const result = await TransferApprovalService.requestChanges({
+        requestId: 'TR-001',
+        approverId: 'approver123',
+        approverRole: 'legal',
+        comments: 'Please add docs'
+      });
+
+      expect(result.request.status).toBe('pending');
+    });
+  });
+
+  describe('cancelTransferRequest - additional scenarios', () => {
+    it('should throw error if request not found', async () => {
+      databaseAdapter.findOne.mockResolvedValue(null);
+
+      await expect(
+        TransferApprovalService.cancelTransferRequest('TR-999', 'user123')
+      ).rejects.toThrow('Transfer request not found');
+    });
+
+    it('should throw error if request is rejected', async () => {
+      databaseAdapter.findOne.mockResolvedValue({
+        _id: 'request123',
+        status: 'rejected'
+      });
+
+      await expect(
+        TransferApprovalService.cancelTransferRequest('TR-001', 'user123')
+      ).rejects.toThrow('Completed or rejected requests cannot be canceled');
+    });
+
+    it('should allow canceling under_review request', async () => {
+      const mockRequest = {
+        _id: 'request123',
+        requestId: 'TR-001',
+        status: 'under_review'
+      };
+      databaseAdapter.findOne.mockResolvedValue(mockRequest);
+      databaseAdapter.findByIdAndUpdate.mockResolvedValue({
+        ...mockRequest,
+        status: 'canceled',
+        updatedBy: 'user123'
+      });
+
+      const result = await TransferApprovalService.cancelTransferRequest('TR-001', 'user123');
+
+      expect(result.status).toBe('canceled');
+    });
+  });
+
+  describe('checkRofrEligibility - additional scenarios', () => {
+    it('should return not eligible when no stakeholders with ROFR rights', async () => {
+      const mockRequest = {
+        _id: 'request123',
+        requestId: 'TR-001',
+        companyId: 'company123',
+        shareClassId: 'shareClass123',
+        numberOfShares: 1000
+      };
+      databaseAdapter.findOne.mockResolvedValue(mockRequest);
+      databaseAdapter.find.mockResolvedValue([]);
+
+      const result = await TransferApprovalService.checkRofrEligibility('TR-001');
+
+      expect(result.isEligible).toBe(false);
+      expect(result.eligibleParties).toHaveLength(0);
+      expect(result.expirationDate).toBeNull();
+    });
+
+    it('should return eligible with expiration date when ROFR parties exist', async () => {
+      const mockRequest = {
+        _id: 'request123',
+        requestId: 'TR-001',
+        companyId: 'company123',
+        shareClassId: 'shareClass123',
+        numberOfShares: 500
+      };
+      databaseAdapter.findOne.mockResolvedValue(mockRequest);
+      databaseAdapter.find.mockResolvedValue([
+        { stakeholderId: 'stk-1', hasRofrRights: true }
+      ]);
+
+      const result = await TransferApprovalService.checkRofrEligibility('TR-001');
+
+      expect(result.isEligible).toBe(true);
+      expect(result.expirationDate).toBeInstanceOf(Date);
+      expect(result.numberOfShares).toBe(500);
     });
   });
 });

@@ -20,20 +20,26 @@ jest.mock('../../models/Company');
 jest.mock('../../middleware/authMiddleware', () => ({
     authenticate: (req, res, next) => {
         if (req.headers.authorization) {
-            req.user = { userId: 'test_user_123', id: 'test_user_123' };
+            req.user = { userId: 'test_user_123', id: 'test_user_123', companyId: 'company_123', role: 'admin' };
         }
         next();
     },
     authenticateToken: (req, res, next) => {
         if (req.headers.authorization) {
-            req.user = { userId: 'test_user_123', id: 'test_user_123' };
+            req.user = { userId: 'test_user_123', id: 'test_user_123', companyId: 'company_123', role: 'admin' };
         }
         next();
     }
 }));
 jest.mock('../../middleware/rbacMiddleware', () => ({
     hasPermission: (permission) => (req, res, next) => next(),
-    hasRole: (role) => (req, res, next) => next()
+    hasRole: (role) => (req, res, next) => next(),
+    checkPermission: () => true,
+    requireUserNotAgent: (req, res, next) => next(),
+    getUserPermissions: () => [],
+    rolePermissions: {},
+    agentCapabilities: {},
+    hasAgentCapability: () => (req, res, next) => next()
 }));
 
 describe('Settings Endpoints Integration Tests', () => {

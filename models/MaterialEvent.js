@@ -698,7 +698,7 @@ const MaterialEvent = {
             e.status !== EVENT_STATUSES.DISMISSED
         ).sort((a, b) => {
             const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-            const severityDiff = (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2);
+            const severityDiff = (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2);
             if (severityDiff !== 0) return severityDiff;
             return new Date(b.eventDate) - new Date(a.eventDate);
         });
@@ -716,7 +716,7 @@ const MaterialEvent = {
         const events = await this.find(query);
         const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         return events.sort((a, b) => {
-            const severityDiff = (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2);
+            const severityDiff = (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2);
             if (severityDiff !== 0) return severityDiff;
             return new Date(b.eventDate) - new Date(a.eventDate);
         });

@@ -2,6 +2,15 @@
  * Tax Withholding Service Tests
  * Feature: Issue #72 - Tax Withholding Calculator
  */
+const mockSave = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../../models/TaxWithholding', () => {
+  return function MockTaxWithholding(data) {
+    Object.assign(this, data);
+    this.save = mockSave;
+  };
+});
+
 const TaxWithholdingService = require('../../../services/taxWithholdingService');
 
 describe('TaxWithholdingService', () => {
@@ -284,6 +293,187 @@ describe('TaxWithholdingService', () => {
 
       // Should round up, not down
       expect(sharesToWithhold * sharePrice).toBeGreaterThanOrEqual(totalWithholding);
+    });
+  });
+
+  describe('calculateWithholding - SS wage base edge cases', () => {
+    it('should skip social security when ytdSocialSecurity exceeds wage base', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 100000,
+        ordinaryIncome: 100000,
+        eventType: 'nso_exercise',
+        employeeProfile: baseEmployeeProfile,
+        ytdWages: 200000,
+        ytdSocialSecurity: 170000 // Over $168,600 wage base
+      });
+
+      expect(result.summary.socialSecurityWithholding).toBe(0);
+    });
+
+    it('should handle unknown state code gracefully', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 100000,
+        ordinaryIncome: 100000,
+        eventType: 'nso_exercise',
+        employeeProfile: {
+          ...baseEmployeeProfile,
+          stateCode: 'ZZ' // Unknown state
+        },
+        ytdWages: 0
+      });
+
+      expect(result.summary.stateWithholding).toBe(0);
+    });
+
+    it('should use standard rate when state has no supplemental rate', () => {
+      const result = TaxWithholdingService.calculateWithholding({
+        grossAmount: 100000,
+        ordinaryIncome: 100000,
+        eventType: 'nso_exercise',
+        employeeProfile: {
+          ...baseEmployeeProfile,
+          stateCode: 'FL' // Florida - no state income tax
+        },
+        ytdWages: 0
+      });
+
+      expect(result.summary.stateWithholding).toBe(0);
+    });
+  });
+
+  describe('createWithholdingRecord', () => {
+    beforeEach(() => {
+      mockSave.mockClear();
+    });
+
+    it('should create an NSO exercise withholding record and save it', async () => {
+      const params = {
+        companyId: 'comp-1',
+        employeeId: 'emp-1',
+        eventType: 'nso_exercise',
+        sourceType: 'OptionExercise',
+        sourceId: 'opt-1',
+        taxYear: 2024,
+        eventDate: new Date('2024-06-15'),
+        calculationParams: {
+          exercisePrice: 1.00,
+          fmvAtExercise: 10.00,
+          sharesExercised: 1000,
+          employeeProfile: baseEmployeeProfile,
+          ytdWages: 0,
+          ytdSocialSecurity: 0
+        },
+        userId: 'user-1'
+      };
+
+      const result = await TaxWithholdingService.createWithholdingRecord(params);
+
+      expect(mockSave).toHaveBeenCalledTimes(1);
+      expect(result.companyId).toBe('comp-1');
+      expect(result.employeeId).toBe('emp-1');
+      expect(result.eventType).toBe('nso_exercise');
+      expect(result.income.ordinaryIncome).toBe(9000);
+      expect(result.method).toBe('supplemental');
+      expect(result.createdBy).toBe('user-1');
+    });
+
+    it('should route iso_exercise event type in createWithholdingRecord', async () => {
+      const params = {
+        companyId: 'comp-1',
+        employeeId: 'emp-1',
+        eventType: 'iso_exercise',
+        sourceType: 'OptionExercise',
+        sourceId: 'opt-1',
+        taxYear: 2024,
+        eventDate: new Date('2024-06-15'),
+        calculationParams: {
+          exercisePrice: 1.00,
+          fmvAtExercise: 10.00,
+          sharesExercised: 1000,
+          employeeProfile: baseEmployeeProfile
+        },
+        userId: 'user-1'
+      };
+
+      const result = await TaxWithholdingService.createWithholdingRecord(params);
+
+      expect(mockSave).toHaveBeenCalledTimes(1);
+      expect(result.income.ordinaryIncome).toBe(0);
+      expect(result.income.amtIncome).toBe(9000);
+    });
+
+    it('should route rsu_vest event type in createWithholdingRecord', async () => {
+      const params = {
+        companyId: 'comp-1',
+        employeeId: 'emp-1',
+        eventType: 'rsu_vest',
+        sourceType: 'RSUVest',
+        sourceId: 'rsu-1',
+        taxYear: 2024,
+        eventDate: new Date('2024-06-15'),
+        calculationParams: {
+          fmvAtVest: 50.00,
+          sharesVested: 100,
+          employeeProfile: baseEmployeeProfile,
+          ytdWages: 0,
+          ytdSocialSecurity: 0
+        },
+        userId: 'user-1'
+      };
+
+      const result = await TaxWithholdingService.createWithholdingRecord(params);
+
+      expect(mockSave).toHaveBeenCalledTimes(1);
+      expect(result.income.ordinaryIncome).toBe(5000);
+    });
+
+    it('should route default event type in createWithholdingRecord', async () => {
+      const params = {
+        companyId: 'comp-1',
+        employeeId: 'emp-1',
+        eventType: 'bonus_payment',
+        sourceType: 'BonusPayment',
+        sourceId: 'bon-1',
+        taxYear: 2024,
+        eventDate: new Date('2024-06-15'),
+        calculationParams: {
+          grossAmount: 50000,
+          ordinaryIncome: 50000,
+          employeeProfile: baseEmployeeProfile,
+          ytdWages: 0,
+          ytdSocialSecurity: 0
+        },
+        userId: 'user-1'
+      };
+
+      const result = await TaxWithholdingService.createWithholdingRecord(params);
+
+      expect(mockSave).toHaveBeenCalledTimes(1);
+      expect(result.income.ordinaryIncome).toBe(50000);
+    });
+
+    it('should route iso_exercise event type correctly via direct call', () => {
+      const isoResult = TaxWithholdingService.calculateISOExerciseWithholding({
+        exercisePrice: 1.00,
+        fmvAtExercise: 10.00,
+        sharesExercised: 1000,
+        employeeProfile: baseEmployeeProfile
+      });
+
+      expect(isoResult.income.ordinaryIncome).toBe(0);
+      expect(isoResult.income.amtIncome).toBe(9000);
+    });
+
+    it('should route rsu_vest event type correctly via direct call', () => {
+      const rsuResult = TaxWithholdingService.calculateRSUVestWithholding({
+        fmvAtVest: 50.00,
+        sharesVested: 100,
+        employeeProfile: baseEmployeeProfile,
+        ytdWages: 0,
+        ytdSocialSecurity: 0
+      });
+
+      expect(rsuResult.income.ordinaryIncome).toBe(5000);
     });
   });
 
