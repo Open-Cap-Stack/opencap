@@ -11,7 +11,7 @@
 const User = require('../models/User');
 const ApiKey = require('../models/ApiKey');
 const StripeCustomer = require('../models/StripeCustomer');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const fileStorageService = require('../services/fileStorageService');
 const sharp = require('sharp');
 const { sanitizeUser, sanitizeUsers } = require('../utils/sanitizeUser');

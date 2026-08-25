@@ -33,7 +33,7 @@ jest.mock('google-auth-library', () => ({
 const httpMocks = require('node-mocks-http');
 const authController = require('../../../controllers/authController');
 const User = require('../../../models/User');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 jest.spyOn(bcrypt, 'hash');
 jest.spyOn(bcrypt, 'compare');

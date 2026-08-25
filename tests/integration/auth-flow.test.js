@@ -12,7 +12,7 @@
 
 const request = require('supertest');
 const { createApp } = require('../setup/app');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 describe('Authentication Flow Integration Tests', () => {

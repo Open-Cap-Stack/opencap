@@ -187,7 +187,7 @@ describe('OWASP Top 10 Security Vulnerability Tests', () => {
     describe('Password Storage', () => {
       it('should hash passwords using strong algorithms', async () => {
         // Verify that bcrypt is used for password hashing
-        const bcrypt = require('bcrypt');
+        const bcrypt = require('bcryptjs');
         const testHash = await bcrypt.hash('TestPass123!', 10);
 
         // BCrypt hashes start with $2a$, $2b$, or $2y$

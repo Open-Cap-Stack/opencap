@@ -370,7 +370,7 @@ describe('Security: No Hardcoded Credentials', () => {
   });
 
   test('should hash all passwords before storage', async () => {
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
 
     // Verify bcrypt is available for password hashing
     const testPassword = 'testPassword123!';
