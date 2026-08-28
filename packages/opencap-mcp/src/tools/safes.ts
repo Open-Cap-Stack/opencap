@@ -95,6 +95,13 @@ export const safeTools: ToolDefinition[] = [
         .string()
         .optional()
         .describe('Reason for the status change (used only when status is provided)'),
+      investmentAmount: coerceFloat('Investment amount in USD').optional(),
+      valuationCap: coerceFloat('Valuation cap in USD').optional(),
+      discountRate: coerceFloat('Discount rate percentage (e.g. 20 for 20%)').optional(),
+      investorName: z.string().optional().describe('Display name of the investor'),
+      investorId: z.string().optional().describe('Stakeholder ID of the investor'),
+      notes: z.string().optional().describe('Free-text notes about this SAFE'),
+      investmentDate: z.string().optional().describe('Investment date in ISO 8601 format (YYYY-MM-DD)'),
       conversionDate: z
         .string()
         .optional()

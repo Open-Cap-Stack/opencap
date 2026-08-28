@@ -98,19 +98,50 @@ export const equityGrantTools: ToolDefinition[] = [
   {
     name: 'update_equity_grant',
     description:
-      'Update the status of an equity grant (e.g. approve, cancel, mark as exercised). ' +
-      'Use the `grantId` field from `list_equity_grants`, not the `_id` field.',
+      'Update an equity grant — change status, fix linkage, adjust shares, or add notes. ' +
+      'Use the `grantId` field from `list_equity_grants`, not the `_id` field. ' +
+      'When `status` is provided, uses the dedicated status-transition endpoint. ' +
+      'Other fields use the generic PUT endpoint.',
     inputSchema: z.object({
       id: z
         .string()
         .describe('Grant ID — use the `grantId` field from list_equity_grants, not `_id`'),
       status: z
         .enum(['pending', 'approved', 'active', 'exercised', 'cancelled', 'expired'])
-        .describe('New status for the grant'),
+        .optional()
+        .describe('New status for the grant (uses dedicated status-transition endpoint)'),
+      employeeId: z
+        .string()
+        .optional()
+        .describe('Stakeholder row_id to link this grant to'),
+      numberOfShares: coerceInt('Number of shares in this grant').optional(),
+      strikePrice: coerceFloat('Exercise/strike price per share in USD').optional(),
+      grantDate: z.string().optional().describe('Grant date in ISO 8601 format (YYYY-MM-DD)'),
+      expirationDate: z.string().optional().describe('Expiration date in ISO 8601 format (YYYY-MM-DD)'),
+      vestingSchedule: z
+        .object({
+          totalShares: coerceInt('Total shares in vesting schedule').optional(),
+          vestingPeriodMonths: coerceInt('Total vesting period in months').optional(),
+          cliffMonths: coerceInt('Cliff period in months').optional(),
+          vestingFrequency: z.enum(['monthly', 'quarterly', 'annually']).optional(),
+          startDate: z.string().optional().describe('Vesting start date (YYYY-MM-DD)'),
+        })
+        .optional()
+        .describe('Vesting schedule for this grant'),
+      notes: z.string().optional().describe('Free-text notes about this grant'),
     }),
     handler: async (input, client) => {
-      const { id, ...body } = input;
-      await client.patch(`/api/v1/equity-grants/${id}/status`, body);
+      const { id, status, ...rest } = input;
+
+      if (status) {
+        await client.patch(`/api/v1/equity-grants/${id}/status`, { status });
+      }
+
+      const hasOtherFields = Object.keys(rest).length > 0;
+      if (hasOtherFields) {
+        await client.put(`/api/v1/equity-grants/${id}`, rest);
+      }
+
       try {
         const { data: confirmed } = await client.get(`/api/v1/equity-grants/${id}`);
         const record = confirmed?.data ?? confirmed;
@@ -118,7 +149,7 @@ export const equityGrantTools: ToolDefinition[] = [
           content: [
             {
               type: 'text',
-              text: `Equity grant updated and confirmed:\ngrantId: ${record.grantId ?? id}\nstatus: ${record.status ?? input.status}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
+              text: `Equity grant updated and confirmed:\ngrantId: ${record.grantId ?? id}\nstatus: ${record.status ?? status ?? 'unchanged'}\ncompanyId: ${record.companyId ?? 'unknown'}\n\nFull record:\n${JSON.stringify(record, null, 2)}`,
             },
           ],
         };

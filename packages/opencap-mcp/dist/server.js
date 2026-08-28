@@ -21,6 +21,7 @@ import { exportTools } from './tools/export.js';
 import { kycTools } from './tools/kyc.js';
 import { mercuryTools } from './tools/mercury.js';
 import { boardTools } from './tools/board.js';
+import { vestingScheduleTools } from './tools/vestingSchedules.js';
 import { formatMcpError } from './errors.js';
 const ALL_TOOLS = [
     ...metaTools,
@@ -40,6 +41,7 @@ const ALL_TOOLS = [
     ...kycTools,
     ...mercuryTools,
     ...boardTools,
+    ...vestingScheduleTools,
 ];
 export function createServer(client) {
     const server = new Server({

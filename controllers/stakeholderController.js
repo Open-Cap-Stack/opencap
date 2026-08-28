@@ -122,31 +122,26 @@ exports.getAllStakeholders = async (req, res) => {
 
     const { limit, skip } = parsePagination(req.query);
 
-    // By default, exclude bulk-imported VC investor records from the cap table.
-    // These are served via /investor-database instead. Use ?includeInvestors=true
-    // to override (e.g. for admin views that need the full list).
-    const excludeInvestors = req.query.includeInvestors !== 'true';
+    // By default, exclude bulk-imported VC investor records (names starting
+    // with "/fund/") from the cap table — they're served via /investor-database.
+    // Real investors who hold SAFEs or equity (e.g. RSCM) are always included.
+    // Use ?includeInvestors=true to include everything.
+    const excludeBulkImports = req.query.includeInvestors !== 'true';
     let stakeholders;
 
-    if (excludeInvestors && !filter.role) {
-      // ZeroDB doesn't support $ne, and the table has ~13K investor rows that
-      // bury non-investor stakeholders in pagination. Query each non-investor
-      // role separately and merge results.
-      const NON_INVESTOR_ROLES = ['founder', 'employee', 'advisor', 'other', 'co_founder', 'board_member'];
+    if (excludeBulkImports && !filter.role) {
+      // Query non-investor roles plus real investors (those without /fund/ prefix).
+      const NON_INVESTOR_ROLES = ['founder', 'employee', 'advisor', 'other', 'co_founder', 'board_member', 'investor'];
       const results = await Promise.all(
         NON_INVESTOR_ROLES.map(role =>
           Stakeholder.find({ ...filter, role }, { limit, skip: 0 }).catch(() => [])
         )
       );
       stakeholders = results.flat();
+      // Filter out bulk-imported VC contacts (names like "/fund/kleiner-perkins")
+      stakeholders = stakeholders.filter(sh => !sh.name?.startsWith('/fund/'));
     } else {
       stakeholders = await Stakeholder.find(filter, { limit, skip });
-      if (excludeInvestors) {
-        stakeholders = stakeholders.filter(sh => {
-          const role = (sh.role || '').toLowerCase();
-          return role !== 'investor';
-        });
-      }
     }
 
     // Support ?excludeRole= (comma-separated) for additional filtering.

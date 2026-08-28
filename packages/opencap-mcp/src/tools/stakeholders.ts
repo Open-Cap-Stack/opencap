@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { coerceInt } from '../schema.js';
+import { coerceInt, coerceFloat } from '../schema.js';
 import { type ToolDefinition } from '../types.js';
 
 export const stakeholderTools: ToolDefinition[] = [
@@ -83,6 +83,7 @@ export const stakeholderTools: ToolDefinition[] = [
         .optional()
         .describe('Stakeholder role'),
       title: z.string().optional().describe("Job title or role title, e.g. 'Director of Developer Relations', 'Lead Advisor'"),
+      ownershipPercentage: coerceFloat('Ownership percentage (e.g. 2.5 for 2.5%)').optional(),
     }),
     handler: async (input, client) => {
       const { id, ...body } = input;
