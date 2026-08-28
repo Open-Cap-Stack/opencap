@@ -195,8 +195,8 @@ exports.updateSAFE = async (req, res) => {
       return sendError(res, 403, 'Access denied');
     }
 
-    // Only allow updates in draft status
-    if (safe.status !== 'draft') {
+    // Only allow updates in draft status — unless the user is super_admin
+    if (safe.status !== 'draft' && req.user?.role !== 'super_admin') {
       return sendError(res, 400, 'Can only update SAFEs in draft status');
     }
 
