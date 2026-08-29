@@ -24,8 +24,7 @@ router.use(authenticateToken);
 router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager']), requireAccreditation('safe'), safeController.createSAFE);
 // Root GET — list SAFEs for the authenticated user's company (frontend calls GET /safes)
 router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'employee']), (req, res, next) => {
-  // Always delegate to getCompanySAFEs — it handles null/default companyId by returning all
-  const companyId = req.user?.companyId || 'default';
+  const companyId = req.user?.companyId || '';
   req.params = { ...req.params, companyId };
   return safeController.getCompanySAFEs(req, res, next);
 });
