@@ -140,6 +140,9 @@ const spvSchema = {
     wizardStep: { type: 'number', default: 0 },
     wizardCompletedSteps: { type: 'array' },
 
+    // --- Wire instructions ---
+    wireInstructions: { type: 'object' }, // {bankName, routingNumber, accountNumber, swiftCode, referencePrefix, specialInstructions}
+
     // --- Status lifecycle (issue #580) ---
     statusHistory: { type: 'array' }, // [{status, changedAt, changedBy}]
 

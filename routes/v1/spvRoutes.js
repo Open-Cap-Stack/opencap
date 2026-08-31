@@ -152,6 +152,27 @@ router.get('/:id/public', hasRole(['super_admin', 'admin', 'founder', 'manager',
 router.post('/:id/commit', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVInvestorController.commitToSPV);
 
 /**
+ * @route GET /api/spvs/:id/wire-instructions
+ * @desc Get wire transfer instructions for committed LP investors
+ * @access Private (investor + admin roles)
+ */
+router.get('/:id/wire-instructions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVInvestorController.getWireInstructions);
+
+/**
+ * @route POST /api/spvs/:id/wire-instructions
+ * @desc Set or update wire transfer instructions on an SPV (admin only)
+ * @access Private (admin roles only)
+ */
+router.post('/:id/wire-instructions', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.setWireInstructions);
+
+/**
+ * @route POST /api/spvs/:id/confirm-wire
+ * @desc Confirm wire receipt and update LP wiredAmount (admin only)
+ * @access Private (admin roles only)
+ */
+router.post('/:id/confirm-wire', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.confirmWireReceipt);
+
+/**
  * @route PUT /api/spvs/:id/status
  * @desc Transition SPV status with lifecycle guards (Issue #580)
  * @access Private

@@ -376,6 +376,154 @@ exports.deleteInvestor = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/spv/:id/wire-instructions
+ * Return wire transfer instructions for an SPV.
+ *
+ * Admin roles (super_admin, admin, founder, manager, service_provider) can
+ * retrieve wire instructions directly by verifying SPV ownership.
+ * Investor role must be an LP with status 'committed' or 'wired'.
+ */
+exports.getWireInstructions = async (req, res) => {
+  try {
+    const { id: spvId } = req.params;
+    if (!spvId || spvId.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+
+    const spv = await SPV.findBySPVID(spvId) || await SPV.findById(spvId).catch(() => null);
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    const role = req.user?.role;
+    const adminRoles = ['super_admin', 'admin', 'founder', 'manager', 'service_provider'];
+    const isAdmin = adminRoles.includes(role);
+
+    // Admin roles: verify SPV ownership (company match), return wire info without LP check
+    if (isAdmin) {
+      const wire = spv.wireInstructions || {};
+      return res.status(200).json({
+        wireInstructions: {
+          bankName: wire.bankName || null,
+          routingNumber: wire.routingNumber || null,
+          accountNumber: wire.accountNumber || null,
+          swiftCode: wire.swiftCode || null,
+          specialInstructions: wire.specialInstructions || null,
+          referencePrefix: wire.referencePrefix || spvId,
+        },
+      });
+    }
+
+    // Investor role: must be an LP with committed or wired status
+    const userId = req.user?.userId || req.user?.id || req.user?._id;
+    const email = req.user?.email;
+
+    let lpRecord = null;
+    if (userId) lpRecord = await SPVInvestor.findOne({ spvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId, email });
+    const effectiveSpvId = spv.SPVID || spvId;
+    if (!lpRecord && userId) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, email });
+
+    if (!lpRecord) {
+      return res.status(403).json({ message: 'You are not an LP in this SPV' });
+    }
+    if (lpRecord.status !== 'committed' && lpRecord.status !== 'wired') {
+      return res.status(403).json({ message: 'Wire instructions are available only after commitment' });
+    }
+
+    const wire = spv.wireInstructions || {};
+    const investorId = lpRecord._id || lpRecord.row_id;
+    const prefix = wire.referencePrefix || spvId;
+    const wireReference = `${prefix}-${investorId}`;
+
+    res.status(200).json({
+      wireInstructions: {
+        bankName: wire.bankName || null,
+        routingNumber: wire.routingNumber || null,
+        accountNumber: wire.accountNumber || null,
+        swiftCode: wire.swiftCode || null,
+        specialInstructions: wire.specialInstructions || null,
+        wireReference,
+      },
+      commitment: {
+        amount: lpRecord.committedAmount,
+        status: lpRecord.status,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to retrieve wire instructions', error: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/spv/:id/wire-instructions
+ * Set or update wire transfer instructions on an SPV (admin only).
+ *
+ * Body: { bankName, routingNumber, accountNumber, swiftCode, referencePrefix, specialInstructions }
+ * At minimum bankName and accountNumber are required.
+ */
+exports.setWireInstructions = async (req, res) => {
+  try {
+    const { id: spvId } = req.params;
+    if (!spvId || spvId.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+
+    const { bankName, routingNumber, accountNumber, swiftCode, referencePrefix, specialInstructions } = req.body;
+
+    // Validate required fields
+    if (!bankName || typeof bankName !== 'string' || bankName.trim() === '') {
+      return res.status(400).json({ message: 'bankName is required' });
+    }
+    if (!accountNumber || typeof accountNumber !== 'string' || accountNumber.trim() === '') {
+      return res.status(400).json({ message: 'accountNumber is required' });
+    }
+
+    let spv = await SPV.findBySPVID(spvId);
+    if (!spv) {
+      spv = await SPV.findById(spvId).catch(() => null);
+    }
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    const wireInstructions = {
+      bankName: sanitizeText(bankName),
+      routingNumber: routingNumber ? sanitizeText(routingNumber) : null,
+      accountNumber: sanitizeText(accountNumber),
+      swiftCode: swiftCode ? sanitizeText(swiftCode) : null,
+      referencePrefix: referencePrefix ? sanitizeText(referencePrefix) : spvId,
+      specialInstructions: specialInstructions ? sanitizeText(specialInstructions) : null,
+    };
+
+    // Update using SPVID if available, otherwise _id
+    const query = spv.SPVID ? { SPVID: spv.SPVID } : { _id: spv._id || spv.row_id };
+    const updated = await SPV.findOneAndUpdate(
+      query,
+      { $set: { wireInstructions, updatedAt: new Date().toISOString() } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(500).json({ message: 'Failed to update wire instructions' });
+    }
+
+    res.status(200).json({ wireInstructions: updated.wireInstructions || wireInstructions });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to set wire instructions', error: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/spv/:id/commit
+ * LP investor commits a dollar amount to an SPV.
+ * Body: { amount: <number>, acceptTerms: <boolean> }
+ *
+ * Requires accreditation check via middleware. The investor must be
+ * an LP in the SPV with status 'invited' or 'committed' (re-commit).
+ */
 exports.commitToSPV = async (req, res) => {
   try {
     const { id: spvId } = req.params;
@@ -384,11 +532,83 @@ exports.commitToSPV = async (req, res) => {
     if (!spvId || spvId.trim() === '') {
       return res.status(400).json({ message: 'SPV ID is required' });
     }
-    if (acceptTerms !== true) {
-      return res.status(400).json({ message: 'You must accept the LP terms to commit' });
+
+    if (!acceptTerms) {
+      return res.status(400).json({ message: 'You must accept the terms to commit' });
     }
+
     if (!amount || typeof amount !== 'number' || amount <= 0) {
       return res.status(400).json({ message: 'A positive commitment amount is required' });
+    }
+
+    // Find the SPV
+    const spv = await SPV.findBySPVID(spvId) || await SPV.findById(spvId).catch(() => null);
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    // Enforce minimum investment if configured
+    const minimum = spv.lpMinimumInvestment || 0;
+    if (minimum > 0 && amount < minimum) {
+      return res.status(400).json({
+        message: `Commitment must be at least $${minimum.toLocaleString()}`
+      });
+    }
+
+    // Find the LP investor record
+    const userId = req.user?.userId || req.user?.id;
+    const email = req.user?.email;
+    const effectiveSpvId = spv.SPVID || spvId;
+
+    let lpRecord = null;
+    if (userId) lpRecord = await SPVInvestor.findOne({ spvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId, email });
+    if (!lpRecord && userId) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, email });
+
+    if (!lpRecord) {
+      return res.status(403).json({ message: 'You are not an LP in this SPV' });
+    }
+
+    // Prevent commitment from ineligible statuses
+    if (lpRecord.status === 'wired') {
+      return res.status(400).json({ message: 'Cannot re-commit: funds already wired' });
+    }
+    if (lpRecord.status === 'declined') {
+      return res.status(400).json({ message: 'Cannot commit: invitation was declined' });
+    }
+
+    const updated = await SPVInvestor.findOneAndUpdate(
+      { _id: lpRecord._id || lpRecord.row_id },
+      {
+        $set: {
+          status: 'committed',
+          committedAmount: amount,
+          committedAt: new Date().toISOString(),
+        },
+      },
+      { new: true }
+    );
+
+    res.status(200).json({ investor: sanitizeInvestor(updated) });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to commit to SPV', error: error.message });
+  }
+};
+
+exports.confirmWireReceipt = async (req, res) => {
+  try {
+    const { id: spvId } = req.params;
+    const { investorId, wiredAmount, wireReference, wireDate } = req.body;
+
+    if (!spvId || spvId.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+    if (!investorId) {
+      return res.status(400).json({ message: 'investorId is required' });
+    }
+    if (!wiredAmount || typeof wiredAmount !== 'number' || wiredAmount <= 0) {
+      return res.status(400).json({ message: 'A positive wiredAmount is required' });
     }
 
     const spv = await SPV.findBySPVID(spvId) || await SPV.findById(spvId).catch(() => null);
@@ -396,43 +616,36 @@ exports.commitToSPV = async (req, res) => {
       return res.status(404).json({ message: 'SPV not found' });
     }
 
-    const minInvestment = spv.lpMinimumInvestment;
-    if (minInvestment && amount < minInvestment) {
-      return res.status(400).json({
-        message: `Commitment must be at least ${minInvestment.toLocaleString()}`,
-        minimumCommitment: minInvestment,
-      });
+    const investor = await SPVInvestor.findOne({ _id: investorId, spvId });
+    if (!investor) {
+      const effectiveSpvId = spv.SPVID || spvId;
+      const altInvestor = await SPVInvestor.findOne({ _id: investorId, spvId: effectiveSpvId });
+      if (!altInvestor) {
+        return res.status(404).json({ message: 'Investor not found in this SPV' });
+      }
     }
 
-    const userId = req.user?.userId || req.user?.id || req.user?._id;
-    const email = req.user?.email;
-
-    let lpRecord = null;
-    if (userId) lpRecord = await SPVInvestor.findOne({ spvId, userId });
-    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId, email });
-
-    const effectiveSpvId = spv.SPVID || spvId;
-    if (!lpRecord && userId) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, userId });
-    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, email });
-
-    if (!lpRecord) {
-      return res.status(403).json({ message: 'You are not an LP in this SPV' });
-    }
-    if (lpRecord.status === 'wired') {
-      return res.status(400).json({ message: 'You have already wired funds for this SPV' });
-    }
-    if (lpRecord.status === 'declined') {
-      return res.status(400).json({ message: 'You have declined this SPV. Contact the fund manager to be re-invited.' });
+    const record = investor || await SPVInvestor.findOne({ _id: investorId });
+    if (record.status !== 'committed') {
+      return res.status(400).json({ message: `Cannot confirm wire for investor with status '${record.status}'. Must be 'committed'.` });
     }
 
     const updated = await SPVInvestor.findOneAndUpdate(
-      { _id: lpRecord._id || lpRecord.row_id },
-      { $set: { status: 'committed', committedAmount: amount, committedAt: new Date().toISOString() } },
+      { _id: investorId },
+      {
+        $set: {
+          status: 'wired',
+          wiredAmount,
+          wiredAt: wireDate || new Date().toISOString(),
+          wireReference: wireReference || null,
+        },
+      },
       { new: true }
     );
 
     res.status(200).json({ investor: sanitizeInvestor(updated) });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to submit commitment', error: error.message });
+    res.status(500).json({ message: 'Failed to confirm wire receipt', error: error.message });
   }
 };
+

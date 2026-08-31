@@ -42,7 +42,9 @@ const EXTENDED_FIELDS = [
   // Metrics
   'totalRaised', 'lpCount',
   // Wizard state
-  'wizardStep', 'wizardCompletedSteps'
+  'wizardStep', 'wizardCompletedSteps',
+  // Wire instructions
+  'wireInstructions'
 ];
 
 /**
