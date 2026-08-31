@@ -4,6 +4,7 @@
  * Updated: ZeroDB Migration - Uses ZeroDB model methods
  */
 const SPV = require('../models/SPV');
+const { sendSPVStatusUpdate } = require('../services/emailService');
 
 /**
  * Helper function to check if ID looks like a UUID or ZeroDB row_id
@@ -616,6 +617,21 @@ exports.transitionStatus = async (req, res) => {
 
     if (!updatedSPV) {
       return res.status(500).json({ message: 'Failed to update SPV status' });
+    }
+
+    // Notify LP investors of the status change (fire-and-forget)
+    try {
+      const SPVInvestorModel = require('../models/SPVInvestor');
+      const effectiveSpvId = spv.SPVID || id;
+      const investors = await SPVInvestorModel.findBySPV(effectiveSpvId);
+      if (investors && investors.length > 0) {
+        sendSPVStatusUpdate(investors, updatedSPV, targetStatus).catch(err => {
+          console.error('[Email] Failed to send SPV status update notifications:', err.message);
+        });
+      }
+    } catch (notifyErr) {
+      // Email failures should never block the status transition response
+      console.error('[Email] Error fetching investors for notification:', notifyErr.message);
     }
 
     res.status(200).json(updatedSPV);

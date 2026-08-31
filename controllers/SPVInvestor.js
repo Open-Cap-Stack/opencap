@@ -8,6 +8,7 @@
 
 const SPVInvestor = require('../models/SPVInvestor');
 const SPV = require('../models/SPV');
+const { sendCommitmentConfirmation } = require('../services/emailService');
 
 /**
  * Maximum number of emails that can be invited in a single request.
@@ -589,6 +590,18 @@ exports.commitToSPV = async (req, res) => {
       },
       { new: true }
     );
+
+    // Send commitment confirmation email (fire-and-forget)
+    try {
+      sendCommitmentConfirmation(
+        { email: updated.email || lpRecord.email, name: updated.name || lpRecord.name, committedAmount: amount },
+        spv
+      ).catch(err => {
+        console.error('[Email] Failed to send commitment confirmation:', err.message);
+      });
+    } catch (notifyErr) {
+      console.error('[Email] Error sending commitment confirmation:', notifyErr.message);
+    }
 
     res.status(200).json({ investor: sanitizeInvestor(updated) });
   } catch (error) {

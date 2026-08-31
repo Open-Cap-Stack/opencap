@@ -355,6 +355,156 @@ async function sendOnboardingReminder({ to, firstName, daysAgo }) {
   await send(to, `${name}, finish setting up your OpenCap Stack account`, html);
 }
 
+// ─── 13. SPV status update notification ─────────────────────────────────────
+
+/**
+ * Notify LP investors when the SPV status changes (e.g. raising -> closing).
+ * @param {Array<{email:string, name?:string}>} investors - LP investors to notify
+ * @param {Object} spv - SPV record (Name, SPVID, Status, etc.)
+ * @param {string} newStatus - The new status the SPV has transitioned to
+ */
+async function sendSPVStatusUpdate(investors, spv, newStatus) {
+  if (!investors || !Array.isArray(investors) || investors.length === 0) return;
+
+  const spvName = spv.Name || spv.name || 'SPV';
+  const spvId = spv.SPVID || spv.spvId || '';
+  const statusLabel = newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  for (const investor of investors) {
+    if (!investor.email) continue;
+    const name = investor.name || 'Investor';
+    const html = layout(`
+      <p>Hi ${name},</p>
+      <p>The status of <strong>${spvName}</strong> has been updated.</p>
+      <div class="highlight">
+        <div>SPV: <strong>${spvName}</strong></div>
+        <div style="margin-top:4px;">New Status:</div>
+        <div class="big">${statusLabel}</div>
+      </div>
+      <p>Log in to your investor portal to see the latest details and any actions required on your end.</p>
+      <a class="btn" href="${APP_URL}/investor/spv/${spvId}">View SPV Details &rarr;</a>
+      <p>If you have questions, please reach out to the fund lead or your company administrator.</p>
+    `, `SPV Status Update — ${spvName}`);
+    await send(investor.email, `${spvName} — Status Update: ${statusLabel}`, html);
+  }
+}
+
+// ─── 14. SPV commitment confirmation ─────────────────────────────────────────
+
+/**
+ * Confirm to an LP that their commitment has been recorded.
+ * @param {{email:string, name?:string, committedAmount?:number}} investor
+ * @param {Object} spv - SPV record
+ */
+async function sendCommitmentConfirmation(investor, spv) {
+  if (!investor || !investor.email) return;
+
+  const name = investor.name || 'Investor';
+  const spvName = spv.Name || spv.name || 'SPV';
+  const spvId = spv.SPVID || spv.spvId || '';
+  const amount = investor.committedAmount
+    ? `$${Number(investor.committedAmount).toLocaleString()}`
+    : 'N/A';
+
+  const html = layout(`
+    <p>Hi ${name},</p>
+    <p>Your commitment to <strong>${spvName}</strong> has been confirmed.</p>
+    <div class="highlight">
+      <div>SPV: <strong>${spvName}</strong></div>
+      <div style="margin-top:4px;">Committed Amount:</div>
+      <div class="big">${amount}</div>
+    </div>
+    <p>Next steps: once the fund lead initiates the closing process, you will receive wire transfer instructions at this email address.</p>
+    <a class="btn" href="${APP_URL}/investor/spv/${spvId}">View Your Commitment &rarr;</a>
+    <p>If you need to adjust your commitment amount, please contact the fund lead before the closing date.</p>
+  `, `Commitment Confirmed — ${spvName}`);
+  await send(investor.email, `Commitment Confirmed — ${spvName}`, html);
+}
+
+// ─── 15. SPV wire instructions email ─────────────────────────────────────────
+
+/**
+ * Send wire transfer instructions to an LP investor.
+ * @param {{email:string, name?:string, committedAmount?:number}} investor
+ * @param {Object} spv - SPV record
+ * @param {Object} wireInstructions - { bankName, routingNumber, accountNumber, swiftCode, specialInstructions, wireReference }
+ */
+async function sendWireInstructionsEmail(investor, spv, wireInstructions) {
+  if (!investor || !investor.email) return;
+  if (!wireInstructions) return;
+
+  const name = investor.name || 'Investor';
+  const spvName = spv.Name || spv.name || 'SPV';
+  const spvId = spv.SPVID || spv.spvId || '';
+  const amount = investor.committedAmount
+    ? `$${Number(investor.committedAmount).toLocaleString()}`
+    : 'your committed amount';
+
+  const bankName = wireInstructions.bankName || 'N/A';
+  const routingNumber = wireInstructions.routingNumber || 'N/A';
+  const accountNumber = wireInstructions.accountNumber || 'N/A';
+  const swiftCode = wireInstructions.swiftCode || '';
+  const specialInstructions = wireInstructions.specialInstructions || '';
+  const wireReference = wireInstructions.wireReference || '';
+
+  const html = layout(`
+    <p>Hi ${name},</p>
+    <p>Wire transfer instructions are now available for your commitment to <strong>${spvName}</strong>.</p>
+    <div class="highlight">
+      <div><strong>Bank Name:</strong> ${bankName}</div>
+      <div><strong>Routing Number:</strong> ${routingNumber}</div>
+      <div><strong>Account Number:</strong> ${accountNumber}</div>
+      ${swiftCode ? `<div><strong>SWIFT Code:</strong> ${swiftCode}</div>` : ''}
+      ${wireReference ? `<div style="margin-top:8px;"><strong>Wire Reference:</strong> ${wireReference}</div>` : ''}
+      ${specialInstructions ? `<div style="margin-top:8px;font-size:12px;color:#6b7280;"><strong>Special Instructions:</strong> ${specialInstructions}</div>` : ''}
+    </div>
+    <div class="highlight">
+      <div>Amount to wire:</div>
+      <div class="big">${amount}</div>
+    </div>
+    <p><strong>Important:</strong> Please include the wire reference in your transfer memo so we can match your payment to your commitment.</p>
+    <a class="btn" href="${APP_URL}/investor/spv/${spvId}">View SPV Details &rarr;</a>
+    <p>If you have questions about the wire process, please contact the fund lead.</p>
+  `, `Wire Instructions — ${spvName}`);
+  await send(investor.email, `Wire Instructions — ${spvName}`, html);
+}
+
+// ─── 16. SPV capital call notice ─────────────────────────────────────────────
+
+/**
+ * Send a capital call notice to LP investors.
+ * @param {Array<{email:string, name?:string}>} investors - LP investors to notify
+ * @param {Object} spv - SPV record
+ * @param {number} amount - Total capital call amount
+ */
+async function sendCapitalCallNotice(investors, spv, amount) {
+  if (!investors || !Array.isArray(investors) || investors.length === 0) return;
+
+  const spvName = spv.Name || spv.name || 'SPV';
+  const spvId = spv.SPVID || spv.spvId || '';
+  const formattedAmount = amount
+    ? `$${Number(amount).toLocaleString()}`
+    : 'N/A';
+
+  for (const investor of investors) {
+    if (!investor.email) continue;
+    const name = investor.name || 'Investor';
+    const html = layout(`
+      <p>Hi ${name},</p>
+      <p>A capital call has been issued for <strong>${spvName}</strong>.</p>
+      <div class="highlight">
+        <div>SPV: <strong>${spvName}</strong></div>
+        <div style="margin-top:4px;">Capital Call Amount:</div>
+        <div class="big">${formattedAmount}</div>
+      </div>
+      <p>Please log in to your investor portal to view the full capital call notice, including wire instructions and the due date for your payment.</p>
+      <a class="btn" href="${APP_URL}/investor/spv/${spvId}">View Capital Call &rarr;</a>
+      <p>If you have questions about this capital call, please contact the fund lead or your company administrator.</p>
+    `, `Capital Call Notice — ${spvName}`);
+    await send(investor.email, `Capital Call Notice — ${spvName}`, html);
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -370,4 +520,8 @@ module.exports = {
   send83bDeadlineReminder,
   sendOnboardingComplete,
   sendOnboardingReminder,
+  sendSPVStatusUpdate,
+  sendCommitmentConfirmation,
+  sendWireInstructionsEmail,
+  sendCapitalCallNotice,
 };
