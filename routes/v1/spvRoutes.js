@@ -15,6 +15,9 @@ const SPVNestedController = require('../../controllers/SPVNested');
 const SPVInvestorController = require('../../controllers/SPVInvestor');
 const { requireAccreditation, requireSPVRoleEligibility } = require('../../middleware/kycVerification');
 
+// Public (unauthenticated) routes
+router.post('/join/:token', SPVInvestorController.joinViaToken);
+
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
@@ -133,6 +136,20 @@ router.get('/:id/performance', hasRole(['super_admin', 'admin', 'founder', 'mana
  * @access Private
  */
 router.get('/:id/reports/:type', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVReport);
+
+/**
+ * @route GET /api/spvs/:id/public
+ * @desc Get investor-facing SPV detail (public fields only, LP membership check)
+ * @access Private (investor + admin roles)
+ */
+router.get('/:id/public', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVController.getPublicSPVDetail);
+
+/**
+ * @route POST /api/spvs/:id/commit
+ * @desc LP commits a dollar amount to an SPV
+ * @access Private (investor + admin roles)
+ */
+router.post('/:id/commit', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVInvestorController.commitToSPV);
 
 /**
  * @route PUT /api/spvs/:id/status

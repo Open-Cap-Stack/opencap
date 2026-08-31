@@ -688,3 +688,70 @@ exports.getSPVAnalytics = async (req, res) => {
     });
   }
 };
+
+const SPVInvestor = require('../models/SPVInvestor');
+
+const PUBLIC_FIELDS = [
+  'SPVID', 'Name', 'Purpose', 'Status', 'CreationDate',
+  'companyLegalName', 'companyStage', 'countryOfIncorporation',
+  'targetClosingDate', 'lpMinimumInvestment',
+  'transactionType', 'instrument', 'includesTokenWarrant',
+  'valuation', 'valuationCap', 'discount', 'round', 'roundSize',
+  'allocation', 'otherTerms',
+  'memo', 'pitchDeckUrl', 'coInvestors',
+  'carryPercentage', 'totalRaised', 'lpCount',
+  'name', 'status',
+];
+
+exports.getPublicSPVDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || id.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+
+    let spv = await SPV.findOne({ SPVID: id });
+    if (!spv && isValidId(id)) {
+      spv = await SPV.findById(id).catch(() => null);
+    }
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    const userId = req.user?.userId || req.user?.id || req.user?._id;
+    const email = req.user?.email;
+
+    let lpRecords = [];
+    if (userId) lpRecords = await SPVInvestor.find({ spvId: id, userId });
+    if (lpRecords.length === 0 && email) {
+      lpRecords = await SPVInvestor.find({ spvId: id, email });
+    }
+    if (lpRecords.length === 0) {
+      const spvId = spv.SPVID || id;
+      if (userId) lpRecords = await SPVInvestor.find({ spvId, userId });
+      if (lpRecords.length === 0 && email) {
+        lpRecords = await SPVInvestor.find({ spvId, email });
+      }
+    }
+
+    if (lpRecords.length === 0 && req.user?.role === 'investor') {
+      return res.status(403).json({ message: 'You are not an LP in this SPV' });
+    }
+
+    const publicData = {};
+    for (const field of PUBLIC_FIELDS) {
+      if (spv[field] !== undefined) publicData[field] = spv[field];
+    }
+
+    const myRecord = lpRecords[0] || null;
+    const myCommitment = myRecord ? {
+      status: myRecord.status,
+      committedAmount: myRecord.committedAmount,
+      wiredAmount: myRecord.wiredAmount,
+    } : null;
+
+    res.status(200).json({ spv: publicData, myCommitment });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to retrieve SPV details', error: error.message });
+  }
+};
