@@ -8,6 +8,7 @@
 
 const SPVInvestor = require('../models/SPVInvestor');
 const SPV = require('../models/SPV');
+const { sendSPVInvite } = require('../services/emailService');
 
 /**
  * Maximum number of emails that can be invited in a single request.
@@ -135,7 +136,7 @@ exports.inviteInvestors = async (req, res) => {
       return res.status(400).json({ message: `Maximum ${MAX_BATCH_SIZE} invites per request` });
     }
 
-    const { error } = await verifySPVOwnership(req, res, spvId);
+    const { spv, error } = await verifySPVOwnership(req, res, spvId);
     if (error) return;
 
     // Validate all emails before creating any records
@@ -186,7 +187,29 @@ exports.inviteInvestors = async (req, res) => {
       if (result.status === 'fulfilled') {
         created.push(result.value);
       }
-      // Failed creations are silently skipped; could be logged in production
+    }
+
+    const spvName = spv?.Name || spv?.name || 'SPV';
+    const founderName = req.user?.name || req.user?.firstName || undefined;
+    const companyName = spv?.companyLegalName || undefined;
+    const baseUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
+
+    for (const inv of created) {
+      const inviteLink = inv.inviteToken
+        ? `${baseUrl}/spv/join/${inv.inviteToken}`
+        : `${baseUrl}/spv/${spvId}`;
+      try {
+        await sendSPVInvite({
+          to: inv.email,
+          spvName,
+          inviteLink,
+          founderName,
+          companyName,
+          message: sanitizedMessage || undefined,
+        });
+      } catch (emailErr) {
+        console.warn(`[SPVInvestor] Failed to send invite email to ${inv.email}:`, emailErr.message);
+      }
     }
 
     res.status(201).json({ created, skipped });
@@ -209,16 +232,79 @@ exports.getInviteLink = async (req, res) => {
       return res.status(400).json({ message: 'SPV ID is required' });
     }
 
-    const { error } = await verifySPVOwnership(req, res, spvId);
+    const { error, spv } = await verifySPVOwnership(req, res, spvId);
     if (error) return;
 
     const token = SPVInvestor.generateInviteToken();
+    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    await SPVInvestor.create({
+      spvId,
+      email: `invite-link-${token.slice(0, 8)}@placeholder.opencapstack.com`,
+      name: 'Invite Link Placeholder',
+      status: 'invited',
+      inviteToken: token,
+      inviteTokenExpiry: expiry,
+    });
+
     const baseUrl = process.env.FRONTEND_URL || 'https://opencapstack.com';
     const url = `${baseUrl}/spv/join/${token}`;
 
-    res.status(200).json({ url, token, spvId });
+    res.status(200).json({ url, token, spvId, expiresAt: expiry });
   } catch (error) {
     res.status(500).json({ message: 'Failed to generate invite link', error: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/spv/join/:token
+ * Validate and redeem an SPV invite token. Does not require authentication.
+ * Returns SPV details if the token is valid and not expired.
+ */
+exports.joinViaToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!token || token.trim() === '') {
+      return res.status(400).json({ message: 'Invite token is required' });
+    }
+
+    const investor = await SPVInvestor.findByInviteToken(token);
+    if (!investor) {
+      return res.status(404).json({ message: 'Invalid or expired invite token' });
+    }
+
+    if (investor.inviteTokenExpiry && new Date(investor.inviteTokenExpiry) < new Date()) {
+      return res.status(410).json({ message: 'Invite token has expired' });
+    }
+
+    const spv = await SPV.findBySPVID(investor.spvId) ||
+      await SPV.findById(investor.spvId).catch(() => null);
+
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV no longer exists' });
+    }
+
+    res.status(200).json({
+      valid: true,
+      spv: {
+        spvId: spv.SPVID || spv.spvId,
+        name: spv.Name || spv.name,
+        purpose: spv.Purpose || spv.purpose,
+        status: spv.Status || spv.status,
+        targetSize: spv.targetSize || spv.allocation,
+        minimumCommitment: spv.lpMinimumInvestment,
+        valuationCap: spv.valuationCap,
+        memo: spv.memo,
+      },
+      investor: {
+        email: investor.email,
+        status: investor.status,
+        invitedAt: investor.invitedAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to validate invite token', error: error.message });
   }
 };
 
@@ -313,5 +399,80 @@ exports.deleteInvestor = async (req, res) => {
     res.status(200).json({ message: 'Investor removed successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete investor', error: error.message });
+  }
+};
+
+/**
+ * POST /api/v1/spv/:id/commit
+ * Investor self-service: submit a commitment to an SPV.
+ * Finds the authenticated user's LP record and updates it.
+ */
+exports.commitToSPV = async (req, res) => {
+  try {
+    const { id: spvId } = req.params;
+    const { amount, acceptTerms } = req.body;
+
+    if (!spvId || spvId.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+
+    if (acceptTerms !== true) {
+      return res.status(400).json({ message: 'You must accept the LP terms to commit' });
+    }
+
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ message: 'A positive commitment amount is required' });
+    }
+
+    const spv = await SPV.findBySPVID(spvId) || await SPV.findById(spvId).catch(() => null);
+    if (!spv) {
+      return res.status(404).json({ message: 'SPV not found' });
+    }
+
+    const minInvestment = spv.lpMinimumInvestment;
+    if (minInvestment && amount < minInvestment) {
+      return res.status(400).json({
+        message: `Commitment must be at least $${minInvestment.toLocaleString()}`,
+        minimumCommitment: minInvestment,
+      });
+    }
+
+    const userId = req.user?.userId || req.user?.id || req.user?._id;
+    const email = req.user?.email;
+
+    let lpRecord = null;
+    if (userId) lpRecord = await SPVInvestor.findOne({ spvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId, email });
+    const effectiveSpvId = spv.SPVID || spvId;
+    if (!lpRecord && userId) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, userId });
+    if (!lpRecord && email) lpRecord = await SPVInvestor.findOne({ spvId: effectiveSpvId, email });
+
+    if (!lpRecord) {
+      return res.status(403).json({ message: 'You are not an LP in this SPV' });
+    }
+
+    if (lpRecord.status === 'wired') {
+      return res.status(400).json({ message: 'You have already wired funds for this SPV' });
+    }
+
+    if (lpRecord.status === 'declined') {
+      return res.status(400).json({ message: 'You have declined this SPV. Contact the fund manager to be re-invited.' });
+    }
+
+    const updated = await SPVInvestor.findOneAndUpdate(
+      { _id: lpRecord._id || lpRecord.row_id },
+      {
+        $set: {
+          status: 'committed',
+          committedAmount: amount,
+          committedAt: new Date().toISOString(),
+        },
+      },
+      { new: true }
+    );
+
+    res.status(200).json({ investor: sanitizeInvestor(updated) });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to submit commitment', error: error.message });
   }
 };

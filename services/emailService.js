@@ -355,6 +355,29 @@ async function sendOnboardingReminder({ to, firstName, daysAgo }) {
   await send(to, `${name}, finish setting up your OpenCap Stack account`, html);
 }
 
+// ─── 13. SPV LP invite ──────────────────────────────────────────────────────
+
+async function sendSPVInvite({ to, spvName, inviteLink, founderName, companyName, message }) {
+  const spv = spvName || 'an SPV';
+  const company = companyName || 'a company';
+  const founder = founderName || 'The team';
+
+  const messageBlock = message
+    ? `<div class="highlight"><div>${message}</div></div>`
+    : '';
+
+  const html = layout(`
+    <p>Hi there,</p>
+    <p>${founder} at <strong>${company}</strong> has invited you to invest in <strong>${spv}</strong> on OpenCap Stack.</p>
+    ${messageBlock}
+    <p>Click below to view the SPV details, terms, and submit your commitment:</p>
+    <a class="btn" href="${inviteLink}">View SPV &amp; Invest →</a>
+    <p style="font-size:12px;color:#6b7280;margin-top:16px;">If you weren't expecting this invite, you can safely ignore this email.</p>
+  `, `You've been invited to invest in ${spv}`);
+
+  await send(to, `You've been invited to invest in ${spv} — ${company}`, html);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -370,4 +393,5 @@ module.exports = {
   send83bDeadlineReminder,
   sendOnboardingComplete,
   sendOnboardingReminder,
+  sendSPVInvite,
 };
