@@ -10,6 +10,18 @@ const Stakeholder = require('../../../models/Stakeholder');
 // Mock Stakeholder model
 jest.mock('../../../models/Stakeholder');
 
+// Mock databaseAdapter (used by enrichWithLiveVesting)
+jest.mock('../../../services/databaseAdapter', () => ({
+  find: jest.fn().mockResolvedValue([]),
+}));
+const databaseAdapter = require('../../../services/databaseAdapter');
+
+// Mock equityGrantService (used by enrichWithLiveVesting)
+jest.mock('../../../services/equityGrantService', () => ({
+  calculateVestedShares: jest.fn(),
+}));
+const equityGrantService = require('../../../services/equityGrantService');
+
 // Mock pagination middleware
 jest.mock('../../../middleware/pagination', () => ({
   parsePagination: jest.fn((query) => ({
@@ -606,6 +618,202 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(Stakeholder.findById).toHaveBeenCalledWith('zerodb-id-123');
       expect(Stakeholder.findByIdAndDelete).toHaveBeenCalledWith('zerodb-id-123');
+    });
+  });
+
+  describe('Vesting-aware share display', () => {
+    it('should show vested shares in sharesHeld, not total granted', async () => {
+      const advisorStakeholder = {
+        row_id: 'stk-advisor-001',
+        name: 'Test Advisor',
+        role: 'advisor',
+        totalGrantedShares: 25000,
+        ownershipPercentage: 0.25,
+      };
+
+      Stakeholder.find.mockResolvedValue([advisorStakeholder]);
+
+      // Mock finding a linked grant with 20-month vesting on a 4-year schedule
+      databaseAdapter.find.mockResolvedValue([{
+        employeeId: 'stk-advisor-001',
+        numberOfShares: 25000,
+        status: 'active',
+        grantDate: '2026-01-01',
+        vestingSchedule: {
+          vestingPeriodMonths: 48,
+          cliffMonths: 12,
+          vestingFrequency: 'monthly',
+          vestingStartDate: '2026-01-01',
+        },
+      }]);
+
+      // Mock the vesting calculation to return 20 months vested
+      equityGrantService.calculateVestedShares.mockReturnValue({
+        vestedShares: 10416,
+        vestedPercentage: 41.67,
+        unvestedShares: 14584,
+      });
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      const result = mockRes.json.mock.calls[0][0];
+      const advisor = result.find(s => s.name === 'Test Advisor');
+
+      expect(advisor).toBeDefined();
+      expect(advisor.sharesHeld).toBe(10416);
+      expect(advisor.sharesOwned).toBe(10416);
+      expect(advisor.shares).toBe(10416);
+      expect(advisor.issuedShares).toBe(25000);
+    });
+
+    it('should compute vestedOwnershipPercentage proportionally', async () => {
+      const advisorStakeholder = {
+        row_id: 'stk-advisor-002',
+        name: 'Ownership Advisor',
+        role: 'advisor',
+        totalGrantedShares: 25000,
+        ownershipPercentage: 0.25,
+      };
+
+      Stakeholder.find.mockResolvedValue([advisorStakeholder]);
+
+      databaseAdapter.find.mockResolvedValue([{
+        employeeId: 'stk-advisor-002',
+        numberOfShares: 25000,
+        status: 'active',
+        vestingSchedule: {
+          vestingPeriodMonths: 48,
+          cliffMonths: 12,
+          vestingFrequency: 'monthly',
+          vestingStartDate: '2025-01-01',
+        },
+      }]);
+
+      // 50% vested
+      equityGrantService.calculateVestedShares.mockReturnValue({
+        vestedShares: 12500,
+        vestedPercentage: 50,
+        unvestedShares: 12500,
+      });
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const result = mockRes.json.mock.calls[0][0];
+      const advisor = result.find(s => s.name === 'Ownership Advisor');
+
+      // Full ownership is 0.25%, 50% vested = 0.125% vested ownership
+      expect(advisor.vestedOwnershipPercentage).toBe(0.125);
+      expect(advisor.sharesHeld).toBe(12500);
+    });
+
+    it('should show zero shares before cliff period', async () => {
+      const advisorStakeholder = {
+        row_id: 'stk-new-001',
+        name: 'New Advisor',
+        role: 'advisor',
+        totalGrantedShares: 25000,
+        ownershipPercentage: 0.25,
+      };
+
+      Stakeholder.find.mockResolvedValue([advisorStakeholder]);
+
+      databaseAdapter.find.mockResolvedValue([{
+        employeeId: 'stk-new-001',
+        numberOfShares: 25000,
+        status: 'active',
+        vestingSchedule: {
+          vestingPeriodMonths: 48,
+          cliffMonths: 12,
+          vestingFrequency: 'monthly',
+          vestingStartDate: '2026-08-01',
+        },
+      }]);
+
+      // Before cliff — 0 vested
+      equityGrantService.calculateVestedShares.mockReturnValue({
+        vestedShares: 0,
+        vestedPercentage: 0,
+        unvestedShares: 25000,
+      });
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const result = mockRes.json.mock.calls[0][0];
+      const advisor = result.find(s => s.name === 'New Advisor');
+
+      expect(advisor.sharesHeld).toBe(0);
+      expect(advisor.vestedOwnershipPercentage).toBe(0);
+      expect(advisor.issuedShares).toBe(25000);
+    });
+
+    it('should fallback gracefully when grant lookup fails', async () => {
+      const advisorStakeholder = {
+        row_id: 'stk-error-001',
+        name: 'Error Advisor',
+        role: 'advisor',
+        totalGrantedShares: 25000,
+        totalVestedShares: 5000,
+        ownershipPercentage: 0.25,
+      };
+
+      Stakeholder.find.mockResolvedValue([advisorStakeholder]);
+
+      // Simulate database error
+      databaseAdapter.find.mockRejectedValue(new Error('Connection timeout'));
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      const result = mockRes.json.mock.calls[0][0];
+      const advisor = result.find(s => s.name === 'Error Advisor');
+
+      // Should fallback to stored totalVestedShares
+      expect(advisor.sharesHeld).toBe(5000);
+    });
+
+    it('should enrich single stakeholder with live vesting on getById', async () => {
+      mockReq.params.id = 'stk-detail-001';
+
+      const mockStakeholder = {
+        row_id: 'stk-detail-001',
+        name: 'Detail Advisor',
+        role: 'advisor',
+        companyId: 'company_123',
+        totalGrantedShares: 10000,
+        ownershipPercentage: 0.1,
+      };
+
+      Stakeholder.findById.mockResolvedValue(mockStakeholder);
+
+      databaseAdapter.find.mockResolvedValue([{
+        employeeId: 'stk-detail-001',
+        numberOfShares: 10000,
+        status: 'active',
+        vestingSchedule: {
+          vestingPeriodMonths: 24,
+          cliffMonths: 0,
+          vestingFrequency: 'monthly',
+          vestingStartDate: '2026-01-01',
+        },
+      }]);
+
+      // 8 months vested on a 24-month schedule = ~3333 shares
+      equityGrantService.calculateVestedShares.mockReturnValue({
+        vestedShares: 3333,
+        vestedPercentage: 33.33,
+        unvestedShares: 6667,
+      });
+
+      await stakeholderController.getStakeholderById(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      const result = mockRes.json.mock.calls[0][0];
+      const stakeholder = result.stakeholder;
+
+      expect(stakeholder.sharesHeld).toBe(3333);
+      expect(stakeholder.issuedShares).toBe(10000);
+      expect(stakeholder.vestedOwnershipPercentage).toBeCloseTo(0.0333, 3);
     });
   });
 });

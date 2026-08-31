@@ -10,6 +10,8 @@ const Stakeholder = require('../models/Stakeholder');
 const { parsePagination } = require('../middleware/pagination');
 const { resolveTargetCompanyId, assertCompanyOwnership } = require('../middleware/companyScope');
 const logger = require('../utils/logger');
+const databaseAdapter = require('../services/databaseAdapter');
+const equityGrantService = require('../services/equityGrantService');
 
 /**
  * Capitalize the first letter of a string
@@ -36,14 +38,59 @@ function normalizeForDisplay(stakeholder) {
   if (obj.type) obj.type = capitalize(obj.type);
   if (obj.role) obj.role = toTitleCase(obj.role);
   if (obj.status) obj.status = capitalize(obj.status);
-  // Cap-table page compatibility: expose share count under legacy field names used by
-  // the frontend (sharesHeld, shares, sharesOwned) alongside the canonical names.
-  const issuedShares = obj.totalGrantedShares || 0;
-  obj.sharesHeld = issuedShares;
-  obj.sharesOwned = issuedShares;
-  obj.shares = issuedShares;
-  obj.issuedShares = issuedShares;
+
+  const totalGranted = obj.totalGrantedShares || 0;
+  const vestedShares = obj.totalVestedShares || 0;
+
+  // Legacy field names used by the frontend — show VESTED shares, not total granted.
+  // Advisors/employees should only see what has actually vested to date.
+  obj.sharesHeld = vestedShares;
+  obj.sharesOwned = vestedShares;
+  obj.shares = vestedShares;
+  obj.issuedShares = totalGranted;
+
+  // Compute vested ownership percentage from the full ownership percentage
+  if (obj.ownershipPercentage && totalGranted > 0) {
+    obj.vestedOwnershipPercentage = parseFloat(
+      ((vestedShares / totalGranted) * obj.ownershipPercentage).toFixed(4)
+    );
+  } else {
+    obj.vestedOwnershipPercentage = obj.ownershipPercentage || 0;
+  }
+
   return obj;
+}
+
+/**
+ * Compute live vesting totals for a stakeholder from their linked equity grants.
+ * Updates totalVestedShares on the stakeholder object in-place.
+ */
+async function enrichWithLiveVesting(stakeholder) {
+  const stkId = stakeholder.row_id || stakeholder._id || stakeholder.stakeholderId;
+  if (!stkId) return stakeholder;
+
+  try {
+    const grants = await databaseAdapter.find('EquityGrant', { employeeId: stkId });
+    if (grants.length === 0) return stakeholder;
+
+    let totalVested = 0;
+    let totalGranted = 0;
+    for (const grant of grants) {
+      if (grant.status !== 'active' && grant.status !== 'exercised') continue;
+      const vesting = equityGrantService.calculateVestedShares(grant, new Date());
+      totalVested += vesting.vestedShares || 0;
+      totalGranted += grant.numberOfShares || 0;
+    }
+
+    stakeholder.totalVestedShares = totalVested;
+    if (totalGranted > 0) {
+      stakeholder.totalGrantedShares = totalGranted;
+    }
+  } catch {
+    // If grant lookup fails, fall back to stored values
+  }
+
+  return stakeholder;
 }
 
 /**
@@ -167,6 +214,9 @@ exports.getAllStakeholders = async (req, res) => {
       });
     }
 
+    // Enrich with live vesting calculations from linked equity grants
+    await Promise.all(stakeholders.map(sh => enrichWithLiveVesting(sh)));
+
     res.status(200).json(stakeholders.map(normalizeForDisplay));
   } catch (error) {
     logger.error('Error fetching stakeholders', { error: error.message });
@@ -192,6 +242,7 @@ exports.getStakeholderById = async (req, res) => {
 
     if (!assertCompanyOwnership(req, res, stakeholder)) return;
 
+    await enrichWithLiveVesting(stakeholder);
     res.status(200).json({ stakeholder: normalizeForDisplay(stakeholder) });
   } catch (error) {
     logger.error('Error fetching stakeholder', { error: error.message });
