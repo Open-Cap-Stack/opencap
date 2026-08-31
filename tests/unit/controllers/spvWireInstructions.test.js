@@ -7,6 +7,7 @@ jest.mock('../../../models/SPV', () => ({
   findOne: jest.fn(),
   findById: jest.fn(),
   findBySPVID: jest.fn(),
+  findOneAndUpdate: jest.fn(),
   find: jest.fn(),
   VALID_STATUSES: ['draft', 'in_review', 'raising', 'closing', 'wired', 'canceled'],
   VALID_COMPLIANCE_STATUSES: ['Compliant', 'NonCompliant', 'PendingReview'],
@@ -140,6 +141,192 @@ describe('GET /spv/:id/wire-instructions — getWireInstructions', () => {
     await controller.getWireInstructions(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
+
+  it('returns wire instructions for admin without LP membership check', async () => {
+    SPV.findBySPVID.mockResolvedValue(MOCK_SPV);
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      user: { userId: 'admin_1', role: 'admin', companyId: 'comp_1' },
+    });
+    await controller.getWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.wireInstructions.bankName).toBe('First National Bank');
+    expect(body.wireInstructions.referencePrefix).toBe('ALPHA');
+    // Admin response should NOT include commitment or wireReference
+    expect(body.commitment).toBeUndefined();
+    // SPVInvestor.findOne should NOT have been called for admin
+    expect(SPVInvestor.findOne).not.toHaveBeenCalled();
+  });
+
+  it('returns wire instructions for super_admin role', async () => {
+    SPV.findBySPVID.mockResolvedValue(MOCK_SPV);
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      user: { userId: 'sa_1', role: 'super_admin' },
+    });
+    await controller.getWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(SPVInvestor.findOne).not.toHaveBeenCalled();
+  });
+
+  it('returns wire instructions for founder role', async () => {
+    SPV.findBySPVID.mockResolvedValue(MOCK_SPV);
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      user: { userId: 'founder_1', role: 'founder', companyId: 'comp_1' },
+    });
+    await controller.getWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(SPVInvestor.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /spv/:id/wire-instructions — setWireInstructions', () => {
+  it('sets wire instructions successfully', async () => {
+    SPV.findBySPVID.mockResolvedValue(MOCK_SPV);
+    SPV.findOneAndUpdate.mockResolvedValue({
+      ...MOCK_SPV,
+      wireInstructions: {
+        bankName: 'Silicon Valley Bank',
+        routingNumber: '121140399',
+        accountNumber: '9876543210',
+        swiftCode: 'SVBKUS6S',
+        referencePrefix: 'OCS-001',
+        specialInstructions: 'Include LP ID',
+      },
+    });
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      body: {
+        bankName: 'Silicon Valley Bank',
+        routingNumber: '121140399',
+        accountNumber: '9876543210',
+        swiftCode: 'SVBKUS6S',
+        referencePrefix: 'OCS-001',
+        specialInstructions: 'Include LP ID',
+      },
+      user: { userId: 'admin_1', role: 'admin', companyId: 'comp_1' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.wireInstructions.bankName).toBe('Silicon Valley Bank');
+    expect(body.wireInstructions.accountNumber).toBe('9876543210');
+    expect(SPV.findOneAndUpdate).toHaveBeenCalledWith(
+      { SPVID: 'spv_001' },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          wireInstructions: expect.objectContaining({
+            bankName: 'Silicon Valley Bank',
+            accountNumber: '9876543210',
+          }),
+        }),
+      }),
+      { new: true }
+    );
+  });
+
+  it('returns 400 when bankName is missing', async () => {
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      body: { accountNumber: '9876543210' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].message).toBe('bankName is required');
+  });
+
+  it('returns 400 when accountNumber is missing', async () => {
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      body: { bankName: 'Test Bank' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].message).toBe('accountNumber is required');
+  });
+
+  it('returns 404 when SPV does not exist', async () => {
+    SPV.findBySPVID.mockResolvedValue(null);
+    SPV.findById.mockRejectedValue(new Error('Not found'));
+
+    const { req, res } = mockReqRes({
+      params: { id: 'nonexistent' },
+      body: { bankName: 'Test Bank', accountNumber: '111222333' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json.mock.calls[0][0].message).toBe('SPV not found');
+  });
+
+  it('sets wire instructions with only required fields', async () => {
+    SPV.findBySPVID.mockResolvedValue(MOCK_SPV);
+    SPV.findOneAndUpdate.mockResolvedValue({
+      ...MOCK_SPV,
+      wireInstructions: {
+        bankName: 'Simple Bank',
+        routingNumber: null,
+        accountNumber: '111222333',
+        swiftCode: null,
+        referencePrefix: 'spv_001',
+        specialInstructions: null,
+      },
+    });
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      body: { bankName: 'Simple Bank', accountNumber: '111222333' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.wireInstructions.bankName).toBe('Simple Bank');
+    expect(body.wireInstructions.routingNumber).toBeNull();
+    expect(body.wireInstructions.swiftCode).toBeNull();
+  });
+
+  it('returns 400 when SPV ID is empty', async () => {
+    const { req, res } = mockReqRes({
+      params: { id: '' },
+      body: { bankName: 'Test Bank', accountNumber: '111222333' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].message).toBe('SPV ID is required');
+  });
+
+  it('returns 500 on server error', async () => {
+    SPV.findBySPVID.mockRejectedValue(new Error('DB unavailable'));
+
+    const { req, res } = mockReqRes({
+      params: { id: 'spv_001' },
+      body: { bankName: 'Test Bank', accountNumber: '111222333' },
+      user: { userId: 'admin_1', role: 'admin' },
+    });
+    await controller.setWireInstructions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json.mock.calls[0][0].message).toBe('Failed to set wire instructions');
+  });
 });
 
 describe('POST /spv/:id/confirm-wire — confirmWireReceipt', () => {
@@ -244,6 +431,15 @@ describe('Route configuration for #749', () => {
     );
     expect(src).toContain("/:id/wire-instructions");
     expect(src).toContain("'investor'");
+  });
+
+  it('POST /:id/wire-instructions route exists (admin only, no investor)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../../../routes/v1/spvRoutes.js'), 'utf8'
+    );
+    expect(src).toContain("post('/:id/wire-instructions'");
+    const postLine = src.split('\n').find(l => l.includes("post('/:id/wire-instructions'"));
+    expect(postLine).not.toContain("'investor'");
   });
 
   it('POST /:id/confirm-wire route exists (admin only)', () => {
