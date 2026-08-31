@@ -37,6 +37,7 @@ const spvInvestorSchema = {
   accreditation: { type: 'string' },
   notes: { type: 'string' },
   inviteToken: { type: 'string', unique: true },
+  inviteTokenExpiry: { type: 'date' },
   createdAt: { type: 'date' },
   updatedAt: { type: 'date' }
 };
