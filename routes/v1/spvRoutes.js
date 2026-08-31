@@ -13,7 +13,31 @@ const { hasRole } = require('../../middleware/rbacMiddleware');
 const SPVController = require('../../controllers/SPV');
 const SPVNestedController = require('../../controllers/SPVNested');
 const SPVInvestorController = require('../../controllers/SPVInvestor');
+const SPVDocumentController = require('../../controllers/SPVDocument');
+const SPVTimelineController = require('../../controllers/SPVTimeline');
 const { requireAccreditation, requireSPVRoleEligibility } = require('../../middleware/kycVerification');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// Configure multer for SPV document uploads
+const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME;
+const spvUploadDir = isRailway ? '/tmp/uploads/spv-docs' : path.join(__dirname, '../../uploads/spv-docs');
+const spvDocStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    if (!fs.existsSync(spvUploadDir)) {
+      fs.mkdirSync(spvUploadDir, { recursive: true });
+    }
+    cb(null, spvUploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const spvDocUpload = multer({ storage: spvDocStorage, limits: { fileSize: 50 * 1024 * 1024 } });
+const { requireLPMembership } = require('../../middleware/spvAccessMiddleware');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -30,7 +54,7 @@ router.post('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service
  * @desc Get all SPVs
  * @access Private
  */
-router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVController.getSPVs);
+router.get('/', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVController.getSPVs);
 
 /**
  * Special handler for trailing slash requests to return 404
@@ -76,9 +100,16 @@ router.get('/parent/:id', hasRole(['super_admin', 'admin', 'founder', 'manager',
 /**
  * @route GET /api/v1/spv/:id/investors
  * @desc List all LP investors for an SPV (supports ?status= filter)
- * @access Private
+ * @access Private (investors see only SPVs they are an LP in)
  */
-router.get('/:id/investors', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVInvestorController.listInvestors);
+router.get('/:id/investors', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVInvestorController.listInvestors);
+
+/**
+ * @route PATCH /api/v1/spv/:id/investors/me
+ * @desc Investor self-service: update own LP record (status, committedAmount)
+ * @access Private (investor only — LP membership required)
+ */
+router.patch('/:id/investors/me', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVInvestorController.updateMyInvestorRecord);
 
 /**
  * @route POST /api/v1/spv/:id/invite
@@ -116,23 +147,23 @@ router.delete('/:id/investors/:investorId', hasRole(['super_admin', 'admin', 'fo
 /**
  * @route GET /api/spvs/:id/investments
  * @desc Get all investments for an SPV
- * @access Private
+ * @access Private (investors see only SPVs they are an LP in)
  */
-router.get('/:id/investments', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVInvestments);
+router.get('/:id/investments', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVNestedController.getSPVInvestments);
 
 /**
  * @route GET /api/spvs/:id/performance
  * @desc Get performance metrics for an SPV (NAV, ROI, IRR)
- * @access Private
+ * @access Private (investors see only SPVs they are an LP in)
  */
-router.get('/:id/performance', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVPerformance);
+router.get('/:id/performance', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVNestedController.getSPVPerformance);
 
 /**
  * @route GET /api/spvs/:id/reports/:type
  * @desc Generate report for an SPV (summary, detailed, tax)
- * @access Private
+ * @access Private (investors see only SPVs they are an LP in)
  */
-router.get('/:id/reports/:type', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.getSPVReport);
+router.get('/:id/reports/:type', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVNestedController.getSPVReport);
 
 /**
  * @route PUT /api/spvs/:id/status
@@ -166,11 +197,56 @@ router.post('/:id/close', hasRole(['super_admin', 'admin', 'founder', 'manager',
 router.post('/:id/liquidate', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVNestedController.liquidateSPV);
 
 /**
- * @route GET /api/spvs/:id
- * @desc Get SPV by ID (either MongoDB ID or custom SPVID)
+ * SPV Document Endpoints (Issue #269)
+ * These routes must be defined BEFORE the generic /:id route
+ */
+
+/**
+ * @route GET /api/v1/spv/:id/documents
+ * @desc List all documents for an SPV
  * @access Private
  */
-router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), (req, res, next) => {
+router.get('/:id/documents', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVDocumentController.listDocuments);
+
+/**
+ * @route POST /api/v1/spv/:id/documents
+ * @desc Upload a document for an SPV (multipart FormData with fields: name, category, file)
+ * @access Private
+ */
+router.post('/:id/documents', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), spvDocUpload.single('file'), SPVDocumentController.uploadDocument);
+
+/**
+ * @route DELETE /api/v1/spv/:id/documents/:docId
+ * @desc Remove a document from an SPV
+ * @access Private
+ */
+router.delete('/:id/documents/:docId', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVDocumentController.deleteDocument);
+
+/**
+ * @route POST /api/v1/spv/:id/documents/:docId/remind
+ * @desc Send a signature reminder for a document
+ * @access Private
+ */
+router.post('/:id/documents/:docId/remind', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider']), SPVDocumentController.sendReminder);
+
+/**
+ * SPV Timeline Endpoints (Issue #269)
+ * These routes must be defined BEFORE the generic /:id route
+ */
+
+/**
+ * @route GET /api/v1/spv/:id/timeline
+ * @desc List timeline events for an SPV (supports ?limit=N)
+ * @access Private
+ */
+router.get('/:id/timeline', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, SPVTimelineController.listEvents);
+
+/**
+ * @route GET /api/spvs/:id
+ * @desc Get SPV by ID (either MongoDB ID or custom SPVID)
+ * @access Private (investors see only SPVs they are an LP in)
+ */
+router.get('/:id', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireLPMembership, (req, res, next) => {
   // Check for empty ID parameter and handle it directly
   if (!req.params.id || req.params.id.trim() === '') {
     return res.status(404).json({ message: 'SPV ID is required' });

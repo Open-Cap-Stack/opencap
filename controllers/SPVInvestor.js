@@ -315,3 +315,107 @@ exports.deleteInvestor = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete investor', error: error.message });
   }
 };
+
+/**
+ * Investor self-service fields — a strict subset of UPDATABLE_FIELDS.
+ * Investors can update their commitment status and amount, but not admin
+ * fields like tags, accreditation, or name.
+ */
+const SELF_SERVICE_FIELDS = ['status', 'committedAmount'];
+
+/**
+ * Valid self-service status transitions.
+ * Investors can mark themselves as committed or declined, but not wired
+ * (wired requires admin confirmation of funds received).
+ */
+const SELF_SERVICE_STATUSES = ['committed', 'declined'];
+
+/**
+ * PATCH /api/v1/spv/:id/investors/me
+ * Investor self-service: update the authenticated investor's own LP record.
+ *
+ * Uses req.lpRecord (set by requireLPMembership middleware) or falls back
+ * to looking up by userId/email. Only allows updating status and committedAmount.
+ */
+exports.updateMyInvestorRecord = async (req, res) => {
+  try {
+    const { id: spvId } = req.params;
+
+    if (!spvId || spvId.trim() === '') {
+      return res.status(400).json({ message: 'SPV ID is required' });
+    }
+
+    // Use the LP record attached by requireLPMembership middleware
+    let lpRecord = req.lpRecord;
+
+    if (!lpRecord) {
+      // Fallback: look up the investor's own record
+      const userId = req.user?.userId || req.user?.id || req.user?._id;
+      const email = req.user?.email;
+
+      if (userId) {
+        lpRecord = await SPVInvestor.findOne({ spvId, userId });
+      }
+      if (!lpRecord && email) {
+        lpRecord = await SPVInvestor.findOne({ spvId, email });
+      }
+    }
+
+    if (!lpRecord) {
+      return res.status(404).json({ message: 'Your LP record was not found for this SPV' });
+    }
+
+    // Build the update payload from self-service fields only
+    const updateData = {};
+    for (const field of SELF_SERVICE_FIELDS) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        message: `No valid fields provided. Allowed fields: ${SELF_SERVICE_FIELDS.join(', ')}`
+      });
+    }
+
+    // Validate status if being updated
+    if (updateData.status) {
+      if (!SELF_SERVICE_STATUSES.includes(updateData.status)) {
+        return res.status(400).json({
+          message: `Invalid status for self-service. Allowed values: ${SELF_SERVICE_STATUSES.join(', ')}`
+        });
+      }
+    }
+
+    // Validate committedAmount if provided
+    if (updateData.committedAmount !== undefined) {
+      const amount = parseFloat(updateData.committedAmount);
+      if (isNaN(amount) || amount < 0) {
+        return res.status(400).json({ message: 'committedAmount must be a non-negative number' });
+      }
+      updateData.committedAmount = amount;
+    }
+
+    // Set timestamp fields based on status transitions
+    if (updateData.status === 'committed') {
+      updateData.committedAt = new Date().toISOString();
+    }
+
+    const investorId = lpRecord._id || lpRecord.id || lpRecord.row_id;
+
+    const updated = await SPVInvestor.findOneAndUpdate(
+      { _id: investorId, spvId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Failed to update LP record' });
+    }
+
+    res.status(200).json(sanitizeInvestor(updated));
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update your LP record', error: error.message });
+  }
+};

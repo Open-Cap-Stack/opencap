@@ -4,6 +4,7 @@
  * Updated: ZeroDB Migration - Uses ZeroDB model methods
  */
 const SPV = require('../models/SPV');
+const SPVInvestor = require('../models/SPVInvestor');
 
 /**
  * Helper function to check if ID looks like a UUID or ZeroDB row_id
@@ -180,18 +181,49 @@ exports.createSPV = async (req, res) => {
  */
 exports.getSPVs = async (req, res) => {
   try {
-    // Scope to the authenticated user's company; fall back to explicit query param.
-    // If no companyId is resolvable, return empty — never leak cross-company data.
+    if (req.user?.role === 'investor') {
+      const userId = req.user?.userId || req.user?.id || req.user?._id;
+      const email = req.user?.email;
+
+      let lpRecords = [];
+      if (userId) lpRecords = await SPVInvestor.find({ userId });
+      if ((!lpRecords || lpRecords.length === 0) && email) {
+        lpRecords = await SPVInvestor.find({ email });
+      }
+
+      if (!lpRecords || lpRecords.length === 0) {
+        return res.status(200).json({ message: 'No SPVs found', spvs: [] });
+      }
+
+      const lpSpvIds = [...new Set(lpRecords.map(r => r.spvId))];
+      const spvPromises = lpSpvIds.map(async (spvId) => {
+        let spv = await SPV.findOne({ SPVID: spvId });
+        if (!spv) spv = await SPV.findById(spvId).catch(() => null);
+        return spv;
+      });
+      const spvs = (await Promise.all(spvPromises)).filter(Boolean);
+
+      if (spvs.length === 0) {
+        return res.status(200).json({ message: 'No SPVs found', spvs: [] });
+      }
+
+      const normalized = spvs.map(s => ({
+        ...s,
+        name: s.name || s.Name,
+        status: s.status || s.Status,
+        spvId: s.spvId || s.SPVID,
+      }));
+      return res.status(200).json({ spvs: normalized });
+    }
+
     const parentCompanyId = req.user?.companyId || req.query.companyId;
     if (!parentCompanyId) return res.status(200).json({ message: 'No SPVs found', spvs: [] });
 
-    // Fetch SPVs matching either ParentCompanyID or companyId
     const [byParent, byCompany] = await Promise.all([
       SPV.find({ ParentCompanyID: parentCompanyId }),
       SPV.find({ companyId: parentCompanyId })
     ]);
 
-    // Merge and deduplicate by SPVID
     const seen = new Set();
     const spvs = [...byParent, ...byCompany].filter(s => {
       const id = s.SPVID || s._id;
@@ -204,7 +236,6 @@ exports.getSPVs = async (req, res) => {
       return res.status(200).json({ message: 'No SPVs found', spvs: [] });
     }
 
-    // Normalize capitalized field names to camelCase for consistent API output
     const normalized = spvs.map(s => ({
       ...s,
       name: s.name || s.Name,
