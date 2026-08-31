@@ -149,7 +149,7 @@ router.get('/:id/public', hasRole(['super_admin', 'admin', 'founder', 'manager',
  * @desc LP commits a dollar amount to an SPV
  * @access Private (investor + admin roles)
  */
-router.post('/:id/commit', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), SPVInvestorController.commitToSPV);
+router.post('/:id/commit', hasRole(['super_admin', 'admin', 'founder', 'manager', 'service_provider', 'investor']), requireAccreditation('spv'), SPVInvestorController.commitToSPV);
 
 /**
  * @route GET /api/spvs/:id/wire-instructions
