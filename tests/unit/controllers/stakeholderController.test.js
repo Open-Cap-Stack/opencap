@@ -31,11 +31,14 @@ describe('Stakeholder Controller (ZeroDB)', () => {
     jest.clearAllMocks();
 
     // Setup mock request and response
+    // role: founder has company-wide stakeholder read access, unlike role: employee
+    // which is restricted to its own record (see "Row-level scoping" tests below,
+    // and Issue #196).
     mockReq = {
       body: {},
       params: {},
       query: {},
-      user: { userId: 'user_123', companyId: 'company_123', role: 'employee', permissions: [] }
+      user: { userId: 'user_123', companyId: 'company_123', role: 'founder', permissions: [] }
     };
 
     mockRes = {
@@ -203,6 +206,85 @@ describe('Stakeholder Controller (ZeroDB)', () => {
 
       expect(parsePagination).toHaveBeenCalledWith({ limit: '10', skip: '5' });
       expect(Stakeholder.find).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllStakeholders — row-level scoping (Issue #196)', () => {
+    const allStakeholders = [
+      { _id: '1', stakeholderId: 'STK-001', name: 'Founder Person', email: 'founder@example.com', role: 'founder', sharesOwned: 8000000 },
+      { _id: '2', stakeholderId: 'STK-002', name: 'Some Employee', email: 'employee@example.com', role: 'employee', sharesOwned: 5000 },
+      { _id: '3', stakeholderId: 'STK-003', name: 'Other Employee', email: 'other@example.com', role: 'employee', sharesOwned: 1000 }
+    ];
+
+    // The controller issues one Stakeholder.find call per non-investor role and
+    // merges the results — mirror that so each call returns only its role's rows.
+    const mockMultiRoleFind = () => {
+      Stakeholder.find.mockImplementation((filter) =>
+        Promise.resolve(allStakeholders.filter(sh => sh.role === filter.role))
+      );
+    };
+
+    it('restricts role: employee callers to their own stakeholder record only', async () => {
+      mockReq.user = { userId: 'user_456', companyId: 'company_123', role: 'employee', email: 'employee@example.com', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      const returned = mockRes.json.mock.calls[0][0];
+      expect(returned).toHaveLength(1);
+      expect(returned[0]).toEqual(expect.objectContaining({ email: 'employee@example.com', stakeholderId: 'STK-002' }));
+    });
+
+    it('does not leak other stakeholders full equity data to an employee caller', async () => {
+      mockReq.user = { userId: 'user_456', companyId: 'company_123', role: 'employee', email: 'employee@example.com', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const returned = mockRes.json.mock.calls[0][0];
+      expect(returned.find(sh => sh.email === 'founder@example.com')).toBeUndefined();
+      expect(returned.find(sh => sh.email === 'other@example.com')).toBeUndefined();
+    });
+
+    it('returns an empty list for an employee caller with no email on the token', async () => {
+      mockReq.user = { userId: 'user_456', companyId: 'company_123', role: 'employee', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith([]);
+    });
+
+    it('allows role: founder callers to see the full company stakeholder list', async () => {
+      mockReq.user = { userId: 'user_789', companyId: 'company_123', role: 'founder', email: 'founder@example.com', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const returned = mockRes.json.mock.calls[0][0];
+      expect(returned).toHaveLength(3);
+    });
+
+    it('allows role: admin callers to see the full company stakeholder list', async () => {
+      mockReq.user = { userId: 'user_admin', companyId: 'company_123', role: 'admin', email: 'admin@example.com', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const returned = mockRes.json.mock.calls[0][0];
+      expect(returned).toHaveLength(3);
+    });
+
+    it('allows role: manager callers to see the full company stakeholder list', async () => {
+      mockReq.user = { userId: 'user_mgr', companyId: 'company_123', role: 'manager', email: 'mgr@example.com', permissions: [] };
+      mockMultiRoleFind();
+
+      await stakeholderController.getAllStakeholders(mockReq, mockRes);
+
+      const returned = mockRes.json.mock.calls[0][0];
+      expect(returned).toHaveLength(3);
     });
   });
 

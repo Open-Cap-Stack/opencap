@@ -11,6 +11,12 @@ const { parsePagination } = require('../middleware/pagination');
 const { resolveTargetCompanyId, assertCompanyOwnership } = require('../middleware/companyScope');
 const logger = require('../utils/logger');
 
+// Roles permitted on GET /api/v1/stakeholders (see routes/v1/stakeholderRoutes.js)
+// whose permission set is scoped to their OWN data only, per rbacMiddleware's
+// rolePermissions map (role: employee -> read:own_equity, read:own_documents, ...).
+// These roles must not receive the full company stakeholder roster.
+const OWN_RECORD_ONLY_ROLES = new Set(['employee']);
+
 /**
  * Capitalize the first letter of a string
  */
@@ -165,6 +171,16 @@ exports.getAllStakeholders = async (req, res) => {
         const notes = (sh.notes || '').toLowerCase();
         return name.includes(term) || email.includes(term) || notes.includes(term);
       });
+    }
+
+    // Row-level scoping: roles whose permissions are limited to their own data
+    // (e.g. role: employee, which only grants read:own_equity) must not see
+    // the full cap table — restrict to their own stakeholder record(s).
+    if (OWN_RECORD_ONLY_ROLES.has(req.user?.role)) {
+      const callerEmail = (req.user?.email || '').toLowerCase();
+      stakeholders = callerEmail
+        ? stakeholders.filter(sh => (sh.email || '').toLowerCase() === callerEmail)
+        : [];
     }
 
     res.status(200).json(stakeholders.map(normalizeForDisplay));
