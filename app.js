@@ -231,6 +231,10 @@ const safeRequire = (routePath) => {
 const axDiscoveryRoutes = require('./routes/axDiscoveryRoutes');
 app.use('/', axDiscoveryRoutes);
 
+// NLWeb-style conversational search (public, no auth) — GET /ask?q=...
+const nlwebAskRoutes = require('./routes/nlwebAskRoutes');
+app.use('/', nlwebAskRoutes);
+
 // Agent self-onboarding (public, no auth required) — mounted before auth-protected routes
 const agentOnboardingRoutes = require('./routes/v1/agentOnboardingRoutes');
 app.use('/api/v1/agents', agentOnboardingRoutes);
